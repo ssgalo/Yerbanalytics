@@ -1,0 +1,20 @@
+# Normalizar finales de línea en todo el repositorio.
+# Git guarda los archivos de texto con LF internamente y los entrega
+# en el formato nativo de cada sistema operativo al hacer checkout.
+* text=auto
+
+# Documentación y archivos de texto: forzar LF para consistencia
+# sin importar el sistema operativo de cada integrante del equipo.
+*.md   text eol=lf
+*.txt  text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Archivos binarios: nunca modificar finales de línea.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.zip  binary
