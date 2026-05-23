@@ -159,6 +159,22 @@ El MVP de banco es **la unidad atómica** (un nodo, un plantín). La escala NO s
 | **Visión** (salud individual) | Por planta | **Vivero:** una cámara fija o sobre **riel/gantry** cubre miles de plantines. **Campo:** **captura móvil periódica** (celular del productor, rover o drone) |
 | **Actuación** | Por sector | **Electroválvulas sectorizadas** sobre la red de aspersión/fertirriego existente |
 
+### Cómo escala cada componente (sensores · cámara · actuadores)
+
+**🌡️ Sensores (variables ambientales — se comparten por zona, NO por planta)**
+- **Vivero:** el ambiente bajo el sombráculo es uniforme → pocos **nodos sensores por mesada/sector** (temp/hum aire, luz; humedad de sustrato representativa por lote de bandejas) cubren miles de plantines. Energía de red, WiFi. *Escalar = sumar un nodo sensor por cada sector nuevo.*
+- **Campo (años 1-2):** el lote NO es uniforme (lomas, bajos, curvas de nivel = microclimas distintos) → los nodos se ubican **por zona de microclima/topografía** (alineado con la red híbrida del Punto 1), priorizando las zonas más secas/vulnerables. Energía autónoma (solar + batería + deep sleep), conectividad LoRa/offline-first. *Escalar = un nodo por zona de manejo, nunca uno por planta.*
+
+**📷 Cámara (salud individual — se resuelve por barrido, NO por cámara fija por planta)**
+- **Vivero:** cámara sobre **riel/gantry motorizado** que se desplaza sobre las mesadas y escanea fila por fila → una sola cámara cubre miles de plantines, con luz pareja. *Escalar = extender el riel / agregar tramos por sombráculo.*
+- **Campo (años 1-2):** plantas dispersas → no hay riel ni cámara por planta. **Captura móvil periódica:** (1) el productor/peón con el **celular** en sus recorridas (app que sube las fotos); (2) un **rover** que recorre las calles de 3 m (ya diseñadas para que pase el tractor); (3) a futuro, **drone** para cobertura general. Frecuencia: pasadas semanales/quincenales, no continua. *Es la parte más cara y difícil del campo — se reconoce. Escalar = más recorrido, no más hardware fijo.*
+
+**⚙️ Actuadores (acción física — se sectorizan donde hay infraestructura)**
+- **Vivero:** el nodo **comanda electroválvulas sectorizadas** sobre el riego/fertirriego que YA existe; un actuador de sombra por paño de malla; un punto de dosificación por sector de riego. *Un actuador acciona sobre cientos/miles de plantines. Escalar = un actuador por sector existente.*
+- **Campo (años 1-2):** NO hay red de riego fija (secano) → la actuación física **no escala como automatismo**. Se degrada a **capa de alerta/recomendación**: el sistema avisa "zona X necesita agua/sombra" y el productor responde (tractor cisterna por los caminos de 100 m, tablita manual, aplicación localizada). *Escalar = el valor escala como decisión/alerta, no como hardware que actúa solo.*
+
+> **La regla de oro de la escala:** sensores por **zona**, cámara por **barrido**, actuadores por **sector** (y a campo, por **alerta**). Nunca "un nodo completo por planta" — eso sería técnica y económicamente inviable.
+
 **Arquitectura de la red (diseño teórico):**
 
 ```
