@@ -1,3 +1,5 @@
+# PRIMERA APROXIMACIÓN
+
 ## 2.1 Business Model Canvas
 
 > (Nota: El desarrollo conceptual del Canvas se detalla exhaustivamente en la sección 2.2).
@@ -6,19 +8,17 @@
 
 ### 2.2.1 Segmento de mercado
 
-Nuestra empresa opera bajo un modelo B2B (Business-to-Business), desarrollando soluciones de infraestructura tecnológica integral (combinando software y hardware) exclusivamente para el sector agroindustrial yerbatero.
-
 **¿Para quién creamos valor y cuáles son nuestros clientes clave?**
 
-Generamos valor económico y operativo enfocado en tres perfiles principales:
+Generamos valor económico y operativo enfocado en dos perfiles principales:
 
 - **Productores Yerbateros:** Empresarios de Misiones y el norte de Corrientes que operan su propio vivero yerbatero para producir los plantines que luego trasplantan a campo. Necesitan reducir la mortalidad durante la rustificación y optimizar el gasto en insumos, pero carecen de personal para reaccionar a tiempo ante cada problema. Utilizan la plataforma web como tablero de supervisión e historial, mientras el sistema interviene físicamente en su ecosistema de forma autónoma.
 - **Viveros Yerbateros Dedicados:** Empresas cuyo negocio central es la producción masiva de plantines de yerba mate para venderlos a terceros (productores, cooperativas y grandes yerbateras). Para ello, trabajan con operaciones especializadas en la propagación y rustificación intensiva de plantines de Ilex paraguariensis que es la etapa que automatiza nuestro sistema. Su rentabilidad depende por completo de la tasa de supervivencia y de la homogeneidad de cada lote. Es el perfil de mayor concentración de valor: cada mejora impacta sobre cientos de miles de plantines.
-- **Cooperativas:** Organizaciones que nuclean a múltiples productores y operan un vivero central de yerba mate para abastecerlos de plantines. Son cliente directo porque utilizan el ecosistema en su propia producción, con el mismo funcionamiento que un productor individual, pero a escala institucional, garantizando plantines sanos y homogéneos para toda su red. También pueden financiar el despliegue para sus asociados, traccionando la adopción dentro de la cooperativa.
+- **Cooperativas:** Organizaciones que nuclean a múltiples productores y operan un vivero central de yerba mate para abastecerlos de plantines. Son clientes directos porque utilizan el ecosistema en su propia producción, con el mismo funcionamiento que un productor individual, pero a escala institucional, garantizando plantines sanos y homogéneos para toda su red. También pueden financiar el despliegue para sus asociados, traccionando la adopción dentro de la cooperativa.
 
 **Tipología del segmento: Mercado Nicho**
 
-Nuestra empresa se posiciona estratégicamente en un mercado nicho: la producción intensiva de plantines de yerba mate (*Ilex paraguariensis*) en su etapa inicial y jóven. Dedicamos todos nuestros recursos, diseños y desarrollos de inteligencia artificial a resolver los desafíos únicos de este cultivo en su fase más delicada. Nos especializamos en sus particularidades biológicas, brindando un nivel de precisión y capacidad de actuación que las plataformas agrícolas genéricas no pueden igualar.
+Nuestra empresa se posiciona estratégicamente en un mercado nicho: la producción intensiva de plantines de yerba mate (Ilex paraguariensis) en su etapa inicial y joven. Dedicamos todos nuestros recursos, diseños y desarrollos de inteligencia artificial a resolver los desafíos únicos de este cultivo en su fase más delicada. Nos especializamos en sus particularidades biológicas, brindando un nivel de precisión y capacidad de actuación que las plataformas agrícolas genéricas no pueden igualar.
 
 ### 2.2.2 Propuesta de valor
 
@@ -26,45 +26,45 @@ Nuestra empresa transforma la gestión agrícola tradicional en una operación i
 
 **Problemas que resolvemos y necesidades que satisfacemos**
 
-Atacamos la pérdida de cultivos por factores ambientales, el avance de plagas y el derroche de insumos. El productor suele reaccionar cuando el daño en la planta ya es irreversible o generalizado. Cubrimos la necesidad crítica de una infraestructura que no solo diagnostique el problema, sino que tenga la capacidad de actuar físicamente e inmediatamente para mitigarlo, integrando las variables del entorno.
+Atacamos la pérdida de cultivos por factores ambientales, el avance de plagas y el desperdicio de insumos. El productor suele reaccionar cuando el daño en la planta ya es irreversible o generalizado. Cubrimos la necesidad crítica de una infraestructura que no solo diagnostique el problema, sino que tenga la capacidad de actuar físicamente e inmediatamente para mitigarlo, integrando las variables del entorno.
 
 **Qué productos y servicios ofrecemos**
 
 Brindamos una solución tecnológica integral como servicio continuo, articulada en tres pilares:
 
-- **Detección temprana de problemas:** Vigilamos de forma continua y automática el estado de cada plantín y de las condiciones de su entorno, combinando sensores de campo y visión artificial. El sistema identifica a tiempo las principales amenazas del cultivo —estrés por sol, deficiencias nutricionales, plagas y enfermedades fúngicas— mientras todavía son reversibles, evitando que un problema puntual se propague y comprometa el lote completo.
-- **Respuesta automática sobre el cultivo:** El sistema no se limita a detectar, actúa físicamente sobre el cultivo sin intervención humana. Ante cada amenaza, ejecuta por sí solo las acciones que definen la sanidad del plantín de yerba mate: combate las enfermedades fúngicas y las plagas que atacan los brotes tiernos, aplicando el tratamiento dirigido únicamente sobre los sectores afectados; dosifica los nutrientes específicos que la yerba requiere en cada etapa de su desarrollo; y gestiona de forma gradual y autónoma el control lumínico (aclimatación al sol), el proceso crítico que fortalece el tallo para que el plantín sobreviva al trasplante a campo. El riego de precisión acompaña estas intervenciones para sostener las condiciones óptimas del sustrato. Así, el productor deja de depender de recorridas manuales y cada insumo se aplica con foco, sin desperdicio sobre las plantas sanas.
-- **Control y trazabilidad centralizados:** Toda la operación se concentra en una plataforma web a la que el cliente accede desde cualquier dispositivo. Desde allí supervisa el estado de su producción, consulta el historial completo de cada acción ejecutada junto a la condición que la originó, y dispone de respaldo concreto para sus controles de calidad. La plataforma incorpora además información climática para anticipar condiciones de riesgo antes de que ocurran.
+- **Detección temprana de problemas:** Monitoreamos de forma continua y automática el estado de cada plantín de yerba mate y de las condiciones de su entorno, combinando sensores de campo y visión artificial. El sistema identifica a tiempo las principales amenazas del cultivo tales como estrés por sol, deficiencias nutricionales, plagas y enfermedades fúngicas, mientras todavía son reversibles, evitando que un problema puntual se propague y comprometa el cultivo completo.
+- **Respuesta automática sobre el cultivo:** El sistema actúa físicamente sobre el cultivo sin intervención humana. Ante cada amenaza, ejecuta las acciones que definen la sanidad del plantín de yerba mate: el riego de precisión sostiene las condiciones óptimas del sustrato; dosifica los nutrientes específicos que la yerba requiere; combate las enfermedades fúngicas y las plagas que lo atacan, aplicando el tratamiento dirigido únicamente sobre los sectores afectados; y gestiona de forma gradual y autónoma el control lumínico (aclimatación al sol), el proceso crítico que fortalece el tallo para que el plantín sobreviva al trasplante a campo. Además, las decisiones y acciones físicas se procesan localmente, asegurando que la producción siga protegida y evolucionando de forma autónoma incluso frente a cortes prolongados de conectividad.
+- **Control y trazabilidad centralizado:** Toda la operación se concentra en una plataforma web a la que el cliente accede desde cualquier dispositivo. Desde allí supervisa el estado de su producción, consulta el historial completo de cada acción ejecutada junto a la condición que la originó, y dispone de respaldo concreto para sus controles de calidad. La plataforma incorpora además información climática para anticipar condiciones de riesgo antes de que ocurran.
 
 ### 2.2.3 Canales
 
 Nuestra estrategia de comunicación y distribución abarca el ciclo de vida completo del cliente (conocimiento, evaluación, compra, entrega y postventa), estructurada a través de los siguientes medios:
 
-- **Eventos y Ferias del Sector Yerbatero:** Son nuestra principal vidriera para darnos a conocer. Las ferias y exposiciones de la región nos permiten mostrarnos cara a cara con productores, viveristas y cooperativas, generar confianza en persona y explicar de forma concreta cuántos plantines pueden salvar y cuánto pueden ahorrar con el sistema.
+- **Eventos y Ferias del Sector Yerbatero:** Son nuestra principal vía para darnos a conocer. Las ferias y exposiciones de la región nos permiten mostrarnos cara a cara con productores, viveristas y cooperativas, generar confianza en persona y explicar de forma concreta cuántos plantines pueden salvar y cuánto pueden ahorrar con el sistema.
 - **Web Corporativa:** Nuestro sitio web es la puerta de entrada para quien quiere conocernos. De forma clara y sin tecnicismos, presenta qué hace el sistema, a quién está dirigido y los resultados que ofrece, e invita al interesado a dejar sus datos para coordinar una visita o una demostración.
-- **Productores Referentes:** En el mundo rural, la recomendación de un vecino vale más que cualquier publicidad. Por eso convertimos a cada cliente satisfecho en nuestro mejor embajador: cuando un productor ve que el de al lado salvó su tanda y bajó sus costos, la confianza se contagia sola. Impulsamos este canal con un programa de referidos que premia a quienes nos recomiendan dentro de su comunidad.
-- **WhatsApp y Redes Sociales:** Es donde el productor realmente está. A través de WhatsApp y redes como Instagram mantenemos un contacto cercano y cotidiano: difundimos resultados reales, mostramos el sistema en acción con videos cortos y respondemos consultas de forma rápida e informal, en el mismo lugar donde el cliente ya se mueve todos los días.
-- **Demostración con Prototipo:** Es nuestro canal decisivo para cerrar la venta. Llevamos un equipo compacto y funcional directamente al vivero del cliente, para que vea con sus propios ojos y sobre sus propias plantas cómo el sistema detecta un problema y actúa solo, sin que nadie lo toque.
+- **WhatsApp y Redes Sociales:** Es donde el productor realmente está. A través de WhatsApp y redes sociales como Instagram y Tiktok mantenemos un contacto cercano y cotidiano: difundimos resultados reales, mostramos el sistema en acción con videos cortos y respondemos consultas de forma rápida e informal, en el mismo lugar donde el cliente ya se mueve todos los días.
+- **Demostración con prototipo:** Es nuestro canal decisivo para cerrar la venta. Llevamos un equipo compacto y funcional directamente al vivero del cliente, para que vea con sus propios ojos y sobre sus propias plantas cómo el sistema detecta un problema y actúa solo, sin que nadie lo toque.
 - **Instalación y entrega:** Es nuestro canal de entrega. Una vez concretada la venta, nuestro equipo técnico viaja al campo o vivero del cliente, instala y calibra todo el equipamiento y lo deja funcionando. En paralelo le entregamos los accesos a la plataforma web y lo acompañamos en sus primeros pasos para que desde el primer día la use con confianza.
-- **Plataforma Web y Acompañamiento Postventa:** Después de la venta, el vínculo sigue vivo por dos vías. La plataforma web es el espacio que el cliente usa todos los días para seguir su producción. Y cuando necesita ayuda, del otro lado encuentra a una persona real: atendemos por teléfono y mensajería de forma directa y cercana, con un equipo que da seguimiento a cada consulta y coordina el reemplazo rápido de cualquier componente para que su producción nunca se detenga.
-- **Red de Cooperativas y Referentes Agronómicos:** Son aliados que nos abren la puerta a toda su red. Cuando una cooperativa o un asesor agronómico adopta o recomienda nuestro sistema para cuidar la calidad de la yerba que compran o supervisan, su respaldo se convierte en la mejor carta de presentación ante cada productor asociado, acelerando la adopción gracias a la confianza que ya tienen ganada.
+- **Acompañamiento postventa:** Después de la venta, el vínculo sigue vivo por dos vías. La plataforma web es el espacio que el cliente usa todos los días para seguir su producción. Y cuando necesita ayuda, del otro lado encuentra a una persona real: atendemos por teléfono y mensajería de forma directa y cercana, con un equipo que da seguimiento a cada consulta y coordina el reemplazo rápido de cualquier componente para que su producción nunca se detenga.
+- **Red de Cooperativas y referentes agronómicos:** Son aliados que nos abren la puerta a toda su red. Cuando una cooperativa o un asesor agronómico adopta o recomienda nuestro sistema para cuidar la calidad de la yerba que compran o supervisan, su respaldo se convierte en la mejor carta de presentación ante cada productor asociado, acelerando la adopción gracias a la confianza que ya tienen ganada
 
 ### 2.2.4 Relaciones con los clientes
 
-Nuestra relación con el cliente es híbrida: combina el trato humano y cercano que el productor necesita con la eficiencia de un sistema que trabaja solo. El acompañamiento es intenso al principio y se vuelve liviano a medida que el cliente gana autonomía, lo que nos permite crecer sin disparar los costos.
+Nuestra empresa establece una relación híbrida con el sector agroindustrial yerbatero, equilibrando el respaldo humano indispensable para el trabajo productivo con la eficiencia y escalabilidad de los sistemas autónomos. La estrategia está diseñada para optimizar los costos operativos a medida que madura el ciclo de vida del cliente.
 
 - **Acompañamiento humano en la instalación y el soporte:** El productor espera un respaldo técnico tangible y cercano, no un servicio exclusivamente virtual. Por eso instalamos y calibramos los equipos en su vivero en persona, y después seguimos a su lado por teléfono o mensajería para resolver cualquier inconveniente. Esta fase tiene un costo operativo alto para la empresa, pero es innegociable para construir confianza tecnológica y garantizar la retención.
 - **Operación diaria automatizada:** Una vez que el sistema está funcionando, el día a día se maneja solo. El cliente sigue todo desde la plataforma web y recibe avisos de lo que el sistema detecta y ejecuta, sin depender de nuestro personal. Acá está la clave del negocio: una relación de mucho valor para el cliente y de muy bajo costo para sostener, que nos deja crecer sin multiplicar la estructura.
-- **Colaboración con referentes del sector:** Con las cooperativas, los asesores agronómicos y los técnicos del rubro mantenemos un vínculo de colaboración: su conocimiento del cultivo nos ayuda a afinar y mejorar las decisiones del sistema. Esa retroalimentación los vuelve aliados clave para que el producto evolucione pegado a la realidad del campo.
+- **Colaboración con referentes del sector:** Con las cooperativas, los asesores agronómicos y los técnicos del rubro mantenemos un vínculo de colaboración: su conocimiento del cultivo nos ayuda a afinar y mejorar las decisiones del sistema. Esa retroalimentación los vuelve aliados clave para que el producto evolucione junto a la realidad del campo.
 
 ### 2.2.5 Fuentes de ingresos
 
-El cliente paga por algo muy concreto: gastar menos en insumos (agua y agroquímicos) y perder menos plantines. Cambia lo que hoy gasta en un control manual y reactivo por una inversión en un sistema preciso que trabaja solo.
+El cliente agroindustrial está dispuesto a pagar por la reducción directa de su gasto en insumos (agua, agroquímicos) y la prevención de la mortalidad de plantines. Reemplazamos su gasto actual en métodos de control manuales y reactivos por una inversión en autonomía y precisión.
 
-Nuestros ingresos vienen de dos fuentes:
+Nuestras fuentes de ingresos se dividen en dos líneas estratégicas:
 
-- **Venta de activos - Infraestructura física y hardware:** Es el ingreso inicial, que se cobra una sola vez al instalar el sistema en el vivero del cliente. Incluye los equipos de medición, actuación y comunicación, más un respaldo de energía que mantiene todo funcionando aunque se corte la luz. Lo vendemos con un margen bajo a propósito, para que la inversión de entrada no frene la compra: es la puerta de acceso a nuestro servicio.
-- **Cuota de suscripción:** Es la fuente que más rinde y el verdadero corazón del negocio. El cliente paga una cuota recurrente (mensual o anual) según el tamaño de su producción, y a cambio tiene acceso a la plataforma web, al procesamiento de sus datos en la nube y al respaldo de un equipo humano siempre disponible ante cualquier problema.
+- **Venta de activos - Infraestructura física y hardware:** Ingreso transaccional inicial generado por la comercialización e instalación del hardware en el vivero (microcontroladores, sensores, actuadores, módulos de visión móvil, gateways de comunicación y sistemas de alimentación autónoma para garantizar la continuidad del monitoreo ante fallos de la red eléctrica). Para romper la barrera de entrada y acelerar la adopción en el sector, este equipamiento se comercializa con un margen de ganancia bajo, operando como el habilitador físico de nuestro servicio.
+- **Cuota de suscripción:** Es el motor financiero de la empresa y la fuente de ingresos con mayor margen de rentabilidad. Consiste en un cobro recurrente (mensual o anual), escalonado según el volumen y el tamaño de las unidades de producción conectadas. Este pago garantiza el acceso al entorno web de trazabilidad, el procesamiento inteligente de datos en la nube y el respaldo técnico humano y permanente ante contingencias.
+- Mantenimiento
 
 ### 2.2.6 Recursos clave
 
@@ -77,42 +77,40 @@ Para sostener nuestro sistema de automatización integral y garantizar la contin
 
 ### 2.2.7 Actividades clave
 
-Para sostener nuestro servicio, mantener los ingresos recurrentes y conservar la confianza del cliente, el trabajo diario de la empresa se organiza en tres frentes:
+Para sostener nuestra infraestructura como servicio, garantizar el flujo de ingresos recurrentes y mantener la fidelidad del cliente, las operaciones diarias de la empresa se estructuran en tres categorías fundamentales:
 
-**Producción y entrega**
+**Producción**
 
-Todo lo necesario para tener un equipo listo y funcionando en el campo del cliente:
+Actividades enfocadas en concretar la venta transaccional inicial y materializar nuestro canal de entrega:
 
 - **Abastecimiento y armado de los equipos:** Comprar los componentes a proveedores (buena parte importados), controlar que lleguen en condiciones y ensamblar cada equipo antes de enviarlo. Gestionar los tiempos de importación y el stock es una parte crítica y muchas veces subestimada de esta tarea.
 - **Instalación y puesta en marcha:** La logística operativa para instalar la infraestructura en las unidades de producción del cliente, calibrar los equipos según la distribución espacial del vivero yerbatero y proveer los accesos necesarios a la plataforma.
 
 **Plataforma y datos**
 
-El trabajo invisible para el cliente, pero que sostiene la suscripción mensual:
+Son las operaciones invisibles para el cliente, pero que garantizan el funcionamiento del motor financiero (la suscripción mensual):
 
 - **Operación y mantenimiento de la nube:** Mantener los servidores funcionando sin caídas, recibir y ordenar los datos que envían los equipos del campo, y sostener la conexión con los servicios de pronóstico del clima.
-- **Armado y etiquetado del dataset:** Recolectar imágenes reales de plantines y clasificarlas una por una (sano, hongo, plaga, déficit nutricional, etc.). Es un trabajo minucioso, manual y constante, y es la materia prima sin la cual la IA simplemente no aprende.
+- **Armado y etiquetado del dataset:** Recolectar imágenes reales de plantines y clasificarlas una por una. Es un trabajo minucioso, manual y constante.
 - **Mejora continua de la IA:** Reentrenar el modelo con los datos nuevos para que diagnostique cada vez con menos errores y se adapte a lo que se ve en cada campaña.
 
 **Soporte y mejora continua**
 
-Lo que mantiene al cliente conforme y al sistema en pie con el paso del tiempo:
+Actividades orientadas a mantener el vínculo con el cliente y validar nuestra propuesta de valor:
 
 - **Soporte y reemplazo de componentes:** Atender los problemas del día a día y coordinar el recambio rápido de cualquier pieza para que la producción no se frene.
 - **Mantenimiento preventivo en campo:** Visitas periódicas para limpiar y recalibrar los equipos, que trabajan en un ambiente húmedo y con polvo que los desgasta con el tiempo. Sin esto, el sistema pierde precisión sin que nadie lo note.
-- **Capacitación del cliente:** Acompañar al productor para que sepa leer la plataforma y confíe en lo que el sistema hace por su cuenta.
-- **Validación agronómica:** Junto a agrónomos y cooperativas, revisar que las decisiones del sistema sigan teniendo sentido biológico para la yerba y sostengan el ahorro prometido al productor.
+- **Validación agronómica:** Trabajo conjunto con ingenieros agrónomos y cooperativas asociadas para auditar las decisiones tomadas por el sistema. Esto asegura que las reglas de negocio se mantengan alineadas con la realidad biológica de la yerba mate y garanticen el ahorro económico prometido al productor.
 
 ### 2.2.8 Socios clave
 
-Para reducir los riesgos de nuestra cadena de suministro, sostener la infraestructura y mantener el rigor biológico del sistema, nos apoyamos en una red de socios y proveedores estratégicos:
+Para mitigar los riesgos de nuestra cadena de suministro, garantizar la escalabilidad de la infraestructura y mantener la rigurosidad biológica de nuestro sistema, la empresa se apoya en una red de socios y proveedores estratégicos divididos en tres frentes operativos:
 
 - **Proveedores de hardware (importadores y distribuidores):** Compramos los componentes electrónicos a importadores y distribuidores mayoristas. Apoyarnos en hardware comercial ya disponible nos evita el costo y riesgos.
 - **Proveedores de infraestructura en la nube:** Les alquilamos el poder de cómputo y el almacenamiento donde vive nuestra plataforma. De ellos depende que el servicio esté siempre disponible y que podamos crecer sin tener que montar y mantener servidores propios.
+- **Proveedores de conectividad (Starlink y operadores locales):** El sistema necesita enviar sus datos a la nube y recibir el pronóstico del clima, pero en Misiones la señal suele ser débil o intermitente. Por eso priorizamos la internet satelital (Starlink) como vía principal de conexión, capaz de llegar a viveros alejados de todo. Según la zona, también podríamos sumar un proveedor de conectividad rural u operador celular local como complemento o alternativa. El sistema sigue actuando por su cuenta aunque la conexión se caiga, pero este socio es clave para mantener la información sincronizada y al día.
 - **Servicios meteorológicos:** De ellos adquirimos los datos meteorológicos geolocalizados que alimentan nuestro motor de decisiones.
-- **Conectividad rural (Starlink y operadores locales):** El sistema necesita enviar sus datos a la nube y recibir el pronóstico del clima, pero en Misiones la señal suele ser débil o intermitente. Por eso priorizamos la internet satelital (Starlink) como vía principal de conexión, capaz de llegar a viveros alejados de todo. Según la zona, también podríamos sumar un proveedor de conectividad rural u operador celular local como complemento o alternativa. El sistema sigue actuando por su cuenta aunque la conexión se caiga, pero este socio es clave para mantener la información sincronizada y al día.
 - **Organismos técnicos y referentes del sector:** Establecemos vínculos de colaboración directa con técnicos del INTA (Instituto Nacional de Tecnología Agropecuaria), ingenieros agrónomos independientes y cooperativas yerbateras de la región. El recurso clave que obtenemos de ellos es el conocimiento experto, el cual nos permite verificar la precisión de nuestras inferencias de Inteligencia Artificial, validar las reglas de actuación del sistema y asegurar que la plataforma resuelva problemas biológicos reales del cultivo.
-- **INYM (Instituto Nacional de la Yerba Mate):** Es el organismo de referencia que regula y representa a toda la cadena yerbatera en Argentina. Acercarnos al INYM nos aporta respaldo institucional, acceso a información oficial del sector y una validación de peso ante productores y cooperativas, que confían en su criterio.
 
 ### 2.2.9 Estructura de costos
 
@@ -120,13 +118,13 @@ Nuestra empresa opera bajo un modelo de negocio impulsado por el valor. El objet
 
 - **Inversión inicial (CAPEX):** Es el gasto previo a operar. Concentra las horas de ingeniería para construir la plataforma web y la arquitectura en la nube, y todo el ciclo de desarrollo de la inteligencia artificial: armado del dataset propio, diseño del modelo, entrenamiento y ajuste posterior. Incluye la inversión en horas de ingeniería para el desarrollo de la plataforma web y la arquitectura base en la nube. Suma además las compras por única vez de herramientas y equipamiento para construir y validar el prototipo MVP.
 - **Costos fijos (OPEX):** Son los gastos recurrentes que existen haya o no ventas: los sueldos del equipo de ingeniería e IA, el alquiler del espacio de trabajo, los servicios de luz e internet, y la tarifa mensual de los servidores en la nube.
-- **Costos variables:** Son los que aparecen con cada nueva venta. Incluyen la compra de los componentes para ensamblar el equipo de cada cliente y los gastos logísticos directos, combustible y viáticos del equipo técnico para trasladarse, instalar el sistema y darle mantenimiento en el vivero del cliente.
+- **Costos Variables:** Son los que aparecen con cada nueva venta. Incluyen la compra de los componentes para ensamblar el equipo de cada cliente y los gastos logísticos directos, combustible y viáticos del equipo técnico para trasladarse, instalar el sistema y darle mantenimiento en el vivero del cliente.
 
 ## 2.3 Oferta - Cuadro de competidores
 
 | Nombre del producto | Sitio Web | Fortalezas | Debilidades |
 | --- | --- | --- | --- |
-| Auravant | https://www.auravant.com/ | Plataforma madura y de adopción masiva. Excelente mapeo satelital y cálculo de índices agronómicos a gran escala para cultivos de campo abierto (soja, trigo, maíz). | Inoperante en entornos de cría intensiva: las imágenes satelitales no pueden penetrar las mallas de los sombráculos. Carecen de visión computacional local para diagnóstico a nivel de plantín y no poseen actuadores físicos. |
+| Auravant | https://www.auravant.com/ | Plataforma madura y de adopción masiva. Excelente mapeo satelital y cálculo de índices agronómicos a gran escala para cultivos de campo abierto (soja, trigo, maíz). | Inoperante en los viveros: las imágenes satelitales no pueden penetrar las mallas de los sombráculos. Carecen de visión computacional local para diagnóstico a nivel de plantín y no poseen actuadores físicos. |
 | SIMA (AgTech Regional) | https://www.sima.ag/ | Líder latinoamericano en digitalización del monitoreo de plagas y lote. Excelente interfaz de usuario que permite al agrónomo tener un registro histórico y geolocalizado de la sanidad vegetal en una App. | Es un sistema de registro 100% manual. Requiere que el operario recorra el lote y tipifique el daño en el teléfono. No ofrece automatización de hardware ni detección autónoma por cámaras. |
 | Pessl Instruments (FieldClimate) | https://metos.at/ | Hardware industrial de máxima precisión. Sensores ambientales extremadamente duraderos con protocolos estandarizados y validación en el mercado global. | Costo de adquisición prohibitivo (fijado en dólares) para el productor mediano. Actúan como recolectores pasivos de telemetría; delegan la responsabilidad de la analítica visual y la intervención física sectorizada al usuario final. |
 
