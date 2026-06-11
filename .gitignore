@@ -32,6 +32,9 @@ env/
 *.onnx
 *.tflite
 
+# Screenshots sueltos en la raíz del repo (no son assets del proyecto)
+/*.png
+
 # ─────────────────────────────────────────────────────────────
 # Sistema operativo / editores
 # ─────────────────────────────────────────────────────────────
