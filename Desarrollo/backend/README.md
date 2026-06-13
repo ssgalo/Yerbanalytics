@@ -29,10 +29,31 @@ La configuración principal se encuentra en `src/main/resources/application.prop
 El proyecto sigue el patrón multicapa clásico de Spring Boot:
 
 - `controller/`: Controladores REST. Definen los endpoints, rutas y manejan las peticiones HTTP.
-- `config/`: Clases de configuración global (CORS, beans, etc.).
-- `dto/`: Objetos de Transferencia de Datos (próximamente). Mantendrán la paridad con la interfaz `domain.ts` del frontend.
-- `service/`: Lógica de negocio principal (próximamente).
+- `config/`: Clases de configuración global (CORS, propiedades, beans).
+- `dto/`: Objetos de Transferencia de Datos. Mantienen paridad con `domain.ts` del frontend.
+- `service/`: Lógica de negocio. `NurseryService` genera el snapshot del vivero.
+- `service/mock/`: Generador determinístico portado del mock del frontend.
 
-## Endpoints Iniciales
+## Endpoints
 
-- `GET /api/nursery`: Endpoint base. Actualmente devuelve un JSON de validación de estado. A futuro, este será el endpoint que devuelva el "snapshot" completo del vivero para poblar el dashboard del frontend.
+- `GET /api/nursery`: Devuelve el snapshot completo del vivero (`NurseryData`). Hoy usa un generador determinístico con semilla configurable (`yerbanalytics.mock.seed`, default `20260613`).
+
+## Integración con el frontend
+
+| `VITE_DATA_SOURCE` | Origen de datos |
+|---|---|
+| `mock` (default) | `MockRepository` en el frontend |
+| `http` | `GET /api/nursery` en este backend |
+
+Para probar la integración:
+
+```bash
+# Terminal 1 — backend
+cd Desarrollo/backend
+mvn spring-boot:run
+
+# Terminal 2 — frontend
+cd Desarrollo/frontend
+# En .env: VITE_DATA_SOURCE=http y VITE_API_BASE_URL=http://localhost:8000/api
+npm run dev
+```
