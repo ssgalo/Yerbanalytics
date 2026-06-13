@@ -1,0 +1,142 @@
+.sidebar {
+  width: 256px;
+  flex-shrink: 0;
+  background: var(--g900);
+  color: var(--cream);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 22px 16px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 8px 22px;
+}
+
+.logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(150deg, var(--brand), #2c8a66);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(28, 138, 102, 0.35);
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.brandSub {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cfaint);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.section {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cfaint);
+  font-weight: 700;
+  padding: 6px 10px 8px;
+}
+
+.sectionTop {
+  padding-top: 20px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: rgba(236, 241, 233, 0.66);
+}
+
+.item:hover {
+  color: var(--cream);
+}
+
+.itemActive {
+  background: rgba(236, 106, 30, 0.16);
+  color: #fce3d0;
+  border-left-color: #ec6a1e;
+}
+
+.itemActive:hover {
+  color: #fce3d0;
+}
+
+.count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(236, 106, 30, 0.22);
+  color: #f6b98a;
+  padding: 1px 7px;
+  border-radius: 20px;
+}
+
+.status {
+  margin-top: auto;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 13px;
+  padding: 12px 13px;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4fd787;
+  box-shadow: 0 0 0 3px rgba(79, 215, 135, 0.18);
+}
+
+.statusSub {
+  font-size: 11.5px;
+  color: var(--cdim);
+  margin-top: 6px;
+  line-height: 1.45;
+}

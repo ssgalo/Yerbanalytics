@@ -1,0 +1,103 @@
+/* Tarjeta individual de diagnóstico */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  display: block;
+  width: 100%;
+  /* Transición para el hover */
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+/* Hover: resaltado con color de marca */
+.card:hover {
+  border-color: var(--brand);
+  box-shadow: 0 8px 22px -10px rgba(30, 106, 78, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Thumbnail cenital */
+.thumb {
+  height: 120px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  padding: 11px;
+}
+
+/* Ícono de hoja centrado sobre el thumbnail */
+.thumbIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Chip del ID sobre la imagen */
+.thumbChip {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(12, 35, 25, 0.4);
+  backdrop-filter: blur(3px);
+  padding: 3px 9px;
+  border-radius: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Cuerpo de la card */
+.body {
+  padding: 13px 15px 15px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.estado {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.sector {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.confBlock {
+  margin-top: 11px;
+}
+
+.confRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.confVal {
+  font-weight: 700;
+  color: var(--ink);
+  font-family: var(--font-display);
+}
+
+.time {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 10px;
+}

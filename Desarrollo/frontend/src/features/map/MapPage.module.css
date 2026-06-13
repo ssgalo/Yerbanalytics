@@ -1,0 +1,23 @@
+/* MapPage */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Dos columnas: grilla ocupa el espacio restante, sidebar fija 320px */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+/* Columna derecha: flex vertical */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
