@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.controller;
 
 import com.yerbanalytics.backend.dto.NurseryData;
+import com.yerbanalytics.backend.service.NurseryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,10 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/nursery")
 public class NurseryController {
 
+    private final NurseryService nurseryService;
+
+    public NurseryController(NurseryService nurseryService) {
+        this.nurseryService = nurseryService;
+    }
+
     @GetMapping
     public ResponseEntity<NurseryData> getNurseryData() {
-        // TODO: Poblar la respuesta desde la capa de servicios (ej. NurseryService).
-        // Por ahora devolvemos null para establecer formalmente el contrato de la API.
-        return ResponseEntity.ok(null);
+        return ResponseEntity.ok(nurseryService.getSnapshot());
     }
 }
