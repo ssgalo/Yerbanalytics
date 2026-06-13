@@ -1,24 +1,19 @@
 package com.yerbanalytics.backend.controller;
 
+import com.yerbanalytics.backend.dto.NurseryData;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/nursery")
 public class NurseryController {
 
     @GetMapping
-    public ResponseEntity<?> getNurseryData() {
-        // TODO: Mapear la data de dominio "NurseryData" de frontend/src/types/domain.ts
-        // Temporalmente devolvemos un JSON de estado para validar que el servidor responde.
-        return ResponseEntity.ok(Map.of(
-                "status", "ok",
-                "message", "Backend inicializado correctamente.",
-                "note", "Falta implementar el DTO NurseryData esperado por el frontend."
-        ));
+    public ResponseEntity<NurseryData> getNurseryData() {
+        // TODO: Poblar la respuesta desde la capa de servicios (ej. NurseryService).
+        // Por ahora devolvemos null para establecer formalmente el contrato de la API.
+        return ResponseEntity.ok(null);
     }
 }
