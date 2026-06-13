@@ -1,0 +1,8 @@
+/* Layout de la página de Diagnósticos de IA */
+
+/* Grid de 4 columnas para las cards */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}

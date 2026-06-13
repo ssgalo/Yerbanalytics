@@ -1,0 +1,46 @@
+/* ============================================================
+   Design tokens — portados EXACTOS desde Yerbanalytics.dc.html
+   Cualquier cambio de color de marca empieza acá.
+   ============================================================ */
+:root {
+  /* superficies */
+  --bg: #f3f2ea;
+  --card: #ffffff;
+
+  /* texto */
+  --ink: #16241d;
+  --muted: #6a776e;
+  --faint: #97a299;
+
+  /* líneas / bordes */
+  --line: #e7e5d9;
+  --line2: #f0efe7;
+
+  /* verdes de marca (oscuros → claro) */
+  --g900: #0c2319;
+  --g800: #11352a;
+  --g700: #1a4d3b;
+  --brand: #1e6a4e;
+
+  /* estados */
+  --ok: #3fa06a;
+  --ok-soft: #e7f1ea;
+  --warn: #e0972c;
+  --warn-soft: #fbf0dc;
+  --crit: #dd5238;
+  --crit-soft: #fbe6e0;
+  --off: #a9b2ab;
+
+  /* acentos */
+  --orange: #ec6a1e;
+  --orange-soft: #fbe7d7;
+
+  /* crema (texto/elementos sobre fondos oscuros) */
+  --cream: #ecf1e9;
+  --cdim: rgba(236, 241, 233, 0.62);
+  --cfaint: rgba(236, 241, 233, 0.4);
+
+  /* tipografías */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
+}

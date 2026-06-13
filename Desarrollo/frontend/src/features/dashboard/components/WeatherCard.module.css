@@ -1,0 +1,111 @@
+/* WeatherCard — clima y riesgo actual */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px 19px;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.currentRow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.sunIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tempNumber {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.condText {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.uvBlock {
+  margin-left: auto;
+  text-align: right;
+}
+
+.uvLabel {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.uvValue {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+/* Banner de alerta de lluvia */
+.rainBanner {
+  display: flex;
+  gap: 11px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  background: var(--orange-soft);
+  border-radius: 11px;
+}
+
+.rainText {
+  font-size: 12.5px;
+  color: #9A4410;
+  line-height: 1.4;
+}
+
+/* Pronóstico por franjas */
+.forecastGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.forecastSlot {
+  text-align: center;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 9px 4px;
+}
+
+.forecastTime {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.forecastRain {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: var(--brand);
+}
+
+.forecastUv {
+  font-size: 10px;
+  color: var(--faint);
+  margin-top: 2px;
+}

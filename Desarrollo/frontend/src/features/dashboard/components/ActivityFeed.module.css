@@ -1,0 +1,89 @@
+/* ActivityFeed — feed de actividad autónoma del sistema */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 22px;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.subtitle {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  margin-top: 16px;
+}
+
+.entry {
+  display: flex;
+  gap: 13px;
+  padding-bottom: 16px;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Ícono del evento */
+.iconWrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Línea vertical que conecta eventos */
+.connector {
+  flex: 1;
+  width: 2px;
+  background: var(--line2);
+  margin-top: 4px;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.evTitle {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.evTime {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.evDetail {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.45;
+}
