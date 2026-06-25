@@ -3,96 +3,161 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
-import com.yerbanalytics.backend.service.mock.NurseryGenerator;
-import static com.yerbanalytics.backend.service.mock.NurseryConstants.*;
+import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.ZonaEntity;
+import com.yerbanalytics.backend.repository.SectorRepository;
+import com.yerbanalytics.backend.repository.ZonaRepository;
+import static com.yerbanalytics.backend.constant.NurseryConstants.*;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class NurseryService {
 
-    private final NurseryGenerator generator;
-    private final int seed;
-    private NurseryData cache;
-    private final ConcurrentHashMap<String, MqttTelemetryPayload> telemetryMap = new ConcurrentHashMap<>();
+    private final ZonaRepository zonaRepository;
+    private final SectorRepository sectorRepository;
+    private final long staleThresholdMs;
 
-    public NurseryService(NurseryProperties properties) {
-        this.generator = new NurseryGenerator();
-        this.seed = properties.getSeed();
+    public NurseryService(NurseryProperties properties,
+                          ZonaRepository zonaRepository,
+                          SectorRepository sectorRepository,
+                          @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
+        this.zonaRepository = zonaRepository;
+        this.sectorRepository = sectorRepository;
+        this.staleThresholdMs = staleThresholdMs;
     }
 
     public NurseryData getSnapshot() {
-        if (cache == null) {
-            cache = generator.build(seed);
-        }
-        if (telemetryMap.isEmpty()) {
-            return cache;
-        }
-        return mergeTelemetry(cache, telemetryMap);
-    }
+        List<ZonaEntity> zonesDb = zonaRepository.findAllWithSectors();
 
-    public void updateTelemetry(String zoneId, MqttTelemetryPayload payload) {
-        telemetryMap.put(zoneId, payload);
-    }
+        List<Sector> allSectors = new ArrayList<>();
+        Map<String, Sector> byId = new LinkedHashMap<>();
+        List<Zona> zonas = new ArrayList<>();
 
-    private NurseryData mergeTelemetry(NurseryData base, Map<String, MqttTelemetryPayload> telemetry) {
-        List<Zona> updatedZonas = new ArrayList<>();
-        List<Sector> updatedSectors = new ArrayList<>();
-        Map<String, Sector> updatedById = new LinkedHashMap<>();
+        for (ZonaEntity ze : zonesDb) {
+            List<Sector> zoneSectors = new ArrayList<>();
+            int sano = 0;
+            int alerta = 0;
+            int off = 0;
 
-        for (Zona z : base.zonas()) {
-            MqttTelemetryPayload payload = telemetry.get(z.id());
-            if (payload == null) {
-                updatedZonas.add(z);
-                for (Sector s : z.sectors()) {
-                    updatedSectors.add(s);
-                    updatedById.put(s.id(), s);
+            for (SectorEntity se : ze.getSectors()) {
+                String finalStatus;
+                String finalColor;
+                String finalStatusLabel;
+                String finalTip;
+                List<Metric> metrics;
+                Diagnosis diagnosis;
+                String reason;
+                Actuadores actuators;
+                String ago;
+                boolean stale;
+
+                boolean isStale = se.getLastReadingTime() == null || 
+                        (System.currentTimeMillis() - se.getLastReadingTime() > staleThresholdMs);
+
+                if (isStale) {
+                    finalStatus = "offline";
+                    finalColor = C.get("offline");
+                    finalStatusLabel = LAB.get("offline");
+                    finalTip = se.getId() + " · " + finalStatusLabel;
+                    metrics = buildOfflineMetricsList();
+                    diagnosis = new Diagnosis("Sin diagnóstico", null, EMDASH);
+                    reason = "Fuera de servicio";
+                    actuators = new Actuadores("Cerrada", "En espera", se.getActuadorShade());
+                    ago = se.getLastReadingTime() == null ? "hace —" : formatAgo(se.getLastReadingTime());
+                    stale = true;
+                } else {
+                    finalStatus = se.getStatus();
+                    finalColor = se.getColor();
+                    finalStatusLabel = se.getStatusLabel();
+                    finalTip = se.getTip();
+                    metrics = buildMetricsList(se);
+                    diagnosis = new Diagnosis(
+                            se.getDiagnosisEstado(),
+                            se.getDiagnosisConf(),
+                            se.getDiagnosisSev()
+                    );
+                    actuators = new Actuadores(
+                            se.getActuadorValve(),
+                            se.getActuadorPump(),
+                            se.getActuadorShade()
+                    );
+                    reason = se.getReason();
+                    ago = formatAgo(se.getLastReadingTime());
+                    stale = false;
                 }
-            } else {
-                List<Sector> zoneSectors = new ArrayList<>();
-                int sano = 0;
-                int alerta = 0;
-                int off = 0;
 
-                for (Sector s : z.sectors()) {
-                    Sector updatedSector = updateSectorWithTelemetry(s, payload);
-                    zoneSectors.add(updatedSector);
-                    updatedSectors.add(updatedSector);
-                    updatedById.put(updatedSector.id(), updatedSector);
+                Sector sectorDto = new Sector(
+                        se.getId(),
+                        ze.getId(),
+                        ze.getName(),
+                        se.getN(),
+                        finalStatus,
+                        finalColor,
+                        finalStatusLabel,
+                        finalTip,
+                        metrics,
+                        diagnosis,
+                        reason,
+                        actuators,
+                        ago,
+                        stale
+                );
 
-                    if ("ok".equals(updatedSector.status())) {
-                        sano++;
-                    } else if ("offline".equals(updatedSector.status())) {
-                        off++;
-                    } else {
-                        alerta++;
-                    }
+                zoneSectors.add(sectorDto);
+                allSectors.add(sectorDto);
+                byId.put(sectorDto.id(), sectorDto);
+
+                if ("ok".equals(finalStatus)) {
+                    sano++;
+                } else if ("offline".equals(finalStatus)) {
+                    off++;
+                } else {
+                    alerta++;
                 }
-                updatedZonas.add(new Zona(z.id(), z.name(), z.sub(), zoneSectors, sano, alerta, off, z.total()));
             }
+
+            // Sort zone sectors by id/n to keep grid order
+            zoneSectors.sort(Comparator.comparing(Sector::id));
+
+            zonas.add(new Zona(
+                    ze.getId(),
+                    ze.getName(),
+                    ze.getSub(),
+                    zoneSectors,
+                    sano,
+                    alerta,
+                    off,
+                    zoneSectors.size()
+            ));
         }
+
+        // Sort zones by id to keep top-to-bottom layout
+        zonas.sort(Comparator.comparing(Zona::id));
 
         // Recompute stats
-        int totalSano = (int) updatedSectors.stream().filter(s -> "ok".equals(s.status())).count();
-        int totalWarning = (int) updatedSectors.stream().filter(s -> "warning".equals(s.status())).count();
-        int totalCritical = (int) updatedSectors.stream().filter(s -> "critical".equals(s.status())).count();
-        int totalOffline = (int) updatedSectors.stream().filter(s -> "offline".equals(s.status())).count();
+        int totalSano = (int) allSectors.stream().filter(s -> "ok".equals(s.status())).count();
+        int totalWarning = (int) allSectors.stream().filter(s -> "warning".equals(s.status())).count();
+        int totalCritical = (int) allSectors.stream().filter(s -> "critical".equals(s.status())).count();
+        int totalOffline = (int) allSectors.stream().filter(s -> "offline".equals(s.status())).count();
         int totalAlerta = totalWarning + totalCritical;
 
-        // Diagnoses: re-build diagnosis list based on all updated sectors
+        // Build diagnoses list based on all updated sectors
         int[] diagCounter = {0};
-        List<DiagnosisCard> updatedDiagnoses = new ArrayList<>();
+        List<DiagnosisCard> diagnoses = new ArrayList<>();
 
-        for (Sector s : updatedSectors) {
+        for (Sector s : allSectors) {
             if ("offline".equals(s.status())) continue;
             Diagnosis d = s.diagnosis();
             if ("Sano".equals(d.estado()) || "Sin diagnóstico".equals(d.estado())) {
                 continue;
             }
             diagCounter[0]++;
-            updatedDiagnoses.add(new DiagnosisCard(
+            diagnoses.add(new DiagnosisCard(
                     "DG-" + String.format(Locale.US, "%03d", diagCounter[0]),
                     s.id(),
                     s.zonaName(),
@@ -103,18 +168,18 @@ public class NurseryService {
                     SEV_MAP.get(d.sev()).ink(),
                     TINTS.getOrDefault(d.estado(), TINTS.get("Sin diagnóstico")),
                     s.ago(),
-                    d.conf() >= 85
+                    d.conf() != null && d.conf() >= 85
             ));
         }
 
-        // Add some non-conclusive cards for warning sectors to match NurseryGenerator
-        List<Sector> ncSectors = updatedSectors.stream()
+        // Add some non-conclusive cards for warning sectors
+        List<Sector> ncSectors = allSectors.stream()
                 .filter(s -> "warning".equals(s.status()))
                 .limit(3)
                 .toList();
         for (Sector s : ncSectors) {
             diagCounter[0]++;
-            updatedDiagnoses.add(new DiagnosisCard(
+            diagnoses.add(new DiagnosisCard(
                     "DG-" + String.format(Locale.US, "%03d", diagCounter[0]),
                     s.id(),
                     s.zonaName(),
@@ -129,26 +194,26 @@ public class NurseryService {
             ));
         }
 
-        updatedDiagnoses.sort(Comparator.comparing(DiagnosisCard::time));
+        diagnoses.sort(Comparator.comparing(DiagnosisCard::time));
 
-        Stats updatedStats = new Stats(
+        Stats stats = new Stats(
                 600, totalSano, totalWarning, totalCritical, totalOffline, totalAlerta,
-                (double) Math.round((totalSano / 600.0) * 100), 41, 28, 7, 6, updatedDiagnoses.size()
+                (double) Math.round((totalSano / 600.0) * 100), 41, 28, 7, 6, diagnoses.size()
         );
 
-        Map<String, DiagnosisCard> updatedDiagById = new LinkedHashMap<>();
-        for (DiagnosisCard d : updatedDiagnoses) {
-            updatedDiagById.put(d.id(), d);
+        Map<String, DiagnosisCard> diagById = new LinkedHashMap<>();
+        for (DiagnosisCard d : diagnoses) {
+            diagById.put(d.id(), d);
         }
 
-        List<DiagnosisCard> updatedRecentDiag = updatedDiagnoses.stream()
+        List<DiagnosisCard> recentDiag = diagnoses.stream()
                 .filter(d -> !"No concluyente".equals(d.estado()))
                 .limit(5)
                 .toList();
 
         // Recompute priority list
         Map<String, Integer> priorityOrder = Map.of("critical", 0, "warning", 1);
-        List<PriorityItem> updatedPriority = updatedSectors.stream()
+        List<PriorityItem> priority = allSectors.stream()
                 .filter(s -> "critical".equals(s.status()) || "warning".equals(s.status()))
                 .sorted(Comparator
                         .comparingInt((Sector s) -> priorityOrder.get(s.status()))
@@ -165,65 +230,198 @@ public class NurseryService {
                 ))
                 .toList();
 
+        // Re-build action event list based on alert sectors
+        List<Sector> actSrc = allSectors.stream()
+                .filter(s -> !"ok".equals(s.status()) && !"offline".equals(s.status()))
+                .toList();
+        List<ActionEvent> actions = new ArrayList<>();
+        for (int i = 0; i < ACT_TPL.size(); i++) {
+            ActTemplate a = ACT_TPL.get(i);
+            Sector sec = actSrc.isEmpty() ? null : actSrc.get(i % actSrc.size());
+            var meta = ACT.get(a.tipo());
+            var rm = RES_MAP.get(a.res());
+            actions.add(new ActionEvent(
+                    a.title() + " · " + (sec != null ? sec.id() : "MZ-2-014"),
+                    a.detail(),
+                    a.time(),
+                    a.res(),
+                    rm.soft(),
+                    rm.ink(),
+                    meta.tint(),
+                    meta.ink(),
+                    meta.path()
+            ));
+        }
+
+        // Re-build alerts list
+        List<Alert> alerts = List.of(
+                new Alert("CRITICAL", C.get("critical"), "14:08",
+                        priority.isEmpty() ? "MZ-3-077" : priority.get(0).id(),
+                        "Daño fúngico confirmado + humedad de sustrato 84%. Dosificación de fungicida en curso.", false),
+                new Alert("CRITICAL", C.get("critical"), "13:41", "MZ-5-042",
+                        "Falla hidráulica: caudalímetro sin flujo tras abrir electroválvula. Sector marcado para revisión.", false),
+                new Alert("WARNING", C.get("warning"), "13:20", "MZ-2-091",
+                        "Nodo testigo con batería baja (18%). Recambio preventivo sugerido.", false),
+                new Alert("WARNING", C.get("warning"), "12:55",
+                        priority.size() > 2 ? priority.get(2).id() : "MZ-1-033",
+                        "Clorosis detectada (confianza 88%). A la espera de validación de dosis nutricional.", false),
+                new Alert("WARNING", C.get("warning"), "11:30", "MZ-4-005",
+                        "Sensor sin reporte hace 2 h — señal intermitente. Mostrando último dato conocido.", false)
+        );
+
+        Weather weather = new Weather(
+                21.0,
+                "Parcial nublado",
+                78.0,
+                7.0,
+                "Alto",
+                "Lluvia probable en ~3 h — riego autónomo pospuesto en 2 macro-zonas.",
+                List.of(
+                        new ForecastSlot("15 h", 7.0, 10.0),
+                        new ForecastSlot("18 h", 3.0, 60.0),
+                        new ForecastSlot("21 h", 0.0, 80.0),
+                        new ForecastSlot("Mañana", 6.0, 25.0)
+                )
+        );
+
         return new NurseryData(
-                updatedZonas,
-                updatedSectors,
-                updatedById,
-                updatedStats,
-                updatedPriority,
-                updatedDiagnoses,
-                updatedDiagById,
-                updatedRecentDiag,
-                base.actions(),
-                base.alerts(),
-                base.weather(),
-                base.sevMap(),
-                base.tints(),
-                base.specs()
+                zonas,
+                allSectors,
+                byId,
+                stats,
+                priority,
+                diagnoses,
+                diagById,
+                recentDiag,
+                actions,
+                alerts,
+                weather,
+                new HashMap<>(SEV_MAP),
+                new HashMap<>(TINTS),
+                SPECS
         );
     }
 
-    private Sector updateSectorWithTelemetry(Sector original, MqttTelemetryPayload payload) {
-        List<Metric> updatedMetrics = new ArrayList<>();
-        boolean hasCritical = false;
-        boolean hasWarning = false;
+    @Transactional
+    public void updateTelemetry(String zoneId, MqttTelemetryPayload payload) {
+        List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
+        if (sectors.isEmpty()) {
+            return;
+        }
 
-        for (Metric m : original.metrics()) {
+        for (SectorEntity s : sectors) {
+            String oldStatus = s.getStatus();
+
+            // Update raw readings
+            s.setHumSusRaw(payload.metrics().humSus());
+            s.setHumAmbRaw(payload.metrics().humAmb());
+            s.setTempRaw(payload.metrics().temp());
+            s.setCeRaw(payload.metrics().ce());
+            s.setUvRaw(payload.metrics().uv());
+            s.setLastReadingTime(payload.timestamp());
+
+            // Build temporary metrics list to recompute status
+            boolean hasCritical = false;
+            boolean hasWarning = false;
+            List<Metric> tempMetrics = buildMetricsList(s);
+            for (Metric m : tempMetrics) {
+                if ("critical".equals(m.status())) {
+                    hasCritical = true;
+                } else if ("warning".equals(m.status())) {
+                    hasWarning = true;
+                }
+            }
+
+            String finalStatus = hasCritical ? "critical" : (hasWarning ? "warning" : "ok");
+            s.setStatus(finalStatus);
+            s.setColor(C.get(finalStatus));
+            s.setStatusLabel(LAB.get(finalStatus));
+            s.setTip(s.getId() + " · " + LAB.get(finalStatus));
+
+            // Diagnosis
+            if ("ok".equals(finalStatus)) {
+                s.setDiagnosisEstado("Sano");
+                s.setDiagnosisConf(98.0);
+                s.setDiagnosisSev(EMDASH);
+            } else {
+                // Keep original if it was already warning/critical and has a valid diagnosis
+                if (!"ok".equals(oldStatus) && !"offline".equals(oldStatus) && !"Sin diagnóstico".equals(s.getDiagnosisEstado())) {
+                    // keep existing diagnosis
+                } else {
+                    List<PathoEntry> pList = PATHOS.get(finalStatus);
+                    if (pList != null && !pList.isEmpty()) {
+                        PathoEntry p = pList.get(0); // Pick default first one
+                        s.setDiagnosisEstado(p.estado());
+                        s.setDiagnosisConf(92.0);
+                        s.setDiagnosisSev(p.sev());
+                    }
+                }
+            }
+
+            // Reason
+            Metric bad = tempMetrics.stream()
+                    .filter(m -> finalStatus.equals(m.status()))
+                    .findFirst()
+                    .orElseGet(() -> tempMetrics.stream().filter(m -> !"ok".equals(m.status())).findFirst().orElse(null));
+            if (bad != null) {
+                s.setReason(bad.label() + " " + bad.value() + ("%".equals(bad.unit()) ? "%" : " " + bad.unit()));
+            } else {
+                s.setReason(s.getDiagnosisEstado());
+            }
+
+            // Actuators
+            double humSusVal = s.getHumSusRaw() != null ? s.getHumSusRaw() : 50.0;
+            String valve = humSusVal < 42 ? "Regando" : "Cerrada";
+            String pump = "critical".equals(finalStatus) && s.getDiagnosisConf() != null && s.getDiagnosisConf() >= 85
+                    ? "Dosificando" : "En espera";
+            s.setActuadorValve(valve);
+            s.setActuadorPump(pump);
+        }
+        sectorRepository.saveAll(sectors);
+    }
+
+    private List<Metric> buildMetricsList(SectorEntity s) {
+        List<Metric> metrics = new ArrayList<>();
+        for (MetricSpec sp : SPECS) {
             Double val = null;
-            if ("humSus".equals(m.key())) {
-                val = payload.metrics().humSus();
-            } else if ("humAmb".equals(m.key())) {
-                val = payload.metrics().humAmb();
-            } else if ("temp".equals(m.key())) {
-                val = payload.metrics().temp();
-            } else if ("ce".equals(m.key())) {
-                val = payload.metrics().ce();
-            } else if ("uv".equals(m.key())) {
-                val = payload.metrics().uv();
+            if ("humSus".equals(sp.key())) {
+                val = s.getHumSusRaw();
+            } else if ("humAmb".equals(sp.key())) {
+                val = s.getHumAmbRaw();
+            } else if ("temp".equals(sp.key())) {
+                val = s.getTempRaw();
+            } else if ("ce".equals(sp.key())) {
+                val = s.getCeRaw();
+            } else if ("uv".equals(sp.key())) {
+                val = s.getUvRaw();
             }
 
             if (val == null) {
-                updatedMetrics.add(m);
-                if ("critical".equals(m.status())) hasCritical = true;
-                else if ("warning".equals(m.status())) hasWarning = true;
+                metrics.add(new Metric(
+                        sp.key(),
+                        sp.label(),
+                        sp.unit(),
+                        null,
+                        "—",
+                        "offline",
+                        C.get("offline"),
+                        sp
+                ));
             } else {
-                MetricSpec sp = m.spec();
                 String status;
                 if (val < sp.warn()[0] || val > sp.warn()[1]) {
                     status = "critical";
-                    hasCritical = true;
                 } else if (val < sp.ideal()[0] || val > sp.ideal()[1]) {
                     status = "warning";
-                    hasWarning = true;
                 } else {
                     status = "ok";
                 }
 
                 String valueStr = String.format(Locale.US, "%." + sp.dec() + "f", val);
-                updatedMetrics.add(new Metric(
-                        m.key(),
-                        m.label(),
-                        m.unit(),
+                metrics.add(new Metric(
+                        sp.key(),
+                        sp.label(),
+                        sp.unit(),
                         val,
                         valueStr,
                         status,
@@ -232,59 +430,34 @@ public class NurseryService {
                 ));
             }
         }
+        return metrics;
+    }
 
-        String finalStatus = hasCritical ? "critical" : (hasWarning ? "warning" : "ok");
-
-        // Determine diagnosis
-        Diagnosis diagnosis;
-        if ("ok".equals(finalStatus)) {
-            diagnosis = new Diagnosis("Sano", 98.0, EMDASH);
-        } else {
-            // Keep original if it was already warning/critical
-            if (!"ok".equals(original.status()) && !"offline".equals(original.status())) {
-                diagnosis = original.diagnosis();
-            } else {
-                List<PathoEntry> pList = PATHOS.get(finalStatus);
-                PathoEntry p = pList.get(0); // Pick default first one
-                diagnosis = new Diagnosis(p.estado(), 92.0, p.sev());
-            }
+    private List<Metric> buildOfflineMetricsList() {
+        List<Metric> metrics = new ArrayList<>();
+        for (MetricSpec sp : SPECS) {
+            metrics.add(new Metric(
+                    sp.key(),
+                    sp.label(),
+                    sp.unit(),
+                    null,
+                    "—",
+                    "offline",
+                    C.get("offline"),
+                    sp
+            ));
         }
+        return metrics;
+    }
 
-        // Determine reason
-        String reason;
-        Metric bad = updatedMetrics.stream()
-                .filter(m -> finalStatus.equals(m.status()))
-                .findFirst()
-                .orElseGet(() -> updatedMetrics.stream().filter(m -> !"ok".equals(m.status())).findFirst().orElse(null));
-        if (bad != null) {
-            reason = bad.label() + " " + bad.value() + ("%".equals(bad.unit()) ? "%" : " " + bad.unit());
-        } else {
-            reason = diagnosis.estado();
+    private String formatAgo(long timestamp) {
+        long diffMs = System.currentTimeMillis() - timestamp;
+        if (diffMs < 0) diffMs = 0;
+        long diffSec = diffMs / 1000;
+        if (diffSec < 60) {
+            return "hace " + diffSec + " s";
         }
-
-        Metric humSusMetric = updatedMetrics.stream().filter(m -> "humSus".equals(m.key())).findFirst().orElse(null);
-        double humSusVal = humSusMetric != null ? humSusMetric.raw() : 50.0;
-        String valve = humSusVal < 42 ? "Regando" : "Cerrada";
-        String pump = "critical".equals(finalStatus) && diagnosis.conf() != null && diagnosis.conf() >= 85
-                ? "Dosificando" : "En espera";
-
-        Actuadores actuators = new Actuadores(valve, pump, original.actuadores().shade());
-
-        return new Sector(
-                original.id(),
-                original.zona(),
-                original.zonaName(),
-                original.n(),
-                finalStatus,
-                C.get(finalStatus),
-                LAB.get(finalStatus),
-                original.id() + " \u00b7 " + LAB.get(finalStatus),
-                updatedMetrics,
-                diagnosis,
-                reason,
-                actuators,
-                "hace 0 min",
-                false
-        );
+        long diffMin = diffSec / 60;
+        return "hace " + diffMin + " min";
     }
 }
