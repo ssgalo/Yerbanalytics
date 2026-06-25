@@ -16,12 +16,20 @@ export function NurseryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    getRepository()
-      .getNursery()
-      .then((d) => active && setData(d))
-      .catch((e) => active && setError(e instanceof Error ? e : new Error(String(e))));
+
+    const fetchData = () => {
+      getRepository()
+        .getNursery()
+        .then((d) => active && setData(d))
+        .catch((e) => active && setError(e instanceof Error ? e : new Error(String(e))));
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, []);
 

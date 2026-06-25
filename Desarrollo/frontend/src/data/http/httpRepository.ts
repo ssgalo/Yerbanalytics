@@ -10,7 +10,7 @@ export class HttpRepository implements DataRepository {
   constructor(private readonly baseUrl: string) {}
 
   async getNursery(): Promise<NurseryData> {
-    const res = await fetch(`${this.baseUrl}/nursery`);
+    const res = await fetch(`${this.baseUrl}/nursery?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el vivero desde ${this.baseUrl}`);
     }
