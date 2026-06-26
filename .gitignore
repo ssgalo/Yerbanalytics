@@ -35,6 +35,9 @@ env/
 # Screenshots sueltos en la raíz del repo (no son assets del proyecto)
 /*.png
 
+# Frontend
+node_modules/
+
 # Compilación de Maven
 target/
 pom.xml.tag
@@ -48,7 +51,6 @@ buildNumber.properties
 .mvn/wrapper/maven-wrapper.jar
 *.class
 *.jar
-.mvn/
 
 # ─────────────────────────────────────────────────────────────
 # Sistema operativo / editores

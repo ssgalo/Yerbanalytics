@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+MAVEN_VERSION="3.9.6"
+WRAPPER_DIR="$HOME/.m2/wrapper"
+MAVEN_HOME="$WRAPPER_DIR/apache-maven-$MAVEN_VERSION"
+MAVEN_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN_VERSION/apache-maven-$MAVEN_VERSION-bin.tar.gz"
+
+if [ ! -f "$MAVEN_HOME/bin/mvn" ]; then
+    echo "[mvnw] Maven $MAVEN_VERSION no encontrado. Descargando..."
+    mkdir -p "$WRAPPER_DIR"
+
+    if command -v curl > /dev/null 2>&1; then
+        curl -fsSL "$MAVEN_URL" -o "$WRAPPER_DIR/maven.tar.gz"
+    elif command -v wget > /dev/null 2>&1; then
+        wget -q "$MAVEN_URL" -O "$WRAPPER_DIR/maven.tar.gz"
+    else
+        echo "[mvnw] ERROR: Se necesita curl o wget para descargar Maven."
+        exit 1
+    fi
+
+    tar -xzf "$WRAPPER_DIR/maven.tar.gz" -C "$WRAPPER_DIR"
+    rm "$WRAPPER_DIR/maven.tar.gz"
+    echo "[mvnw] Maven $MAVEN_VERSION listo."
+    echo ""
+fi
+
+exec "$MAVEN_HOME/bin/mvn" "$@"

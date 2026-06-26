@@ -1,32 +1,92 @@
+$ScriptRoot = $PSScriptRoot
+
 Write-Host "===========================================" -ForegroundColor Green
-Write-Host "  Starting Yerbanalytics Services...       " -ForegroundColor Green
+Write-Host "  Yerbanalytics -- Verificando requisitos... " -ForegroundColor Green
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""
 
-# 1. Start Docker
-Write-Host "[1/3] Starting Docker containers (PostgreSQL & Mosquitto)..." -ForegroundColor Cyan
-docker-compose up -d
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to start Docker containers. Make sure Docker Desktop is running."
-    Exit $LASTEXITCODE
+# Verificar Java 17+
+$javaOutput = java -version 2>&1 | Select-Object -First 1
+if ($javaOutput -match '"([\d\.]+)"') {
+    $javaVerStr = $matches[1]
+    $javaMajor = [int]($javaVerStr -split '\.')[0]
+    if ($javaMajor -lt 17) {
+        Write-Host "[ERROR] Se requiere Java 17+. Version detectada: $javaVerStr" -ForegroundColor Red
+        Write-Host "        Descarga Java 17 desde: https://adoptium.net" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[OK] Java $javaVerStr" -ForegroundColor Green
+} else {
+    Write-Host "[ERROR] Java no encontrado." -ForegroundColor Red
+    Write-Host "        Instala Java 17 desde: https://adoptium.net" -ForegroundColor Red
+    exit 1
 }
 
-# Wait for DB
-Write-Host "Waiting 3 seconds for database to initialize..." -ForegroundColor Yellow
+# Verificar Node.js
+$nodeVer = node --version 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Node.js no encontrado." -ForegroundColor Red
+    Write-Host "        Instala desde: https://nodejs.org" -ForegroundColor Red
+    exit 1
+}
+Write-Host "[OK] Node.js $nodeVer" -ForegroundColor Green
+
+# Verificar Docker
+$null = docker info 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Docker no esta corriendo. Inicia Docker Desktop primero." -ForegroundColor Red
+    exit 1
+}
+Write-Host "[OK] Docker" -ForegroundColor Green
+Write-Host ""
+
+# npm install si falta node_modules
+$frontendDir = Join-Path $ScriptRoot "Desarrollo\frontend"
+if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
+    Write-Host "[setup] node_modules no encontrado. Instalando dependencias del frontend..." -ForegroundColor Yellow
+    Push-Location $frontendDir
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] Fallo npm install." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+    Pop-Location
+    Write-Host "[OK] Dependencias instaladas." -ForegroundColor Green
+    Write-Host ""
+}
+
+Write-Host "===========================================" -ForegroundColor Green
+Write-Host "  Iniciando servicios...                   " -ForegroundColor Green
+Write-Host "===========================================" -ForegroundColor Green
+Write-Host ""
+
+# 1. Docker
+Write-Host "[1/3] Iniciando contenedores Docker (PostgreSQL + Mosquitto)..." -ForegroundColor Cyan
+Push-Location $ScriptRoot
+docker-compose up -d
+$dcExit = $LASTEXITCODE
+Pop-Location
+if ($dcExit -ne 0) {
+    Write-Host "[ERROR] Fallo al iniciar Docker. Asegurate de que Docker Desktop este corriendo." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Esperando 3 segundos para que la base de datos se inicialice..." -ForegroundColor Yellow
 Start-Sleep -Seconds 3
 
-# 2. Start Backend
-Write-Host "[2/3] Launching Spring Boot Backend in a new window..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host '--- Starting Yerbanalytics Backend ---' -ForegroundColor Yellow; cd Desarrollo/backend; mvn spring-boot:run"
+# 2. Backend
+Write-Host "[2/3] Iniciando Backend (Spring Boot)..." -ForegroundColor Cyan
+$backendDir = Join-Path $ScriptRoot "Desarrollo\backend"
+Start-Process powershell -WorkingDirectory $backendDir -ArgumentList "-NoExit", "-Command", "Write-Host '--- Yerbanalytics Backend ---' -ForegroundColor Yellow; .\mvnw.cmd spring-boot:run"
 
-# 3. Start Frontend
-Write-Host "[3/3] Launching React + Vite Frontend in a new window..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host '--- Starting Yerbanalytics Frontend ---' -ForegroundColor Yellow; cd Desarrollo/frontend; npm run dev"
+# 3. Frontend
+Write-Host "[3/3] Iniciando Frontend (React + Vite)..." -ForegroundColor Cyan
+Start-Process powershell -WorkingDirectory $frontendDir -ArgumentList "-NoExit", "-Command", "Write-Host '--- Yerbanalytics Frontend ---' -ForegroundColor Yellow; npm run dev"
 
 Write-Host ""
 Write-Host "===========================================" -ForegroundColor Green
-Write-Host "  All services are booting up!             " -ForegroundColor Green
-Write-Host "  - Backend: http://localhost:8000         " -ForegroundColor Green
+Write-Host "  Servicios iniciando en segundo plano.    " -ForegroundColor Green
+Write-Host "  - Backend:  http://localhost:8000        " -ForegroundColor Green
 Write-Host "  - Frontend: http://localhost:5173        " -ForegroundColor Green
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""
