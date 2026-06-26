@@ -1,4 +1,4 @@
-package com.yerbanalytics.backend.service.mock;
+package com.yerbanalytics.backend.constant;
 
 import com.yerbanalytics.backend.dto.ColorPair;
 import com.yerbanalytics.backend.dto.MetricSpec;
