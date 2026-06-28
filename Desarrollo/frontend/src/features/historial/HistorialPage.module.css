@@ -1,0 +1,7 @@
+/* Vista Historial y trazabilidad */
+
+.state {
+  padding: 40px;
+  font-family: var(--font-body);
+  color: var(--muted);
+}

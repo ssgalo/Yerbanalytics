@@ -1,0 +1,61 @@
+/* Filtros de la vista Historial */
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.select {
+  appearance: none;
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 10px;
+  padding: 9px 32px 9px 13px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%236A776E" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  outline: none;
+}
+
+.input {
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+.count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -4,7 +4,7 @@
    ya define el contrato esperado (GET {baseUrl}/nursery).
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
-import type { NurseryData } from '@/types/domain';
+import type { ActionRecord, NurseryData } from '@/types/domain';
 
 export class HttpRepository implements DataRepository {
   constructor(private readonly baseUrl: string) {}
@@ -15,5 +15,13 @@ export class HttpRepository implements DataRepository {
       throw new Error(`Error ${res.status} al obtener el vivero desde ${this.baseUrl}`);
     }
     return (await res.json()) as NurseryData;
+  }
+
+  async getHistory(): Promise<ActionRecord[]> {
+    const res = await fetch(`${this.baseUrl}/historial?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener el historial desde ${this.baseUrl}`);
+    }
+    return (await res.json()) as ActionRecord[];
   }
 }

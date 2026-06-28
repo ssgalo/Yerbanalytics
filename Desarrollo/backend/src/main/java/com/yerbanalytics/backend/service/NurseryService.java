@@ -20,14 +20,17 @@ public class NurseryService {
 
     private final ZonaRepository zonaRepository;
     private final SectorRepository sectorRepository;
+    private final HistorialService historialService;
     private final long staleThresholdMs;
 
     public NurseryService(NurseryProperties properties,
                           ZonaRepository zonaRepository,
                           SectorRepository sectorRepository,
+                          HistorialService historialService,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
+        this.historialService = historialService;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -370,12 +373,23 @@ public class NurseryService {
             }
 
             // Actuators
+            String oldValve = s.getActuadorValve();
+            String oldPump = s.getActuadorPump();
             double humSusVal = s.getHumSusRaw() != null ? s.getHumSusRaw() : 50.0;
             String valve = humSusVal < 42 ? "Regando" : "Cerrada";
             String pump = "critical".equals(finalStatus) && s.getDiagnosisConf() != null && s.getDiagnosisConf() >= 85
                     ? "Dosificando" : "En espera";
             s.setActuadorValve(valve);
             s.setActuadorPump(pump);
+
+            // Hook de historial: registrar SÓLO en la transición a estado activo,
+            // para no inundar la tabla en cada ciclo de telemetría.
+            if ("Regando".equals(valve) && !"Regando".equals(oldValve)) {
+                historialService.registrarRiego(s);
+            }
+            if ("Dosificando".equals(pump) && !"Dosificando".equals(oldPump)) {
+                historialService.registrarInsumo(s);
+            }
         }
         sectorRepository.saveAll(sectors);
     }
