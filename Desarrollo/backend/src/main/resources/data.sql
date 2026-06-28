@@ -635,3 +635,24 @@ INSERT INTO historial_evento (id, sector_id, zona_id, zona_name, tipo, ts, lectu
  ('HE-009', 'MZ-3-012', 'MZ-3', 'Macro-zona 3', 'Insumo', (EXTRACT(EPOCH FROM NOW())*1000)::BIGINT - 21600000, 'Diagnóstico IA: Clorosis por déficit nutricional (confianza 89%).', 'Confianza sobre el umbral: el motor habilita la dosificación de nutrientes.', 'Bomba peristáltica inyectó 3,0 ml de NPK en la línea del sector.', 'En seguimiento', 'Media', 'humSus', 30, 5, 120000, TRUE, 'Humedad de sustrato', '30', '49', '%', '+19', '2 min', 'Efectiva', (EXTRACT(EPOCH FROM NOW())*1000)::BIGINT - 20000000, FALSE) ON CONFLICT (id) DO NOTHING;
 INSERT INTO historial_evento (id, sector_id, zona_id, zona_name, tipo, ts, lectura, decision, accion, res, sev, metric_key, valor_antes, umbral_recuperacion, latency_ms, evo_show, evo_metric, evo_antes, evo_ahora, evo_unit, evo_delta, evo_latencia, evo_verdict, evo_evaluado_ts, bloqueo_repeticion) VALUES
  ('HE-010', 'MZ-5-061', 'MZ-5', 'Macro-zona 5', 'Mediasombra', (EXTRACT(EPOCH FROM NOW())*1000)::BIGINT - 25200000, 'Plan de rustificación día 11.', 'Avance del cronograma: apertura gradual programada.', 'Cobertura ajustada de 25% a 35% por plan de rustificación.', 'Efectiva', '—', NULL, NULL, NULL, NULL, FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, FALSE) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- Configuración agronómica (HU-15): valores de fábrica seguros
+-- para Ilex paraguariensis. Las bandas replican NurseryConstants.SPECS.
+-- ============================================================
+
+-- Umbrales de métricas (bandas ideal / warn / crit)
+INSERT INTO umbral_metrica (metric_key, ideal_min, ideal_max, warn_min, warn_max, crit_min, crit_max) VALUES ('humSus', 42, 68, 32, 80, 22, 90) ON CONFLICT (metric_key) DO NOTHING;
+INSERT INTO umbral_metrica (metric_key, ideal_min, ideal_max, warn_min, warn_max, crit_min, crit_max) VALUES ('humAmb', 62, 84, 52, 91, 42, 96) ON CONFLICT (metric_key) DO NOTHING;
+INSERT INTO umbral_metrica (metric_key, ideal_min, ideal_max, warn_min, warn_max, crit_min, crit_max) VALUES ('temp', 18, 27, 15, 31, 11, 35) ON CONFLICT (metric_key) DO NOTHING;
+INSERT INTO umbral_metrica (metric_key, ideal_min, ideal_max, warn_min, warn_max, crit_min, crit_max) VALUES ('ce', 1.0, 1.9, 0.8, 2.5, 0.5, 3.1) ON CONFLICT (metric_key) DO NOTHING;
+INSERT INTO umbral_metrica (metric_key, ideal_min, ideal_max, warn_min, warn_max, crit_min, crit_max) VALUES ('uv', 1, 6, 0, 8, 0, 12) ON CONFLICT (metric_key) DO NOTHING;
+
+-- Límites operativos de actuadores y parámetros de seguimiento (fila única)
+INSERT INTO configuracion_operativa (id, riego_tiempo_max_seg, riego_vol_max_diario_ml, insumo_dosis_max_24h_ml, mediasombra_apertura_max_pct, seguimiento_latencia_min, seguimiento_delta_min, updated_by, updated_ts) VALUES (1, 120, 2000, 15, 100, 2, 5, 'Valores de fábrica', NULL) ON CONFLICT (id) DO NOTHING;
+
+-- Plan de rustificación por etapas (cronograma de días · % de apertura de mediasombra)
+INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (1, 1, 7, 20) ON CONFLICT (orden) DO NOTHING;
+INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (2, 8, 14, 40) ON CONFLICT (orden) DO NOTHING;
+INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (3, 15, 21, 70) ON CONFLICT (orden) DO NOTHING;
+INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (4, 22, 30, 100) ON CONFLICT (orden) DO NOTHING;

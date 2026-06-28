@@ -267,6 +267,47 @@ export interface SectorDetail {
   statusInk: string;
 }
 
+/** Bandas configurables de una métrica (HU-15). Espejo del DTO `UmbralMetrica`. */
+export interface MetricThreshold {
+  key: string;
+  label: string;
+  unit: string;
+  dec: number;
+  idealMin: number;
+  idealMax: number;
+  warnMin: number;
+  warnMax: number;
+  critMin: number;
+  critMax: number;
+}
+
+/** Límites operativos de actuadores y parámetros de seguimiento (HU-15). */
+export interface ConfigOperativa {
+  riegoTiempoMaxSeg: number;
+  riegoVolMaxDiarioMl: number;
+  insumoDosisMax24hMl: number;
+  mediasombraAperturaMaxPct: number;
+  seguimientoLatenciaMin: number;
+  seguimientoDeltaMin: number;
+  updatedBy: string | null;
+  updatedTs: number | null;
+}
+
+/** Etapa del plan de rustificación (HU-15 CA-06). */
+export interface RustificacionEtapa {
+  orden: number;
+  diaDesde: number;
+  diaHasta: number;
+  aperturaPct: number;
+}
+
+/** Configuración agronómica completa (HU-15). Espejo del DTO `Configuracion`. */
+export interface Configuracion {
+  umbrales: MetricThreshold[];
+  operativa: ConfigOperativa;
+  rustificacion: RustificacionEtapa[];
+}
+
 /** Dataset completo del vivero (lo que entrega el repositorio). */
 export interface NurseryData {
   zonas: Zona[];

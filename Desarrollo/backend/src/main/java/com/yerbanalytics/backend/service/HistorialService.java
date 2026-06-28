@@ -10,6 +10,7 @@ import com.yerbanalytics.backend.repository.SectorRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,17 +37,21 @@ public class HistorialService {
 
     private final HistorialRepository historialRepository;
     private final SectorRepository sectorRepository;
+    private final ConfiguracionService configuracionService;
+    /** Fallbacks por properties, usados si la configuración persistida no está disponible. */
     private final long latencyMs;
     private final String latencyLabel;
     private final double umbralRecuperacion;
 
     public HistorialService(HistorialRepository historialRepository,
                             SectorRepository sectorRepository,
+                            @Lazy ConfiguracionService configuracionService,
                             @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
                             @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
                             @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion) {
         this.historialRepository = historialRepository;
         this.sectorRepository = sectorRepository;
+        this.configuracionService = configuracionService;
         this.latencyMs = latencyMs;
         this.latencyLabel = latencyLabel;
         this.umbralRecuperacion = umbralRecuperacion;
@@ -95,19 +100,55 @@ public class HistorialService {
     }
 
     private void withSeguimiento(HistorialEventoEntity e, double valorAntes) {
+        // Latencia y delta vienen de la configuración agronómica vigente (HU-15 CA-07),
+        // con los valores de properties como fallback.
+        long effLatency = latencyMs;
+        String effLabel = latencyLabel;
+        double effUmbral = umbralRecuperacion;
+        try {
+            effLatency = configuracionService.getLatencyMs();
+            effLabel = configuracionService.getLatencyLabel();
+            effUmbral = configuracionService.getUmbralRecuperacion();
+        } catch (RuntimeException ignored) {
+            // Sin configuración disponible: se usan los fallbacks por properties.
+        }
+
         e.setMetricKey("humSus");
         e.setValorAntes(valorAntes);
-        e.setUmbralRecuperacion(umbralRecuperacion);
-        e.setLatencyMs(latencyMs);
+        e.setUmbralRecuperacion(effUmbral);
+        e.setLatencyMs(effLatency);
         e.setEvoShow(true);
         e.setEvoMetric("Humedad de sustrato");
         e.setEvoUnit("%");
         e.setEvoAntes(fmt0(valorAntes));
         e.setEvoAhora("—");
         e.setEvoDelta("—");
-        e.setEvoLatencia(latencyLabel);
+        e.setEvoLatencia(effLabel);
         e.setEvoVerdict("En seguimiento");
         e.setEvoEvaluadoTs(null);
+    }
+
+    /**
+     * Registra, de forma inmutable, un cambio de configuración agronómica (HU-15 CA-02):
+     * deja asentado quién y cuándo recalibró el sistema.
+     */
+    @Transactional
+    public void registrarConfiguracion(String usuario) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId("—");
+        e.setZonaId("—");
+        e.setZonaName("Sistema");
+        e.setTipo("Configuración");
+        e.setTs(System.currentTimeMillis());
+        e.setLectura("Recalibración de parámetros agronómicos por " + usuario + ".");
+        e.setDecision("Se validaron los nuevos umbrales y límites contra el rango fisiológico.");
+        e.setAccion("Configuración actualizada: umbrales, límites operativos y plan de rustificación.");
+        e.setRes("Efectiva");
+        e.setSev("—");
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
     }
 
     // ------------------------------------------------------------------
