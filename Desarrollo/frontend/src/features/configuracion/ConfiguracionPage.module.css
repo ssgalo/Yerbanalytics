@@ -1,0 +1,106 @@
+/* Vista Configuración agronómica (HU-15) */
+
+.state {
+  padding: 40px;
+  font-family: var(--font-body);
+  color: var(--muted);
+}
+
+.intro {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 18px;
+  max-width: 720px;
+}
+
+.section {
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sectionHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Barra de acciones inferior, fija al hacer scroll */
+.actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 4px;
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.feedbackOk {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.feedbackErr {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--crit);
+}
+
+.audit {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.btnPrimary {
+  border: none;
+  background-color: var(--brand);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled {
+  background-color: var(--line);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary:hover {
+  border-color: var(--muted);
+}

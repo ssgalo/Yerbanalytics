@@ -5,6 +5,7 @@ import { MapPage } from '@/features/map/MapPage';
 import { SectorPage } from '@/features/sector/SectorPage';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
 import { HistorialPage } from '@/features/historial/HistorialPage';
+import { ConfiguracionPage } from '@/features/configuracion/ConfiguracionPage';
 import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
 
 export const router = createBrowserRouter([
@@ -17,7 +18,7 @@ export const router = createBrowserRouter([
       { path: 'sector/:id', element: <SectorPage /> },
       { path: 'diagnosticos', element: <DiagnosticsPage /> },
       { path: 'historial', element: <HistorialPage /> },
-      { path: 'configuracion', element: <PlaceholderPage title="Umbrales y rustificación" /> },
+      { path: 'configuracion', element: <ConfiguracionPage /> },
       { path: 'hardware', element: <PlaceholderPage title="Estado del hardware" /> },
     ],
   },

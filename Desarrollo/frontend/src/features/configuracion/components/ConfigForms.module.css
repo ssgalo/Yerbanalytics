@@ -1,0 +1,164 @@
+/* Estilos compartidos por los formularios de configuración */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.inputWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--muted);
+}
+
+.inputError {
+  border-color: var(--crit);
+  background-color: #FDF1EE;
+}
+
+.unit {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* --- Tabla de umbrales --- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0 8px 8px;
+}
+
+.table td {
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.metricName {
+  font-weight: 600;
+  color: var(--ink);
+  font-family: var(--font-body);
+  white-space: nowrap;
+}
+
+.metricUnit {
+  font-size: 11px;
+  color: var(--faint);
+  margin-left: 4px;
+}
+
+.cellInput {
+  width: 74px;
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+}
+
+.cellInput:focus {
+  border-color: var(--muted);
+}
+
+.rowError {
+  color: var(--crit);
+  font-size: 11px;
+  padding: 0 8px 8px;
+}
+
+/* --- Plan de rustificación --- */
+.etapas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.etapaRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.etapaOrden {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 70px;
+  padding-bottom: 9px;
+}
+
+.btnGhost {
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 10px;
+  padding: 8px 13px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btnGhost:hover {
+  border-color: var(--muted);
+}
+
+.btnRemove {
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.btnRemove:hover {
+  border-color: var(--crit);
+  color: var(--crit);
+}

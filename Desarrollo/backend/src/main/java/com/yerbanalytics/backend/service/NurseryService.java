@@ -21,16 +21,19 @@ public class NurseryService {
     private final ZonaRepository zonaRepository;
     private final SectorRepository sectorRepository;
     private final HistorialService historialService;
+    private final ConfiguracionService configuracionService;
     private final long staleThresholdMs;
 
     public NurseryService(NurseryProperties properties,
                           ZonaRepository zonaRepository,
                           SectorRepository sectorRepository,
                           HistorialService historialService,
+                          ConfiguracionService configuracionService,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.historialService = historialService;
+        this.configuracionService = configuracionService;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -301,7 +304,7 @@ public class NurseryService {
                 weather,
                 new HashMap<>(SEV_MAP),
                 new HashMap<>(TINTS),
-                SPECS
+                configuracionService.getEffectiveSpecs()
         );
     }
 
@@ -376,7 +379,7 @@ public class NurseryService {
             String oldValve = s.getActuadorValve();
             String oldPump = s.getActuadorPump();
             double humSusVal = s.getHumSusRaw() != null ? s.getHumSusRaw() : 50.0;
-            String valve = humSusVal < 42 ? "Regando" : "Cerrada";
+            String valve = humSusVal < configuracionService.getRiegoHumSusUmbral() ? "Regando" : "Cerrada";
             String pump = "critical".equals(finalStatus) && s.getDiagnosisConf() != null && s.getDiagnosisConf() >= 85
                     ? "Dosificando" : "En espera";
             s.setActuadorValve(valve);
@@ -396,7 +399,7 @@ public class NurseryService {
 
     private List<Metric> buildMetricsList(SectorEntity s) {
         List<Metric> metrics = new ArrayList<>();
-        for (MetricSpec sp : SPECS) {
+        for (MetricSpec sp : configuracionService.getEffectiveSpecs()) {
             Double val = null;
             if ("humSus".equals(sp.key())) {
                 val = s.getHumSusRaw();
@@ -449,7 +452,7 @@ public class NurseryService {
 
     private List<Metric> buildOfflineMetricsList() {
         List<Metric> metrics = new ArrayList<>();
-        for (MetricSpec sp : SPECS) {
+        for (MetricSpec sp : configuracionService.getEffectiveSpecs()) {
             metrics.add(new Metric(
                     sp.key(),
                     sp.label(),
