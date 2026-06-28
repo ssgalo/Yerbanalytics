@@ -216,6 +216,30 @@ export interface Evolution {
   vInk: string;
 }
 
+/** Registro del historial global de acciones (HU-11 / HU-12). Espejo del DTO backend. */
+export interface ActionRecord {
+  id: string;
+  sectorId: string;
+  zonaName: string;
+  tipo: string; // 'Riego' | 'Insumo' | 'Mediasombra'
+  time: string; // tiempo relativo: 'hace 6 min'
+  ts: number; // epoch ms (orden y filtro por fecha)
+  fecha: string; // 'dd/MM HH:mm'
+  /** Cadena de justificación: lectura/diagnóstico → decisión → acción. */
+  lectura: string;
+  decision: string;
+  accion: string;
+  res: string; // 'Efectiva' | 'En seguimiento' | 'Pospuesta' | 'Abortada'
+  resSoft: string;
+  resInk: string;
+  sev: Severity;
+  tint: string; // fondo del ícono
+  ink: string; // color del ícono
+  path: string; // path SVG del ícono
+  /** Seguimiento post-acción; null si la acción no lo requiere. */
+  evo: Evolution | null;
+}
+
 /** Presentación del diagnóstico en el detalle. */
 export interface DiagnosisDetail {
   estado: string;

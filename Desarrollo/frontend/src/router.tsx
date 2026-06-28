@@ -4,6 +4,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { MapPage } from '@/features/map/MapPage';
 import { SectorPage } from '@/features/sector/SectorPage';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
+import { HistorialPage } from '@/features/historial/HistorialPage';
 import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
 
 export const router = createBrowserRouter([
@@ -15,7 +16,7 @@ export const router = createBrowserRouter([
       { path: 'mapa', element: <MapPage /> },
       { path: 'sector/:id', element: <SectorPage /> },
       { path: 'diagnosticos', element: <DiagnosticsPage /> },
-      { path: 'historial', element: <PlaceholderPage title="Historial y trazabilidad" /> },
+      { path: 'historial', element: <HistorialPage /> },
       { path: 'configuracion', element: <PlaceholderPage title="Umbrales y rustificación" /> },
       { path: 'hardware', element: <PlaceholderPage title="Estado del hardware" /> },
     ],

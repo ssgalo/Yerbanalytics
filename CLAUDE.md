@@ -16,7 +16,7 @@ y para cualquiera que llegue nuevo al repo. **Mantenelo actualizado.**
 Yerbanalytics/
 ├── Desarrollo/
 │   ├── frontend/      Dashboard React + TS + Vite (ver §4)
-│   ├── backend/       API (aún sin implementar)
+│   ├── backend/       API REST Spring Boot (Java 17, puerto 8000)
 │   └── Modelo_IA/     Modelo de visión: datasets, notebooks, resultados (ver §5)
 ├── Documentacion/     Documentos de negocio, alcance, arquitectura, entregas
 ├── openspec/          Spec-driven development (ver §3)
@@ -24,8 +24,8 @@ Yerbanalytics/
 └── README.md
 ```
 
-Tres áreas de trabajo independientes: **frontend**, **backend** (pendiente) y
-**Modelo_IA**. No están acopladas todavía; se integran vía la API del backend.
+Tres áreas de trabajo: **frontend**, **backend** y **Modelo_IA**. El frontend consume
+el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es futura.
 
 ---
 
@@ -125,9 +125,23 @@ Modelo de visión para clasificar el estado del plantín.
 
 ## 6. Backend (`Desarrollo/backend/`)
 
-Aún sin implementar. Contrato esperado por el frontend (modo `http`):
-`GET {VITE_API_BASE_URL}/nursery` → snapshot del vivero (forma `NurseryData` en
-`frontend/src/types/domain.ts`).
+App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta MQTT
+(con simulador). El esquema lo crea Hibernate (`ddl-auto=update`) y se siembra con
+`resources/data.sql` (600 sectores, 6 zonas).
+
+### Arranque rápido
+```bash
+cd Desarrollo/backend
+./mvnw spring-boot:run   # escucha en http://localhost:8000
+```
+
+### Endpoints principales
+- `GET /api/nursery` → snapshot del vivero (`NurseryData` en `frontend/src/types/domain.ts`)
+
+### Convenciones internas
+- Entidades con Lombok + `JpaRepository` + service + controller.
+- Datos iniciales en `src/main/resources/data.sql`.
+- Para features nuevas, espejar el patrón existente (entity → repo → service → controller → seed).
 
 ---
 
