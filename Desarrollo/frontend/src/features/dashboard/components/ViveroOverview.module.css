@@ -53,7 +53,7 @@
 
 .zonaGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* grid-template-columns se fija inline según la disposición configurada (HU-18 CA-01) */
   gap: 14px;
   margin-top: 18px;
 }
@@ -104,7 +104,7 @@
 
 .heatmap {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  /* grid-template-columns se fija inline según la disposición configurada (HU-18 CA-01) */
   gap: 2.5px;
   margin-top: 11px;
 }

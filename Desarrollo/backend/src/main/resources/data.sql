@@ -651,6 +651,9 @@ INSERT INTO umbral_metrica (metric_key, ideal_min, ideal_max, warn_min, warn_max
 -- Límites operativos de actuadores y parámetros de seguimiento (fila única)
 INSERT INTO configuracion_operativa (id, riego_tiempo_max_seg, riego_vol_max_diario_ml, insumo_dosis_max_24h_ml, mediasombra_apertura_max_pct, seguimiento_latencia_min, seguimiento_delta_min, updated_by, updated_ts) VALUES (1, 120, 2000, 15, 100, 2, 5, 'Valores de fábrica', NULL) ON CONFLICT (id) DO NOTHING;
 
+-- Disposición visual de la topología (fila única): macro-zonas por fila / sectores por fila
+INSERT INTO topologia_layout (id, macro_zonas_por_fila, sectores_por_fila) VALUES (1, 3, 10) ON CONFLICT (id) DO NOTHING;
+
 -- Plan de rustificación por etapas (cronograma de días · % de apertura de mediasombra)
 INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (1, 1, 7, 20) ON CONFLICT (orden) DO NOTHING;
 INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (2, 8, 14, 40) ON CONFLICT (orden) DO NOTHING;

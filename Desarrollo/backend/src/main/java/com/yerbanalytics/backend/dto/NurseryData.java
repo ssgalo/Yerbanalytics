@@ -8,5 +8,6 @@ public record NurseryData(
         Stats stats, List<PriorityItem> priority, List<DiagnosisCard> diagnoses,
         Map<String, DiagnosisCard> diagById, List<DiagnosisCard> recentDiag,
         List<ActionEvent> actions, List<Alert> alerts, Weather weather,
-        Map<String, ColorPair> sevMap, Map<String, String> tints, List<MetricSpec> specs
+        Map<String, ColorPair> sevMap, Map<String, String> tints, List<MetricSpec> specs,
+        LayoutTopologia layout
 ) {}

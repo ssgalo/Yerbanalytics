@@ -1,14 +1,16 @@
 import { useNavigate } from 'react-router-dom';
-import type { Zona } from '@/types/domain';
+import type { DisposicionTopologia, Zona } from '@/types/domain';
 import styles from './ViveroOverview.module.css';
 
 interface ViveroOverviewProps {
   zonas: Zona[];
+  layout: DisposicionTopologia;
 }
 
-/** Mapa de estado del vivero: 6 macro-zonas con heatmap de 100 sectores c/u. */
-export function ViveroOverview({ zonas }: ViveroOverviewProps) {
+/** Mapa de estado del vivero: macro-zonas con heatmap de sectores, según la disposición. */
+export function ViveroOverview({ zonas, layout }: ViveroOverviewProps) {
   const navigate = useNavigate();
+  const totalSectores = zonas.reduce((acc, z) => acc + z.total, 0);
 
   return (
     <div className={styles.card}>
@@ -17,7 +19,7 @@ export function ViveroOverview({ zonas }: ViveroOverviewProps) {
         <div>
           <h2 className={styles.title}>Estado del vivero</h2>
           <div className={styles.subtitle}>
-            600 sectores · 6 macro-zonas · cada celda es 1 sector (~100 tubetes)
+            {totalSectores} sectores · {zonas.length} macro-zonas · cada celda es 1 sector
           </div>
         </div>
         <div className={styles.legend}>
@@ -40,8 +42,11 @@ export function ViveroOverview({ zonas }: ViveroOverviewProps) {
         </div>
       </div>
 
-      {/* Grilla de macro-zonas */}
-      <div className={styles.zonaGrid}>
+      {/* Grilla de macro-zonas (columnas según la disposición configurada) */}
+      <div
+        className={styles.zonaGrid}
+        style={{ gridTemplateColumns: `repeat(${layout.macroZonasPorFila}, 1fr)` }}
+      >
         {zonas.map((zona) => (
           <button
             key={zona.id}
@@ -58,8 +63,11 @@ export function ViveroOverview({ zonas }: ViveroOverviewProps) {
               <span style={{ color: 'var(--warn)' }}>{zona.alerta} alerta</span>
               <span style={{ color: 'var(--off)' }}>{zona.off} s/s</span>
             </div>
-            {/* Mini-heatmap: 100 sectores en grilla 10x10 */}
-            <div className={styles.heatmap}>
+            {/* Mini-heatmap: sectores por fila según la disposición configurada */}
+            <div
+              className={styles.heatmap}
+              style={{ gridTemplateColumns: `repeat(${layout.sectoresPorFila}, 1fr)` }}
+            >
               {zona.sectors.map((s) => (
                 <span
                   key={s.id}

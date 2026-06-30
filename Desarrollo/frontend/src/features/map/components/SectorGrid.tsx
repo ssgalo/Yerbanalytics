@@ -1,5 +1,6 @@
 /* ============================================================
-   SectorGrid — grilla 10×10 de sectores de una macro-zona.
+   SectorGrid — grilla de sectores de una macro-zona, con tantos
+   sectores por fila como indique la disposición configurada.
    Cada celda es un botón coloreado por estado de salud.
    Hover: escala 1.12 + sombra (via CSS Module).
    ============================================================ */
@@ -8,10 +9,11 @@ import styles from './SectorGrid.module.css';
 
 interface SectorGridProps {
   zona: Zona;
+  sectoresPorFila: number;
   onSectorClick: (sectorId: string) => void;
 }
 
-export function SectorGrid({ zona, onSectorClick }: SectorGridProps) {
+export function SectorGrid({ zona, sectoresPorFila, onSectorClick }: SectorGridProps) {
   return (
     <div className={styles.wrapper}>
       {/* Encabezado: nombre de zona + leyenda */}
@@ -19,7 +21,7 @@ export function SectorGrid({ zona, onSectorClick }: SectorGridProps) {
         <div>
           <h2 className={styles.title}>{zona.name}</h2>
           <div className={styles.subtitle}>
-            100 sectores · 1 microaspersor por sector · clic para ver el detalle
+            {zona.total} sectores · 1 microaspersor por sector · clic para ver el detalle
           </div>
         </div>
         {/* Leyenda de colores */}
@@ -31,8 +33,11 @@ export function SectorGrid({ zona, onSectorClick }: SectorGridProps) {
         </div>
       </div>
 
-      {/* Grilla 10×10 */}
-      <div className={styles.grid}>
+      {/* Grilla de sectores (columnas según la disposición configurada) */}
+      <div
+        className={styles.grid}
+        style={{ gridTemplateColumns: `repeat(${sectoresPorFila}, 1fr)` }}
+      >
         {zona.sectors.map((s: Sector) => (
           <button
             key={s.id}

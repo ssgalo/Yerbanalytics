@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_MACRO_ZONAS_POR_FILA,
+  DEFAULT_SECTORES_POR_FILA,
+  disposicionError,
   MAX_MACRO_ZONAS,
   MAX_SECTORES_POR_ZONA,
   topologiaError,
@@ -12,13 +15,33 @@ import type { NuevaTopologia } from '@/types/domain';
 const SEED = 20260613;
 
 describe('topología — helpers (HU-18 CA-01)', () => {
-  it('resume una grilla N × M', () => {
+  it('resume una grilla N × M con la disposición por defecto', () => {
     expect(topologiaSummary(10, 100)).toEqual({
       macroZonas: 10,
       sectoresPorMacroZona: 100,
       totalSectores: 1000,
       generada: true,
+      macroZonasPorFila: DEFAULT_MACRO_ZONAS_POR_FILA,
+      sectoresPorFila: DEFAULT_SECTORES_POR_FILA,
     });
+  });
+
+  it('incluye la disposición indicada, acotada a las cantidades', () => {
+    const t = topologiaSummary(4, 8, { macroZonasPorFila: 2, sectoresPorFila: 4 });
+    expect(t.macroZonasPorFila).toBe(2);
+    expect(t.sectoresPorFila).toBe(4);
+    // se acota si excede las cantidades
+    const clamped = topologiaSummary(4, 8, { macroZonasPorFila: 9, sectoresPorFila: 99 });
+    expect(clamped.macroZonasPorFila).toBe(4);
+    expect(clamped.sectoresPorFila).toBe(8);
+  });
+
+  it('valida la disposición contra la grilla actual', () => {
+    expect(disposicionError({ macroZonasPorFila: 3, sectoresPorFila: 10 }, 6, 100)).toBeNull();
+    expect(disposicionError({ macroZonasPorFila: 0, sectoresPorFila: 10 }, 6, 100)).not.toBeNull();
+    expect(disposicionError({ macroZonasPorFila: 7, sectoresPorFila: 10 }, 6, 100)).not.toBeNull();
+    expect(disposicionError({ macroZonasPorFila: 3, sectoresPorFila: 101 }, 6, 100)).not.toBeNull();
+    expect(disposicionError({ macroZonasPorFila: 1.5, sectoresPorFila: 10 }, 6, 100)).not.toBeNull();
   });
 
   it('genera N macro-zonas con ids, nombres y subs sintetizados', () => {
@@ -85,5 +108,40 @@ describe('topología — MockRepository (HU-18 CA-01)', () => {
     await repo.generarTopologia({ macroZonas: 2, sectoresPorMacroZona: 5, regenerar: true });
     const hw = await repo.getHardware();
     expect(hw.total).toBe(0);
+  });
+
+  it('expone la disposición en el snapshot del vivero', async () => {
+    const repo = new MockRepository(SEED);
+    const nursery = await repo.getNursery();
+    expect(nursery.layout).toEqual({
+      macroZonasPorFila: DEFAULT_MACRO_ZONAS_POR_FILA,
+      sectoresPorFila: DEFAULT_SECTORES_POR_FILA,
+    });
+  });
+
+  it('guarda la disposición sin regenerar la grilla ni descartar la flota', async () => {
+    const repo = new MockRepository(SEED);
+    const hwAntes = await repo.getHardware();
+
+    const t = await repo.guardarDisposicion({ macroZonasPorFila: 2, sectoresPorFila: 5 });
+    expect(t.macroZonasPorFila).toBe(2);
+    expect(t.sectoresPorFila).toBe(5);
+    // la grilla no cambió
+    expect(t.macroZonas).toBe(6);
+    expect(t.totalSectores).toBe(600);
+
+    const nursery = await repo.getNursery();
+    expect(nursery.layout).toEqual({ macroZonasPorFila: 2, sectoresPorFila: 5 });
+    expect(nursery.sectors).toHaveLength(600);
+    // la flota queda intacta
+    const hwDespues = await repo.getHardware();
+    expect(hwDespues.total).toBe(hwAntes.total);
+  });
+
+  it('rechaza una disposición fuera del rango de la grilla', async () => {
+    const repo = new MockRepository(SEED);
+    await expect(
+      repo.guardarDisposicion({ macroZonasPorFila: 99, sectoresPorFila: 5 }),
+    ).rejects.toThrow();
   });
 });

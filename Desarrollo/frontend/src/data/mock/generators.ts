@@ -7,6 +7,7 @@ import type {
   ActionEvent,
   Alert,
   DiagnosisCard,
+  DisposicionTopologia,
   Metric,
   NurseryData,
   PriorityItem,
@@ -17,12 +18,22 @@ import type {
   Zona,
 } from '@/types/domain';
 import { ACT, C, LAB, actTpl, pathos, resMap, sevMap, specs, tints, zonaDefs } from './specs';
-import { zonaDefsFor } from './topologia';
+import {
+  clampDisposicion,
+  DEFAULT_MACRO_ZONAS_POR_FILA,
+  DEFAULT_SECTORES_POR_FILA,
+  zonaDefsFor,
+} from './topologia';
 
-/** Estructura de la grilla a generar: cantidad de macro-zonas y de sectores por macro-zona. */
+/**
+ * Estructura de la grilla a generar: cantidad de macro-zonas y de sectores por macro-zona, más
+ * la disposición visual por fila (opcional; defaults si no se especifica).
+ */
 export interface TopologiaGrid {
   macroZonas: number;
   sectoresPorMacroZona: number;
+  macroZonasPorFila?: number;
+  sectoresPorFila?: number;
 }
 
 /** Clasifica un valor según las bandas de su spec. */
@@ -164,14 +175,33 @@ function makeSector(
  * Sin `topologia`: la grilla demo por defecto (6 × 100) con estados aleatorios. Con
  * `topologia` (tras una generación del Administrador, HU-18 CA-01): una grilla N × M con
  * todos los sectores en estado offline ("Fuera de servicio"), como el seed, hasta que
- * llegue telemetría.
+ * llegue telemetría. `disposicion` fija la disposición visual por fila con independencia de
+ * la grilla (permite reacomodar la grilla demo sin volverla offline).
  */
-export function buildNursery(seed: number, topologia?: TopologiaGrid): NurseryData {
+export function buildNursery(
+  seed: number,
+  topologia?: TopologiaGrid,
+  disposicion?: DisposicionTopologia,
+): NurseryData {
   const r = createRng(seed);
 
   const zonaList = topologia ? zonaDefsFor(topologia.macroZonas) : zonaDefs;
   const sectoresPorZona = topologia ? topologia.sectoresPorMacroZona : 100;
   const offlineOnly = topologia != null;
+  const macroZonasCount = zonaList.length;
+
+  // Disposición visual acotada a la grilla (defaults reproducen la presentación previa).
+  // Prioridad: disposición explícita > la incluida en la topología > defaults.
+  const layout = {
+    macroZonasPorFila: clampDisposicion(
+      disposicion?.macroZonasPorFila ?? topologia?.macroZonasPorFila ?? DEFAULT_MACRO_ZONAS_POR_FILA,
+      macroZonasCount,
+    ),
+    sectoresPorFila: clampDisposicion(
+      disposicion?.sectoresPorFila ?? topologia?.sectoresPorFila ?? DEFAULT_SECTORES_POR_FILA,
+      sectoresPorZona,
+    ),
+  };
 
   const sectors: Sector[] = [];
   const byId: Record<string, Sector> = {};
@@ -346,5 +376,6 @@ export function buildNursery(seed: number, topologia?: TopologiaGrid): NurseryDa
     sevMap: sevMap as Record<Severity, { soft: string; ink: string }>,
     tints,
     specs,
+    layout,
   };
 }

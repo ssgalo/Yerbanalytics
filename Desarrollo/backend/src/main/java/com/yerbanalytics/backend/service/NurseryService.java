@@ -4,8 +4,10 @@ import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.SectorRepository;
+import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
@@ -18,11 +20,15 @@ import java.util.*;
 @Service
 public class NurseryService {
 
+    /** Identidad de la fila única de disposición visual. */
+    private static final int LAYOUT_ID = 1;
+
     private final ZonaRepository zonaRepository;
     private final SectorRepository sectorRepository;
     private final HistorialService historialService;
     private final ConfiguracionService configuracionService;
     private final HardwareService hardwareService;
+    private final TopologiaLayoutRepository layoutRepository;
     private final long staleThresholdMs;
 
     public NurseryService(NurseryProperties properties,
@@ -31,12 +37,14 @@ public class NurseryService {
                           HistorialService historialService,
                           ConfiguracionService configuracionService,
                           HardwareService hardwareService,
+                          TopologiaLayoutRepository layoutRepository,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.historialService = historialService;
         this.configuracionService = configuracionService;
         this.hardwareService = hardwareService;
+        this.layoutRepository = layoutRepository;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -295,6 +303,11 @@ public class NurseryService {
                 )
         );
 
+        // Disposición visual configurada, acotada a la grilla actual (HU-18 CA-01).
+        int macroZonas = zonas.size();
+        int sectoresPorMacroZona = macroZonas > 0 ? totalSectores / macroZonas : 0;
+        LayoutTopologia layout = buildLayout(macroZonas, sectoresPorMacroZona);
+
         return new NurseryData(
                 zonas,
                 allSectors,
@@ -309,8 +322,24 @@ public class NurseryService {
                 weather,
                 new HashMap<>(SEV_MAP),
                 new HashMap<>(TINTS),
-                configuracionService.getEffectiveSpecs()
+                configuracionService.getEffectiveSpecs(),
+                layout
         );
+    }
+
+    /** Disposición visual de la fila única (defaults si nunca se configuró), acotada a la grilla. */
+    private LayoutTopologia buildLayout(int macroZonas, int sectoresPorMacroZona) {
+        TopologiaLayoutEntity e = layoutRepository.findById(LAYOUT_ID).orElse(null);
+        int mzPorFila = e != null ? e.getMacroZonasPorFila() : 3;
+        int secPorFila = e != null ? e.getSectoresPorFila() : 10;
+        return new LayoutTopologia(clampLayout(mzPorFila, macroZonas), clampLayout(secPorFila, sectoresPorMacroZona));
+    }
+
+    private static int clampLayout(int value, int max) {
+        if (value < 1) {
+            return 1;
+        }
+        return max > 0 ? Math.min(value, max) : value;
     }
 
     @Transactional

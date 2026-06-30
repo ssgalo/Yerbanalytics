@@ -55,7 +55,7 @@
 /* Grilla 10 columnas */
 .grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  /* grid-template-columns se fija inline según la disposición configurada (HU-18 CA-01) */
   gap: 7px;
 }
 

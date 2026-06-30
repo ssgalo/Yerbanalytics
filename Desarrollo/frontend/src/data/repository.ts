@@ -5,6 +5,7 @@
 import type {
   ActionRecord,
   Configuracion,
+  DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
@@ -31,4 +32,6 @@ export interface DataRepository {
   getTopologia(): Promise<TopologiaVivero>;
   /** Genera (o regenera) la grilla lógica del vivero y devuelve el resumen resultante (HU-18 CA-01). */
   generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero>;
+  /** Actualiza la disposición visual por fila sin regenerar la grilla (HU-18 CA-01). */
+  guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero>;
 }

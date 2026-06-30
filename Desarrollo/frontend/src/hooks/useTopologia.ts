@@ -5,7 +5,7 @@
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import { getRepository } from '@/data';
-import type { NuevaTopologia, TopologiaVivero } from '@/types/domain';
+import type { DisposicionTopologia, NuevaTopologia, TopologiaVivero } from '@/types/domain';
 
 interface UseTopologiaResult {
   data: TopologiaVivero | null;
@@ -14,6 +14,8 @@ interface UseTopologiaResult {
   generating: boolean;
   /** Genera (o regenera) la grilla; resuelve con el resumen actualizado o rechaza con el error. */
   generar: (input: NuevaTopologia) => Promise<TopologiaVivero>;
+  /** Guarda la disposición visual sin regenerar la grilla; resuelve con el resumen actualizado. */
+  guardarDisposicion: (input: DisposicionTopologia) => Promise<TopologiaVivero>;
 }
 
 export function useTopologia(): UseTopologiaResult {
@@ -56,5 +58,19 @@ export function useTopologia(): UseTopologiaResult {
     }
   }, []);
 
-  return { data, loading, error, generating, generar };
+  const guardarDisposicion = useCallback(
+    async (input: DisposicionTopologia): Promise<TopologiaVivero> => {
+      setGenerating(true);
+      try {
+        const updated = await getRepository().guardarDisposicion(input);
+        setData(updated);
+        return updated;
+      } finally {
+        setGenerating(false);
+      }
+    },
+    [],
+  );
+
+  return { data, loading, error, generating, generar, guardarDisposicion };
 }

@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.controller;
 
+import com.yerbanalytics.backend.dto.DisposicionTopologia;
 import com.yerbanalytics.backend.dto.NuevaTopologia;
 import com.yerbanalytics.backend.dto.TopologiaVivero;
 import com.yerbanalytics.backend.service.TopologiaConflictoException;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,6 +41,12 @@ public class TopologiaController {
     @PostMapping
     public ResponseEntity<TopologiaVivero> generar(@RequestBody NuevaTopologia dto) {
         return ResponseEntity.ok(topologiaService.generar(dto));
+    }
+
+    /** Actualiza la disposición visual por fila sin regenerar la grilla (HU-18 CA-01). */
+    @PutMapping("/disposicion")
+    public ResponseEntity<TopologiaVivero> actualizarDisposicion(@RequestBody DisposicionTopologia dto) {
+        return ResponseEntity.ok(topologiaService.actualizarDisposicion(dto));
     }
 
     /** Cantidad de macro-zonas/sectores fuera de los límites válidos (HU-18 CA-01) → 400. */
