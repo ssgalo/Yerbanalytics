@@ -1,0 +1,144 @@
+package com.yerbanalytics.backend.service;
+
+import com.yerbanalytics.backend.dto.NuevaTopologia;
+import com.yerbanalytics.backend.dto.TopologiaVivero;
+import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.ZonaEntity;
+import com.yerbanalytics.backend.repository.DispositivoRepository;
+import com.yerbanalytics.backend.repository.HistorialRepository;
+import com.yerbanalytics.backend.repository.SectorRepository;
+import com.yerbanalytics.backend.repository.ZonaRepository;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Generación dinámica de la topología del vivero (HU-18 CA-01). El Administrador define
+ * N macro-zonas × M sectores y el servicio crea la grilla lógica con identificadores
+ * únicos (`MZ-{z}` / `MZ-{z}-{NNN}`) y los defaults offline idénticos al seed, dejándola
+ * disponible para el mapa de producción.
+ *
+ * <p>Genera sobre un vivero vacío; si ya hay topología, rechaza (409) salvo que el request
+ * pida regenerar, en cuyo caso reemplaza la grilla limpiando las referencias colgantes
+ * (dispositivos e historial referencian sector/zona por string, sin FK).
+ */
+@Service
+public class TopologiaService {
+
+    /** Límites operativos de la grilla (evitan generaciones absurdas). */
+    static final int MAX_MACRO_ZONAS = 50;
+    static final int MAX_SECTORES_POR_ZONA = 500;
+
+    private static final String[] SUBS = {"Sector norte", "Sector centro", "Sector sur"};
+
+    // Defaults offline, idénticos al seed de data.sql (sector "Fuera de servicio").
+    private static final String STATUS_OFFLINE = "offline";
+    private static final String COLOR_OFFLINE = "#A9B2AB";
+    private static final String LABEL_OFFLINE = "Fuera de servicio";
+    private static final String DIAG_OFFLINE = "Sin diagnóstico";
+    private static final String SEV_OFFLINE = "—";
+    private static final String VALVE_OFFLINE = "Cerrada";
+    private static final String PUMP_OFFLINE = "En espera";
+
+    private final ZonaRepository zonaRepository;
+    private final SectorRepository sectorRepository;
+    private final DispositivoRepository dispositivoRepository;
+    private final HistorialRepository historialRepository;
+
+    public TopologiaService(ZonaRepository zonaRepository,
+                            SectorRepository sectorRepository,
+                            DispositivoRepository dispositivoRepository,
+                            HistorialRepository historialRepository) {
+        this.zonaRepository = zonaRepository;
+        this.sectorRepository = sectorRepository;
+        this.dispositivoRepository = dispositivoRepository;
+        this.historialRepository = historialRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public TopologiaVivero getTopologia() {
+        List<ZonaEntity> zonas = zonaRepository.findAll();
+        long totalSectores = sectorRepository.count();
+        int macroZonas = zonas.size();
+        int sectoresPorMacroZona = macroZonas > 0 ? (int) (totalSectores / macroZonas) : 0;
+        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, (int) totalSectores, macroZonas > 0);
+    }
+
+    @Transactional
+    public TopologiaVivero generar(NuevaTopologia dto) {
+        int macroZonas = dto.macroZonas();
+        int sectoresPorMacroZona = dto.sectoresPorMacroZona();
+        if (macroZonas <= 0 || macroZonas > MAX_MACRO_ZONAS) {
+            throw new TopologiaInvalidaException(
+                    "La cantidad de macro-zonas debe estar entre 1 y " + MAX_MACRO_ZONAS + ".");
+        }
+        if (sectoresPorMacroZona <= 0 || sectoresPorMacroZona > MAX_SECTORES_POR_ZONA) {
+            throw new TopologiaInvalidaException(
+                    "La cantidad de sectores por macro-zona debe estar entre 1 y " + MAX_SECTORES_POR_ZONA + ".");
+        }
+
+        boolean existeTopologia = zonaRepository.count() > 0;
+        if (existeTopologia && !dto.regenerar()) {
+            throw new TopologiaConflictoException(
+                    "El vivero ya tiene una topología cargada. Confirmá la regeneración para reemplazarla.");
+        }
+        if (existeTopologia) {
+            // Limpia referencias colgantes: dispositivos e historial apuntan a sector/zona por
+            // string (sin FK); el cascade de la zona elimina sus sectores.
+            dispositivoRepository.deleteAll();
+            historialRepository.deleteAll();
+            zonaRepository.deleteAll();
+            zonaRepository.flush();
+        }
+
+        List<ZonaEntity> zonas = new ArrayList<>();
+        List<SectorEntity> sectores = new ArrayList<>();
+        for (int z = 1; z <= macroZonas; z++) {
+            String zonaId = "MZ-" + z;
+            ZonaEntity zona = new ZonaEntity();
+            zona.setId(zonaId);
+            zona.setName("Macro-zona " + z);
+            zona.setSub(SUBS[(z - 1) % SUBS.length]);
+            zonas.add(zona);
+
+            for (int n = 1; n <= sectoresPorMacroZona; n++) {
+                sectores.add(nuevoSectorOffline(zona, zonaId, n));
+            }
+        }
+        zonaRepository.saveAll(zonas);
+        sectorRepository.saveAll(sectores);
+
+        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, sectores.size(), true);
+    }
+
+    /** Sector en estado offline, replicando los defaults del seed (id `MZ-{z}-{NNN}`). */
+    private SectorEntity nuevoSectorOffline(ZonaEntity zona, String zonaId, int n) {
+        String sectorId = String.format(Locale.US, "%s-%03d", zonaId, n);
+        SectorEntity s = new SectorEntity();
+        s.setId(sectorId);
+        s.setZona(zona);
+        s.setN(n);
+        s.setStatus(STATUS_OFFLINE);
+        s.setColor(COLOR_OFFLINE);
+        s.setStatusLabel(LABEL_OFFLINE);
+        s.setTip(sectorId + " · " + LABEL_OFFLINE);
+        s.setReason(LABEL_OFFLINE);
+        s.setDiagnosisEstado(DIAG_OFFLINE);
+        s.setDiagnosisConf(null);
+        s.setDiagnosisSev(SEV_OFFLINE);
+        s.setActuadorValve(VALVE_OFFLINE);
+        s.setActuadorPump(PUMP_OFFLINE);
+        s.setActuadorShade(0);
+        s.setLastReadingTime(null);
+        s.setHumSusRaw(null);
+        s.setHumAmbRaw(null);
+        s.setTempRaw(null);
+        s.setCeRaw(null);
+        s.setUvRaw(null);
+        return s;
+    }
+}

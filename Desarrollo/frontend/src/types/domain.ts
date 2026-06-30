@@ -308,6 +308,72 @@ export interface Configuracion {
   rustificacion: RustificacionEtapa[];
 }
 
+/** Estado operativo derivado de un dispositivo (HU-21). */
+export type EstadoHardware = 'operativo' | 'intermitente' | 'fuera_de_servicio';
+
+/** Un dispositivo de la flota con su estado técnico (HU-21). Espejo del DTO `Dispositivo`. */
+export interface Dispositivo {
+  id: string;
+  serial: string;
+  tipo: string; // 'nodo_testigo' | 'electrovalvula' | 'bomba_peristaltica' | 'mediasombra'
+  tipoLabel: string;
+  zonaId: string | null;
+  sectorId: string | null;
+  ubicacion: string;
+  bateria: number | null; // %
+  senal: number | null; // dBm
+  ultimoUpdate: number | null; // epoch ms
+  ultimoUpdateLabel: string;
+  estado: EstadoHardware;
+  estadoLabel: string;
+  estadoSoft: string;
+  estadoInk: string;
+  bateriaBaja: boolean;
+  falla: string | null;
+}
+
+/** Sector con mapeo de hardware incompleto (HU-18 CA-04). */
+export interface SectorIncompleto {
+  sectorId: string;
+  zonaName: string;
+  faltantes: string[]; // etiquetas de los actuadores faltantes
+}
+
+/** Estado técnico de la flota (HU-18 / HU-21). Espejo del DTO `HardwareData`. */
+export interface HardwareData {
+  dispositivos: Dispositivo[];
+  total: number;
+  operativos: number;
+  bateriaBaja: number;
+  fueraDeServicio: number;
+  averiados: number;
+  incompletos: SectorIncompleto[];
+}
+
+/** Alta o recambio de un dispositivo (HU-18 / HU-21). */
+export interface NuevoDispositivo {
+  serial: string;
+  tipo: string;
+  zonaId: string | null;
+  sectorId: string | null;
+}
+
+/** Resumen de la topología cargada en el vivero (HU-18 CA-01). Espejo del DTO `TopologiaVivero`. */
+export interface TopologiaVivero {
+  macroZonas: number;
+  sectoresPorMacroZona: number;
+  totalSectores: number;
+  /** `true` si hay una grilla disponible para el mapa de producción. */
+  generada: boolean;
+}
+
+/** Generación de la topología del vivero (HU-18 CA-01). `regenerar` reemplaza una grilla ya cargada. */
+export interface NuevaTopologia {
+  macroZonas: number;
+  sectoresPorMacroZona: number;
+  regenerar?: boolean;
+}
+
 /** Dataset completo del vivero (lo que entrega el repositorio). */
 export interface NurseryData {
   zonas: Zona[];

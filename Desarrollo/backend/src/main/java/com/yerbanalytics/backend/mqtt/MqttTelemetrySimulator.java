@@ -44,9 +44,15 @@ public class MqttTelemetrySimulator {
             // Simulate zones MZ-1 to MZ-6
             for (int i = 1; i <= 6; i++) {
                 String zoneId = "MZ-" + i;
+                // MAC distinta por macro-zona, para que cada nodo testigo actualice su fila.
+                String mac = String.format("A4:CF:12:9A:00:%02d", i);
+                // La macro-zona 2 reporta batería baja para ejercitar "Batería Baja" (HU-21 CA-02).
+                int battery = i == 2 ? 12 + random.nextInt(8) : 70 + random.nextInt(30);
+                int signal = -55 - random.nextInt(35); // dBm: -55 a -89
                 MqttTelemetryPayload payload = new MqttTelemetryPayload(
-                        "AA:BB:CC:DD:EE:FF",
-                        80 + random.nextInt(20), // battery 80-99
+                        mac,
+                        battery,
+                        signal,
                         System.currentTimeMillis(),
                         new MqttTelemetryPayload.MetricsPayload(
                                 38.0 + random.nextDouble() * 25, // humSus (ideal is 42-68)

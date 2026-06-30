@@ -656,3 +656,40 @@ INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALU
 INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (2, 8, 14, 40) ON CONFLICT (orden) DO NOTHING;
 INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (3, 15, 21, 70) ON CONFLICT (orden) DO NOTHING;
 INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALUES (4, 22, 30, 100) ON CONFLICT (orden) DO NOTHING;
+
+-- ============================================================
+-- Flota de hardware (HU-18 / HU-21) — seed de ejemplo.
+-- Nodos testigo (uno por macro-zona) + actuadores de algunos sectores.
+-- ultimo_update NULL: el simulador MQTT refresca el heartbeat de los nodos.
+-- Casos demostrativos: MZ-2 batería baja · MZ-1-003 y MZ-3-010 incompletos · MZ-5-042 averiado.
+-- ============================================================
+
+-- Nodos sensores testigo (1 por macro-zona)
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-001', 'A4:CF:12:9A:00:01', 'nodo_testigo', 'MZ-1', NULL, 88, -62, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-002', 'A4:CF:12:9A:00:02', 'nodo_testigo', 'MZ-2', NULL, 16, -78, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-003', 'A4:CF:12:9A:00:03', 'nodo_testigo', 'MZ-3', NULL, 75, -55, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-004', 'A4:CF:12:9A:00:04', 'nodo_testigo', 'MZ-4', NULL, 90, -60, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-005', 'A4:CF:12:9A:00:05', 'nodo_testigo', 'MZ-5', NULL, 64, -70, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-006', 'A4:CF:12:9A:00:06', 'nodo_testigo', 'MZ-6', NULL, 82, -66, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+
+-- MZ-1-001: sector completo (electroválvula + bomba + mediasombra)
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-101', 'EV-1-001', 'electrovalvula', NULL, 'MZ-1-001', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-102', 'BP-1-001', 'bomba_peristaltica', NULL, 'MZ-1-001', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-103', 'MS-1-001', 'mediasombra', NULL, 'MZ-1-001', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+
+-- MZ-1-002: sector completo
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-104', 'EV-1-002', 'electrovalvula', NULL, 'MZ-1-002', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-105', 'BP-1-002', 'bomba_peristaltica', NULL, 'MZ-1-002', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-106', 'MS-1-002', 'mediasombra', NULL, 'MZ-1-002', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+
+-- MZ-1-003: incompleto (falta la bomba peristáltica)
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-107', 'EV-1-003', 'electrovalvula', NULL, 'MZ-1-003', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-108', 'MS-1-003', 'mediasombra', NULL, 'MZ-1-003', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+
+-- MZ-3-010: incompleto (sólo electroválvula; faltan bomba y mediasombra)
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-109', 'EV-3-010', 'electrovalvula', NULL, 'MZ-3-010', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+
+-- MZ-5-042: sector completo pero con la electroválvula averiada (HU-21 CA-04)
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-110', 'EV-5-042', 'electrovalvula', NULL, 'MZ-5-042', NULL, NULL, NULL, 'Falla Hidráulica') ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-111', 'BP-5-042', 'bomba_peristaltica', NULL, 'MZ-5-042', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO dispositivo (id, serial, tipo, zona_id, sector_id, bateria, senal, ultimo_update, falla) VALUES ('DEV-112', 'MS-5-042', 'mediasombra', NULL, 'MZ-5-042', NULL, NULL, NULL, NULL) ON CONFLICT (id) DO NOTHING;

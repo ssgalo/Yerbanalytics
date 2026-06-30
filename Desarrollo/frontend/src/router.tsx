@@ -6,7 +6,8 @@ import { SectorPage } from '@/features/sector/SectorPage';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
 import { HistorialPage } from '@/features/historial/HistorialPage';
 import { ConfiguracionPage } from '@/features/configuracion/ConfiguracionPage';
-import { PlaceholderPage } from '@/features/placeholder/PlaceholderPage';
+import { HardwarePage } from '@/features/hardware/HardwarePage';
+import { TopologiaPage } from '@/features/topologia/TopologiaPage';
 
 export const router = createBrowserRouter([
   {
@@ -19,7 +20,8 @@ export const router = createBrowserRouter([
       { path: 'diagnosticos', element: <DiagnosticsPage /> },
       { path: 'historial', element: <HistorialPage /> },
       { path: 'configuracion', element: <ConfiguracionPage /> },
-      { path: 'hardware', element: <PlaceholderPage title="Estado del hardware" /> },
+      { path: 'hardware', element: <HardwarePage /> },
+      { path: 'topologia', element: <TopologiaPage /> },
     ],
   },
 ]);
