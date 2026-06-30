@@ -17,6 +17,13 @@ import type {
   Zona,
 } from '@/types/domain';
 import { ACT, C, LAB, actTpl, pathos, resMap, sevMap, specs, tints, zonaDefs } from './specs';
+import { zonaDefsFor } from './topologia';
+
+/** Estructura de la grilla a generar: cantidad de macro-zonas y de sectores por macro-zona. */
+export interface TopologiaGrid {
+  macroZonas: number;
+  sectoresPorMacroZona: number;
+}
 
 /** Clasifica un valor según las bandas de su spec. */
 export function metricStatus(v: number, sp: (typeof specs)[number]): Status {
@@ -151,23 +158,38 @@ function makeSector(
   };
 }
 
-/** Genera el dataset completo del vivero con una semilla dada. */
-export function buildNursery(seed: number): NurseryData {
+/**
+ * Genera el dataset completo del vivero con una semilla dada.
+ *
+ * Sin `topologia`: la grilla demo por defecto (6 × 100) con estados aleatorios. Con
+ * `topologia` (tras una generación del Administrador, HU-18 CA-01): una grilla N × M con
+ * todos los sectores en estado offline ("Fuera de servicio"), como el seed, hasta que
+ * llegue telemetría.
+ */
+export function buildNursery(seed: number, topologia?: TopologiaGrid): NurseryData {
   const r = createRng(seed);
+
+  const zonaList = topologia ? zonaDefsFor(topologia.macroZonas) : zonaDefs;
+  const sectoresPorZona = topologia ? topologia.sectoresPorMacroZona : 100;
+  const offlineOnly = topologia != null;
 
   const sectors: Sector[] = [];
   const byId: Record<string, Sector> = {};
-  const zonas: Zona[] = zonaDefs.map((z) => {
+  const zonas: Zona[] = zonaList.map((z) => {
     const list: Sector[] = [];
     let sano = 0;
     let alerta = 0;
     let off = 0;
-    for (let i = 1; i <= 100; i++) {
-      const u = r();
+    for (let i = 1; i <= sectoresPorZona; i++) {
       let status: Status = 'ok';
-      if (u > 0.978) status = 'offline';
-      else if (u > 0.94) status = 'critical';
-      else if (u > 0.83) status = 'warning';
+      if (offlineOnly) {
+        status = 'offline';
+      } else {
+        const u = r();
+        if (u > 0.978) status = 'offline';
+        else if (u > 0.94) status = 'critical';
+        else if (u > 0.83) status = 'warning';
+      }
       const s = makeSector(z, i, status, r);
       list.push(s);
       sectors.push(s);
@@ -176,27 +198,28 @@ export function buildNursery(seed: number): NurseryData {
       else if (status === 'offline') off++;
       else alerta++;
     }
-    return { ...z, sectors: list, sano, alerta, off, total: 100 };
+    return { ...z, sectors: list, sano, alerta, off, total: sectoresPorZona };
   });
 
   // stats
   const cnt = (st: Status) => sectors.filter((s) => s.status === st).length;
+  const total = sectors.length;
   const sano = cnt('ok');
   const warning = cnt('warning');
   const critical = cnt('critical');
   const offline = cnt('offline');
   const stats = {
-    total: 600,
+    total,
     sano,
     warning,
     critical,
     offline,
     alerta: warning + critical,
-    sanoPct: Math.round((sano / 600) * 100),
-    actToday: 41,
-    actRiego: 28,
-    actInsumo: 7,
-    actSombra: 6,
+    sanoPct: total > 0 ? Math.round((sano / total) * 100) : 0,
+    actToday: offlineOnly ? 0 : 41,
+    actRiego: offlineOnly ? 0 : 28,
+    actInsumo: offlineOnly ? 0 : 7,
+    actSombra: offlineOnly ? 0 : 6,
     diagCount: 0,
   };
 
@@ -280,8 +303,10 @@ export function buildNursery(seed: number): NurseryData {
     };
   });
 
-  // alertas
-  const alerts: Alert[] = (
+  // alertas — un vivero recién generado (offline) aún no tiene alertas activas.
+  const alerts: Alert[] = offlineOnly
+    ? []
+    : (
     [
       { level: 'CRITICAL', color: C.critical, time: '14:08', sectorId: priority[0] ? priority[0].id : 'MZ-3-077', msg: 'Daño fúngico confirmado + humedad de sustrato 84%. Dosificación de fungicida en curso.' },
       { level: 'CRITICAL', color: C.critical, time: '13:41', sectorId: 'MZ-5-042', msg: 'Falla hidráulica: caudalímetro sin flujo tras abrir electroválvula. Sector marcado para revisión.' },

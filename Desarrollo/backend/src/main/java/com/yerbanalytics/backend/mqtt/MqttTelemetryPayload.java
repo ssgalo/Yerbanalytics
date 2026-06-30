@@ -6,6 +6,7 @@ package com.yerbanalytics.backend.mqtt;
 public record MqttTelemetryPayload(
     String mac,
     Integer battery,
+    Integer signal,
     Long timestamp,
     MetricsPayload metrics
 ) {

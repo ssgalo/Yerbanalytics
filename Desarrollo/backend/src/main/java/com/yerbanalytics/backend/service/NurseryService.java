@@ -22,6 +22,7 @@ public class NurseryService {
     private final SectorRepository sectorRepository;
     private final HistorialService historialService;
     private final ConfiguracionService configuracionService;
+    private final HardwareService hardwareService;
     private final long staleThresholdMs;
 
     public NurseryService(NurseryProperties properties,
@@ -29,11 +30,13 @@ public class NurseryService {
                           SectorRepository sectorRepository,
                           HistorialService historialService,
                           ConfiguracionService configuracionService,
+                          HardwareService hardwareService,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.historialService = historialService;
         this.configuracionService = configuracionService;
+        this.hardwareService = hardwareService;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -202,9 +205,11 @@ public class NurseryService {
 
         diagnoses.sort(Comparator.comparing(DiagnosisCard::time));
 
+        int totalSectores = allSectors.size();
+        double pctSano = totalSectores > 0 ? Math.round((totalSano / (double) totalSectores) * 100) : 0;
         Stats stats = new Stats(
-                600, totalSano, totalWarning, totalCritical, totalOffline, totalAlerta,
-                (double) Math.round((totalSano / 600.0) * 100), 41, 28, 7, 6, diagnoses.size()
+                totalSectores, totalSano, totalWarning, totalCritical, totalOffline, totalAlerta,
+                pctSano, 41, 28, 7, 6, diagnoses.size()
         );
 
         Map<String, DiagnosisCard> diagById = new LinkedHashMap<>();
@@ -395,6 +400,10 @@ public class NurseryService {
             }
         }
         sectorRepository.saveAll(sectors);
+
+        // Heartbeat del nodo testigo de la zona: batería/señal/último update (HU-21 CA-01).
+        // Antes el mac/battery del payload se descartaban; ahora alimentan el registro de hardware.
+        hardwareService.actualizarHeartbeat(zoneId, payload.mac(), payload.battery(), payload.signal(), payload.timestamp());
     }
 
     private List<Metric> buildMetricsList(SectorEntity s) {

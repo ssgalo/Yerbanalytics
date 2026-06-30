@@ -1,0 +1,195 @@
+/* Vista Topología: generación de la grilla del vivero (HU-18 CA-01) */
+
+.state {
+  padding: 40px;
+  font-family: var(--font-body);
+  color: var(--muted);
+}
+
+.intro {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 18px;
+  max-width: 760px;
+}
+
+/* ---- Resumen ---- */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.summaryCard {
+  padding: 14px 16px;
+}
+
+.summaryValue {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ---- Sección del formulario ---- */
+.section {
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sectionHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.formGrid {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.input {
+  appearance: none;
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+  width: 120px;
+}
+
+.fixedValue {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 6px 0;
+}
+
+/* ---- Botones ---- */
+.btnPrimary {
+  border: none;
+  background-color: var(--brand);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled,
+.btnDanger:disabled {
+  background-color: var(--line);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary:hover {
+  border-color: var(--muted);
+}
+
+.btnDanger {
+  border: none;
+  background-color: var(--crit);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---- Avisos ---- */
+.warn {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--crit);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+  max-width: 720px;
+}
+
+.formError {
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--crit);
+}
+
+.feedbackOk {
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ok);
+}

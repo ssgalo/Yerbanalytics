@@ -23,6 +23,7 @@ const GESTION: NavItem[] = [
   { to: '/historial', icon: 'history', label: 'Historial' },
   { to: '/configuracion', icon: 'config', label: 'Configuración' },
   { to: '/hardware', icon: 'hardware', label: 'Hardware' },
+  { to: '/topologia', icon: 'cube', label: 'Topología' },
 ];
 
 function NavItemLink({ item, count }: { item: NavItem; count: number }) {
