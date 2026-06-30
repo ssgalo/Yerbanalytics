@@ -1,20 +1,27 @@
 /* Vista de Administración: generación de la topología del vivero (HU-18 CA-01) */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useTopologia } from '@/hooks/useTopologia';
 import {
+  clampDisposicion,
+  DEFAULT_MACRO_ZONAS_POR_FILA,
+  DEFAULT_SECTORES_POR_FILA,
+  disposicionError,
   MAX_MACRO_ZONAS,
   MAX_SECTORES_POR_ZONA,
 } from '@/data/mock/topologia';
+import { TopologiaPreview } from './components/TopologiaPreview';
 import styles from './Topologia.module.css';
 
 type Feedback = { kind: 'ok'; msg: string } | null;
 
 export function TopologiaPage() {
-  const { data, loading, error, generating, generar } = useTopologia();
+  const { data, loading, error, generating, generar, guardarDisposicion } = useTopologia();
   const [macroZonas, setMacroZonas] = useState('6');
   const [sectores, setSectores] = useState('100');
+  const [mzPorFila, setMzPorFila] = useState(DEFAULT_MACRO_ZONAS_POR_FILA);
+  const [secPorFila, setSecPorFila] = useState(DEFAULT_SECTORES_POR_FILA);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -23,6 +30,18 @@ export function TopologiaPage() {
     'Topología del vivero',
     data ? `${data.macroZonas} macro-zonas · ${data.totalSectores} sectores` : '',
   );
+
+  // Inicializa el formulario y la disposición con la topología real una sola vez.
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (data && !initialized.current) {
+      initialized.current = true;
+      setMacroZonas(String(data.macroZonas));
+      setSectores(String(data.sectoresPorMacroZona));
+      setMzPorFila(data.macroZonasPorFila);
+      setSecPorFila(data.sectoresPorFila);
+    }
+  }, [data]);
 
   if (error) {
     return (
@@ -36,6 +55,18 @@ export function TopologiaPage() {
     return <div className={styles.state}>Cargando topología…</div>;
   }
 
+  const mzNum = Number(macroZonas) || 0;
+  const spzNum = Number(sectores) || 0;
+  const totalPrevisto = mzNum * spzNum;
+
+  // ¿Cambió la cantidad de la grilla respecto de la topología cargada? Eso es destructivo.
+  const cantidadesCambiaron = mzNum !== data.macroZonas || spzNum !== data.sectoresPorMacroZona;
+  // ¿Cambió solo la disposición visual? (no destructivo)
+  const disposicionCambiada =
+    mzPorFila !== data.macroZonasPorFila || secPorFila !== data.sectoresPorFila;
+  // Hay algo para guardar → mostramos el popup de guardado.
+  const hayCambios = cantidadesCambiaron || disposicionCambiada;
+
   /** Validación en cliente, espejo del backend (rangos operativos). */
   function validar(): { mz: number; spz: number } | string {
     const mz = Number(macroZonas);
@@ -46,10 +77,16 @@ export function TopologiaPage() {
     if (!Number.isInteger(spz) || spz <= 0 || spz > MAX_SECTORES_POR_ZONA) {
       return `La cantidad de sectores por macro-zona debe estar entre 1 y ${MAX_SECTORES_POR_ZONA}.`;
     }
+    const dispErr = disposicionError({ macroZonasPorFila: mzPorFila, sectoresPorFila: secPorFila }, mz, spz);
+    if (dispErr) return dispErr;
     return { mz, spz };
   }
 
-  const handleGenerar = async () => {
+  /**
+   * Guardado unificado: si cambiaron las cantidades, regenera la grilla (destructivo, con
+   * confirmación). Si solo cambió la disposición, la guarda sin tocar la grilla ni el hardware.
+   */
+  const handleGuardar = async () => {
     const v = validar();
     if (typeof v === 'string') {
       setFormError(v);
@@ -57,65 +94,75 @@ export function TopologiaPage() {
       return;
     }
     setFormError(null);
-    // Regenerar sobre una topología ya cargada exige confirmación explícita (HU-18 CA-01).
-    if (data.generada && !confirming) {
-      setFeedback(null);
-      setConfirming(true);
+
+    if (cantidadesCambiaron) {
+      // Regenerar sobre una topología ya cargada exige confirmación explícita (HU-18 CA-01).
+      if (data.generada && !confirming) {
+        setFeedback(null);
+        setConfirming(true);
+        return;
+      }
+      try {
+        const updated = await generar({
+          macroZonas: v.mz,
+          sectoresPorMacroZona: v.spz,
+          regenerar: data.generada,
+          macroZonasPorFila: mzPorFila,
+          sectoresPorFila: secPorFila,
+        });
+        setConfirming(false);
+        setMzPorFila(updated.macroZonasPorFila);
+        setSecPorFila(updated.sectoresPorFila);
+        setFeedback({
+          kind: 'ok',
+          msg: `Topología generada: ${updated.macroZonas} macro-zonas × ${updated.sectoresPorMacroZona} sectores (${updated.totalSectores} en total).`,
+        });
+      } catch (e) {
+        setConfirming(false);
+        setFormError(e instanceof Error ? e.message : String(e));
+      }
       return;
     }
+
+    // Solo cambió la disposición: guardado no destructivo.
     try {
-      const updated = await generar({
-        macroZonas: v.mz,
-        sectoresPorMacroZona: v.spz,
-        regenerar: data.generada,
-      });
-      setConfirming(false);
+      const updated = await guardarDisposicion({ macroZonasPorFila: mzPorFila, sectoresPorFila: secPorFila });
+      setMzPorFila(updated.macroZonasPorFila);
+      setSecPorFila(updated.sectoresPorFila);
       setFeedback({
         kind: 'ok',
-        msg: `Topología generada: ${updated.macroZonas} macro-zonas × ${updated.sectoresPorMacroZona} sectores (${updated.totalSectores} en total).`,
+        msg: `Disposición guardada: ${updated.macroZonasPorFila} macro-zonas por fila · ${updated.sectoresPorFila} sectores por fila.`,
       });
     } catch (e) {
-      setConfirming(false);
       setFormError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const totalPrevisto = (Number(macroZonas) || 0) * (Number(sectores) || 0);
+  /** Descarta los cambios sin guardar y vuelve a los valores de la topología cargada. */
+  const handleDescartar = () => {
+    setMacroZonas(String(data.macroZonas));
+    setSectores(String(data.sectoresPorMacroZona));
+    setMzPorFila(data.macroZonasPorFila);
+    setSecPorFila(data.sectoresPorFila);
+    setConfirming(false);
+    setFormError(null);
+    setFeedback(null);
+  };
 
   return (
     <div>
       <p className={styles.intro}>
         Definí la distribución física del vivero indicando la cantidad de macro-zonas y de
-        sectores por macro-zona. El sistema genera la grilla lógica, asigna un identificador
-        único a cada macro-zona (MZ-1, MZ-2…) y a cada sector (MZ-1-001…), y la deja disponible
-        para el mapa de producción.
+        sectores por macro-zona, y cómo se muestran en pantalla (macro-zonas y sectores por fila).
+        Arrastrá los controles laterales del preview o ajustá los valores. Cambiar las cantidades
+        regenera la grilla; cambiar solo la disposición no afecta el hardware.
       </p>
-
-      <div className={styles.summary}>
-        <Card className={styles.summaryCard}>
-          <div className={styles.summaryValue}>{data.macroZonas}</div>
-          <div className={styles.summaryLabel}>Macro-zonas</div>
-        </Card>
-        <Card className={styles.summaryCard}>
-          <div className={styles.summaryValue}>{data.sectoresPorMacroZona}</div>
-          <div className={styles.summaryLabel}>Sectores por macro-zona</div>
-        </Card>
-        <Card className={styles.summaryCard}>
-          <div className={styles.summaryValue}>{data.totalSectores}</div>
-          <div className={styles.summaryLabel}>Sectores totales</div>
-        </Card>
-        <Card className={styles.summaryCard}>
-          <div className={styles.summaryValue}>{data.generada ? 'Cargada' : 'Sin cargar'}</div>
-          <div className={styles.summaryLabel}>Topología</div>
-        </Card>
-      </div>
 
       <Card className={styles.section}>
         <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Generar topología</span>
+          <span className={styles.sectionTitle}>Topología y disposición</span>
           <span className={styles.sectionHint}>
-            Grilla uniforme de macro-zonas × sectores; los sectores nacen fuera de servicio hasta
-            recibir telemetría
+            Los sectores nacen fuera de servicio hasta recibir telemetría
           </span>
         </div>
 
@@ -134,6 +181,8 @@ export function TopologiaPage() {
               onChange={(e) => {
                 setMacroZonas(e.target.value);
                 setConfirming(false);
+                const n = Number(e.target.value);
+                if (n > 0) setMzPorFila((p) => clampDisposicion(p, n));
               }}
             />
           </div>
@@ -152,6 +201,44 @@ export function TopologiaPage() {
               onChange={(e) => {
                 setSectores(e.target.value);
                 setConfirming(false);
+                const n = Number(e.target.value);
+                if (n > 0) setSecPorFila((p) => clampDisposicion(p, n));
+              }}
+            />
+          </div>
+
+          <div className={styles.group}>
+            <label className={styles.label} htmlFor="mzPorFila">
+              Macro-zonas por fila
+            </label>
+            <input
+              id="mzPorFila"
+              className={styles.input}
+              type="number"
+              min={1}
+              max={mzNum || 1}
+              value={mzPorFila}
+              onChange={(e) => {
+                setMzPorFila(clampDisposicion(Number(e.target.value) || 1, mzNum));
+                setFeedback(null);
+              }}
+            />
+          </div>
+
+          <div className={styles.group}>
+            <label className={styles.label} htmlFor="secPorFila">
+              Sectores por fila
+            </label>
+            <input
+              id="secPorFila"
+              className={styles.input}
+              type="number"
+              min={1}
+              max={spzNum || 1}
+              value={secPorFila}
+              onChange={(e) => {
+                setSecPorFila(clampDisposicion(Number(e.target.value) || 1, spzNum));
+                setFeedback(null);
               }}
             />
           </div>
@@ -160,36 +247,81 @@ export function TopologiaPage() {
             <label className={styles.label}>Sectores totales</label>
             <span className={styles.fixedValue}>{totalPrevisto}</span>
           </div>
-
-          <span className={styles.toolbarSpacer} />
-
-          {confirming ? (
-            <>
-              <button type="button" className={styles.btnSecondary} onClick={() => setConfirming(false)}>
-                Cancelar
-              </button>
-              <button type="button" className={styles.btnDanger} disabled={generating} onClick={handleGenerar}>
-                {generating ? 'Regenerando…' : 'Confirmar regeneración'}
-              </button>
-            </>
-          ) : (
-            <button type="button" className={styles.btnPrimary} disabled={generating} onClick={handleGenerar}>
-              {generating ? 'Generando…' : 'Generar grilla'}
-            </button>
-          )}
         </div>
 
-        {confirming && (
-          <div className={styles.warn}>
-            El vivero ya tiene una topología cargada. Regenerarla <strong>reemplaza la grilla</strong>{' '}
-            y descarta los dispositivos registrados y el historial asociado. Esta acción no se puede
-            deshacer.
-          </div>
-        )}
+        <TopologiaPreview
+          macroZonas={mzNum}
+          sectoresPorMacroZona={spzNum}
+          macroZonasPorFila={mzPorFila}
+          sectoresPorFila={secPorFila}
+          onChange={({ macroZonasPorFila, sectoresPorFila }) => {
+            setMzPorFila(macroZonasPorFila);
+            setSecPorFila(sectoresPorFila);
+            setFeedback(null);
+          }}
+        />
 
-        {formError && <div className={styles.formError}>{formError}</div>}
-        {feedback && <div className={styles.feedbackOk}>{feedback.msg}</div>}
+        {feedback && !hayCambios && <div className={styles.feedbackOk}>{feedback.msg}</div>}
       </Card>
+
+      {/* Popup de guardado: aparece solo si hay cambios, fuera del área de edición. */}
+      {hayCambios && (
+        <div className={styles.savebar} role="dialog" aria-live="polite">
+          <div className={styles.savebarBody}>
+            <span className={styles.savebarTitle}>
+              {confirming ? 'Confirmá la regeneración' : 'Tenés cambios sin guardar'}
+            </span>
+            <span className={styles.savebarHint}>
+              {confirming
+                ? 'Reemplazar la grilla descarta los dispositivos registrados y el historial asociado. No se puede deshacer.'
+                : cantidadesCambiaron
+                  ? 'Cambiar las cantidades regenera la grilla del vivero.'
+                  : 'Se actualizará solo la disposición en pantalla; no afecta el hardware.'}
+            </span>
+            {formError && <span className={styles.savebarError}>{formError}</span>}
+          </div>
+          <div className={styles.savebarActions}>
+            {confirming ? (
+              <>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={() => setConfirming(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnDanger}
+                  disabled={generating}
+                  onClick={handleGuardar}
+                >
+                  {generating ? 'Regenerando…' : 'Confirmar regeneración'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  disabled={generating}
+                  onClick={handleDescartar}
+                >
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  disabled={generating}
+                  onClick={handleGuardar}
+                >
+                  {generating ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

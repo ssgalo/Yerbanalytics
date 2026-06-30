@@ -1,12 +1,15 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.dto.DisposicionTopologia;
 import com.yerbanalytics.backend.dto.NuevaTopologia;
 import com.yerbanalytics.backend.dto.TopologiaVivero;
 import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
+import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 
 import org.springframework.stereotype.Service;
@@ -33,6 +36,13 @@ public class TopologiaService {
     static final int MAX_MACRO_ZONAS = 50;
     static final int MAX_SECTORES_POR_ZONA = 500;
 
+    /** Identidad de la fila única de disposición visual. */
+    private static final int LAYOUT_ID = 1;
+
+    /** Disposición visual por defecto (reproduce la presentación previa al cambio). */
+    static final int DEFAULT_MACRO_ZONAS_POR_FILA = 3;
+    static final int DEFAULT_SECTORES_POR_FILA = 10;
+
     private static final String[] SUBS = {"Sector norte", "Sector centro", "Sector sur"};
 
     // Defaults offline, idénticos al seed de data.sql (sector "Fuera de servicio").
@@ -48,15 +58,18 @@ public class TopologiaService {
     private final SectorRepository sectorRepository;
     private final DispositivoRepository dispositivoRepository;
     private final HistorialRepository historialRepository;
+    private final TopologiaLayoutRepository layoutRepository;
 
     public TopologiaService(ZonaRepository zonaRepository,
                             SectorRepository sectorRepository,
                             DispositivoRepository dispositivoRepository,
-                            HistorialRepository historialRepository) {
+                            HistorialRepository historialRepository,
+                            TopologiaLayoutRepository layoutRepository) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.historialRepository = historialRepository;
+        this.layoutRepository = layoutRepository;
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +78,57 @@ public class TopologiaService {
         long totalSectores = sectorRepository.count();
         int macroZonas = zonas.size();
         int sectoresPorMacroZona = macroZonas > 0 ? (int) (totalSectores / macroZonas) : 0;
-        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, (int) totalSectores, macroZonas > 0);
+        TopologiaLayoutEntity layout = loadLayout();
+        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, (int) totalSectores, macroZonas > 0,
+                clamp(layout.getMacroZonasPorFila(), macroZonas),
+                clamp(layout.getSectoresPorFila(), sectoresPorMacroZona));
+    }
+
+    /**
+     * Actualiza la disposición visual por fila (HU-18 CA-01) sin tocar la grilla. Valida que los
+     * valores sean enteros positivos dentro de los límites de la topología actual.
+     */
+    @Transactional
+    public TopologiaVivero actualizarDisposicion(DisposicionTopologia dto) {
+        long totalSectores = sectorRepository.count();
+        int macroZonas = (int) zonaRepository.count();
+        int sectoresPorMacroZona = macroZonas > 0 ? (int) (totalSectores / macroZonas) : 0;
+        validarDisposicion(dto.macroZonasPorFila(), dto.sectoresPorFila(), macroZonas, sectoresPorMacroZona);
+
+        TopologiaLayoutEntity layout = loadLayout();
+        layout.setId(LAYOUT_ID);
+        layout.setMacroZonasPorFila(dto.macroZonasPorFila());
+        layout.setSectoresPorFila(dto.sectoresPorFila());
+        layoutRepository.save(layout);
+
+        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, (int) totalSectores, macroZonas > 0,
+                dto.macroZonasPorFila(), dto.sectoresPorFila());
+    }
+
+    /** Disposición visual actual (fila única); defaults si nunca se configuró. */
+    private TopologiaLayoutEntity loadLayout() {
+        return layoutRepository.findById(LAYOUT_ID).orElseGet(() ->
+                new TopologiaLayoutEntity(LAYOUT_ID, DEFAULT_MACRO_ZONAS_POR_FILA, DEFAULT_SECTORES_POR_FILA));
+    }
+
+    /** Disposición acotada al rango válido [1, max]; con grilla vacía deja el valor configurado. */
+    private static int clamp(int value, int max) {
+        if (value < 1) {
+            return 1;
+        }
+        return max > 0 ? Math.min(value, max) : value;
+    }
+
+    private void validarDisposicion(int macroZonasPorFila, int sectoresPorFila,
+                                    int macroZonas, int sectoresPorMacroZona) {
+        if (macroZonasPorFila <= 0 || (macroZonas > 0 && macroZonasPorFila > macroZonas)) {
+            throw new TopologiaInvalidaException(
+                    "Las macro-zonas por fila deben estar entre 1 y " + Math.max(1, macroZonas) + ".");
+        }
+        if (sectoresPorFila <= 0 || (sectoresPorMacroZona > 0 && sectoresPorFila > sectoresPorMacroZona)) {
+            throw new TopologiaInvalidaException(
+                    "Los sectores por fila deben estar entre 1 y " + Math.max(1, sectoresPorMacroZona) + ".");
+        }
     }
 
     @Transactional
@@ -112,7 +175,18 @@ public class TopologiaService {
         zonaRepository.saveAll(zonas);
         sectorRepository.saveAll(sectores);
 
-        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, sectores.size(), true);
+        // Persiste la disposición visual del payload, acotada a las nuevas cantidades.
+        int mzPorFila = clamp(dto.macroZonasPorFila() > 0 ? dto.macroZonasPorFila() : DEFAULT_MACRO_ZONAS_POR_FILA,
+                macroZonas);
+        int secPorFila = clamp(dto.sectoresPorFila() > 0 ? dto.sectoresPorFila() : DEFAULT_SECTORES_POR_FILA,
+                sectoresPorMacroZona);
+        TopologiaLayoutEntity layout = loadLayout();
+        layout.setId(LAYOUT_ID);
+        layout.setMacroZonasPorFila(mzPorFila);
+        layout.setSectoresPorFila(secPorFila);
+        layoutRepository.save(layout);
+
+        return new TopologiaVivero(macroZonas, sectoresPorMacroZona, sectores.size(), true, mzPorFila, secPorFila);
     }
 
     /** Sector en estado offline, replicando los defaults del seed (id `MZ-{z}-{NNN}`). */

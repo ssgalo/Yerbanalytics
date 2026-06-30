@@ -11,7 +11,7 @@ import { RecentDiagnostics } from './components/RecentDiagnostics';
 export function DashboardPage() {
   usePageTitle('Panel general', 'Vivero San Ignacio · Misiones, AR');
 
-  const { stats, zonas, priority, weather, actions, recentDiag } = useNurseryData();
+  const { stats, zonas, priority, weather, actions, recentDiag, layout } = useNurseryData();
 
   return (
     <div style={{ animation: 'ybFade .4s both' }}>
@@ -29,7 +29,7 @@ export function DashboardPage() {
           alignItems: 'start',
         }}
       >
-        <ViveroOverview zonas={zonas} />
+        <ViveroOverview zonas={zonas} layout={layout} />
 
         {/* Rail derecho: prioridad + clima */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

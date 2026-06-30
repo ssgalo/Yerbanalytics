@@ -365,6 +365,10 @@ export interface TopologiaVivero {
   totalSectores: number;
   /** `true` si hay una grilla disponible para el mapa de producción. */
   generada: boolean;
+  /** Disposición visual: macro-zonas mostradas por fila en el panel general. */
+  macroZonasPorFila: number;
+  /** Disposición visual: sectores mostrados por fila dentro de cada macro-zona. */
+  sectoresPorFila: number;
 }
 
 /** Generación de la topología del vivero (HU-18 CA-01). `regenerar` reemplaza una grilla ya cargada. */
@@ -372,6 +376,15 @@ export interface NuevaTopologia {
   macroZonas: number;
   sectoresPorMacroZona: number;
   regenerar?: boolean;
+  /** Disposición visual a guardar junto con la grilla; defaults si se omite. */
+  macroZonasPorFila?: number;
+  sectoresPorFila?: number;
+}
+
+/** Disposición visual de la topología (HU-18 CA-01). Espejo del DTO `DisposicionTopologia`. */
+export interface DisposicionTopologia {
+  macroZonasPorFila: number;
+  sectoresPorFila: number;
 }
 
 /** Dataset completo del vivero (lo que entrega el repositorio). */
@@ -390,4 +403,6 @@ export interface NurseryData {
   sevMap: Record<Severity, ColorPair>;
   tints: Record<string, string>;
   specs: MetricSpec[];
+  /** Disposición visual de la grilla (macro-zonas/sectores por fila) — HU-18 CA-01. */
+  layout: DisposicionTopologia;
 }

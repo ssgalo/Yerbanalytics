@@ -17,7 +17,7 @@ export function MapPage() {
   /* Metadata de la topbar */
   usePageTitle('Mapa de producción', '600 sectores · seleccioná una macro-zona');
 
-  const { zonas, sevMap } = useNurseryData();
+  const { zonas, sevMap, layout } = useNurseryData();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -44,8 +44,12 @@ export function MapPage() {
 
       {/* Layout principal: grilla grande + columna derecha */}
       <div className={styles.layout}>
-        {/* Grilla 10×10 de sectores */}
-        <SectorGrid zona={mapZona} onSectorClick={handleSectorClick} />
+        {/* Grilla de sectores (disposición configurable) */}
+        <SectorGrid
+          zona={mapZona}
+          sectoresPorFila={layout.sectoresPorFila}
+          onSectorClick={handleSectorClick}
+        />
 
         {/* Columna derecha: resumen + sectores a revisar */}
         <div className={styles.sidebar}>

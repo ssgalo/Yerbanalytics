@@ -7,6 +7,7 @@ import type { DataRepository } from '@/data/repository';
 import type {
   ActionRecord,
   Configuracion,
+  DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
@@ -103,6 +104,20 @@ export class HttpRepository implements DataRepository {
       // El backend devuelve { error } con el motivo (rango inválido 400 / conflicto 409).
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? `Error ${res.status} al generar la topología`);
+    }
+    return (await res.json()) as TopologiaVivero;
+  }
+
+  async guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero> {
+    const res = await fetch(`${this.baseUrl}/topologia/disposicion`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      // El backend devuelve { error } con el motivo (rango inválido 400).
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al guardar la disposición`);
     }
     return (await res.json()) as TopologiaVivero;
   }

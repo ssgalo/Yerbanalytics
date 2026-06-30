@@ -1,0 +1,151 @@
+/* Preview interactivo de la topología (HU-18 CA-01) */
+
+.wrapper {
+  margin-top: 6px;
+  /* Aire a la derecha para que la solapa de la box no quede pegada al borde. */
+  padding-right: 12px;
+}
+
+/* Box que se ajusta al tamaño de las macro-zonas; si no entran, hace scroll. */
+.previewBox {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+}
+
+.scrollArea {
+  overflow: auto;
+  max-height: 62vh;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.zonaGrid {
+  display: grid;
+  gap: 12px;
+  justify-content: start;
+  width: max-content;
+}
+
+.zonaCard {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 10px 11px 13px;
+  animation: cardIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.zonaHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.zonaName {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.heatmap {
+  display: grid;
+  gap: 3px;
+}
+
+.cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--off, #a9b2ab);
+  opacity: 0.55;
+  animation: cellIn 0.22s ease-out both;
+}
+
+@keyframes cellIn {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+}
+
+/* ---- Solapas de arrastre (estilo pestaña en el borde derecho) ---- */
+.gripSector,
+.gripMacro {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 3;
+}
+
+/* Textura de agarre (puntitos) dentro de la solapa. */
+.gripDots {
+  width: 4px;
+  height: 60%;
+  max-height: 26px;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 1px, transparent 1.3px);
+  background-size: 4px 5px;
+  background-repeat: repeat-y;
+  background-position: center;
+}
+
+/* Solapa de sectores por fila: sobre el borde derecho de la macro-zona MZ-1. */
+.gripSector {
+  right: -9px;
+  width: 13px;
+  height: 46px;
+  border-radius: 0 7px 7px 0;
+  background: var(--muted);
+  opacity: 0.7;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+
+.gripSector:hover {
+  opacity: 1;
+}
+
+/* Solapa de macro-zonas por fila: en el borde derecho de la box. */
+.gripMacro {
+  right: -10px;
+  width: 15px;
+  height: 66px;
+  border-radius: 0 8px 8px 0;
+  background: var(--brand);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.gripMacro:hover {
+  filter: brightness(1.08);
+}
+
+/* Sin animaciones si el usuario prefiere movimiento reducido. */
+@media (prefers-reduced-motion: reduce) {
+  .zonaCard,
+  .cell {
+    animation: none;
+  }
+}

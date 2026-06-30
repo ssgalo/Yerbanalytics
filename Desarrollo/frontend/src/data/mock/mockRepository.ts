@@ -6,6 +6,7 @@ import type { DataRepository } from '@/data/repository';
 import type {
   ActionRecord,
   Configuracion,
+  DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
@@ -25,8 +26,12 @@ import {
   type RawDispositivo,
 } from './hardware';
 import {
+  clampDisposicion,
   DEFAULT_MACRO_ZONAS,
+  DEFAULT_MACRO_ZONAS_POR_FILA,
+  DEFAULT_SECTORES_POR_FILA,
   DEFAULT_SECTORES_POR_MACRO_ZONA,
+  disposicionError,
   topologiaError,
   topologiaSummary,
 } from './topologia';
@@ -38,12 +43,18 @@ export class MockRepository implements DataRepository {
   private fleetCache: RawDispositivo[] | null = null;
   /** Topología generada por el Administrador; null = grilla demo por defecto (HU-18 CA-01). */
   private topologiaOverride: TopologiaGrid | null = null;
+  /** Disposición visual elegida por el Administrador; null = defaults (HU-18 CA-01). */
+  private disposicionOverride: DisposicionTopologia | null = null;
 
   constructor(private readonly seed: number) {}
 
   async getNursery(): Promise<NurseryData> {
     if (!this.cache) {
-      this.cache = buildNursery(this.seed, this.topologiaOverride ?? undefined);
+      this.cache = buildNursery(
+        this.seed,
+        this.topologiaOverride ?? undefined,
+        this.disposicionOverride ?? undefined,
+      );
     }
     return this.cache;
   }
@@ -112,9 +123,23 @@ export class MockRepository implements DataRepository {
     );
   }
 
+  /** Disposición visual actual, acotada a la grilla; defaults si no se configuró. */
+  private disposicion(grid: TopologiaGrid): DisposicionTopologia {
+    return {
+      macroZonasPorFila: clampDisposicion(
+        this.disposicionOverride?.macroZonasPorFila ?? DEFAULT_MACRO_ZONAS_POR_FILA,
+        grid.macroZonas,
+      ),
+      sectoresPorFila: clampDisposicion(
+        this.disposicionOverride?.sectoresPorFila ?? DEFAULT_SECTORES_POR_FILA,
+        grid.sectoresPorMacroZona,
+      ),
+    };
+  }
+
   async getTopologia(): Promise<TopologiaVivero> {
     const t = this.topologia();
-    return topologiaSummary(t.macroZonas, t.sectoresPorMacroZona);
+    return topologiaSummary(t.macroZonas, t.sectoresPorMacroZona, this.disposicion(t));
   }
 
   async generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero> {
@@ -123,16 +148,46 @@ export class MockRepository implements DataRepository {
     const error = topologiaError(true, input);
     if (error) throw new Error(error);
 
+    // La disposición del payload se guarda junto con la grilla, acotada a las nuevas cantidades.
+    const disposicion: DisposicionTopologia = {
+      macroZonasPorFila: clampDisposicion(
+        input.macroZonasPorFila ?? DEFAULT_MACRO_ZONAS_POR_FILA,
+        input.macroZonas,
+      ),
+      sectoresPorFila: clampDisposicion(
+        input.sectoresPorFila ?? DEFAULT_SECTORES_POR_FILA,
+        input.sectoresPorMacroZona,
+      ),
+    };
     this.topologiaOverride = {
       macroZonas: input.macroZonas,
       sectoresPorMacroZona: input.sectoresPorMacroZona,
     };
+    this.disposicionOverride = disposicion;
     // Regenerar reemplaza la grilla y limpia las referencias colgantes (igual que el backend):
     // se reconstruye el vivero y se descarta la flota, y se ajustan las zonas disponibles.
     this.cache = null;
     this.fleetCache = [];
     setZonasDisponibles(input.macroZonas);
 
-    return topologiaSummary(input.macroZonas, input.sectoresPorMacroZona);
+    return topologiaSummary(input.macroZonas, input.sectoresPorMacroZona, disposicion);
+  }
+
+  async guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero> {
+    // Mismo comportamiento que el backend: valida rango contra la grilla actual y guarda sin
+    // regenerar la grilla ni descartar la flota.
+    const t = this.topologia();
+    const error = disposicionError(input, t.macroZonas, t.sectoresPorMacroZona);
+    if (error) throw new Error(error);
+
+    this.disposicionOverride = {
+      macroZonasPorFila: input.macroZonasPorFila,
+      sectoresPorFila: input.sectoresPorFila,
+    };
+    // Solo se invalida el snapshot para que los paneles tomen la nueva disposición; la flota
+    // y el resto del estado quedan intactos.
+    this.cache = null;
+
+    return topologiaSummary(t.macroZonas, t.sectoresPorMacroZona, this.disposicionOverride);
   }
 }
