@@ -1,6 +1,9 @@
 -- Yerbanalytics Database Initial Seed
 -- 6 Macro-zonas and 600 Sectors initialized in 'offline' state (sensors as NULL)
 
+-- Modo de operación del vivero (fila única). Default de fábrica: estático.
+INSERT INTO modo_operacion (id, modo) VALUES (1, 'estatico') ON CONFLICT (id) DO NOTHING;
+
 -- Insert Zones
 INSERT INTO zona (id, name, sub) VALUES ('MZ-1', 'Macro-zona 1', 'Sector norte') ON CONFLICT (id) DO NOTHING;
 INSERT INTO zona (id, name, sub) VALUES ('MZ-2', 'Macro-zona 2', 'Sector norte') ON CONFLICT (id) DO NOTHING;

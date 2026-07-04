@@ -6,10 +6,14 @@ import type {
   ActionRecord,
   Configuracion,
   DisposicionTopologia,
+  EnvioTelemetria,
   HardwareData,
+  ModoSimulacion,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  SensorSimulado,
+  SimulacionEstado,
   TopologiaVivero,
 } from '@/types/domain';
 
@@ -34,4 +38,16 @@ export interface DataRepository {
   generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero>;
   /** Actualiza la disposición visual por fila sin regenerar la grilla (HU-18 CA-01). */
   guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero>;
+  /** Devuelve el modo de operación vigente (dashboard de simulación). */
+  getSimulacionEstado(): Promise<SimulacionEstado>;
+  /** Cambia el modo de operación (estático/simulación) y devuelve el estado resultante. */
+  setModoSimulacion(modo: ModoSimulacion): Promise<SimulacionEstado>;
+  /** Lista los sensores simulados (emisores en memoria, desacoplados del registro de hardware). */
+  getSensoresSimulados(): Promise<SensorSimulado[]>;
+  /** Da de alta un sensor simulado (serial/MAC + macro-zona) y devuelve la lista actualizada. */
+  crearSensorSimulado(input: SensorSimulado): Promise<SensorSimulado[]>;
+  /** Elimina un sensor simulado por serial/MAC y devuelve la lista actualizada. */
+  eliminarSensorSimulado(serial: string): Promise<SensorSimulado[]>;
+  /** Envía una lectura manual de un sensor simulado (se publica por MQTT en el backend real). */
+  enviarTelemetria(input: EnvioTelemetria): Promise<void>;
 }

@@ -10,8 +10,8 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                // Permite el origen del frontend Vite
-                .allowedOrigins("http://localhost:5173")
+                // Orígenes del frontend Vite: dashboard principal (:5173) y simulador (:5180)
+                .allowedOrigins("http://localhost:5173", "http://localhost:5180")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);

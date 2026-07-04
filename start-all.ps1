@@ -62,7 +62,7 @@ Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""
 
 # 1. Docker
-Write-Host "[1/3] Iniciando contenedores Docker (PostgreSQL + Mosquitto)..." -ForegroundColor Cyan
+Write-Host "[1/4] Iniciando contenedores Docker (PostgreSQL + Mosquitto)..." -ForegroundColor Cyan
 Push-Location $ScriptRoot
 docker-compose up -d
 $dcExit = $LASTEXITCODE
@@ -75,18 +75,23 @@ Write-Host "Esperando 3 segundos para que la base de datos se inicialice..." -Fo
 Start-Sleep -Seconds 3
 
 # 2. Backend
-Write-Host "[2/3] Iniciando Backend (Spring Boot)..." -ForegroundColor Cyan
+Write-Host "[2/4] Iniciando Backend (Spring Boot)..." -ForegroundColor Cyan
 $backendDir = Join-Path $ScriptRoot "Desarrollo\backend"
 Start-Process powershell -WorkingDirectory $backendDir -ArgumentList "-NoExit", "-Command", "Write-Host '--- Yerbanalytics Backend ---' -ForegroundColor Yellow; .\mvnw.cmd spring-boot:run"
 
 # 3. Frontend
-Write-Host "[3/3] Iniciando Frontend (React + Vite)..." -ForegroundColor Cyan
+Write-Host "[3/4] Iniciando Frontend (React + Vite)..." -ForegroundColor Cyan
 Start-Process powershell -WorkingDirectory $frontendDir -ArgumentList "-NoExit", "-Command", "Write-Host '--- Yerbanalytics Frontend ---' -ForegroundColor Yellow; npm run dev"
+
+# 4. Simulador de sensores (app aparte)
+Write-Host "[4/4] Iniciando Simulador de sensores (React + Vite)..." -ForegroundColor Cyan
+Start-Process powershell -WorkingDirectory $frontendDir -ArgumentList "-NoExit", "-Command", "Write-Host '--- Yerbanalytics Simulador ---' -ForegroundColor Yellow; npm run dev:sim"
 
 Write-Host ""
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host "  Servicios iniciando en segundo plano.    " -ForegroundColor Green
-Write-Host "  - Backend:  http://localhost:8000        " -ForegroundColor Green
-Write-Host "  - Frontend: http://localhost:5173        " -ForegroundColor Green
+Write-Host "  - Backend:    http://localhost:8000      " -ForegroundColor Green
+Write-Host "  - Frontend:   http://localhost:5173      " -ForegroundColor Green
+Write-Host "  - Simulador:  http://localhost:5180      " -ForegroundColor Green
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""

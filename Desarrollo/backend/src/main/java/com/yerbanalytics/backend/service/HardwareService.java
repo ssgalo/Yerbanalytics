@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -271,16 +272,22 @@ public class HardwareService {
     // ------------------------------------------------------------------
 
     /**
-     * Actualiza batería/señal/último update del nodo testigo de una macro-zona a partir de
-     * su telemetría. Si la zona no tiene nodo registrado, no hace nada.
+     * Actualiza batería/señal/último update del dispositivo registrado cuyo serial/MAC
+     * coincide con el de la telemetría. Si ningún dispositivo tiene ese serial/MAC, no hace
+     * nada: el equipo emite pero el sistema aún no lo reconoce (los sectores de la zona sí se
+     * actualizan por separado, en {@code NurseryService.updateTelemetry}). Es lo que ata un
+     * sensor simulado a un nodo registrado con el mismo serial/MAC.
      */
     @Transactional
     public void actualizarHeartbeat(String zonaId, String mac, Integer bateria, Integer senal, Long ts) {
-        List<DispositivoEntity> nodos = dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO);
-        if (nodos.isEmpty()) {
+        if (mac == null || mac.isBlank()) {
             return;
         }
-        DispositivoEntity nodo = nodos.get(0);
+        Optional<DispositivoEntity> encontrado = dispositivoRepository.findBySerial(mac.trim());
+        if (encontrado.isEmpty()) {
+            return;
+        }
+        DispositivoEntity nodo = encontrado.get();
         if (bateria != null) nodo.setBateria(bateria);
         if (senal != null) nodo.setSenal(senal);
         nodo.setUltimoUpdate(ts != null ? ts : System.currentTimeMillis());

@@ -352,12 +352,16 @@ public class NurseryService {
         for (SectorEntity s : sectors) {
             String oldStatus = s.getStatus();
 
-            // Update raw readings
-            s.setHumSusRaw(payload.metrics().humSus());
-            s.setHumAmbRaw(payload.metrics().humAmb());
-            s.setTempRaw(payload.metrics().temp());
-            s.setCeRaw(payload.metrics().ce());
-            s.setUvRaw(payload.metrics().uv());
+            // Update raw readings. Sólo se actualizan las métricas presentes en el payload:
+            // una lectura parcial (p. ej. sólo radiación desde el simulador) conserva el
+            // último valor de las demás. El hardware real envía las cinco, así que su
+            // comportamiento no cambia.
+            MqttTelemetryPayload.MetricsPayload pm = payload.metrics();
+            if (pm.humSus() != null) s.setHumSusRaw(pm.humSus());
+            if (pm.humAmb() != null) s.setHumAmbRaw(pm.humAmb());
+            if (pm.temp() != null) s.setTempRaw(pm.temp());
+            if (pm.ce() != null) s.setCeRaw(pm.ce());
+            if (pm.uv() != null) s.setUvRaw(pm.uv());
             s.setLastReadingTime(payload.timestamp());
 
             // Build temporary metrics list to recompute status

@@ -8,10 +8,14 @@ import type {
   ActionRecord,
   Configuracion,
   DisposicionTopologia,
+  EnvioTelemetria,
   HardwareData,
+  ModoSimulacion,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  SensorSimulado,
+  SimulacionEstado,
   TopologiaVivero,
 } from '@/types/domain';
 
@@ -120,5 +124,73 @@ export class HttpRepository implements DataRepository {
       throw new Error(body?.error ?? `Error ${res.status} al guardar la disposición`);
     }
     return (await res.json()) as TopologiaVivero;
+  }
+
+  async getSimulacionEstado(): Promise<SimulacionEstado> {
+    const res = await fetch(`${this.baseUrl}/simulacion?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener el estado de simulación desde ${this.baseUrl}`);
+    }
+    return (await res.json()) as SimulacionEstado;
+  }
+
+  async setModoSimulacion(modo: ModoSimulacion): Promise<SimulacionEstado> {
+    const res = await fetch(`${this.baseUrl}/simulacion`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modo }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al cambiar el modo de simulación`);
+    }
+    return (await res.json()) as SimulacionEstado;
+  }
+
+  async getSensoresSimulados(): Promise<SensorSimulado[]> {
+    const res = await fetch(`${this.baseUrl}/simulacion/sensores?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al listar los sensores simulados desde ${this.baseUrl}`);
+    }
+    return (await res.json()) as SensorSimulado[];
+  }
+
+  async crearSensorSimulado(input: SensorSimulado): Promise<SensorSimulado[]> {
+    const res = await fetch(`${this.baseUrl}/simulacion/sensores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      // 400 si el serial/MAC ya existe o falta la zona.
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al crear el sensor simulado`);
+    }
+    return this.getSensoresSimulados();
+  }
+
+  async eliminarSensorSimulado(serial: string): Promise<SensorSimulado[]> {
+    const res = await fetch(
+      `${this.baseUrl}/simulacion/sensores?serial=${encodeURIComponent(serial)}`,
+      { method: 'DELETE' },
+    );
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al eliminar el sensor simulado`);
+    }
+    return this.getSensoresSimulados();
+  }
+
+  async enviarTelemetria(input: EnvioTelemetria): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/simulacion/telemetria`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      // El backend devuelve { error }: 409 si la simulación está inactiva, 400 dato inválido,
+      // 502 si falla la publicación al broker.
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al enviar la telemetría`);
+    }
   }
 }
