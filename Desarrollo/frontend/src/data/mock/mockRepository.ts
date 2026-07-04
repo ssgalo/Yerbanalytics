@@ -7,10 +7,14 @@ import type {
   ActionRecord,
   Configuracion,
   DisposicionTopologia,
+  EnvioTelemetria,
   HardwareData,
+  ModoSimulacion,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  SensorSimulado,
+  SimulacionEstado,
   TopologiaVivero,
 } from '@/types/domain';
 import { validateConfig } from '@/lib/configValidation';
@@ -25,6 +29,7 @@ import {
   setZonasDisponibles,
   type RawDispositivo,
 } from './hardware';
+import { aplicarEnvioMock } from './simulacion';
 import {
   clampDisposicion,
   DEFAULT_MACRO_ZONAS,
@@ -45,6 +50,11 @@ export class MockRepository implements DataRepository {
   private topologiaOverride: TopologiaGrid | null = null;
   /** Disposición visual elegida por el Administrador; null = defaults (HU-18 CA-01). */
   private disposicionOverride: DisposicionTopologia | null = null;
+  /** Modo de operación (dashboard de simulación). En memoria, default estático. */
+  private modoSimulacion: ModoSimulacion = 'estatico';
+  private autoSimulador = false;
+  /** Sensores simulados en memoria, desacoplados del registro de hardware. */
+  private sensoresSimulados: SensorSimulado[] = [];
 
   constructor(private readonly seed: number) {}
 
@@ -189,5 +199,49 @@ export class MockRepository implements DataRepository {
     this.cache = null;
 
     return topologiaSummary(t.macroZonas, t.sectoresPorMacroZona, this.disposicionOverride);
+  }
+
+  async getSimulacionEstado(): Promise<SimulacionEstado> {
+    return { modo: this.modoSimulacion, autoSimulador: this.autoSimulador };
+  }
+
+  async setModoSimulacion(modo: ModoSimulacion): Promise<SimulacionEstado> {
+    this.modoSimulacion = modo;
+    // Al volver a estático se apaga el simulador automático (igual que el backend).
+    if (modo === 'estatico') this.autoSimulador = false;
+    return { modo: this.modoSimulacion, autoSimulador: this.autoSimulador };
+  }
+
+  async getSensoresSimulados(): Promise<SensorSimulado[]> {
+    return this.sensoresSimulados.map((s) => ({ ...s }));
+  }
+
+  async crearSensorSimulado(input: SensorSimulado): Promise<SensorSimulado[]> {
+    const serial = input.serial.trim();
+    const zonaId = input.zonaId.trim();
+    if (!serial) throw new Error('El serial/MAC del sensor es obligatorio.');
+    if (!zonaId) throw new Error('La macro-zona del sensor es obligatoria.');
+    if (this.sensoresSimulados.some((s) => s.serial.toLowerCase() === serial.toLowerCase())) {
+      throw new Error(`Ya existe un sensor simulado con el serial/MAC «${serial}».`);
+    }
+    this.sensoresSimulados = [...this.sensoresSimulados, { serial, zonaId }];
+    return this.getSensoresSimulados();
+  }
+
+  async eliminarSensorSimulado(serial: string): Promise<SensorSimulado[]> {
+    this.sensoresSimulados = this.sensoresSimulados.filter(
+      (s) => s.serial.toLowerCase() !== serial.trim().toLowerCase(),
+    );
+    return this.getSensoresSimulados();
+  }
+
+  async enviarTelemetria(input: EnvioTelemetria): Promise<void> {
+    // Mismo comportamiento que el backend: sólo se acepta en modo simulación (409).
+    if (this.modoSimulacion !== 'simulacion') {
+      throw new Error('La simulación está inactiva. Activá el modo simulación para enviar lecturas.');
+    }
+    // Sin broker: se refleja el envío actualizando los sectores de la zona en el snapshot.
+    const nursery = await this.getNursery();
+    this.cache = aplicarEnvioMock(nursery, input);
   }
 }

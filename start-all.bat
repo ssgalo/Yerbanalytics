@@ -67,7 +67,7 @@ echo ===========================================
 echo.
 
 :: 1. Docker
-echo [1/3] Iniciando contenedores Docker (PostgreSQL + Mosquitto)...
+echo [1/4] Iniciando contenedores Docker (PostgreSQL + Mosquitto)...
 docker-compose up -d
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Fallo al iniciar Docker. Asegurate de que Docker Desktop este corriendo.
@@ -77,18 +77,23 @@ echo Esperando 3 segundos para que la base de datos se inicialice...
 timeout /t 3 /nobreak > nul
 
 :: 2. Backend
-echo [2/3] Iniciando Backend (Spring Boot)...
+echo [2/4] Iniciando Backend (Spring Boot)...
 start "Yerbanalytics Backend" /D "%~dp0Desarrollo\backend" cmd /k "mvnw.cmd spring-boot:run"
 
 :: 3. Frontend
-echo [3/3] Iniciando Frontend (React + Vite)...
+echo [3/4] Iniciando Frontend (React + Vite)...
 start "Yerbanalytics Frontend" /D "%~dp0Desarrollo\frontend" cmd /k "npm run dev"
+
+:: 4. Simulador de sensores (app aparte)
+echo [4/4] Iniciando Simulador de sensores (React + Vite)...
+start "Yerbanalytics Simulador" /D "%~dp0Desarrollo\frontend" cmd /k "npm run dev:sim"
 
 echo.
 echo ===========================================
 echo   Servicios iniciando en segundo plano.
-echo   - Backend:  http://localhost:8000
-echo   - Frontend: http://localhost:5173
+echo   - Backend:    http://localhost:8000
+echo   - Frontend:   http://localhost:5173
+echo   - Simulador:  http://localhost:5180
 echo ===========================================
 echo.
 popd

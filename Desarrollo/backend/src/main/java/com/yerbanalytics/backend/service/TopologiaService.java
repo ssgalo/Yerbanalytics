@@ -150,11 +150,18 @@ public class TopologiaService {
                     "El vivero ya tiene una topología cargada. Confirmá la regeneración para reemplazarla.");
         }
         if (existeTopologia) {
-            // Limpia referencias colgantes: dispositivos e historial apuntan a sector/zona por
-            // string (sin FK); el cascade de la zona elimina sus sectores.
-            dispositivoRepository.deleteAll();
-            historialRepository.deleteAll();
-            zonaRepository.deleteAll();
+            // Borrado en bloque (una sentencia DELETE por tabla), no entidad por entidad:
+            //  - es mucho más rápido → ventana de bloqueo mínima, sin quedarse "colgado" si un
+            //    proceso en segundo plano (p. ej. la evaluación de historial) toca una fila;
+            //  - evita el chequeo de versión por fila de deleteAll() que, ante una modificación
+            //    o borrado concurrente, lanzaba ObjectOptimisticLockingFailureException.
+            // El borrado en bloque no dispara el cascade JPA, así que se eliminan los sectores
+            // explícitamente antes que las zonas (sector.zona_id → zona). Dispositivos e
+            // historial referencian sector/zona por string (sin FK): se limpian aparte.
+            dispositivoRepository.deleteAllInBatch();
+            historialRepository.deleteAllInBatch();
+            sectorRepository.deleteAllInBatch();
+            zonaRepository.deleteAllInBatch();
             zonaRepository.flush();
         }
 

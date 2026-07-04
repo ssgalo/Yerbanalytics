@@ -21,7 +21,8 @@ export type IconName =
   | 'chevron-left'
   | 'arrow-right'
   | 'close'
-  | 'cube';
+  | 'cube'
+  | 'signal';
 
 const PATHS: Record<IconName, JSX.Element> = {
   leaf: (
@@ -105,6 +106,12 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <path d="M12 2 2 7l10 5 10-5-10-5Z" />
       <path d="m2 17 10 5 10-5M2 12l10 5 10-5" />
+    </>
+  ),
+  signal: (
+    <>
+      <path d="M4.9 16.1a10 10 0 0 1 0-8.2M7.8 13.9a6 6 0 0 1 0-3.8M19.1 7.9a10 10 0 0 1 0 8.2M16.2 10.1a6 6 0 0 1 0 3.8" />
+      <circle cx="12" cy="12" r="1.6" />
     </>
   ),
 };

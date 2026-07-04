@@ -25,12 +25,21 @@ npm run dev              # http://localhost:5173
 
 | Script | Qué hace |
 |--------|----------|
-| `npm run dev` | Servidor de desarrollo (HMR) |
-| `npm run build` | Type-check + build de producción (`dist/`) |
-| `npm run preview` | Sirve el build de producción |
+| `npm run dev` | Servidor de desarrollo del dashboard (HMR) — http://localhost:5173 |
+| `npm run dev:sim` | Servidor del **simulador de sensores** (app aparte) — http://localhost:5180 |
+| `npm run build` | Type-check + build de producción del dashboard (`dist/`) |
+| `npm run build:sim` | Build de producción del simulador (`dist-simulador/`) |
+| `npm run preview` | Sirve el build del dashboard |
+| `npm run preview:sim` | Sirve el build del simulador |
 | `npm run lint` | ESLint (0 warnings permitidos) |
 | `npm run format` | Prettier |
 | `npm test` | Tests (Vitest) |
+
+> **Simulador de sensores** (`npm run dev:sim`, puerto **5180**): app standalone,
+> separada del dashboard principal. Permite alternar entre datos estáticos y
+> simulación, crear sensores (nodos testigo) y enviar telemetría manual por MQTT.
+> Comparte la capa de datos y componentes del frontend, pero se sirve en su propio
+> puerto y no aparece en la navegación del dashboard.
 
 ## Variables de entorno
 

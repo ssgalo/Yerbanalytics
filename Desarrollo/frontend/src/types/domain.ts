@@ -358,6 +358,49 @@ export interface NuevoDispositivo {
   sectorId: string | null;
 }
 
+/** Modo de operación del vivero (dashboard de simulación). */
+export type ModoSimulacion = 'estatico' | 'simulacion';
+
+/** Estado del modo de operación. Espejo del DTO `SimulacionEstado`. */
+export interface SimulacionEstado {
+  modo: ModoSimulacion;
+  /** Si el simulador automático de telemetría está activo (sólo aplica en modo simulación). */
+  autoSimulador: boolean;
+}
+
+/**
+ * Valores de las métricas monitoreadas en una lectura simulada. Cada métrica es opcional:
+ * se puede enviar una sola (p. ej. sólo radiación/uv) o todas juntas. Debe venir al menos
+ * una; las ausentes conservan su último valor en el vivero.
+ */
+export interface EnvioMetrics {
+  humSus?: number;
+  humAmb?: number;
+  temp?: number;
+  ce?: number;
+  uv?: number;
+}
+
+/** Lectura manual a enviar por un sensor simulado. Espejo del DTO `EnvioTelemetria`. */
+export interface EnvioTelemetria {
+  serial: string;
+  zonaId: string;
+  battery?: number | null;
+  signal?: number | null;
+  /** Fecha/hora de la lectura (epoch ms). Si se omite, el backend usa la hora actual. */
+  timestamp?: number | null;
+  metrics: EnvioMetrics;
+}
+
+/**
+ * Sensor simulado del dashboard de simulación: un emisor de telemetría (serial/MAC +
+ * macro-zona), independiente del registro de hardware. Espejo del DTO `SensorSimulado`.
+ */
+export interface SensorSimulado {
+  serial: string;
+  zonaId: string;
+}
+
 /** Resumen de la topología cargada en el vivero (HU-18 CA-01). Espejo del DTO `TopologiaVivero`. */
 export interface TopologiaVivero {
   macroZonas: number;
