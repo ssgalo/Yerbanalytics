@@ -99,24 +99,20 @@ public record RuleContext(
 - **MQTT publish** al broker para comandar actuadores (protocolo simétrico a
   la ingesta de telemetría).
 - **Persistencia** en `historial_evento` con la cadena completa
-  `Lectura → Decisión → Acción` (HU-11 CA-01).
+  `Lectura → Decisión → Acción` (HU-11 CA-01). **Esto incluye el Registro de Inacción:** si una regla aborta una acción (ej. "no regar por lluvia"), se persiste un evento informativo para que el usuario sepa *por qué* el sistema decidió no actuar.
 - **Emisión de alertas** clasificadas por severidad (HU-10).
 - **Actualización** de campos del `SectorEntity` (`actuador_valve`,
   `actuador_pump`, `actuador_shade`).
 
-> **El canal backend → actuador todavía no existe.** Hoy el único publisher
-> MQTT es de *ingesta* (sensor → backend); no hay canal de *comando*
-> (backend → actuador). Hay que diseñarlo como pieza de primera clase, no darlo
-> por hecho:
-> - **Topic** de comando (ej. `nursery/zone/{zonaId}/sector/{sectorId}/command`).
-> - **Payload** del comando (actuador, acción, parámetros).
+> **El canal backend ↔ actuador debe separarse por intereses (Separation of Concerns).**
+> Para evitar bucles infinitos (ecos) y tener payloads limpios, usaremos tres tópicos:
+> - **Ingesta:** `nursery/zone/{zonaId}/sector/{sectorId}/telemetry` (ESP32 publica, Backend suscribe).
+> - **Comando:** `nursery/zone/{zonaId}/sector/{sectorId}/command` (Backend publica, ESP32 suscribe).
+> - **Confirmación (Ack):** `nursery/zone/{zonaId}/sector/{sectorId}/ack` (ESP32 publica). El payload debe indicar obligatoriamente si pudo terminar o no (ej. `{"status": "SUCCESS"}` o `{"status": "ERROR"}`).
 > - **QoS**: se recomienda **QoS 2** (exactly-once) para comandos de actuador,
 >   porque una orden duplicada puede significar doble riego o **doble dosis de
->   químico**. Distinto de la ingesta, donde QoS 1 alcanza. A confirmar por el
->   autor.
-> - **Convivencia con el simulador**: definir si en el simulador se sigue
->   escribiendo el campo del actuador directo y en producción se comanda por
->   MQTT, o si se unifican. Queda como tarea explícita en `tasks.md`.
+>   químico**.
+> - **Convivencia con el simulador**: el `ActionExecutor` debe usar un patrón Factory/Strategy para despachar comandos. En simulador escribe a la BD directo; en producción publica en MQTT.
 
 ### 4. WeatherService: cliente de API climática (HU-09)
 
@@ -129,6 +125,20 @@ public record RuleContext(
   thread-safe**: con el trigger reactivo (MQTT) y el proactivo (`@Scheduled`)
   corriendo en paralelo, una cache mutable sin sincronizar es una condición de
   carrera.
+
+### 5. Configuración dinámica (Envars) e Idempotencia (Cooldowns)
+
+Para proteger al hardware de inundaciones de comandos (flooding) si los sensores envían datos muy seguido, el motor debe aplicar "Cooldowns" o periodos de enfriamiento antes de repetir una orden sobre un mismo sector.
+
+Para lograr flexibilidad sin necesidad de despliegues, estos tiempos críticos se configurarán mediante variables de entorno (que luego inyecta Spring vía `@Value`):
+- `SENSOR_POLLING_INTERVAL`: Cada cuánto tiempo (en ms o minutos) el ESP32 envía telemetría.
+- `ACTION_COOLDOWN_MINUTES`: Minutos mínimos que deben pasar antes de enviar el mismo comando (ej. riego) al mismo sector.
+
+**Máquina de estados para los Cooldowns:**
+1. **In-Flight Lock:** Cuando el Backend publica un comando, marca el sector como `ACTUANDO`. Las reglas ignoran nueva telemetría mientras esté en este estado para no duplicar comandos. Si se excede un *timeout* sin respuesta, se asume falla y se quita el lock.
+2. **Evaluación de ACK:** Cuando el ESP32 publica en el tópico de `ack`:
+   - Si dice `{"status": "SUCCESS"}`: Se quita el lock `ACTUANDO`, se actualiza el timestamp `ultimo_exito_ts = now()`, y **comienza a correr el `ACTION_COOLDOWN_MINUTES`**.
+   - Si dice `{"status": "ERROR"}`: Se quita el lock `ACTUANDO` pero **no** se aplica el cooldown, permitiendo que el motor reintente la acción en el próximo ciclo de telemetría.
 
 ### 5. Tabla `bloqueo_manual` (HU-19)
 
@@ -163,12 +173,10 @@ El motor se evalúa en dos caminos:
 
 - **Reactivo**: en cada ingesta de telemetría MQTT (`MqttTelemetryReceiver` →
   `NurseryService` → `RuleOrchestrator.evaluate()`). Es el flujo actual.
-- **Proactivo** (`@Scheduled`): para reglas que no dependen de telemetría
-  fresca, como `MediasombraRule` (plan de rustificación por día) y
-  `ClimaOverrideRule` (reevaluación periódica del forecast).
+- **Proactivo (Watchdog)** (`@Scheduled`): Además de evaluar reglas independientes de telemetría (como el plan de días de la `MediasombraRule` y el pronóstico de la `ClimaOverrideRule`), el scheduler actúa como **Perro Guardián**. Itera periódicamente todos los sectores: si el hardware está apagado y no envía telemetría (flujo reactivo muerto), el scheduler dispara el motor para que el `StaleSensorRule` detecte la anomalía y emita una Alerta Crítica de nodo desconectado.
 
 > **Pregunta abierta para debate**: ¿Ambos triggers son necesarios desde el
-> inicio, o el proactivo se agrega después? Ver sección Open Questions.
+> inicio, o el proactivo se agrega después? **Resuelto**: Se necesitan ambos, el proactivo es vital por su rol de Watchdog.
 
 ### 7. Paquete y ubicación
 
@@ -236,9 +244,8 @@ sus reglas correspondientes sin adelantar lógica de versiones futuras.
 - **Riesgo (seguridad)**: sin idempotencia, dos paquetes del mismo sector casi
   simultáneos (o un mensaje MQTT duplicado por QoS 1) pueden hacer que dos hilos
   evalúen y **ejecuten la misma acción dos veces** — en "inyectar insumo" es
-  doble dosis. **Mitigación**: lock por sector o deduplicación por
-  `(sector, ventana de tiempo)` antes de ejecutar acciones, sumado al QoS 2 en
-  el canal de comando.
+  doble dosis. **Mitigación**: Implementar los cooldowns vía envars (`ACTION_COOLDOWN_MINUTES`), combinado con QoS 2 en
+  el canal de comando y el tópico de `ack` para confirmar ejecución real.
 - **Trade-off**: reglas en Java puro vs. motor genérico (Drools). Aceptado:
   el dominio tiene ~8 reglas y el equipo no tiene experiencia con DSLs de
   reglas.
