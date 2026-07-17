@@ -2,11 +2,12 @@
 
 ## 1. Scaffold del motor (refactor puro)
 - [ ] 1.1 Crear paquete `engine/` con interfaz `Rule`, records `RuleContext` y `RuleAction`
-- [ ] 1.2 Crear `RuleOrchestrator` (itera reglas por prioridad, corta en bloqueantes)
+- [ ] 1.2 Crear `RuleOrchestrator` (ordena las reglas en el constructor con `Comparator.comparingInt(Rule::priority)` —Spring no las ordena solo—, itera por prioridad, corta en bloqueantes)
 - [ ] 1.3 Crear `ActionExecutor` (MQTT publish a actuadores, persistencia historial, alertas)
 - [ ] 1.4 Extraer lógica de riego de `NurseryService.updateTelemetry()` → `RiegoRule`
 - [ ] 1.5 Extraer lógica de insumo de `NurseryService.updateTelemetry()` → `InsumoRule`
 - [ ] 1.6 Test de regresión: el `updateTelemetry()` refactorizado produce el mismo resultado
+- [ ] 1.7 Test: el `RuleOrchestrator` evalúa las reglas en orden de prioridad (verifica el ordenamiento explícito)
 
 ## 2. Reglas R1 — Monitoreo y Visualización Base
 - [ ] 2.1 `StaleSensorRule`: evalúa antigüedad de telemetría, emite `ABORT_RIEGO` si > umbral
@@ -19,7 +20,7 @@
 - [ ] 3.4 Test unitario de `ClimaOverrideRule` (con forecast / sin forecast / con lluvia / sin lluvia)
 
 ## 4. Reglas R3 — Automatización Agronómica
-- [ ] 4.1 Tabla `bloqueo_manual` en `schema.sql` + entidad JPA + repository
+- [ ] 4.1 Entidad JPA `BloqueoManualEntity` + `BloqueoManualRepository` (Hibernate crea la tabla vía `ddl-auto`; no hay `schema.sql`)
 - [ ] 4.2 `BloqueoManualRule`: consulta bloqueos activos → `ABORT_ALL` si existe
 - [ ] 4.3 `DosisLimiteRule`: consulta historial 24 h del sector → `BLOQUEAR_DOSIFICACION` si supera máx
 - [ ] 4.4 `MediasombraRule`: evalúa día del plan de rustificación y/o pico UV → `MOVER_MEDIASOMBRA`
@@ -36,3 +37,5 @@
 - [ ] 6.2 Scheduler proactivo (`@Scheduled`) para reglas independientes de telemetría
 - [ ] 6.3 Test de integración end-to-end del ciclo telemetría → reglas → acciones → historial
 - [ ] 6.4 Documentar en `CLAUDE.md` §6 la sección del motor de reglas
+- [ ] 6.5 Diseñar y construir el canal de comando backend → actuador (topic, payload, QoS 2 por la doble ejecución) y definir su convivencia con el simulador
+- [ ] 6.6 Estrategia de idempotencia / concurrencia: lock por sector o dedup por `(sector, ventana)` antes de ejecutar acciones, y hacer thread-safe la cache de `WeatherService`

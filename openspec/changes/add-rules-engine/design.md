@@ -37,11 +37,22 @@ autocontenidos, testeables y encadenables.
 
 ## Decisions
 
-### 1. Patrón: Rule como Strategy + Chain of Responsibility
+### 1. Patrón: Rule como Strategy en un pipeline con corte por prioridad
 
 Cada regla implementa una interfaz `Rule` con un método `evaluate(RuleContext)`
 que devuelve una lista de `RuleAction`. El `RuleOrchestrator` las itera en
 orden de prioridad y corta la cadena si una acción es bloqueante.
+
+> **Ordenamiento explícito (Spring no lo hace por vos)**: Spring inyecta la
+> `List<Rule>` en orden de declaración, **no** por `priority()`. El
+> `RuleOrchestrator` debe ordenarla en su constructor con
+> `Comparator.comparingInt(Rule::priority)`; sin eso, el corte de la cadena
+> corre en orden arbitrario (bug silencioso). Se cubre con un test.
+
+> **Precisión del patrón**: no es un Chain of Responsibility clásico (donde
+> cada handler decide si delega al siguiente). Acá el orquestador posee el loop
+> y corta desde afuera, más cercano a un **pipeline de estrategias con corte
+> anticipado** (Specification). No cambia el diseño, solo el nombre correcto.
 
 ```
 Rule (interface)
@@ -93,6 +104,20 @@ public record RuleContext(
 - **Actualización** de campos del `SectorEntity` (`actuador_valve`,
   `actuador_pump`, `actuador_shade`).
 
+> **El canal backend → actuador todavía no existe.** Hoy el único publisher
+> MQTT es de *ingesta* (sensor → backend); no hay canal de *comando*
+> (backend → actuador). Hay que diseñarlo como pieza de primera clase, no darlo
+> por hecho:
+> - **Topic** de comando (ej. `nursery/zone/{zonaId}/sector/{sectorId}/command`).
+> - **Payload** del comando (actuador, acción, parámetros).
+> - **QoS**: se recomienda **QoS 2** (exactly-once) para comandos de actuador,
+>   porque una orden duplicada puede significar doble riego o **doble dosis de
+>   químico**. Distinto de la ingesta, donde QoS 1 alcanza. A confirmar por el
+>   autor.
+> - **Convivencia con el simulador**: definir si en el simulador se sigue
+>   escribiendo el campo del actuador directo y en producción se comanda por
+>   MQTT, o si se unifican. Queda como tarea explícita en `tasks.md`.
+
 ### 4. WeatherService: cliente de API climática (HU-09)
 
 - Consulta asíncrona con timeout de 10 s (HU-09 CA-01).
@@ -100,23 +125,35 @@ public record RuleContext(
   15 s (HU-09 CA-02).
 - Si los reintentos fallan: `forecast = null`, se loguea un warning de
   degradación de servicio, y el motor opera solo con sensores (HU-09 CA-03).
-- Cache local del último forecast válido para minimizar llamadas.
+- Cache local del último forecast válido para minimizar llamadas. **Debe ser
+  thread-safe**: con el trigger reactivo (MQTT) y el proactivo (`@Scheduled`)
+  corriendo en paralelo, una cache mutable sin sincronizar es una condición de
+  carrera.
 
 ### 5. Tabla `bloqueo_manual` (HU-19)
 
-```sql
-CREATE TABLE IF NOT EXISTS bloqueo_manual (
-    id BIGSERIAL PRIMARY KEY,
-    sector_id VARCHAR(255),          -- null = bloquea toda la zona
-    zona_id VARCHAR(255) NOT NULL,
-    activado_por VARCHAR(255) NOT NULL,
-    activado_ts BIGINT NOT NULL,
-    motivo VARCHAR(255),
-    activo BOOLEAN NOT NULL DEFAULT TRUE
-);
+El esquema se crea con el **patrón real del repo**: una entidad JPA que
+Hibernate materializa vía `ddl-auto=update`. **No hay `schema.sql`** en el
+proyecto; las 9 tablas nacen de sus entidades y el `data.sql` solo tiene
+`INSERT`s de seed. Se agrega la entidad + su repository, como toda otra tabla.
+
+```java
+@Entity
+@Table(name = "bloqueo_manual")
+public class BloqueoManualEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String sectorId;          // null = bloquea toda la zona
+    private String zonaId;
+    private String activadoPor;
+    private Long activadoTs;
+    private String motivo;
+    private Boolean activo = Boolean.TRUE;
+}
+// + BloqueoManualRepository extends JpaRepository<BloqueoManualEntity, Long>
 ```
 
-El `BloqueoManualRule` consulta esta tabla al inicio de la cadena. Si existe
+El `BloqueoManualRule` consulta este repository al inicio de la cadena. Si existe
 un bloqueo activo para el sector o su zona, emite `ABORT_ALL` y corta la
 evaluación.
 
@@ -193,13 +230,22 @@ sus reglas correspondientes sin adelantar lógica de versiones futuras.
 
 - **Riesgo**: la extracción introduce regresión en el comportamiento actual de
   riego/insumo. **Mitigación**: la fase 1 es un refactor puro (misma lógica,
-  misma salida) con test de integración antes/después.
+  misma salida) con test de integración antes/después. El design debe mostrar la
+  **nueva firma de `updateTelemetry()`** tras el refactor (qué queda síncrono y
+  qué delega al orquestador) para que la extracción sea inequívoca.
+- **Riesgo (seguridad)**: sin idempotencia, dos paquetes del mismo sector casi
+  simultáneos (o un mensaje MQTT duplicado por QoS 1) pueden hacer que dos hilos
+  evalúen y **ejecuten la misma acción dos veces** — en "inyectar insumo" es
+  doble dosis. **Mitigación**: lock por sector o deduplicación por
+  `(sector, ventana de tiempo)` antes de ejecutar acciones, sumado al QoS 2 en
+  el canal de comando.
 - **Trade-off**: reglas en Java puro vs. motor genérico (Drools). Aceptado:
   el dominio tiene ~8 reglas y el equipo no tiene experiencia con DSLs de
   reglas.
 - **Trade-off**: `WeatherService` agrega una dependencia externa con latencia
   variable. Aceptado: el fallback a `null` garantiza que el motor nunca se
   bloquea por la API climática.
-- **Riesgo**: la tabla `bloqueo_manual` no existe y requiere migración de
-  esquema. **Mitigación**: se agrega como script DDL (`schema.sql`) consistente
-  con el patrón existente.
+- **Riesgo**: la tabla `bloqueo_manual` no existe. **Mitigación**: se agrega
+  como **entidad JPA + repository** y Hibernate la crea vía `ddl-auto=update`,
+  que es el patrón real del repo. (No hay `schema.sql`; el `data.sql` solo
+  siembra datos.)

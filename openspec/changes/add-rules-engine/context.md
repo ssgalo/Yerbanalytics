@@ -134,16 +134,23 @@ sequenceDiagram
 
 ## Tabla nueva requerida
 
-```sql
-CREATE TABLE IF NOT EXISTS bloqueo_manual (
-    id BIGSERIAL PRIMARY KEY,
-    sector_id VARCHAR(255),
-    zona_id VARCHAR(255) NOT NULL,
-    activado_por VARCHAR(255) NOT NULL,
-    activado_ts BIGINT NOT NULL,
-    motivo VARCHAR(255),
-    activo BOOLEAN NOT NULL DEFAULT TRUE
-);
+Se crea con el **patrón real del repo**: una entidad JPA que Hibernate
+materializa vía `ddl-auto=update` (no hay `schema.sql`; el `data.sql` solo
+siembra datos). Se agrega `BloqueoManualEntity` + `BloqueoManualRepository`.
+
+```java
+@Entity
+@Table(name = "bloqueo_manual")
+public class BloqueoManualEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String sectorId;          // null = bloquea toda la zona
+    private String zonaId;
+    private String activadoPor;
+    private Long activadoTs;
+    private String motivo;
+    private Boolean activo = Boolean.TRUE;
+}
 ```
 
 ## Relación con tablas existentes
