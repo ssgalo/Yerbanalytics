@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motor de Reglas y MQTT — Informe Yerbanalytics</title>
+<style>
+  :root {
+    --ground: #FAFBF7;
+    --surface: #FFFFFF;
+    --surface-2: #F1F4EC;
+    --ink: #1A211B;
+    --ink-soft: #37423A;
+    --muted: #5D685E;
+    --faint: #869084;
+    --border: #E1E6DA;
+    --border-strong: #CBD3C2;
+    --accent: #2E6B3B;
+    --accent-soft: #E7F0E4;
+    --accent-ink: #245531;
+    --ok: #3E8E4F;
+    --warn: #B9791A;
+    --crit: #C0413B;
+    --offline: #6B7280;
+    --code-bg: #F3F5EF;
+    --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+    --maxw: 74ch;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F120D;
+      --surface: #161A12;
+      --surface-2: #1D2218;
+      --ink: #E9ECE2;
+      --ink-soft: #CFD5C7;
+      --muted: #9BA593;
+      --faint: #737D6C;
+      --border: #29301F;
+      --border-strong: #3A4330;
+      --accent: #64B274;
+      --accent-soft: #1C2A1C;
+      --accent-ink: #9CD3A6;
+      --ok: #63B473;
+      --warn: #D69C3E;
+      --crit: #E0645E;
+      --offline: #8A93A0;
+      --code-bg: #191E14;
+      --code-ink: #C6D0BB;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+    --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+    --border: #29301F; --border-strong: #3A4330;
+    --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+    --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+    --code-bg: #191E14; --code-ink: #C6D0BB;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 18px;
+    line-height: 1.66;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .wrap {
+    display: grid;
+    grid-template-columns: 1fr;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  @media (min-width: 1080px) {
+    .wrap { grid-template-columns: 250px minmax(0,1fr); gap: 56px; }
+  }
+
+  /* ---- Sidebar TOC ---- */
+  aside {
+    font-family: var(--font-display);
+    align-self: start;
+  }
+  @media (min-width: 1080px) {
+    aside { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 40px 0 40px; }
+  }
+  .toc-brand {
+    font-weight: 700; font-size: 15px; letter-spacing: .02em;
+    color: var(--ink); margin-bottom: 4px; display:flex; align-items:center; gap:8px;
+  }
+  .toc-brand .leaf { width: 10px; height: 10px; border-radius: 2px 8px 2px 8px; background: var(--accent); display:inline-block; }
+  .toc-sub { font-size: 12px; color: var(--faint); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 22px; }
+  nav.toc { display: none; }
+  @media (min-width: 1080px) { nav.toc { display: block; } }
+  nav.toc a {
+    display: block; color: var(--muted); text-decoration: none;
+    font-size: 13.5px; line-height: 1.4; padding: 5px 0 5px 12px;
+    border-left: 2px solid var(--border); transition: color .15s, border-color .15s;
+  }
+  nav.toc a:hover { color: var(--accent); border-left-color: var(--accent); }
+  nav.toc a .n { color: var(--faint); font-variant-numeric: tabular-nums; margin-right: 7px; font-size: 12px; }
+
+  main { padding: 40px 0 120px; min-width: 0; }
+
+  /* ---- Hero ---- */
+  header.hero { margin-bottom: 56px; }
+  .eyebrow {
+    font-family: var(--font-display); text-transform: uppercase;
+    letter-spacing: .16em; font-size: 12px; font-weight: 600;
+    color: var(--accent); margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(2.1rem, 5vw, 3.2rem); line-height: 1.05;
+    letter-spacing: -0.02em; margin: 0 0 20px; text-wrap: balance; color: var(--ink);
+  }
+  .lede { font-size: 1.24rem; color: var(--ink-soft); max-width: 60ch; margin: 0 0 28px; line-height: 1.5; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 10px 8px; font-family: var(--font-display);
+    font-size: 12.5px; padding-top: 24px; border-top: 1px solid var(--border);
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 12px; color: var(--muted);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .chip.open { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+
+  /* ---- Sections ---- */
+  section { margin-bottom: 64px; scroll-margin-top: 24px; max-width: var(--maxw); }
+  section.wide { max-width: 100%; }
+  .part-head { margin-bottom: 28px; }
+  .part-num {
+    font-family: var(--font-display); font-weight: 700; font-size: 13px;
+    letter-spacing: .12em; color: var(--accent); display: block; margin-bottom: 8px;
+  }
+  h2 {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.6rem, 3.4vw, 2.15rem); line-height: 1.12;
+    letter-spacing: -0.015em; margin: 0; color: var(--ink); text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 1.3rem; letter-spacing: -0.01em; margin: 40px 0 14px; color: var(--ink);
+  }
+  h4 {
+    font-family: var(--font-display); font-weight: 600; font-size: 1.02rem;
+    margin: 28px 0 10px; color: var(--ink-soft);
+  }
+  p { margin: 0 0 18px; }
+  a { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+  strong { color: var(--ink); font-weight: 700; }
+  em { color: var(--ink-soft); }
+  ul, ol { margin: 0 0 18px; padding-left: 24px; }
+  li { margin: 0 0 9px; }
+  li::marker { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+  code {
+    font-family: var(--font-mono); font-size: 0.85em;
+    background: var(--code-bg); color: var(--code-ink);
+    padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--border);
+  }
+  pre {
+    font-family: var(--font-mono); font-size: 13.5px; line-height: 1.55;
+    background: var(--code-bg); color: var(--code-ink);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; margin: 0 0 22px;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
+
+  /* ---- Callouts ---- */
+  .call {
+    border-radius: 12px; padding: 18px 20px 18px 22px; margin: 0 0 24px;
+    border: 1px solid var(--border); background: var(--surface);
+    position: relative; box-shadow: var(--shadow);
+  }
+  .call .tag {
+    font-family: var(--font-display); font-weight: 700; font-size: 11.5px;
+    letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 8px;
+  }
+  .call p:last-child, .call ul:last-child, .call ol:last-child { margin-bottom: 0; }
+  .call.analogy { border-left: 4px solid #7C6FCB; }
+  .call.analogy .tag { color: #7C6FCB; }
+  .call.here { border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  .call.here .tag { color: var(--accent-ink); }
+  .call.warnbox { border-left: 4px solid var(--warn); }
+  .call.warnbox .tag { color: var(--warn); }
+  .call.verdict { border-left: 4px solid var(--ink); }
+  .call.verdict .tag { color: var(--ink); }
+
+  /* ---- Tables ---- */
+  .table-scroll { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; font-family: var(--font-display); }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { background: var(--surface-2); color: var(--ink); font-weight: 600; font-size: 12.5px; letter-spacing: .02em; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td code { white-space: nowrap; }
+
+  /* status dots */
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: baseline; }
+  .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);} .dot.crit{background:var(--crit);} .dot.off{background:var(--offline);}
+
+  /* pill */
+  .pill { font-family: var(--font-display); font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing:.02em; white-space:nowrap; }
+  .pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+  .pill.crit { color: var(--crit); background: color-mix(in srgb, var(--crit) 13%, transparent); }
+  .pill.neutral { color: var(--muted); background: var(--surface-2); }
+
+  /* diagram */
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin: 0 0 24px; overflow-x: auto; box-shadow: var(--shadow); }
+  pre.mermaid { background: none; border: none; padding: 0; text-align: center; }
+
+  .cols { display: grid; gap: 16px; margin: 0 0 24px; }
+  @media (min-width: 640px) { .cols.two { grid-template-columns: 1fr 1fr; } }
+  .mini {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  }
+  .mini h4 { margin: 0 0 8px; font-size: .95rem; }
+  .mini p { font-size: .9rem; margin: 0; color: var(--muted); }
+  .plus { color: var(--ok); font-weight: 700; }
+  .minus { color: var(--crit); font-weight: 700; }
+
+  .btn-row { margin: 4px 0 8px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--font-display); font-weight: 600; font-size: 15px;
+    color: #fff; background: var(--accent); padding: 13px 22px; border-radius: 11px;
+    text-decoration: none; border: 1px solid var(--accent-ink);
+    box-shadow: var(--shadow); transition: transform .12s, background .15s;
+  }
+  .btn:hover { background: var(--accent-ink); transform: translateY(-1px); }
+  .btn .arr { transition: transform .15s; }
+  .btn:hover .arr { transform: translateX(3px); }
+  .btn small { display:block; font-weight: 400; font-size: 11.5px; opacity: .85; letter-spacing: .01em; }
+  @media (prefers-color-scheme: dark) { .btn { color: #0F120D; } }
+  :root[data-theme="dark"] .btn { color: #0F120D; }
+  :root[data-theme="light"] .btn { color: #fff; }
+
+  .ver {
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    font-family: var(--font-display); font-weight: 600; font-size: 12px;
+    color: var(--accent); text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+    padding: 4px 10px; border-radius: 7px; transition: background .15s, gap .15s;
+  }
+  .ver:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); gap: 8px; }
+  .origen { font-family: var(--font-display); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .origen .mk { margin-right: 5px; }
+  .o-hoy { color: var(--offline); }
+  .o-parcial { color: var(--warn); }
+  .o-nueva { color: var(--accent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--font-display); font-size: 12.5px; color: var(--muted); margin: 0 0 20px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  .qos-grid { display: grid; gap: 14px; margin: 0 0 24px; }
+  @media (min-width: 720px) { .qos-grid { grid-template-columns: repeat(3, 1fr); } }
+  .qos-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; background: var(--surface); }
+  .qos-card .lvl { font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; color: var(--accent); }
+  .qos-card .name { font-family: var(--font-display); font-weight: 600; font-size: .95rem; margin: 2px 0 8px; }
+  .qos-card p { font-size: .88rem; color: var(--muted); margin: 0; }
+
+  footer.end { max-width: var(--maxw); margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--border); font-size: 14px; color: var(--muted); font-family: var(--font-display); }
+  footer.end a { word-break: break-word; }
+  .src-list { list-style: none; padding: 0; }
+  .src-list li { margin-bottom: 7px; font-size: 13px; }
+
+  ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+  html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+  <aside>
+    <div class="toc-brand"><span class="leaf"></span> Yerbanalytics</div>
+    <div class="toc-sub">Informe técnico · Motor de reglas</div>
+    <nav class="toc">
+      <a href="#tldr"><span class="n">00</span>Resumen ejecutivo</a>
+      <a href="#mqtt"><span class="n">01</span>MQTT de 0 a experto</a>
+      <a href="#negocio"><span class="n">02</span>Qué se quiere implementar</a>
+      <a href="#actual"><span class="n">03</span>La arquitectura de hoy</a>
+      <a href="#propuesta"><span class="n">04</span>La propuesta de Agustín</a>
+      <a href="#evaluacion"><span class="n">05</span>Mi evaluación crítica</a>
+      <a href="#recomendaciones"><span class="n">06</span>Qué haría yo</a>
+      <a href="#fuentes"><span class="n">—</span>Fuentes</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="hero">
+      <div class="eyebrow">Informe 0 → experto · para entender todo</div>
+      <h1>El motor de reglas: qué es MQTT, qué se quiere construir y si la propuesta cierra</h1>
+      <p class="lede">Un recorrido desde los cimientos —qué es MQTT y por qué existe— hasta la evaluación crítica de la arquitectura que propone Agustín en el PR&nbsp;#12. Sin saltarnos conceptos.</p>
+      <div class="meta-row">
+        <span class="chip open">● PR #12 · OPEN</span>
+        <span class="chip">Rama <b>feat/motor-reglas → develop</b></span>
+        <span class="chip">Autor <b>AgusPanigazzi</b></span>
+        <span class="chip"><b>+457</b> líneas · <b>4</b> archivos · <b>0</b> Java</span>
+      </div>
+    </header>
+
+    <!-- ============ 00 TL;DR ============ -->
+    <section id="tldr">
+      <div class="part-head">
+        <span class="part-num">00 — RESUMEN EJECUTIVO</span>
+        <h2>Lo esencial, en un minuto</h2>
+      </div>
+      <p>Antes de bajar al detalle, la foto completa para que leas el resto con contexto:</p>
+      <ul>
+        <li><strong>MQTT</strong> es el "sistema nervioso" del vivero: un protocolo liviano de mensajería (publicar/suscribir) por donde los sensores mandan sus lecturas al backend. No es una base de datos ni una API REST — es un <em>cartero</em> en tiempo real. Lo ves en detalle en la Parte&nbsp;1.</li>
+        <li><strong>El "motor de reglas"</strong> es el cerebro que decide, ante cada lectura: ¿riego?, ¿inyecto un insumo?, ¿muevo la mediasombra?, ¿o no hago nada y aviso? Hoy esa lógica <em>ya existe</em>, pero está <strong>enredada dentro de un solo método</strong> del backend. La propuesta busca sacarla a un componente propio, ordenado y testeable.</li>
+        <li><strong>El PR #12 no tiene una línea de código.</strong> Son 4 documentos OpenSpec (<code>proposal</code>, <code>design</code>, <code>context</code>, <code>tasks</code>): una <em>propuesta de arquitectura</em>, no una implementación. Y eso <strong>está bien</strong> — es exactamente el flujo que pide el repo (concepto antes que código).</li>
+        <li><strong>Mi veredicto:</strong> el diseño es <strong>bueno y va en la dirección correcta</strong> — identifica bien el problema real y propone una solución idiomática y extensible. Pero tiene <strong>dos afirmaciones técnicamente incorrectas</strong> y <strong>dos vacíos de diseño</strong> que hay que resolver <em>antes</em> de empezar a codear. Los detallo en la Parte&nbsp;5.</li>
+      </ul>
+      <div class="call verdict">
+        <span class="tag">En una frase</span>
+        <p>Buena propuesta de arquitectura, bien pensada, pero con un par de supuestos que no aguantan el contraste con el código real. Aprobála <em>con correcciones</em>, no tal cual.</p>
+      </div>
+    </section>
+
+    <!-- ============ 01 MQTT ============ -->
+    <section id="mqtt">
+      <div class="part-head">
+        <span class="part-num">01 — FUNDAMENTOS</span>
+        <h2>MQTT de 0 a experto</h2>
+      </div>
+      <p>Esto es lo primero que tenés que dominar, porque el motor de reglas <em>se dispara</em> cuando llega un mensaje MQTT. Si no entendés el mensajero, no entendés cuándo ni por qué se activa el cerebro. Vamos de lo más básico a lo avanzado.</p>
+
+      <h3>1.1 — El problema que MQTT resuelve</h3>
+      <p>Imaginá 10 nodos sensores repartidos en un vivero de Misiones, cada uno midiendo humedad, temperatura, radiación. Tienen que mandar datos <strong>seguido</strong>, con <strong>poca batería</strong>, por una conexión <strong>débil e intermitente</strong> (Starlink, señal que va y viene). ¿Les hacés hacer un <code>POST</code> HTTP cada vez? HTTP es pesado: abre conexión, manda cabeceras enormes, espera respuesta, cierra. Multiplicá eso por miles de lecturas y se te cae todo.</p>
+      <p>MQTT nació justo para esto: <strong>máquinas con recursos limitados y redes malas</strong>. Es un protocolo de mensajería <em>publish/subscribe</em>, liviano, pensado para IoT. Según OASIS, cubre más del <strong>85% de los proyectos IoT</strong> del mundo. No es una moda: es <em>el</em> estándar.</p>
+
+      <h3>1.2 — Publicar / Suscribir: la idea central</h3>
+      <p>Acá está el corazón, y es lo que más cuesta al principio porque rompe con el modelo cliente-servidor clásico. En HTTP, el que quiere el dato lo <em>pide</em> (pull). En MQTT, el que tiene el dato lo <em>publica</em> y el que lo quiere se <em>suscribe</em> (push). <strong>Nadie le pregunta a nadie: los mensajes fluyen solos.</strong></p>
+      <div class="call analogy">
+        <span class="tag">Analogía</span>
+        <p>Pensá en la <strong>radio</strong>. La emisora (el sensor) transmite en la frecuencia 100.5 sin saber ni le importa quién escucha. Vos prendés la radio y sintonizás 100.5 (te suscribís). Puede haber una persona escuchando o un millón — a la emisora le da igual. <strong>El emisor y el receptor están totalmente desacoplados:</strong> no se conocen, no se esperan, no dependen uno del otro. Eso es publish/subscribe.</p>
+      </div>
+      <p>¿Y quién coordina todo? El <strong>broker</strong> — el servidor central de MQTT. Es el "cartero" o la "central telefónica": recibe <em>todos</em> los mensajes de <em>todos</em> los publicadores, y los reparte a quien esté suscripto. En Yerbanalytics el broker corre en <code>tcp://localhost:1883</code> (1883 es el puerto estándar de MQTT).</p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+    S1[["Sensor MZ-1"]] -- publica --> B(("Broker<br/>MQTT"))
+    S2[["Sensor MZ-2"]] -- publica --> B
+    S3[["Simulador"]] -- publica --> B
+    B -- entrega --> BK["Backend<br/>(suscripto)"]
+    B -. entrega .-> DASH["Otro suscriptor<br/>(ej. dashboard)"]
+    style B fill:#2E6B3B,stroke:#245531,color:#fff
+    style BK fill:#E7F0E4,stroke:#2E6B3B,color:#1A211B
+        </pre>
+      </div>
+
+      <h3>1.3 — Topics: las "direcciones" de los mensajes</h3>
+      <p>¿Cómo sabe el broker a quién mandarle qué? Con los <strong>topics</strong> (temas). Un topic es una etiqueta jerárquica, separada por barras, como una ruta de carpetas. En Yerbanalytics es:</p>
+      <pre><code>nursery/zone/MZ-1/telemetry
+        │     │    │      │
+     raíz  nivel  zona  tipo de dato</code></pre>
+      <p>Cuando te suscribís, podés usar <strong>comodines (wildcards)</strong> para escuchar varios topics de una:</p>
+      <ul>
+        <li><code>+</code> — comodín de <strong>un nivel</strong>. El backend se suscribe a <code>nursery/zone/<strong>+</strong>/telemetry</code>: escucha la telemetría de <em>cualquier</em> zona (MZ-1, MZ-2, … MZ-6) con una sola suscripción.</li>
+        <li><code>#</code> — comodín de <strong>múltiples niveles</strong> (todo lo que cuelgue de ahí). <code>nursery/#</code> escucharía absolutamente todo lo del vivero.</li>
+      </ul>
+      <div class="call here">
+        <span class="tag">En Yerbanalytics</span>
+        <p>El backend usa un único adaptador suscripto a <code>nursery/zone/+/telemetry</code>. De ese topic saca el <code>zonaId</code> partiendo el string por <code>/</code> y tomando la posición 2. Un solo punto de entrada para las 6 zonas <em>y</em> para el simulador — que publica al mismo topic, así que desde la ingesta <strong>el hardware real y el simulado son indistinguibles</strong>. Detalle de diseño muy elegante.</p>
+      </div>
+
+      <h3>1.4 — QoS: los tres niveles de garantía de entrega</h3>
+      <p>Acá empieza lo "de experto". Una red mala pierde paquetes. ¿Qué pasa si un mensaje no llega? MQTT te deja elegir <strong>cuánto te querés esforzar</strong> en que llegue, con tres niveles de <em>Quality of Service</em>:</p>
+      <div class="qos-grid">
+        <div class="qos-card">
+          <div class="lvl">0</div>
+          <div class="name">At most once — "lo tiro y me olvido"</div>
+          <p>Se manda una vez, sin confirmación. Si se perdió, se perdió. Máxima velocidad, cero garantía. Sirve para datos que se repiten seguido (si perdés una lectura, la próxima llega en segundos).</p>
+        </div>
+        <div class="qos-card">
+          <div class="lvl">1</div>
+          <div class="name">At least once — "insisto hasta que confirmen"</div>
+          <p>El emisor reintenta hasta recibir un ACK. Garantiza que llega, pero <strong>puede llegar duplicado</strong>. Es el punto justo entre confiabilidad y costo. <strong>El que usa Yerbanalytics.</strong></p>
+        </div>
+        <div class="qos-card">
+          <div class="lvl">2</div>
+          <div class="name">Exactly once — "exactamente una vez"</div>
+          <p>Handshake de cuatro pasos: llega <strong>una sola vez, sin duplicados</strong>. La garantía más fuerte y la más cara. Se reserva para datos críticos (ej. un comando que no podés ejecutar dos veces).</p>
+        </div>
+      </div>
+      <div class="call warnbox">
+        <span class="tag">Ojo — un punto fino que importa para el motor de reglas</span>
+        <p>Yerbanalytics usa <strong>QoS 1</strong> para la telemetría. QoS 1 puede <strong>duplicar mensajes</strong>. Para <em>leer</em> humedad no pasa nada (sobreescribís el valor). Pero cuando el motor de reglas ejecute <strong>acciones</strong> (abrir válvula, inyectar insumo), un duplicado podría significar <em>regar dos veces</em> o <em>doble dosis de fungicida</em>. Guardate esto: es exactamente uno de los riesgos que la propuesta de Agustín <strong>no aborda</strong> (concurrencia / idempotencia). Volvemos a esto en la Parte 5.</p>
+      </div>
+
+      <h3>1.5 — Los conceptos avanzados que separan al que sabe</h3>
+      <div class="cols two">
+        <div class="mini">
+          <h4>Retained messages</h4>
+          <p>El broker guarda el <em>último</em> mensaje marcado como "retenido" de cada topic. Un suscriptor nuevo lo recibe al instante, sin esperar la próxima publicación. Útil para "estado actual" (ej. último valor conocido de un sensor).</p>
+        </div>
+        <div class="mini">
+          <h4>Last Will &amp; Testament (LWT)</h4>
+          <p>Cada cliente puede dejar un "mensaje de despedida" al conectarse. Si se desconecta de golpe (se cae la red), el broker publica ese mensaje por él. Perfecto para detectar sensores caídos — clave en un vivero con conexión inestable.</p>
+        </div>
+        <div class="mini">
+          <h4>Keep-alive</h4>
+          <p>El cliente manda un "ping" cada X segundos para decir "sigo vivo". Si el broker no lo escucha, lo da por muerto y dispara su LWT. Así se detecta una caída sin esperar un timeout de TCP largo.</p>
+        </div>
+        <div class="mini">
+          <h4>Sesiones persistentes</h4>
+          <p>Si un cliente se cae y vuelve, el broker puede haberle <em>guardado</em> los mensajes QoS 1/2 que llegaron mientras estaba offline, y se los entrega al reconectar. MQTT 5.0 agregó control fino sobre cuánto dura esa sesión.</p>
+        </div>
+      </div>
+      <div class="call here">
+        <span class="tag">En Yerbanalytics</span>
+        <p>El proyecto tiene su propia versión "casera" de detección de caídas que <em>no</em> usa LWT: un <strong>watchdog</strong> por heartbeat. Cada nodo manda su estado (batería, señal, timestamp) y el <code>HardwareService</code> deriva en runtime si está <span class="pill ok">operativo</span>, <span class="pill warn">intermitente</span> (&gt;2h sin reportar) o <span class="pill crit">fuera de servicio</span> (&gt;24h). Cuando un nodo cae &gt;24h, <strong>se anula la actuación autónoma de toda esa macro-zona</strong> — una regla de seguridad de negocio, no solo técnica.</p>
+      </div>
+
+      <h3>1.6 — MQTT, tal como corre hoy en el proyecto</h3>
+      <p>Ahora que tenés los conceptos, este es el stack real:</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Pieza</th><th>Qué es</th><th>En el proyecto</th></tr></thead>
+          <tbody>
+            <tr><td>Librería</td><td>El cliente MQTT en Java</td><td><code>spring-integration-mqtt</code> envolviendo <strong>Eclipse Paho</strong></td></tr>
+            <tr><td>Broker</td><td>El servidor central</td><td><code>tcp://localhost:1883</code> (sin auth en dev)</td></tr>
+            <tr><td>Topic de entrada</td><td>Qué escucha</td><td><code>nursery/zone/+/telemetry</code>, QoS 1</td></tr>
+            <tr><td>Payload</td><td>El contenido del mensaje</td><td>JSON: <code>mac</code>, <code>battery</code>, <code>signal</code>, <code>timestamp</code>, <code>metrics{humSus, humAmb, temp, ce, uv}</code></td></tr>
+            <tr><td>Entrada al código</td><td>Dónde aterriza</td><td><code>MqttTelemetryReceiver.processMessage()</code></td></tr>
+            <tr><td>Publicación</td><td>Cómo se manda (simulador)</td><td><code>MqttTelemetryPublisher</code>: cliente Paho efímero por cada publish</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="call warnbox">
+        <span class="tag">Hallazgo importante</span>
+        <p>Hoy MQTT se usa <strong>en una sola dirección</strong>: sensor → backend (ingesta de telemetría). <strong>No existe ningún canal backend → actuador.</strong> Cuando el sistema "abre una válvula", en realidad solo escribe un campo en la base de datos (<code>sector.actuadorValve</code>) — es simulación pura. Esto es central para evaluar la propuesta, porque el diseño de Agustín <em>asume</em> que ese canal de comando ya existe. Spoiler: no existe.</p>
+      </div>
+    </section>
+
+    <!-- ============ 02 NEGOCIO ============ -->
+    <section id="negocio">
+      <div class="part-head">
+        <span class="part-num">02 — NEGOCIO</span>
+        <h2>Qué se quiere implementar (y por qué)</h2>
+      </div>
+      <p>Dejemos la técnica un momento. ¿Qué problema del <em>mundo real</em> resuelve el motor de reglas? Porque el código es un medio; el fin es agronómico.</p>
+
+      <h3>2.1 — La división del vivero: dónde ocurre todo</h3>
+      <p>Antes de cualquier regla, hay que entender <strong>cómo está dividido el espacio físico</strong>. Si no tenés claro qué es un sector o una macro-zona, nada del motor te va a cerrar. El vivero se organiza en una jerarquía de cuatro niveles, de lo más grande a lo más chico:</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+    V["Vivero San Ignacio"] --> MZ["6 MACRO-ZONAS<br/>MZ-1 … MZ-6<br/>(1 sensor testigo c/u)"]
+    MZ --> S["~100 SECTORES por macro-zona<br/>600 en total<br/>(1 microaspersor c/u)"]
+    S --> T["~100 TUBETES por sector"]
+    T --> P["1 PLANTÍN por tubete<br/>(unidad de análisis de la IA)"]
+    style V fill:#2E6B3B,stroke:#245531,color:#fff
+    style P fill:#E7F0E4,stroke:#2E6B3B,color:#1A211B
+        </pre>
+      </div>
+      <div class="cols two">
+        <div class="mini"><h4>Macro-zona (MZ)</h4><p>La división <strong>más grande</strong>. El vivero se parte en <strong>6 macro-zonas</strong> (<code>MZ-1</code> … <code>MZ-6</code>). Cada una tiene <strong>un sensor testigo</strong> que mide humedad, temperatura, UV, etc. para toda la zona.</p></div>
+        <div class="mini"><h4>Sector</h4><p>La <strong>unidad de riego</strong>. Cada MZ agrupa ~100 sectores → <strong>600 en total</strong>. Cada sector tiene <strong>un solo microaspersor</strong>: se riega el sector entero de una, nunca un plantín aislado. Por eso es la unidad mínima sobre la que el motor <em>actúa</em>.</p></div>
+        <div class="mini"><h4>Tubete</h4><p>El recipiente individual donde crece <strong>un plantín</strong>. Cada sector contiene ~100 tubetes.</p></div>
+        <div class="mini"><h4>Plantín</h4><p>La <strong>unidad de análisis</strong>. Un tubete = un plantín. La IA diagnostica <strong>UN plantín por imagen</strong>: el riel/gantry lo aísla y le saca una foto cenital.</p></div>
+      </div>
+      <p>Los nombres que vas a ver en los documentos y en el código —como <code>MZ-3-045</code>— se leen de izquierda a derecha:</p>
+      <pre><code>MZ-3-045
+│    └── sector número 45 dentro de esa macro-zona
+└─────── macro-zona 3</code></pre>
+      <p>Entonces <code>MZ-3-045</code> es "el sector 45 de la macro-zona 3". Un bloqueo o alerta sobre <code>MZ-3</code> cubre <strong>los ~100 sectores</strong> de esa macro-zona; sobre <code>MZ-3-045</code>, solo <strong>ese sector puntual</strong>.</p>
+      <div class="call">
+        <span class="tag">Por qué importa para el motor</span>
+        <p>Cada cosa vive en un nivel distinto, y el motor los cruza: la <strong>IA diagnostica a nivel plantín</strong> (uno por foto), los <strong>sensores miden a nivel macro-zona</strong> (un testigo por MZ) y el <strong>motor actúa a nivel sector</strong> (porque hay un microaspersor por sector). Cuando evalúa un sector, combina el diagnóstico del plantín + la lectura del sensor de su macro-zona, y recién ahí decide qué hacer con el actuador de ese sector.</p>
+      </div>
+
+      <h3>2.2 — El problema agronómico</h3>
+      <p>Yerbanalytics automatiza la etapa más crítica de la yerba mate: el <strong>vivero de plantines</strong> antes del trasplante. El objetivo es frenar la pérdida de cultivo por cuatro causas:</p>
+      <div class="cols two">
+        <div class="mini"><h4>Clorosis</h4><p>Déficit nutricional / pH del sustrato. La hoja amarillea. Se corrige con <strong>nutrientes</strong>.</p></div>
+        <div class="mini"><h4>Estrés solar</h4><p>Exceso de radiación, típico al sacar la mediasombra de golpe. Se maneja con <strong>sombra</strong>.</p></div>
+        <div class="mini"><h4>Daño biótico</h4><p>Plagas (ácaro, psílido) u hongos (damping-off, mal de la tela). Insecticida o fungicida según el caso.</p></div>
+        <div class="mini"><h4>Desperdicio de insumos</h4><p>Tratar todo el vivero "por las dudas" quema plata y químicos. La idea es tratar <strong>solo donde hace falta</strong>.</p></div>
+      </div>
+      <p>Las acciones correctivas se deciden y ejecutan <strong>localmente (en el borde / edge)</strong>, sin depender de la nube, para aguantar cortes de conexión largos. Y hay un dato de negocio que no es menor: <strong>las reglas del motor de decisiones figuran, explícitamente, como uno de los 4 activos intelectuales clave de la empresa</strong> (junto al dataset propio y los modelos de IA). O sea: este componente <em>es</em> parte del valor del producto, no un detalle de implementación.</p>
+
+      <h3>2.3 — Qué es un "motor de reglas" (y qué NO es)</h3>
+      <p>Un motor de reglas es, simplemente, el componente que toma <strong>condiciones</strong> ("si la humedad baja de X") y produce <strong>acciones</strong> ("entonces abrí la válvula"). La industria lo llama patrón <em>condición-acción</em>. La razón de existir es sacar la lógica de decisión de adentro del código de plomería, para poder cambiarla, testearla y entenderla sin romper todo lo demás.</p>
+      <div class="call analogy">
+        <span class="tag">Analogía</span>
+        <p>Es la diferencia entre un termostato con la temperatura <strong>soldada de fábrica</strong> y uno con una <strong>perilla</strong>. Ambos "deciden" prender la calefacción. Pero en el primero, cambiar el umbral significa desarmar el aparato con soldador. En el segundo, girás la perilla. El motor de reglas es la perilla: separa <em>la decisión</em> de <em>la máquina que la ejecuta</em>.</p>
+      </div>
+      <div class="call warnbox">
+        <span class="tag">Precisión conceptual — no te confundas</span>
+        <p>Hay dos tipos de "motor de reglas". Uno <strong>data-driven</strong>: las reglas viven en una base de datos y un agrónomo las edita desde una pantalla sin tocar código (como <em>Drools</em> o <em>Easy Rules</em>). Otro <strong>code-driven</strong>: cada regla es una clase de Java. <strong>La propuesta de Agustín es la segunda</strong>: las condiciones siguen hardcodeadas en Java. Y para 8 reglas de dominio acotado, <em>es la decisión correcta</em> — meter un motor genérico sería sobre-ingeniería. Pero es importante que lo sepas para no esperar una "perilla" configurable que no va a estar.</p>
+      </div>
+
+      <h3>2.4 — Las reglas concretas del vivero</h3>
+      <p>Estas son las reglas de negocio reales, con los umbrales que ya están definidos en el código y en las historias de usuario (HU). Primero, las <strong>bandas</strong> de las 5 métricas — el "qué es normal":</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Métrica</th><th>Ideal</th><th>Warning</th><th>Crítico</th></tr></thead>
+          <tbody>
+            <tr><td>Humedad sustrato (%)</td><td class="num">42–68</td><td class="num">32–80</td><td class="num">22–90</td></tr>
+            <tr><td>Humedad ambiental (%)</td><td class="num">62–84</td><td class="num">52–91</td><td class="num">42–96</td></tr>
+            <tr><td>Temperatura (°C)</td><td class="num">18–27</td><td class="num">15–31</td><td class="num">11–35</td></tr>
+            <tr><td>Nutrientes / CE (dS/m)</td><td class="num">1.0–1.9</td><td class="num">0.8–2.5</td><td class="num">0.5–3.1</td></tr>
+            <tr><td>Radiación UV (UVI)</td><td class="num">1–6</td><td class="num">0–8</td><td class="num">0–12</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Y estas son las reglas de <em>actuación</em>, ordenadas por lo que gatillan:</p>
+
+      <h4><span class="dot ok"></span>Riego (HU-06) — electroválvula</h4>
+      <ul>
+        <li>Abre si humedad de sustrato &lt; umbral <strong>Y</strong> la telemetría es fresca (&lt;2h) <strong>Y</strong> no hay bloqueo manual.</li>
+        <li><strong>Pospone</strong> si la API del clima confirma lluvia inminente (no tiene sentido regar si va a llover).</li>
+        <li><strong>Aborta y alerta</strong> si hay bloqueo manual o el sensor lleva &gt;2h mudo.</li>
+        <li><strong>Corta y marca "Falla Hidráulica"</strong> si el caudalímetro no detecta flujo tras 10s.</li>
+      </ul>
+
+      <h4><span class="dot warn"></span>Insumos (HU-07) — bomba peristáltica <span class="pill crit">la regla más importante del sistema</span></h4>
+      <ul>
+        <li>Inyecta <strong>solo si el Confidence Score de la IA supera el 85%</strong>. Por debajo → "No concluyente", sin acción, requiere validación humana.</li>
+        <li>Bloquea con alerta CRITICAL si la dosis supera el <strong>límite diario de mL/24h</strong> por sector.</li>
+        <li><strong>Fusión multimodal (la joya):</strong> ante un diagnóstico de "Daño biótico", el sensor de humedad <em>desambigua</em> qué tratar → <strong>humedad &gt;80% ⇒ sospecha de hongo</strong> (fungicida + bajar riego); <strong>humedad normal ⇒ sospecha de plaga</strong> (insecticida). La cámara aporta la evidencia; el motor agronómico <em>fusiona</em> las señales de imagen + sensor.</li>
+      </ul>
+
+      <h4><span class="dot crit"></span>Mediasombra / rustificación (HU-08)</h4>
+      <ul>
+        <li>Mueve la mediasombra según el <strong>cronograma del plan de rustificación</strong> (día → % de apertura) o ante un pico de UV sobre el umbral.</li>
+        <li>La rustificación es el endurecimiento gradual del plantín antes del trasplante: se le va sacando la sombra a propósito para que el tallo lignifique.</li>
+      </ul>
+
+      <h4><span class="dot off"></span>Reglas de seguridad y degradación</h4>
+      <ul>
+        <li><strong>Clima externo (HU-09):</strong> timeout 15s, hasta 3 reintentos con backoff exponencial. Si falla → modo conservador, opera solo con sensores locales.</li>
+        <li><strong>Modo offline (HU-13):</strong> decide localmente contra umbrales cacheados; si una regla necesita el clima y no hay conexión, <em>asume el peor escenario</em>. Al reconectar, sincroniza sin duplicar.</li>
+        <li><strong>Seguimiento post-acción (HU-12):</strong> tras una latencia configurable, vuelve a medir. Si la métrica no mejoró lo esperado → "Sin Efectividad", <strong>bloquea repetir la acción sola</strong> y exige revisión física. Esto evita que el sistema riegue infinitamente algo que no se arregla regando.</li>
+        <li><strong>Bloqueo manual (HU-19):</strong> un operario puede congelar la actuación de un sector o zona.</li>
+      </ul>
+      <div class="call here">
+        <span class="tag">La regla de oro del negocio</span>
+        <p>El sistema <strong>recomienda y alerta, no reemplaza al agrónomo</strong>. En fitosanitarios, la decisión final la toma el productor. El valor está en la <em>detección temprana</em> + la <em>recomendación correcta</em>, con trazabilidad total.</p>
+      </div>
+
+      <h3>2.5 — El flujo completo, de la lectura a la acción</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+    A[/"Sensor testigo<br/>humedad · temp · UV"/] --> M{{"MOTOR DE REGLAS<br/>(edge-capable)"}}
+    B[/"Visión IA<br/>imagen cenital"/] --> M
+    C[/"API clima<br/>lluvia · UV"/] --> M
+    M -->|"Confidence &gt;85% + umbrales OK"| ACT["Actuador<br/>válvula · bomba · sombra"]
+    M -->|"Confidence &lt;85%"| NC["'No concluyente'<br/>sin acción · avisar"]
+    M -->|"Sin conexión"| CONS["Modo conservador<br/>solo sensores"]
+    ACT --> H[("Historial inmutable<br/>lectura→decisión→acción")]
+    H --> SEG{"Seguimiento<br/>¿mejoró?"}
+    SEG -->|Sí| EF["Efectiva"]
+    SEG -->|No| BLOCK["'Sin efectividad'<br/>bloquea repetición<br/>+ alerta CRITICAL"]
+    style M fill:#2E6B3B,stroke:#245531,color:#fff
+    style H fill:#E7F0E4,stroke:#2E6B3B,color:#1A211B
+        </pre>
+      </div>
+    </section>
+
+    <!-- ============ 03 ACTUAL ============ -->
+    <section id="actual">
+      <div class="part-head">
+        <span class="part-num">03 — EL CÓDIGO DE HOY</span>
+        <h2>Cómo funciona la arquitectura actual</h2>
+      </div>
+      <p>Para juzgar la propuesta, primero hay que entender qué hay hoy. Y acá está la clave de todo el análisis: <strong>el motor de reglas ya existe</strong>. No en un componente prolijo — está <em>enredado</em> dentro de un solo método. Ese es, precisamente, el problema que Agustín quiere resolver.</p>
+
+      <h3>3.1 — El pipeline de ingesta, paso a paso</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+    SIM["Simulador / Dashboard"] --> PUB["MqttTelemetryPublisher"]
+    ESP["ESP32 real"] --> BROKER
+    PUB --> BROKER(("Broker :1883"))
+    BROKER --> ADP["MqttPahoMessageDrivenChannelAdapter<br/>topic nursery/zone/+/telemetry"]
+    ADP --> RCV["MqttTelemetryReceiver.processMessage()<br/>parsea JSON · saca zonaId"]
+    RCV --> UPD["NurseryService.updateTelemetry()"]
+    UPD --> DB[("PostgreSQL")]
+    UPD --> HIST["HistorialService"]
+    style UPD fill:#B9791A,stroke:#8a5a12,color:#fff
+    style RCV fill:#E7F0E4,stroke:#2E6B3B,color:#1A211B
+        </pre>
+      </div>
+      <p>Todo mensaje —del hardware real o del simulador— entra por el <em>mismo</em> <code>MqttTelemetryReceiver</code> y termina en <strong><code>NurseryService.updateTelemetry()</code></strong> (marcado en ámbar arriba). Ese método es el que nos importa.</p>
+
+      <h3>3.2 — El "motor de reglas rudimentario" que ya vive ahí</h3>
+      <p>En unas <strong>~90 líneas</strong>, dentro de una sola transacción, <code>updateTelemetry()</code> hace <em>cinco</em> cosas distintas:</p>
+      <ol>
+        <li>Actualiza las métricas crudas (<code>humSusRaw</code>, <code>tempRaw</code>, etc.) de cada sector de la zona.</li>
+        <li>Recalcula el <strong>status</strong> por métrica comparando contra las bandas (ideal/warn/crit).</li>
+        <li>Fija el <strong>diagnóstico</strong> desde un mapa estático hardcodeado (<code>PATHOS</code>).</li>
+        <li><strong>Decide los actuadores</strong> con umbrales fijos (<code>humSus &lt; umbralRiego</code>, <code>confidence &gt;= 85</code>).</li>
+        <li>Dispara el registro en el <strong>historial</strong> cuando hay transiciones de estado.</li>
+      </ol>
+      <p>¿Ves el problema? Ingesta de datos, lógica de decisión agronómica y persistencia, <strong>todo mezclado en un bloque</strong>. Agregar una regla nueva (clima, bloqueo manual, plan de rustificación) significaría meter más <code>if</code> en ese método hasta volverlo inmantenible. Esto es <em>exactamente</em> lo que la industria llama la "trampa del hardcoding": empezás con un <code>if</code> simple y a los seis meses tenés una clase de 500 líneas que nadie se anima a tocar.</p>
+      <div class="call here">
+        <span class="tag">El diagnóstico de Agustín es correcto</span>
+        <p>Verifiqué el método línea por línea: efectivamente mezcla 5 responsabilidades. Su lectura del problema <strong>es precisa</strong>. No está inventando una necesidad — el dolor es real y está a la vista en <code>NurseryService.java</code> (~líneas 344–432).</p>
+      </div>
+
+      <h3>3.3 — Las entidades que ya están y se reutilizan</h3>
+      <p>Un dato tranquilizador: casi todo lo que el motor necesita, <strong>ya existe</strong> como tabla. La propuesta reutiliza <code>sector</code>, <code>umbral_metrica</code>, <code>configuracion_operativa</code>, <code>rustificacion_etapa</code>, <code>historial_evento</code> y <code>dispositivo</code>. Solo agrega <em>una</em> tabla nueva: <code>bloqueo_manual</code>. Es una propuesta <strong>de bajo impacto en el modelo de datos</strong>, lo cual es bueno.</p>
+    </section>
+
+    <!-- ============ 04 PROPUESTA ============ -->
+    <section id="propuesta">
+      <div class="part-head">
+        <span class="part-num">04 — LA PROPUESTA</span>
+        <h2>Qué propone Agustín en el PR #12</h2>
+      </div>
+      <div class="call verdict">
+        <span class="tag">Antes que nada</span>
+        <p>El PR <strong>no tiene código</strong>. Son 4 documentos OpenSpec: <code>proposal.md</code> (por qué/qué), <code>design.md</code> (el cómo técnico), <code>context.md</code> (contexto) y <code>tasks.md</code> (checklist). Es una <strong>propuesta de arquitectura</strong> en la fase de diseño, previa a implementar. Y eso está perfecto: es el estándar del repo — concepto antes que código. Juzgamos un <em>plan</em>, no una <em>construcción</em>.</p>
+      </div>
+
+      <h3>4.1 — La idea central</h3>
+      <p>Sacar esas ~90 líneas enredadas de <code>updateTelemetry()</code> y convertirlas en un <strong>componente propio, ordenado y testeable</strong>, que además deje lugar para las reglas que todavía no existen (clima, bloqueo manual, plan de rustificación, gate de confidence de la IA).</p>
+
+      <h3>4.2 — Las piezas del diseño</h3>
+      <p>El corazón son tres tipos de datos y dos servicios:</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Componente</th><th>Tipo</th><th>Rol</th></tr></thead>
+          <tbody>
+            <tr><td><code>Rule</code></td><td>interfaz</td><td>El contrato de toda regla: <code>name()</code>, <code>priority()</code>, <code>evaluate(RuleContext) → List&lt;RuleAction&gt;</code></td></tr>
+            <tr><td><code>RuleContext</code></td><td>record inmutable</td><td>La "foto" de un ciclo: sector, zona, métricas, config, clima, diagnóstico IA, flags de bloqueo/sensor-stale</td></tr>
+            <tr><td><code>RuleAction</code></td><td>record</td><td>La acción emitida: tipo, regla que la originó, justificación, severidad, si es <code>blocking</code></td></tr>
+            <tr><td><code>RuleOrchestrator</code></td><td>@Service</td><td>Itera las reglas por prioridad, corta la cadena si una acción es bloqueante, delega la ejecución</td></tr>
+            <tr><td><code>ActionExecutor</code></td><td>@Service</td><td>Ejecuta: publica MQTT al actuador, persiste en historial, emite alertas</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>La gracia del diseño es el <strong>Open-Closed Principle</strong>: agregar una regla nueva = crear una clase <code>@Component</code> nueva, <em>sin tocar el orquestador</em>. Spring la inyecta sola. Es extensible de verdad.</p>
+
+      <h3>4.3 — Todas las reglas, unificadas</h3>
+      <p>Acá está el mapa completo: las reglas que <strong>ya existen hoy</strong> (enredadas dentro de <code>updateTelemetry()</code> o en el scheduler) <strong>y</strong> las que <strong>agregaría el PR</strong>, en una sola tabla. El orden importa: las de menor número corren primero y pueden <em>cortar</em> la cadena. Tocá <strong>"Ver detalle"</strong> en cualquiera para su explicación teórica, casos de ejemplo y observaciones de negocio.</p>
+      <div class="legend">
+        <span><span class="origen o-hoy"><span class="mk">◆</span></span> Ya existe hoy (se extrae/formaliza)</span>
+        <span><span class="origen o-parcial"><span class="mk">◑</span></span> Parcial (falta completar)</span>
+        <span><span class="origen o-nueva"><span class="mk">✦</span></span> Nueva del PR</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Prio</th><th>Regla</th><th>Qué hace</th><th>Origen</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="num">—</td><td><code>Clasificación + diagnóstico</code></td><td>Paso base: clasifica cada métrica contra sus bandas y asigna diagnóstico. Es el <em>input</em> de todas las reglas.</td><td class="origen o-hoy"><span class="mk">◆</span>Hoy</td><td><a class="ver" href="anexo-reglas.html#regla-clasificacion">Ver detalle →</a></td></tr>
+            <tr><td class="num">0</td><td><code>BloqueoManualRule</code></td><td>Si el operario bloqueó el sector/zona, corta toda actuación. Máxima prioridad.</td><td class="origen o-nueva"><span class="mk">✦</span>Nueva</td><td><a class="ver" href="anexo-reglas.html#regla-bloqueo">Ver detalle →</a></td></tr>
+            <tr><td class="num">1</td><td><code>StaleSensorRule</code></td><td>Si el sensor testigo está mudo (&gt;2h / &gt;24h), no actúa a ciegas.</td><td class="origen o-hoy"><span class="mk">◆</span>Hoy</td><td><a class="ver" href="anexo-reglas.html#regla-stale">Ver detalle →</a></td></tr>
+            <tr><td class="num">2</td><td><code>ClimaOverrideRule</code></td><td>Si va a llover, pospone el riego. Degrada si la API falla.</td><td class="origen o-nueva"><span class="mk">✦</span>Nueva</td><td><a class="ver" href="anexo-reglas.html#regla-clima">Ver detalle →</a></td></tr>
+            <tr><td class="num">5</td><td><code>DosisLimiteRule</code></td><td>Frena si se supera el límite químico diario del sector.</td><td class="origen o-parcial"><span class="mk">◑</span>Parcial</td><td><a class="ver" href="anexo-reglas.html#regla-dosis">Ver detalle →</a></td></tr>
+            <tr><td class="num">10</td><td><code>RiegoRule</code></td><td>Abre la electroválvula por humedad de sustrato baja.</td><td class="origen o-hoy"><span class="mk">◆</span>Hoy</td><td><a class="ver" href="anexo-reglas.html#regla-riego">Ver detalle →</a></td></tr>
+            <tr><td class="num">11</td><td><code>InsumoRule</code></td><td>Inyecta insumo con gate de confidence y fusión multimodal.</td><td class="origen o-parcial"><span class="mk">◑</span>Parcial</td><td><a class="ver" href="anexo-reglas.html#regla-insumo">Ver detalle →</a></td></tr>
+            <tr><td class="num">12</td><td><code>MediasombraRule</code></td><td>Mueve la sombra por plan de rustificación o pico de UV.</td><td class="origen o-nueva"><span class="mk">✦</span>Nueva</td><td><a class="ver" href="anexo-reglas.html#regla-mediasombra">Ver detalle →</a></td></tr>
+            <tr><td class="num">20</td><td><code>SeguimientoRule</code></td><td>Vuelve a medir tras la acción y evalúa su efectividad.</td><td class="origen o-hoy"><span class="mk">◆</span>Hoy</td><td><a class="ver" href="anexo-reglas.html#regla-seguimiento">Ver detalle →</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Todas se apoyan en un <code>WeatherService</code> aparte (cliente async del clima, con timeout, reintentos con backoff, cache local y <em>fallback</em> si falla — el motor sigue operando solo con sensores). Buen manejo de degradación.</p>
+      <div class="btn-row">
+        <a class="btn" href="anexo-reglas.html">
+          <span>Anexo — Detalle de cada regla
+            <small>Definición teórica · casos de ejemplo · observaciones de negocio, regla por regla</small>
+          </span>
+          <span class="arr">→</span>
+        </a>
+      </div>
+
+      <h3>4.4 — El roadmap por fases</h3>
+      <ul>
+        <li><strong>Fase 1:</strong> armar el andamiaje y <em>extraer la lógica actual sin cambiar el comportamiento</em> (refactor puro, verificable contra el <code>updateTelemetry()</code> de hoy). Muy sensato empezar así.</li>
+        <li><strong>R1→R4:</strong> ir sumando reglas de a una — sensor mudo, clima, el grueso (riego/insumo/mediasombra/dosis) y finalmente seguimiento.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 05 EVALUACION ============ -->
+    <section id="evaluacion">
+      <div class="part-head">
+        <span class="part-num">05 — MI EVALUACIÓN</span>
+        <h2>¿Está bien? Qué cambiaría</h2>
+      </div>
+      <div class="call verdict">
+        <span class="tag">Veredicto</span>
+        <p><strong>La propuesta es sólida y aprobable — con correcciones.</strong> Identifica el problema correcto, propone una solución idiomática (encaja con la cultura del repo), extensible y con trade-offs bien pensados. Como <em>documento de arquitectura de nivel propuesta</em>, está bien. Pero tiene <strong>2 afirmaciones técnicamente incorrectas</strong> y <strong>2 vacíos de diseño</strong> que hay que cerrar <em>antes</em> de pasar a <code>apply</code>. No lo mandaría a codear tal cual.</p>
+      </div>
+
+      <h3>5.1 — Puntos fuertes (lo que está muy bien)</h3>
+      <div class="cols two">
+        <div class="mini"><h4><span class="plus">✓</span> Diagnóstico preciso</h4><p>La lectura del problema (los 5 roles mezclados en <code>updateTelemetry</code>) es correcta, verificada línea por línea. No inventa una necesidad.</p></div>
+        <div class="mini"><h4><span class="plus">✓</span> Solución idiomática</h4><p><code>RuleContext</code> inmutable + reglas como componentes encaja con la filosofía del repo (el frontend ya usa Repository para desacoplar). Coherencia arquitectónica.</p></div>
+        <div class="mini"><h4><span class="plus">✓</span> No sobre-ingeniería</h4><p>Rechazar Drools/Easy Rules para 8 reglas acotadas es la decisión correcta, y está <em>justificada</em>. Madurez de criterio.</p></div>
+        <div class="mini"><h4><span class="plus">✓</span> Extensibilidad real</h4><p>Open-Closed de verdad: nueva regla = nueva clase, sin tocar el orquestador. Y arranca por un refactor sin cambio de comportamiento. Impecable.</p></div>
+        <div class="mini"><h4><span class="plus">✓</span> Degradación explícita</h4><p>El <code>WeatherService</code> con fallback a <code>null</code> y el motor operando solo con sensores mapea directo a un criterio de aceptación de HU-09.</p></div>
+        <div class="mini"><h4><span class="plus">✓</span> Bajo impacto en datos</h4><p>Reutiliza 6 tablas existentes, agrega solo <code>bloqueo_manual</code>. No rompe el modelo.</p></div>
+      </div>
+
+      <h3>5.2 — Los problemas (lo que hay que corregir)</h3>
+
+      <h4><span class="minus">✗</span> Error 1 — <code>schema.sql</code> no existe en el proyecto</h4>
+      <p>En Spring Boot hay <strong>dos formas de crear las tablas</strong>, y son excluyentes: <strong>(A)</strong> escribís clases <code>@Entity</code> en Java y Hibernate genera el <code>CREATE TABLE</code> solo; <strong>(B)</strong> escribís el SQL a mano en un archivo <code>schema.sql</code>. <strong>Este proyecto usa la (A)</strong> — con <code>ddl-auto=update</code>, las 9 tablas nacen de sus entidades y el <code>data.sql</code> solo tiene <code>INSERT</code>s de seed (ni un <code>CREATE TABLE</code>). <strong>No existe ningún <code>schema.sql</code>.</strong></p>
+      <p>El <code>design.md</code> propone crear <code>bloqueo_manual</code> "como script DDL (<code>schema.sql</code>), consistente con el patrón existente". Doble error: se apoya en un archivo que <em>no existe</em>, y el patrón real es el <strong>opuesto</strong> (entidades JPA, no SQL crudo). Seguirlo al pie de la letra mete una <em>segunda fuente de verdad</em> para el esquema, que con el tiempo se desincroniza.</p>
+      <p style="margin-bottom:8px;"><strong>Lo que propone</strong> — Opción B, ajena al repo:</p>
+      <pre><code>-- schema.sql  ←  este archivo NO existe hoy
+CREATE TABLE IF NOT EXISTS bloqueo_manual (
+    id       BIGSERIAL PRIMARY KEY,
+    zona_id  VARCHAR(255) NOT NULL,
+    ...
+);</code></pre>
+      <p style="margin-bottom:8px;"><strong>Lo correcto</strong> — Opción A, el patrón real (Hibernate crea la tabla solo):</p>
+      <pre><code>@Entity @Table(name = "bloqueo_manual")
+public class BloqueoManualEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String zonaId;
+    private String sectorId;   // null = bloquea la zona entera
+    private Boolean activo;
+}
+// + BloqueoManualRepository extends JpaRepository&lt;BloqueoManualEntity, Long&gt;</code></pre>
+      <p><strong>Fix:</strong> borrar la mención a <code>schema.sql</code> y crear entidad + repository, como toda otra tabla. Dos clases, cero SQL de estructura. En OpenSpec el <code>design.md</code> es el contrato para quien implementa: un supuesto falso ahí se propaga a la implementación.</p>
+      <div class="btn-row">
+        <a class="btn" href="anexo-esquema-bd.html">
+          <span>Anexo — Gestión del esquema de base de datos
+            <small>DDL vs DML · ddl-auto vs migraciones · qué conviene para producción · recomendación para la tesis</small>
+          </span>
+          <span class="arr">→</span>
+        </a>
+      </div>
+
+      <h4><span class="minus">✗</span> Error 2 — Spring no ordena las reglas solo</h4>
+      <p>El sketch del <code>RuleOrchestrator</code> asume que la <code>List&lt;Rule&gt;</code> inyectada por Spring llega ya ordenada por <code>priority()</code>. <strong>No es así:</strong> Spring no ordena una lista inyectada según un método de instancia custom. Hay que ordenarla explícitamente — un <code>Comparator.comparingInt(Rule::priority)</code> en el constructor del orquestador. Si no, la prioridad (que es <em>el</em> mecanismo de corte de la cadena) no funciona y las reglas corren en orden arbitrario. Bug silencioso esperando a pasar.</p>
+
+      <h4><span class="minus">✗</span> Vacío 1 — el canal de comando a actuadores no existe</h4>
+      <p>El <code>ActionExecutor</code> "publica MQTT hacia los actuadores". Pero —como viste en la Parte 1— <strong>hoy no hay ningún publisher backend → actuador</strong>. El único publisher existente es de <em>ingesta</em> (sensor → backend). La propuesta da por sentado un canal que hay que construir desde cero (topic, protocolo, QoS del comando), y <strong>ni <code>design.md</code> ni <code>tasks.md</code> lo listan como tarea</strong>. Es un vacío de diseño, no solo de implementación. Además falta definir: ¿en el simulador se sigue escribiendo el campo directo y en producción se comanda por MQTT? ¿Se unifican?</p>
+
+      <h4><span class="minus">✗</span> Vacío 2 — concurrencia e idempotencia sin abordar</h4>
+      <p>Dos frentes. Uno: el <code>WeatherService</code> tiene "cache local del último forecast", pero con dos disparadores en paralelo (el reactivo por MQTT + uno proactivo por <code>@Scheduled</code>) una cache mutable sin sincronizar es una condición de carrera. Dos —y más grave— <strong>QoS 1 puede duplicar mensajes</strong> (te lo marqué en la Parte 1): si llegan dos paquetes del mismo sector casi juntos, dos hilos podrían evaluar y <em>ejecutar la misma acción dos veces</em>. En "leer humedad" no importa; en "inyectar fungicida" es doble dosis. Falta una estrategia de idempotencia / lock por sector.</p>
+
+      <h4><span class="minus">~</span> Menor — terminología del patrón</h4>
+      <p>Lo llaman "Strategy + Chain of Responsibility", pero el Chain of Responsibility clásico tiene cada handler decidiendo si delega al siguiente; acá el orquestador posee el loop y corta desde afuera. Es más bien una lista de estrategias con corte anticipado (más cerca de un pipeline / Specification). No es grave, pero para un proyecto que se jacta de "conceptos &gt; código", la precisión importa.</p>
+
+      <h4><span class="minus">~</span> Menor — la nueva firma de <code>updateTelemetry()</code> no está</h4>
+      <p>El <code>design.md</code> no muestra cómo queda el método después. ¿Sigue escribiendo métricas y diagnóstico síncronos y solo delega los actuadores? ¿Se reescribe entero? Esa ambigüedad conviene cerrarla antes de codear para que quien implemente no improvise.</p>
+
+      <h3>5.3 — Resumen del veredicto</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Dimensión</th><th>Evaluación</th></tr></thead>
+          <tbody>
+            <tr><td>Diagnóstico del problema</td><td><span class="pill ok">Excelente</span> Correcto y verificado</td></tr>
+            <tr><td>Dirección de la solución</td><td><span class="pill ok">Correcta</span> Idiomática y extensible</td></tr>
+            <tr><td>Nivel de sobre-ingeniería</td><td><span class="pill ok">Justo</span> Sin excesos</td></tr>
+            <tr><td>Rigor técnico del diseño</td><td><span class="pill warn">A corregir</span> 2 afirmaciones falsas</td></tr>
+            <tr><td>Completitud del diseño</td><td><span class="pill warn">Incompleto</span> 2 vacíos (actuadores, concurrencia)</td></tr>
+            <tr><td>Listo para <code>apply</code></td><td><span class="pill crit">Todavía no</span> Cerrar lo de arriba primero</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 06 RECOMENDACIONES ============ -->
+    <section id="recomendaciones">
+      <div class="part-head">
+        <span class="part-num">06 — ACCIÓN</span>
+        <h2>Qué haría yo, en concreto</h2>
+      </div>
+      <p>Si fuera tu revisor en el PR, no lo rechazaría ni lo aprobaría a ciegas. Le pediría <strong>una segunda vuelta de <code>design</code></strong> con estos puntos cerrados. Concretamente:</p>
+      <ol>
+        <li><strong>Corregir el tema <code>schema.sql</code>:</strong> reemplazar por <code>BloqueoManualEntity</code> + <code>BloqueoManualRepository</code> (patrón real del repo).</li>
+        <li><strong>Agregar el ordenamiento explícito</strong> de las reglas por prioridad en el orquestador (<code>Comparator.comparingInt(Rule::priority)</code>), y un test que lo verifique.</li>
+        <li><strong>Diseñar el canal backend → actuador</strong> como pieza de primera clase: definir topic, payload de comando, QoS (acá sí evaluar QoS 2 por lo de la doble ejecución), y decidir cómo convive con el simulador. Agregarlo a <code>tasks.md</code>.</li>
+        <li><strong>Definir la estrategia de idempotencia / concurrencia:</strong> lock por sector o deduplicación por <code>(sector, ventana de tiempo)</code>, y hacer thread-safe la cache del clima. Esto es <em>seguridad</em>, no un detalle: evita doble riego / doble dosis.</li>
+        <li><strong>Mostrar la nueva firma de <code>updateTelemetry()</code></strong> en el design, para que la extracción sea inequívoca.</li>
+        <li><strong>Ajustar la terminología del patrón</strong> (menor, pero suma rigor).</li>
+      </ol>
+      <div class="call here">
+        <span class="tag">La buena noticia</span>
+        <p>Ninguna de estas correcciones toca la <em>estructura</em> de la propuesta. El esqueleto (reglas como componentes, <code>RuleContext</code> inmutable, orquestador + ejecutor, refactor sin cambio de comportamiento primero) <strong>es correcto y lo mantendría intacto</strong>. Son ajustes de rigor y completitud, no un rediseño. Agustín pensó bien el problema — solo hay que apretar un par de tuercas antes de soldar.</p>
+      </div>
+      <div class="call analogy">
+        <span class="tag">Para cerrar</span>
+        <p>Acordate del principio del repo: <em>conceptos &gt; código</em>. Que este PR sea puro diseño, sin una línea de Java, <strong>es una virtud, no un defecto</strong>. Discutir la arquitectura <em>antes</em> de escribir el primer <code>if</code> es exactamente como se debe trabajar. La discusión que abrís con estas correcciones es la parte valiosa. Eso es hacer las cosas bien.</p>
+      </div>
+    </section>
+
+    <hr>
+
+    <footer class="end" id="fuentes">
+      <p style="font-weight:600;color:var(--ink);font-family:var(--font-display);">Fuentes y material analizado</p>
+      <p style="margin-bottom:14px;">Análisis directo del PR #12 (<code>gh</code>), del código del backend (<code>NurseryService</code>, paquete <code>mqtt/</code>, entidades JPA) y de la documentación de negocio (<code>Documentacion/</code>, HU/CA, OpenSpec). Complementado con:</p>
+      <ul class="src-list">
+        <li>· <a href="https://www.hivemq.com/mqtt/">HiveMQ — MQTT Essentials (conceptos base, QoS, retained, LWT)</a></li>
+        <li>· <a href="https://docs.aws.amazon.com/iot/latest/developerguide/mqtt.html">AWS IoT Core — MQTT publish/subscribe y QoS</a></li>
+        <li>· <a href="https://en.wikipedia.org/wiki/MQTT">Wikipedia — MQTT (protocolo, historia, adopción)</a></li>
+        <li>· <a href="https://www.iotforall.com/condition-action-rules-engines-iot">IoT For All — Condition-Action Rules Engines for IoT</a></li>
+        <li>· <a href="https://www.nected.ai/blog/spring-boot-rule-engine">Nected — Spring Boot Rule Engine (rules engine vs hardcoding)</a></li>
+        <li>· <a href="https://www.waylay.io/articles/a-guide-to-rules-engines-for-iot-condition-action-engines">Waylay — Rules engines for IoT: Condition-Action</a></li>
+      </ul>
+      <p style="margin-top:18px;color:var(--faint);font-size:12.5px;">Informe generado para Santiago · Proyecto Yerbanalytics · Julio 2026</p>
+    </footer>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, securityLevel: "loose",
+    theme: dark ? "dark" : "neutral" });
+</script>
+</html>

@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anexo — Detalle de cada regla del motor</title>
+<style>
+  :root {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --biz: #7C5B34; --biz-soft: #F3EADC;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+    --maxw: 76ch;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+      --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+      --border: #29301F; --border-strong: #3A4330;
+      --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+      --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+      --biz: #D8B784; --biz-soft: #241E14;
+      --code-bg: #191E14; --code-ink: #C6D0BB;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+    --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+    --border: #29301F; --border-strong: #3A4330;
+    --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+    --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+    --biz: #D8B784; --biz-soft: #241E14;
+    --code-bg: #191E14; --code-ink: #C6D0BB;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --biz: #7C5B34; --biz-soft: #F3EADC;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--font-body); font-size: 18px; line-height: 1.66;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  .page { max-width: var(--maxw); margin: 0 auto; padding: 0 24px 120px; }
+  .backbar { max-width: var(--maxw); margin: 0 auto; padding: 22px 24px 0; font-family: var(--font-display); font-size: 14px; }
+  .back { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; font-weight: 500; transition: color .15s, gap .15s; }
+  .back:hover { color: var(--accent); gap: 10px; }
+
+  header.hero { padding: 30px 0 30px; }
+  .eyebrow { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 16px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 4.6vw, 2.6rem); line-height: 1.07; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance; }
+  .lede { font-size: 1.15rem; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+
+  /* quick nav */
+  .qnav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 44px; padding: 18px 0 0; border-top: 1px solid var(--border); }
+  .qnav a { font-family: var(--font-display); font-size: 12.5px; font-weight: 600; text-decoration: none; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; transition: color .15s, border-color .15s, background .15s; }
+  .qnav a:hover { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+
+  .rule { scroll-margin-top: 20px; padding: 30px 0 8px; border-top: 1px solid var(--border); }
+  .rule:first-of-type { border-top: none; }
+  .rule-head { display: flex; align-items: center; gap: 12px; margin: 0 0 4px; flex-wrap: wrap; }
+  .prio-badge { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; color: var(--accent); background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); padding: 3px 11px; border-radius: 999px; white-space: nowrap; }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.4rem, 3vw, 1.85rem); line-height: 1.12; letter-spacing: -0.015em; margin: 0; }
+  .pill { font-family: var(--font-display); font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.hoy { color: var(--offline); background: color-mix(in srgb, var(--offline) 14%, transparent); }
+  .pill.parcial { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+  .pill.nueva { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+  h3 { font-family: var(--font-display); font-weight: 600; font-size: 1rem; letter-spacing: .01em; margin: 24px 0 10px;
+    text-transform: uppercase; color: var(--faint); font-size: 12.5px; letter-spacing: .08em; }
+  p { margin: 0 0 16px; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  strong { color: var(--ink); font-weight: 700; }
+  em { color: var(--ink-soft); }
+  code { font-family: var(--font-mono); font-size: 0.84em; background: var(--code-bg); color: var(--code-ink); padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--border); }
+
+  .caso { border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 9px; padding: 12px 15px; margin: 0 0 11px; background: var(--surface); font-size: 16px; box-shadow: var(--shadow); }
+  .caso-k { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: .06em; color: var(--accent); display: block; margin-bottom: 4px; text-transform: uppercase; }
+  .caso .out { color: var(--ink); font-weight: 700; }
+
+  .biz { border-radius: 12px; padding: 16px 18px 16px 20px; margin: 18px 0 6px; border: 1px solid color-mix(in srgb, var(--biz) 30%, var(--border)); border-left: 4px solid var(--biz); background: var(--biz-soft); }
+  .biz .tag { font-family: var(--font-display); font-weight: 700; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--biz); display: block; margin-bottom: 7px; }
+  .biz p:last-child { margin-bottom: 0; }
+  .biz strong { color: var(--ink); }
+  .resp { border-radius: 12px; padding: 16px 18px 16px 20px; margin: 10px 0 6px; border: 1px solid color-mix(in srgb, var(--ok) 30%, var(--border)); border-left: 4px solid var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+  .resp .tag { font-family: var(--font-display); font-weight: 700; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ok); display: block; margin-bottom: 7px; }
+  .resp p:last-child { margin-bottom: 0; }
+  .resp strong { color: var(--ink); }
+  .sug { border-radius: 12px; padding: 16px 18px 16px 20px; margin: 10px 0 6px; border: 1px solid color-mix(in srgb, var(--warn) 32%, var(--border)); border-left: 4px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); }
+  .sug .tag { font-family: var(--font-display); font-weight: 700; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 7px; }
+  .sug p:last-child { margin-bottom: 0; }
+  .sug strong { color: var(--ink); }
+  .resp .ejemplo-cap { font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+  .mini-tabla { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .mini-tabla th, .mini-tabla td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  .mini-tabla thead th { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+  .mini-tabla tbody tr:last-child td { border-bottom: none; }
+  .mini-tabla td.num { font-family: var(--font-mono); text-align: right; color: var(--ink); white-space: nowrap; }
+
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 0 0 20px; overflow-x: auto; box-shadow: var(--shadow); }
+  pre.mermaid { background: none; border: none; padding: 0; text-align: center; }
+
+  .btn { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 15px;
+    color: #fff; background: var(--accent); padding: 13px 22px; border-radius: 11px; text-decoration: none; border: 1px solid var(--accent-ink);
+    box-shadow: var(--shadow); transition: transform .12s, background .15s; }
+  .btn:hover { background: var(--accent-ink); transform: translateY(-1px); }
+  @media (prefers-color-scheme: dark) { .btn { color: #0F120D; } }
+  :root[data-theme="dark"] .btn { color: #0F120D; }
+  :root[data-theme="light"] .btn { color: #fff; }
+
+  footer.end { margin-top: 44px; padding-top: 26px; border-top: 1px solid var(--border); font-size: 13px; color: var(--faint); font-family: var(--font-display); }
+  ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+  html { scroll-behavior: smooth; }
+</style>
+
+<div class="backbar">
+  <a class="back" href="informe-motor-reglas.html">← Volver al informe principal</a>
+</div>
+
+<div class="page">
+  <header class="hero">
+    <div class="eyebrow">Anexo del módulo 4.3 · Reglas del motor</div>
+    <h1>Detalle de cada regla: teoría, casos y mirada de negocio</h1>
+    <p class="lede">Cada regla del motor —las que ya existen y las que agregaría el PR— explicada con precisión: qué evalúa, qué acción emite, casos concretos con valores reales, y al final una observación sobre qué convendría revisar a nivel negocio.</p>
+    <nav class="qnav">
+      <a href="#regla-clasificacion">Clasificación + diagnóstico</a>
+      <a href="#regla-bloqueo">0 · Bloqueo manual</a>
+      <a href="#regla-stale">1 · Sensor mudo</a>
+      <a href="#regla-clima">2 · Clima override</a>
+      <a href="#regla-dosis">5 · Dosis límite</a>
+      <a href="#regla-riego">10 · Riego</a>
+      <a href="#regla-insumo">11 · Insumo</a>
+      <a href="#regla-mediasombra">12 · Mediasombra</a>
+      <a href="#regla-seguimiento">20 · Seguimiento</a>
+    </nav>
+  </header>
+
+  <!-- CLASIFICACION -->
+  <section class="rule" id="regla-clasificacion">
+    <div class="rule-head">
+      <span class="prio-badge">PASO BASE</span>
+      <h2>Clasificación por bandas + diagnóstico</h2>
+      <span class="pill hoy">Ya existe hoy</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>No es una regla de <em>actuación</em>, sino el <strong>paso previo que alimenta a todas las demás</strong>. Por cada sector, cada una de las 5 métricas crudas (<code>humSus</code>, <code>humAmb</code>, <code>temp</code>, <code>ce</code>, <code>uv</code>) se compara contra sus bandas (ideal / warning / crítico) y produce un status por métrica; el peor status manda el status del sector (<span class="pill nueva">ok</span> / warning / critical). En paralelo se asigna un <strong>diagnóstico</strong> con un nivel de confianza. Hoy ese diagnóstico sale de un mapa estático (<code>PATHOS</code>) porque el modelo de IA todavía no está integrado.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — todo normal</span> Humedad sustrato 55%, temp 23°C, CE 1.4, UV 4 → todas en banda ideal → <span class="out">status del sector: ok</span>, ninguna regla de actuación se dispara.</div>
+    <div class="caso"><span class="caso-k">Caso B — una métrica crítica</span> Humedad sustrato 25% (banda crítica 22–90 pero muy por debajo del ideal 42), resto normal → <span class="out">status: critical por humedad</span> → habilita evaluar la regla de riego.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p>El diagnóstico que hoy consumen las reglas es <strong>sintético</strong> (mapa hardcodeado), no viene del modelo real. Cuando entre la IA con su <em>Confidence Score</em>, este paso cambia y las reglas que dependen de <code>confidence &gt; 85%</code> recién ahí operan con datos verdaderos. <strong>Falta definir</strong> qué pasa en el período de transición: ¿el motor actúa con el diagnóstico sintético o se lo deja en modo "solo sensores" hasta que la IA esté conectada? Decisión de negocio importante para no tomar acciones químicas sobre diagnósticos falsos.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p>Por ahora <strong>dejamos que el motor use el diagnóstico sintético</strong> (opción B) hasta que integremos el modelo de IA, que está próximo a implementarse. Una vez conectado el modelo real con su <em>Confidence Score</em>, este paso pasa a operar con datos verdaderos y se revisa la decisión.</p>
+    </div>
+  </section>
+
+  <!-- BLOQUEO -->
+  <section class="rule" id="regla-bloqueo">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 0 · blocking</span>
+      <h2>Bloqueo manual</h2>
+      <span class="pill nueva">Nueva del PR</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>Máxima prioridad. Un operario o agrónomo puede marcar un sector —o una zona entera— como bloqueado (tabla <code>bloqueo_manual</code>, campo <code>activo</code>). Si existe un bloqueo activo que cubre el sector evaluado, la regla emite una acción <strong>bloqueante</strong> que corta la cadena: <em>ninguna</em> otra regla actúa sobre ese sector. Un bloqueo de zona (<code>sector_id = null</code>) cubre sus ~100 sectores.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — mantenimiento de zona</span> El agrónomo bloquea MZ-3 para hacer trabajo físico. Llega telemetría de MZ-3-045 con humedad 38% (pediría riego) → <span class="out">el bloqueo corta: no riega</span>, registra "Riego abortado por bloqueo manual".</div>
+    <div class="caso"><span class="caso-k">Caso B — bloqueo puntual</span> Se bloquea solo MZ-1-012 por una prueba. El resto de MZ-1 <span class="out">sigue operando normal</span>.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) ¿El bloqueo vence?</strong> Hoy no. Ejemplo: un operario bloquea MZ-3 para trabajar, termina y se olvida de desbloquear → la macro-zona queda sin protección autónoma <em>indefinidamente</em>, y ningún riego ni tratamiento se dispara aunque el plantín lo necesite. Convendría un vencimiento automático (TTL) o al menos una alerta recurrente "el sector X lleva N días bloqueado".</p>
+      <p><strong>(2) ¿Quién puede desbloquear?</strong> No hay modelo de permisos ni registro de quién levanta el bloqueo. Ejemplo: si dos operarios trabajan sobre MZ-1 y uno desbloquea sin avisar, nadie sabe quién fue. Ya existe <code>activado_por</code>; falta el <code>desactivado_por</code> para la trazabilidad que exige la tesis.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>(1)</strong> El bloqueo <strong>no vence</strong>: es responsabilidad del productor desbloquear el sector cuando corresponda. <strong>(2)</strong> Pero la <strong>trazabilidad sí es necesaria</strong>: decidimos agregar también el campo <code>desactivado_por</code> para registrar quién levanta el bloqueo, junto al <code>activado_por</code> que ya existe.</p>
+    </div>
+  </section>
+
+  <!-- STALE -->
+  <section class="rule" id="regla-stale">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 1 · blocking</span>
+      <h2>Sensor mudo (stale)</h2>
+      <span class="pill hoy">Ya existe hoy</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>Ya vive como <em>watchdog</em> en <code>HardwareService</code> y el PR la formaliza como regla. Si la última lectura del sensor testigo de la macro-zona supera el umbral de antigüedad, el motor no debe actuar sobre datos viejos: <strong>&gt;2h</strong> → "intermitente/desactualizado"; <strong>&gt;24h</strong> → "fuera de servicio", que <strong>anula la actuación autónoma de toda la MZ</strong>. Acción bloqueante.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — dato viejo</span> El sensor de MZ-2 no reporta hace 3h. Una acción de riego candidata se basaría en esa lectura vieja → <span class="out">la regla corta</span>: la humedad pudo cambiar; actuar a ciegas es peligroso. Alerta "sensor desactualizado".</div>
+    <div class="caso"><span class="caso-k">Caso B — caída prolongada</span> El sensor lleva 26h mudo → <span class="out">toda MZ-2 pasa a "fuera de servicio"</span>, cero actuación autónoma hasta que vuelva a reportar.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) El umbral 2h/24h es fijo y global</strong>, igual para las 5 métricas, pero no todas envejecen al mismo ritmo. Ejemplo: la humedad de sustrato cambia rápido — tras un riego o un mediodía caluroso, en 1h ya es otra; una lectura de 2h (que la regla todavía considera "fresca") puede estar mintiendo. En cambio el UV o la temperatura de 2h aún sirven perfectamente. Conviene un umbral de frescura <em>por métrica</em> (o por estación).</p>
+      <p><strong>(2) Punto único de falla.</strong> Hay un solo sensor testigo por MZ, replicado a ~100 sectores. Ejemplo: si el sensor de MZ-2 muere, perdés de golpe la visibilidad de <strong>10.000 plantines</strong> y toda la MZ queda sin actuación autónoma. ¿Vale un sensor de respaldo por MZ, o al menos priorizar el recambio de ese nodo? Es una decisión de riesgo de negocio, no solo técnica.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>(1)</strong> Adoptamos un <strong>umbral de frescura por métrica</strong> en lugar del único global: cada métrica caduca a su propio ritmo. Los <strong>valores concretos los define un ingeniero agrónomo junto al productor</strong>, porque es criterio agronómico, no de software. <strong>(2)</strong> <strong>No</strong> vamos a agregar un sensor de respaldo por MZ, por una cuestión de <strong>costos</strong>. Se asume el riesgo del punto único de falla.</p>
+      <p class="ejemplo-cap">Ejemplo ilustrativo de la idea (los valores <strong>NO son recomendación agronómica</strong>, los define el agrónomo):</p>
+      <table class="mini-tabla">
+        <thead><tr><th>Métrica</th><th style="text-align:right">Caduca a los…</th></tr></thead>
+        <tbody>
+          <tr><td>Humedad sustrato</td><td class="num">~45 min</td></tr>
+          <tr><td>Humedad ambiental</td><td class="num">~1 h</td></tr>
+          <tr><td>Temperatura</td><td class="num">~2 h</td></tr>
+          <tr><td>CE / nutrientes</td><td class="num">~3 h</td></tr>
+          <tr><td>Radiación UV</td><td class="num">~2 h</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CLIMA -->
+  <section class="rule" id="regla-clima">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 2 · blocking sobre riego</span>
+      <h2>Clima override</h2>
+      <span class="pill nueva">Nueva del PR</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>Antes de ejecutar un riego, consulta el pronóstico vía <code>WeatherService</code>. Si hay lluvia inminente sobre un umbral de precipitación configurado, <strong>pospone</strong> el riego. Si la API falla (timeout 15s, hasta 3 reintentos con backoff), degrada a <strong>modo conservador</strong>: ignora el clima y opera solo con los sensores locales.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — va a llover</span> Humedad sustrato 38% (bajo el ideal 42) → candidato a riego. El pronóstico da "lluvia 8mm en 1h" → <span class="out">pospone el riego</span>, registra "Riego pospuesto por lluvia inminente". Ahorra agua.</div>
+    <div class="caso"><span class="caso-k">Caso B — API caída</span> El servicio del clima no responde tras 3 reintentos → <span class="out">no bloquea</span>: si el sustrato está seco, riega igual (modo conservador = no confiar en una predicción ausente).</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) Falta precisar la variable meteorológica exacta.</strong> "Va a llover" no es accionable. Ejemplo: un 90% de probabilidad de una llovizna de 0.5mm no reemplaza un riego, pero 8mm seguros sí — y la probabilidad sola no distingue esos dos casos. El umbral debe decir sobre qué magnitud se compara (mm en una ventana de tiempo), no sobre la probabilidad a secas.</p>
+      <p><strong>(2) El riego pospuesto puede quedar sin re-evaluar.</strong> Ejemplo: se pronostica lluvia para las 14h → la regla pospone el riego → la lluvia no cae → el plantín se quedó seco y <em>nadie volvió a mirarlo</em>. El pronóstico falló y la planta pagó. Falta un re-chequeo que vuelva a evaluar el riego pospuesto cuando pasa la ventana de lluvia pronosticada.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>(1)</strong> El motor debe consultar sobre <strong>milímetros de precipitación esperada en una ventana de tiempo</strong>, no sobre la probabilidad sola. Texto de ejemplo del umbral: <em>«Posponer el riego si se esperan ≥ X mm en las próximas N horas y la probabilidad es ≥ Y%.»</em></p>
+      <p><strong>(2)</strong> Agregamos la <strong>re-evaluación del riego pospuesto</strong>: pasada la ventana de lluvia pronosticada, el motor <strong>vuelve a leer el sensor de humedad del sustrato</strong> (no re-consulta la API). Si el sustrato está húmedo → la lluvia cumplió, no riega; si sigue seco → riega ahora. El sensor local es la fuente de verdad: mide el vivero real, no una predicción regional, y evita otra dependencia de la API.</p>
+    </div>
+  </section>
+
+  <!-- DOSIS -->
+  <section class="rule" id="regla-dosis">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 5 · blocking sobre insumo</span>
+      <h2>Dosis límite</h2>
+      <span class="pill parcial">Parcial hoy</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>La configuración del límite ya existe (<code>insumoDosisMax24hMl</code>); lo que agrega el PR es <em>aplicarlo</em>. Antes de inyectar un insumo, verifica que la dosis acumulada en las últimas 24h del sector no supere el máximo. Si lo superaría, <strong>bloquea</strong> con alerta CRITICAL "Límite químico diario alcanzado". Es una protección de seguridad química.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — se pasa del límite</span> El sector ya recibió 18ml hoy, límite 20ml. Nueva orden de 5ml → llegaría a 23ml → <span class="out">bloquea</span>, alerta CRITICAL, no inyecta (o inyecta solo hasta el tope — a definir).</div>
+    <div class="caso"><span class="caso-k">Caso B — dentro del límite</span> Primer tratamiento del día, 5ml, límite 20 → <span class="out">pasa sin problema</span>.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) El límite es un "balde común".</strong> Hoy suma todo en un mismo tope, sin distinguir qué se inyectó. Ejemplo: límite 20ml/día; el sector recibe 12ml de fungicida + 10ml de nutriente = 22ml → bloquea. Pero son químicos distintos, cada uno con su propio umbral de seguridad — no tiene sentido que el nutriente consuma cupo del fungicida. El límite debería ser <strong>por tipo de insumo</strong>.</p>
+      <p><strong>(2) La ventana de "24h" puede no calzar con el producto.</strong> Muchos fitosanitarios se miden por semana o por ciclo, no por día. Ejemplo: un fungicida cuya ficha dice "máximo 3 aplicaciones por ciclo" — podés respetar el límite diario todos los días y aun así <em>pasarte del límite del ciclo</em>, acumulando toxicidad que la regla no ve. El límite tiene que poder expresarse en la ventana que dice el fabricante.</p>
+      <p><strong>(3) El tratamiento bloqueado, ¿se pierde o se re-agenda?</strong> Ejemplo: hay un hongo avanzando, el sistema quiere inyectar fungicida pero el sector ya topó el límite → bloquea. Si ese tratamiento se descarta, el hongo sigue creciendo toda la noche sin que nadie trate al plantín. El bloqueo por seguridad no debería significar "no tratar nunca", sino "avisar y reprogramar".</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>(1)</strong> <strong>Límite por tipo de insumo</strong>: un cupo separado para cada categoría (fungicida, insecticida/acaricida, nutriente). El fungicida no consume cupo del nutriente; se acumula y compara por tipo, no un total mezclado. <strong>(2)</strong> <strong>Ventana configurable por producto</strong> en lugar de fija en 24h: cada insumo declara su límite en la unidad de su ficha técnica (día, semana o ciclo) y la regla acumula sobre esa ventana. Los valores los define el agrónomo. <strong>(3)</strong> <strong>Bloquear no descarta: re-agenda.</strong> El tratamiento que topa el límite se reprograma para cuando el cupo se libere, con alerta al agrónomo — mismo mecanismo de re-evaluación que definimos en Clima override. Seguridad química sí, pero el plantín no queda sin tratar.</p>
+    </div>
+  </section>
+
+  <!-- RIEGO -->
+  <section class="rule" id="regla-riego">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 10</span>
+      <h2>Riego</h2>
+      <span class="pill hoy">Ya existe hoy</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>Es la lógica que hoy vive inline en <code>updateTelemetry()</code>. Abre la electroválvula si la humedad de sustrato está por debajo del umbral (<code>idealMin</code>, hoy 42%), la telemetría es fresca y no hay bloqueo. Cierra al alcanzar el umbral de corte, el tiempo máximo (<code>riegoTiempoMaxSeg</code>) o el volumen diario (<code>riegoVolMaxDiarioMl</code>). Si el caudalímetro no detecta flujo tras 10s → <strong>"Falla Hidráulica"</strong>, corta.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — riego normal</span> Humedad 39% &lt; 42% ideal, dato fresco, sin bloqueo, sin lluvia → <span class="out">abre la válvula</span>, riega hasta ~55% o hasta el tiempo máximo, registra el volumen.</div>
+    <div class="caso"><span class="caso-k">Caso B — válvula trabada</span> Abre pero el caudalímetro marca 0 tras 10s → <span class="out">"Falla Hidráulica"</span>, corta, alerta, no reintenta a ciegas.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) Un solo umbral de humedad decide todo.</strong> Hoy si el sustrato baja de 42%, riega; punto. Pero la necesidad real de agua también depende de cuánto transpira la planta, y eso lo manejan la <em>temperatura</em> y el <em>UV</em>. Ejemplo: mismo 43% de humedad en dos días distintos. Día fresco y nublado (20°C, UV 2): la planta transpira poco, 43% le alcanza. Día de mediodía misionero (34°C, UV 9): transpira muchísimo, ese 43% en una hora es 30% y el plantín se estresa — y la regla no regó porque solo miró el número. La solución de fondo es un umbral <strong>dinámico</strong> (aproximación a <em>evapotranspiración</em>): en día caluroso subir el disparo, en día fresco bajarlo.</p>
+      <p><strong>(2) Se asume que el riego llega parejo a todo el sector.</strong> Un microaspersor moja ~100 tubetes y un solo sensor mide el sector: la regla cree que si el sensor dice 55%, los 100 tubetes están a 55%. Pero el rociado moja más en el centro que en los bordes. Ejemplo: el sensor (central) marca 55% → "sector regado", pero los tubetes de la esquina reciben la mitad y están a 32% (warning), y el promedio los tapa. Es la <strong>uniformidad de aplicación</strong>: si es baja, un solo sensor puntual miente por diseño. Supuesto que conviene validar en campo.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>(1)</strong> Para el prototipo <strong>nos quedamos con un único umbral de humedad fijo</strong> (un solo porcentaje), como está hoy. El umbral <strong>dinámico</strong> por ajuste de temperatura y UV (aproximación a evapotranspiración) queda como <strong>mejora opcional a futuro</strong>. <strong>(2)</strong> Mantenemos <strong>un solo sensor por sector</strong> tal como está: al ser un prototipo, evaluaremos en campo la uniformidad real del riego antes de decidir si hace falta más instrumentación.</p>
+    </div>
+  </section>
+
+  <!-- INSUMO -->
+  <section class="rule" id="regla-insumo">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 11</span>
+      <h2>Insumo (fusión multimodal)</h2>
+      <span class="pill parcial">Parcial hoy</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>La regla más rica del sistema: es la que toma decisiones <strong>químicas</strong> sobre el plantín, y por eso cruza dos fuentes en vez de una.</p>
+    <p><strong>Filtro de confianza (85%).</strong> La IA no solo dice "esto es Daño biótico", también dice <em>cuán segura está</em> (el Confidence Score). Como se está por inyectar un químico real, la regla actúa <strong>solo si la confianza supera el 85%</strong>. Por debajo → marca "No concluyente", <strong>no hace nada</strong> y avisa al agrónomo: mejor no tratar que tratar mal.</p>
+    <p><strong>Fusión multimodal.</strong> "Multimodal" = usa dos sentidos a la vez: la <strong>cámara</strong> (la IA que mira la foto) + el <strong>sensor de humedad</strong>. Hace falta porque "Daño biótico" es ambiguo: puede ser <em>hongo</em> o <em>plaga</em>, y el tratamiento es <strong>opuesto</strong> (fungicida vs. insecticida) — errarle significa envenenar al plantín sin curarlo. La humedad desempata, porque <strong>los hongos aman la humedad y las plagas no</strong>: humedad <strong>&gt;80%</strong> → sospecha de <strong>hongo</strong> (fungicida + bajar riego para quitarle la humedad que lo alimenta); humedad <strong>normal</strong> → sospecha de <strong>plaga</strong> (insecticida/acaricida). Ejemplo: mismo diagnóstico al 91%, humedad 84% dispara fungicida, pero a 55% dispara insecticida. La cámara dice "hay daño"; la humedad decide de qué tipo.</p>
+    <p>Antes de inyectar, además, <strong>respeta la regla de Dosis Límite</strong>: aunque decida el químico, si el sector ya llegó al tope diario, se frena igual. Dos protecciones en cadena: primero la confianza, después la dosis.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — hongo</span> Diagnóstico "Daño biótico" con confidence 91%, humedad sustrato 84% → <span class="out">sospecha hongo</span> → fungicida + baja el riego, registra.</div>
+    <div class="caso"><span class="caso-k">Caso B — plaga</span> Mismo diagnóstico, confidence 91%, humedad 55% (normal) → <span class="out">sospecha plaga</span> → insecticida/acaricida.</div>
+    <div class="caso"><span class="caso-k">Caso C — no concluyente</span> "Daño biótico" con confidence 78% → <span class="out">no inyecta nada</span>, alerta al agrónomo para revisión manual.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) El umbral del 85% es único para todo</strong>, pero no todos los químicos son igual de peligrosos. El mismo 85% dispara un nutriente suave y un insecticida agresivo — y el riesgo de equivocarse no es simétrico: errarle al nutriente casi no pasa nada; errarle al insecticida <strong>envenena plantines sanos</strong> con un químico tóxico y caro. Para el químico más agresivo, la confianza requerida debería ser <em>más alta</em>.</p>
+      <p><strong>(2) La fusión usa solo humedad para separar hongo de plaga.</strong> Es un proxy razonable —los hongos aman la humedad— pero <strong>grueso</strong>. Ejemplo: un plantín puede tener plaga <em>y</em> hongo oportunista a la vez; con humedad normal la regla dice "plaga" → insecticida, y <strong>el hongo sigue avanzando</strong>. La humedad sola no ve cuadros mixtos ni los casos borde (una humedad de 78%, justo abajo del corte, ¿de verdad no tiene riesgo de hongo?).</p>
+      <p><strong>(3) ¿Qué se hace 100% autónomo y qué exige OK humano?</strong> El punto más delicado, y es legal. La doc dice que en fitosanitarios <strong>"el sistema recomienda, no reemplaza al agrónomo"</strong>, pero la regla —como está— <strong>inyecta químico sola</strong> cada vez que supera el 85%, contradiciendo la propia doc. Si el sistema mata una tanda de plantines por un diagnóstico errado, <strong>¿quién responde?</strong> Hay que definir explícitamente la línea entre lo autónomo y lo que exige que un agrónomo apriete "OK" antes de ejecutar. No es un detalle técnico, es responsabilidad.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>(1)</strong> El <strong>umbral de confianza se configura por nivel de agresividad del químico</strong>: cuanto más agresivo, mayor confianza exigida (ej. nutriente ~85%, insecticida/fungicida ~92%). Los valores los define el agrónomo.</p>
+      <p><strong>(2)</strong> Para el prototipo <strong>mantenemos la humedad</strong> como desempate hongo/plaga. Opcionalmente podría sumarse una <strong>revisión humana</strong> en los casos borde, pero esa decisión <strong>queda pendiente de revisar con el equipo</strong>.</p>
+      <p><strong>(3)</strong> Agregamos un <strong>interruptor configurable por el productor, por tipo de acción</strong>: él decide si el sistema inyecta solo o <strong>requiere su confirmación</strong> antes de ejecutar (fungicida, insecticida, herbicida, etc.). Con <strong>default seguro</strong> (los agresivos vienen en "requiere confirmación"), <strong>trazabilidad</strong> de quién confirma cada inyección, y <strong>escalado</strong> de la alerta si la confirmación no llega a tiempo.</p>
+    </div>
+  </section>
+
+  <!-- MEDIASOMBRA -->
+  <section class="rule" id="regla-mediasombra">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 12</span>
+      <h2>Mediasombra / rustificación</h2>
+      <span class="pill nueva">Nueva del PR</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>Mueve la mediasombra motorizada según dos disparadores: <strong>(a)</strong> el cronograma del plan de rustificación (día del plan → % de apertura, tabla <code>rustificacion_etapa</code>) o <strong>(b)</strong> un pico de UV sobre el umbral de estrés. Corta el motor ante sobrecorriente sostenida (atasco) o fin de carrera no alcanzado a tiempo → <strong>"Falla mecánica"</strong>.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — plan de rustificación</span> El plan, día 15, indica 60% de apertura; la sombra está en 40% → <span class="out">abre gradualmente a 60%</span> para ir endureciendo el plantín.</div>
+    <div class="caso"><span class="caso-k">Caso B — pico de UV imprevisto</span> UV 9 (sobre el warning 8), fuera de lo que preveía el plan → <span class="out">cierra sombra para proteger</span>… aunque el plan pedía más apertura. (¿Quién gana? Ver observación.)</div>
+    <div class="caso"><span class="caso-k">Caso C — atasco</span> El motor mueve pero detecta sobrecorriente → <span class="out">"Falla mecánica"</span>, corta y alerta.</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>(1) Dos objetivos que se pelean — ¿quién gana?</strong> El plan de rustificación quiere <em>sacar</em> la sombra (exponer al sol para endurecer el tallo); la regla de UV quiere <em>poner</em> la sombra (proteger del sol). Son metas opuestas y en un día concreto chocan de frente. Ejemplo (Caso B): el plan dice "día 15, abrí al 60%", pero pega un pico de UV 9 → el plan grita "abrí" y la regla de UV grita "cerrá". Hoy quién gana queda librado al <strong>orden de prioridad de las reglas</strong>, y ahí está el error: no es un detalle de código, es una <strong>decisión agronómica central</strong> — ¿un pico de UV suspende el plan, o la rustificación tolera cierto estrés controlado? Si no se explicita, el sistema decide algo importante por accidente.</p>
+      <p><strong>(2) Calendario vs. telemetría.</strong> La rustificación es progresiva <em>por días</em> (un cronograma), pero la regla se evalúa cada vez que llega un paquete de telemetría. El avance del plan (de 40% a 60% de apertura) pasa porque <strong>llegó el día 15</strong>, no porque llegó una lectura de sensor. Ejemplo: si no entra telemetría por unas horas, el plan no avanza solo — queda esperando un evento que no tiene que ver con el calendario. Necesita un disparador <em>proactivo</em> (<code>@Scheduled</code>) que corra por reloj —"todos los días a tal hora, ajustá la sombra según el día del plan"—, el mismo que dejó el PR como "open question" y que además sirve para la re-evaluación del riego pospuesto (Clima override).</p>
+    </div>
+    <div class="sug">
+      <span class="tag">Sugerencia — a debatir (riesgos 1 y 2)</span>
+      <p>Los dos riesgos se resuelven con la misma idea corregida: <strong>el plan no fija una posición de sombra, fija el objetivo de exposición del día</strong>; la posición real se ajusta durante el día. Tres capas, cada una con su trabajo:</p>
+      <p><strong>1 · Calendario (<code>@Scheduled</code>, una vez al día, al amanecer) → define el "sobre" del día.</strong> No dice "poné 60%", dice "hoy, etapa 15, el plantín tolera hasta <em>este</em> nivel de exposición/estrés". Carga los parámetros del día según la etapa de rustificación. Corre por reloj, que es lo que un plan por días necesita (resuelve el riesgo 2).</p>
+      <p><strong>2 · Reactivo (telemetría, continuo) → mueve la sombra DENTRO de ese sobre, siguiendo el sol real.</strong> Mañana con UV/temp bajos → abre (sol suave, parte del endurecimiento); mediodía con calor alto → cierra lo necesario, sin pasarse del estrés que la etapa tolera; tarde → vuelve a abrir. El movimiento intra-día no es una emergencia, es el comportamiento normal de todos los días.</p>
+      <p><strong>3 · Techo de UV crítico → el tope innegociable.</strong> Si el UV pasa el umbral de quemadura, cierra sí o sí, por encima de todo. Ahí el daño es real e irreversible. Esto resuelve el conflicto del riesgo 1: no es "plan vs. UV", es "el plan tolera estrés hasta un techo; pasado el techo, la seguridad gana".</p>
+      <p><strong>4 · Control manual del productor / ingeniero → override sobre toda la automatización.</strong> En cualquier momento el productor o el ingeniero del vivero puede mover la mediasombra a mano, y esa orden manual <strong>tiene prioridad</strong> sobre las tres capas anteriores. La automatización asiste, no le saca las manos al humano. La acción manual queda <strong>registrada</strong> (quién y cuándo) para la trazabilidad, igual que en el resto del motor.</p>
+      <p><strong>Detalle:</strong> si el UV crítico interrumpe la exposición del día, el plan <strong>se extiende</strong> en vez de darse por cumplido — un plantín que no recibió su sol no completó el endurecimiento. Y pasado el pico, la sombra vuelve a la posición del plan (capas 1+2), sin quedar peleándose.</p>
+      <p><em>Por qué así:</em> los extremos son malos —cancelar el plan ante cualquier UV nunca rustifica; ignorar el UV quema plantines—; y un plan por días colgado de la telemetría no avanza solo. Las tres capas separan cada disparador por su naturaleza (tiempo vs. evento) sin que se pisen. Los umbrales (exposición por etapa, UV crítico) los define el agrónomo. <strong>Queda a debate del equipo + agrónomo antes de fijarlo.</strong></p>
+    </div>
+  </section>
+
+  <!-- SEGUIMIENTO -->
+  <section class="rule" id="regla-seguimiento">
+    <div class="rule-head">
+      <span class="prio-badge">PRIO 20</span>
+      <h2>Seguimiento post-acción</h2>
+      <span class="pill hoy">Ya existe hoy</span>
+    </div>
+    <h3>Teoría</h3>
+    <p>Ya existe como scheduler en <code>HistorialService</code>; el PR la reordena como regla. Tras ejecutar una acción, espera una latencia configurable (<code>seguimientoLatenciaMin</code>) y <strong>vuelve a medir</strong>. Calcula el delta contra el valor original: si mejoró sobre el umbral de recuperación → <strong>"Efectiva"</strong>; si no → <strong>"Sin Efectividad"</strong>, <strong>bloquea la repetición autónoma</strong> de esa acción y emite alerta CRITICAL exigiendo revisión física. Evita que el sistema insista infinitamente con algo que no se arregla solo.</p>
+    <h3>Casos de ejemplo</h3>
+    <div class="caso"><span class="caso-k">Caso A — funcionó</span> Regó por humedad 39%. A los 2min mide 52% → mejoró → <span class="out">"Efectiva"</span>, cierra el ciclo.</div>
+    <div class="caso"><span class="caso-k">Caso B — no funcionó</span> Regó, pero a los 2min sigue en 40% (fuga o válvula que no llegó) → <span class="out">"Sin Efectividad"</span> → bloquea repetir el riego solo, alerta "revisar sector físicamente".</div>
+    <div class="biz">
+      <span class="tag">Observación de negocio</span>
+      <p><strong>La latencia de seguimiento no puede ser única.</strong> Hoy es un default de demo (~2min), pero la latencia <em>biológica</em> real varía enormemente: la humedad responde en minutos, un fungicida tarda <strong>días</strong> en mostrar efecto, y la clorosis (nutrientes) puede tardar una <strong>semana</strong>. Un solo parámetro para todas las acciones genera <strong>falsos negativos</strong>: marcaría como "Sin Efectividad" un tratamiento que simplemente todavía no hizo efecto, y encima <em>bloquearía</em> repetirlo. La latencia tiene que ser <strong>por tipo de acción</strong>. La doc ya lo lista como pendiente, pero es crítico para que el seguimiento no mienta.</p>
+    </div>
+    <div class="resp">
+      <span class="tag">Respuesta del equipo</span>
+      <p><strong>Latencia de seguimiento por tipo de acción</strong>, no un único default: cada acción define cuánto se espera antes de re-medir (minutos para el riego, días para un fungicida, una semana para nutrientes). Los valores los define el agrónomo.</p>
+      <p>Y no alcanza con la latencia: también cambian <strong>qué se mide y contra qué umbral</strong>, por tipo de acción. El riego se verifica con el <strong>sensor de humedad</strong>; un tratamiento químico se verifica <strong>re-diagnosticando la imagen con la IA</strong> (¿la lesión dejó de avanzar?), no con un sensor. Es decir: <strong>latencia + métrica + umbral, los tres por tipo de acción</strong>.</p>
+      <p>Cuando marca "Sin Efectividad" y bloquea la repetición autónoma, ese bloqueo se <strong>levanta con un reset manual y trazable</strong> (quién y cuándo), una vez que el productor resolvió el problema físico — mismo patrón que el <code>desactivado_por</code> del bloqueo manual. Así el sector no queda congelado para siempre.</p>
+    </div>
+  </section>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:44px 0 28px;">
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;">
+    <a class="btn" href="informe-motor-reglas.html"><span>←</span> Volver al informe principal</a>
+  </div>
+
+  <footer class="end">
+    Anexo de reglas del motor · Proyecto Yerbanalytics · Julio 2026
+  </footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, securityLevel: "loose", theme: dark ? "dark" : "neutral" });
+</script>
+</html>
