@@ -129,6 +129,36 @@ public class HistorialService {
     }
 
     /**
+     * Registra una inacción deliberada del motor de reglas (Registro de Inacción).
+     *
+     * <p>Cuando el motor evalúa un sector y decide conscientemente NO actuar
+     * (ej. "no riego porque va a llover", "no dosificación porque confianza < 85%"),
+     * este método persiste el motivo en el historial. Permite que el usuario vea
+     * por qué el sistema no actuó, distinguiéndolo de un fallo o desconexión.
+     *
+     * @param s        sector evaluado
+     * @param ruleName nombre de la regla que tomó la decisión
+     * @param motivo   explicación legible de la decisión
+     */
+    public void registrarInaccion(SectorEntity s, String ruleName, String motivo) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(s.getId());
+        e.setZonaId(s.getZona().getId());
+        e.setZonaName(s.getZona().getName());
+        e.setTipo("Info");
+        e.setTs(System.currentTimeMillis());
+        e.setLectura("Ciclo de evaluación: " + ruleName + ".");
+        e.setDecision(motivo);
+        e.setAccion("Sin actuación — condición no cumplida.");
+        e.setRes("Informativo");
+        e.setSev(s.getDiagnosisSev());
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
      * Registra, de forma inmutable, un cambio de configuración agronómica (HU-15 CA-02):
      * deja asentado quién y cuándo recalibró el sistema.
      */
