@@ -1,14 +1,14 @@
 # Tasks: add-rules-engine
 
 ## 1. Scaffold del motor (refactor puro)
-- [ ] 1.1 Crear paquete `engine/` con interfaz `Rule`, records `RuleContext` y `RuleAction`
-- [ ] 1.2 Crear `RuleOrchestrator` (ordena las reglas en el constructor con `Comparator.comparingInt(Rule::priority)` —Spring no las ordena solo—, itera por prioridad, corta en bloqueantes)
-- [ ] 1.3 Crear `ActionExecutor` (Soporte MQTT telemetry/command/ack, persistencia historial con Registro de Inacción, alertas)
-- [ ] 1.4 Extraer lógica de riego de `NurseryService.updateTelemetry()` → `RiegoRule`
-- [ ] 1.5 Extraer lógica de insumo de `NurseryService.updateTelemetry()` → `InsumoRule`
-- [ ] 1.6 Test de regresión: el `updateTelemetry()` refactorizado produce el mismo resultado
-- [ ] 1.7 Test: el `RuleOrchestrator` evalúa las reglas en orden de prioridad (verifica el ordenamiento explícito)
-- [ ] 1.8 Agregar variables de entorno para `SENSOR_POLLING_INTERVAL` y `ACTION_COOLDOWN_MINUTES` en `application.yml`
+- [x] 1.1 Crear paquete `engine/` con interfaz `Rule`, records `RuleContext` y `RuleAction`
+- [x] 1.2 Crear `RuleOrchestrator` (ordena las reglas en el constructor con `Comparator.comparingInt(Rule::priority)` —Spring no las ordena solo—, itera por prioridad, corta en bloqueantes)
+- [x] 1.3 Crear `ActionExecutor` (Soporte MQTT telemetry/command/ack, persistencia historial con Registro de Inacción, alertas)
+- [x] 1.4 Extraer lógica de riego de `NurseryService.updateTelemetry()` → `RiegoRule`
+- [x] 1.5 Extraer lógica de insumo de `NurseryService.updateTelemetry()` → `InsumoRule`
+- [x] 1.6 Test de regresión: el `updateTelemetry()` refactorizado produce el mismo resultado
+- [x] 1.7 Test: el `RuleOrchestrator` evalúa las reglas en orden de prioridad (verifica el ordenamiento explícito)
+- [x] 1.8 Agregar variables de entorno para `SENSOR_POLLING_INTERVAL` y `ACTION_COOLDOWN_MINUTES` en `application.yml`
 
 ## 2. Reglas R1 — Monitoreo y Visualización Base
 - [ ] 2.1 `StaleSensorRule`: evalúa antigüedad de telemetría, emite `ABORT_RIEGO` si > umbral

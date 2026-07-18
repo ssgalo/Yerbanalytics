@@ -2,6 +2,9 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
+import com.yerbanalytics.backend.engine.ActionExecutor;
+import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
@@ -15,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -29,6 +33,8 @@ public class NurseryService {
     private final ConfiguracionService configuracionService;
     private final HardwareService hardwareService;
     private final TopologiaLayoutRepository layoutRepository;
+    private final RuleOrchestrator ruleOrchestrator;
+    private final ActionExecutor actionExecutor;
     private final long staleThresholdMs;
 
     public NurseryService(NurseryProperties properties,
@@ -38,6 +44,8 @@ public class NurseryService {
                           ConfiguracionService configuracionService,
                           HardwareService hardwareService,
                           TopologiaLayoutRepository layoutRepository,
+                          RuleOrchestrator ruleOrchestrator,
+                          ActionExecutor actionExecutor,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
@@ -45,6 +53,8 @@ public class NurseryService {
         this.configuracionService = configuracionService;
         this.hardwareService = hardwareService;
         this.layoutRepository = layoutRepository;
+        this.ruleOrchestrator = ruleOrchestrator;
+        this.actionExecutor = actionExecutor;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -413,30 +423,34 @@ public class NurseryService {
                 s.setReason(s.getDiagnosisEstado());
             }
 
-            // Actuators
-            String oldValve = s.getActuadorValve();
-            String oldPump = s.getActuadorPump();
-            double humSusVal = s.getHumSusRaw() != null ? s.getHumSusRaw() : 50.0;
-            String valve = humSusVal < configuracionService.getRiegoHumSusUmbral() ? "Regando" : "Cerrada";
-            String pump = "critical".equals(finalStatus) && s.getDiagnosisConf() != null && s.getDiagnosisConf() >= 85
-                    ? "Dosificando" : "En espera";
-            s.setActuadorValve(valve);
-            s.setActuadorPump(pump);
-
-            // Hook de historial: registrar SÓLO en la transición a estado activo,
-            // para no inundar la tabla en cada ciclo de telemetría.
-            if ("Regando".equals(valve) && !"Regando".equals(oldValve)) {
-                historialService.registrarRiego(s);
-            }
-            if ("Dosificando".equals(pump) && !"Dosificando".equals(oldPump)) {
-                historialService.registrarInsumo(s);
-            }
+            // Motor de Reglas: delega la decisión de actuación al orquestador.
+            // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
+            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus);
+            actionExecutor.execute(ruleOrchestrator.evaluate(ctx), ctx);
         }
         sectorRepository.saveAll(sectors);
 
         // Heartbeat del nodo testigo de la zona: batería/señal/último update (HU-21 CA-01).
         // Antes el mac/battery del payload se descartaban; ahora alimentan el registro de hardware.
         hardwareService.actualizarHeartbeat(zoneId, payload.mac(), payload.battery(), payload.signal(), payload.timestamp());
+    }
+
+    /**
+     * Construye el {@link RuleContext} para un sector en el ciclo de evaluación actual.
+     *
+     * <p>Los campos de fases futuras (forecast, diagnosis, bloqueoManualActivo, sensorStale)
+     * se incorporarán progresivamente conforme avancen los releases.
+     */
+    private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus) {
+        return new RuleContext(
+                s,
+                s.getZona(),
+                configuracionService.getEffectiveSpecs(),
+                metrics,
+                configuracionService.getConfiguracionOperativa(),
+                finalStatus,
+                Instant.now()
+        );
     }
 
     private List<Metric> buildMetricsList(SectorEntity s) {

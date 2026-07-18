@@ -74,14 +74,16 @@ public final class NurseryConstants {
     public static final Map<String, ActMeta> ACT = Map.of(
             "Riego", new ActMeta("#E2EEF3", "#2A6E8C", "M12 2.7s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11Z"),
             "Insumo", new ActMeta("#EDEAF6", "#5A4B9E", "M9 2h6M10 2v4l-4.5 9A2 2 0 0 0 7.3 18h9.4a2 2 0 0 0 1.8-3L14 6V2"),
-            "Mediasombra", new ActMeta("#F3ECDD", "#8A6A22", "M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z")
+            "Mediasombra", new ActMeta("#F3ECDD", "#8A6A22", "M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z"),
+            "Info", new ActMeta("#EEEDE5", "#6A776E", "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-6v-4m0-4h.01")
     );
 
     public static final Map<String, ColorPair> RES_MAP = Map.of(
             "Efectiva", new ColorPair("#E7F1EA", "#2E7A4F"),
             "En seguimiento", new ColorPair("#F3ECDD", "#8A6A22"),
             "Pospuesta", new ColorPair("#FBE7D7", "#9A4410"),
-            "Abortada", new ColorPair("#FBE6E0", "#A8331C")
+            "Abortada", new ColorPair("#FBE6E0", "#A8331C"),
+            "Informativo", new ColorPair("#EEEDE5", "#6A776E")
     );
 
     public static final List<ActTemplate> ACT_TPL = List.of(

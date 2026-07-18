@@ -298,6 +298,14 @@ public class ConfiguracionService {
         return 42.0; // fallback de fábrica
     }
 
+    /**
+     * Devuelve la entidad de configuración operativa para uso del motor de reglas.
+     * Las reglas consumen esta entidad como input de solo lectura a través del {@link com.yerbanalytics.backend.engine.RuleContext}.
+     */
+    public ConfiguracionOperativaEntity getConfiguracionOperativa() {
+        return loadOperativa();
+    }
+
     /** Latencia de seguimiento en ms (HU-15 CA-07). */
     public long getLatencyMs() {
         return loadOperativa().getSeguimientoLatenciaMin() * 60_000L;
