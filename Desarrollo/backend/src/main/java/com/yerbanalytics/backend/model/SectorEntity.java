@@ -6,6 +6,11 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+/**
+ * Sector del vivero (~100 tubetes con su microaspersor). NO almacena métricas sensadas:
+ * la lectura es de la macro-zona ({@link ZonaEntity}). Su estado de salud se deriva de esa
+ * lectura, pero el diagnóstico de IA y los actuadores sí son propios del sector.
+ */
 @Entity
 @Table(name = "sector")
 @Getter
@@ -57,21 +62,7 @@ public class SectorEntity {
     @Column(name = "actuador_shade", nullable = false)
     private Integer actuadorShade;
 
-    @Column(name = "last_reading_time")
-    private Long lastReadingTime;
-
-    @Column(name = "hum_sus_raw")
-    private Double humSusRaw;
-
-    @Column(name = "hum_amb_raw")
-    private Double humAmbRaw;
-
-    @Column(name = "temp_raw")
-    private Double tempRaw;
-
-    @Column(name = "ce_raw")
-    private Double ceRaw;
-
-    @Column(name = "uv_raw")
-    private Double uvRaw;
+    // Las lecturas sensadas viven en ZonaEntity: hay un solo nodo testigo por macro-zona
+    // y los 100 sectores comparten esa lectura. El sector conserva sólo lo que es suyo
+    // (diagnóstico del plantín, actuadores y estado derivado).
 }

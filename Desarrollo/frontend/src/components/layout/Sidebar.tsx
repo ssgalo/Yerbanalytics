@@ -13,9 +13,11 @@ interface NavItem {
   showCount?: boolean;
 }
 
+/* El detalle de macro-zona (/mapa?zona=) NO está acá a propósito: se entra eligiendo una
+   macro-zona en el Panel general, y desde adentro sólo se vuelve. Sin ese contexto previo
+   la vista no tiene de dónde sacar qué zona mostrar. */
 const PRINCIPAL: NavItem[] = [
   { to: '/', icon: 'dashboard', label: 'Panel general', end: true },
-  { to: '/mapa', icon: 'map', label: 'Mapa de producción' },
   { to: '/diagnosticos', icon: 'diagnostics', label: 'Diagnósticos de IA', showCount: true },
 ];
 

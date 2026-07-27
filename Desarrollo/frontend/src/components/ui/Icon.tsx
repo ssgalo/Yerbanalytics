@@ -22,7 +22,9 @@ export type IconName =
   | 'arrow-right'
   | 'close'
   | 'cube'
-  | 'signal';
+  | 'signal'
+  | 'battery'
+  | 'clock';
 
 const PATHS: Record<IconName, JSX.Element> = {
   leaf: (
@@ -114,6 +116,18 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="12" cy="12" r="1.6" />
     </>
   ),
+  battery: (
+    <>
+      <rect x="2" y="7" width="17" height="10" rx="2.5" />
+      <path d="M22 10.5v3" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5.2l3.2 1.9" />
+    </>
+  ),
 };
 
 interface IconProps {
@@ -124,7 +138,13 @@ interface IconProps {
   style?: CSSProperties;
 }
 
-export function Icon({ name, size = 18, stroke = 'currentColor', strokeWidth = 1.8, style }: IconProps) {
+export function Icon({
+  name,
+  size = 18,
+  stroke = 'currentColor',
+  strokeWidth = 1.8,
+  style,
+}: IconProps) {
   return (
     <svg
       width={size}
@@ -152,7 +172,13 @@ interface GlyphProps {
 }
 
 /** Ícono de un solo path dinámico (acciones, actuadores). */
-export function Glyph({ path, size = 18, stroke = 'currentColor', strokeWidth = 1.9, style }: GlyphProps) {
+export function Glyph({
+  path,
+  size = 18,
+  stroke = 'currentColor',
+  strokeWidth = 1.9,
+  style,
+}: GlyphProps) {
   return (
     <svg
       width={size}

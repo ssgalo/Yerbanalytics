@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.mqtt;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.service.NurseryService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +11,14 @@ import org.springframework.stereotype.Component;
 public class MqttTelemetryReceiver {
 
     private final NurseryService nurseryService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Deserializa tolerando claves desconocidas: el firmware publica métricas que la
+     * plataforma no modela (ver {@link ContratoNodo}) y una clave nueva del lado del nodo no
+     * debe tirar abajo la ingesta de todo el paquete.
+     */
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     @Autowired
     public MqttTelemetryReceiver(NurseryService nurseryService) {

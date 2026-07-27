@@ -1,33 +1,60 @@
-/* Tarjeta de diagnóstico de IA — replica exacta del diseño HTML (líneas 423-448) */
+/* Tarjeta de diagnóstico de IA del plantín del sector */
+import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import type { DiagnosisDetail } from '@/types/domain';
+import { CapturaModal } from './CapturaModal';
 import styles from './DiagnosisCard.module.css';
 
 interface DiagnosisCardProps {
   diag: DiagnosisDetail;
   ago: string;
+  sectorId: string;
 }
 
-export function DiagnosisCard({ diag, ago }: DiagnosisCardProps) {
+export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
+  const [capturaAbierta, setCapturaAbierta] = useState(false);
+
   return (
     <Card className={styles.card}>
       <h3 className={styles.title}>Diagnóstico de IA</h3>
 
       <div className={styles.body}>
-        {/* Thumbnail cenital */}
-        <div className={styles.thumb} style={{ background: diag.thumb }}>
+        {/* Miniatura cenital: abre la captura a tamaño completo */}
+        <button
+          type="button"
+          className={styles.thumb}
+          style={{ background: diag.thumb }}
+          onClick={() => setCapturaAbierta(true)}
+          aria-label={`Ver la captura cenital de ${sectorId} a tamaño completo`}
+        >
           <Icon
             name="leaf-simple"
             size={60}
             stroke="rgba(255,255,255,.55)"
             strokeWidth={1.3}
-            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%,-50%)',
+            }}
           />
           <span className={styles.thumbLabel}>Imagen cenital · {ago}</span>
-        </div>
+          <span className={styles.thumbHint}>Ampliar</span>
+        </button>
+
+        {capturaAbierta && (
+          <CapturaModal
+            thumb={diag.thumb}
+            estado={diag.estado}
+            ago={ago}
+            sectorId={sectorId}
+            onClose={() => setCapturaAbierta(false)}
+          />
+        )}
 
         {/* Columna derecha */}
         <div className={styles.info}>

@@ -20,9 +20,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Alto EXACTO (no min-height): así el área de contenido tiene una altura definida y las
+   vistas que deben entrar sin scroll —como el mapa de producción— pueden pedir el 100%.
+   El scroll de la app vive en AppLayout `.scroll`, no en el body. */
 #root {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 button {

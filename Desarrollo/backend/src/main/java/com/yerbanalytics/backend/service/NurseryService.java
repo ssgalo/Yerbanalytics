@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
@@ -36,6 +37,7 @@ public class NurseryService {
     private final RuleOrchestrator ruleOrchestrator;
     private final ActionExecutor actionExecutor;
     private final long staleThresholdMs;
+    private final int bateriaMinPct;
 
     public NurseryService(NurseryProperties properties,
                           ZonaRepository zonaRepository,
@@ -46,7 +48,8 @@ public class NurseryService {
                           TopologiaLayoutRepository layoutRepository,
                           RuleOrchestrator ruleOrchestrator,
                           ActionExecutor actionExecutor,
-                          @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
+                          @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs,
+                          @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.historialService = historialService;
@@ -56,6 +59,7 @@ public class NurseryService {
         this.ruleOrchestrator = ruleOrchestrator;
         this.actionExecutor = actionExecutor;
         this.staleThresholdMs = staleThresholdMs;
+        this.bateriaMinPct = bateriaMinPct;
     }
 
     public NurseryData getSnapshot() {
@@ -64,6 +68,9 @@ public class NurseryService {
         List<Sector> allSectors = new ArrayList<>();
         Map<String, Sector> byId = new LinkedHashMap<>();
         List<Zona> zonas = new ArrayList<>();
+        // Antigüedad de la lectura por zona: los diagnósticos la usan como sello temporal,
+        // y ya no vive en el sector.
+        Map<String, String> agoPorZona = new HashMap<>();
 
         for (ZonaEntity ze : zonesDb) {
             List<Sector> zoneSectors = new ArrayList<>();
@@ -71,38 +78,36 @@ public class NurseryService {
             int alerta = 0;
             int off = 0;
 
+            // La lectura es de la zona: un solo nodo testigo la produce y sus 100 sectores
+            // la comparten. Si el nodo dejó de reportar, toda la zona queda fuera de servicio.
+            boolean isStale = ze.getLastReadingTime() == null
+                    || (System.currentTimeMillis() - ze.getLastReadingTime() > staleThresholdMs);
+            List<Metric> zoneMetrics = isStale ? buildOfflineMetricsList() : buildMetricsList(ze);
+            String zoneAgo = ze.getLastReadingTime() == null ? "hace —" : formatAgo(ze.getLastReadingTime());
+            agoPorZona.put(ze.getId(), zoneAgo);
+
             for (SectorEntity se : ze.getSectors()) {
                 String finalStatus;
                 String finalColor;
                 String finalStatusLabel;
                 String finalTip;
-                List<Metric> metrics;
                 Diagnosis diagnosis;
                 String reason;
                 Actuadores actuators;
-                String ago;
-                boolean stale;
-
-                boolean isStale = se.getLastReadingTime() == null || 
-                        (System.currentTimeMillis() - se.getLastReadingTime() > staleThresholdMs);
 
                 if (isStale) {
                     finalStatus = "offline";
                     finalColor = C.get("offline");
                     finalStatusLabel = LAB.get("offline");
                     finalTip = se.getId() + " · " + finalStatusLabel;
-                    metrics = buildOfflineMetricsList();
                     diagnosis = new Diagnosis("Sin diagnóstico", null, EMDASH);
                     reason = "Fuera de servicio";
                     actuators = new Actuadores("Cerrada", "En espera", se.getActuadorShade());
-                    ago = se.getLastReadingTime() == null ? "hace —" : formatAgo(se.getLastReadingTime());
-                    stale = true;
                 } else {
                     finalStatus = se.getStatus();
                     finalColor = se.getColor();
                     finalStatusLabel = se.getStatusLabel();
                     finalTip = se.getTip();
-                    metrics = buildMetricsList(se);
                     diagnosis = new Diagnosis(
                             se.getDiagnosisEstado(),
                             se.getDiagnosisConf(),
@@ -114,8 +119,6 @@ public class NurseryService {
                             se.getActuadorShade()
                     );
                     reason = se.getReason();
-                    ago = formatAgo(se.getLastReadingTime());
-                    stale = false;
                 }
 
                 Sector sectorDto = new Sector(
@@ -127,12 +130,9 @@ public class NurseryService {
                         finalColor,
                         finalStatusLabel,
                         finalTip,
-                        metrics,
                         diagnosis,
                         reason,
-                        actuators,
-                        ago,
-                        stale
+                        actuators
                 );
 
                 zoneSectors.add(sectorDto);
@@ -159,7 +159,14 @@ public class NurseryService {
                     sano,
                     alerta,
                     off,
-                    zoneSectors.size()
+                    zoneSectors.size(),
+                    new LecturaZona(zoneMetrics, ze.getLastReadingTime(), zoneAgo, isStale),
+                    new NodoTestigo(
+                            ze.getNodoMac(),
+                            ze.getNodoBattery(),
+                            ze.getNodoSignal(),
+                            ze.getNodoBattery() != null && ze.getNodoBattery() < bateriaMinPct
+                    )
             ));
         }
 
@@ -194,7 +201,7 @@ public class NurseryService {
                     SEV_MAP.get(d.sev()).soft(),
                     SEV_MAP.get(d.sev()).ink(),
                     TINTS.getOrDefault(d.estado(), TINTS.get("Sin diagnóstico")),
-                    s.ago(),
+                    agoPorZona.getOrDefault(s.zona(), "hace —"),
                     d.conf() != null && d.conf() >= 85
             ));
         }
@@ -216,7 +223,7 @@ public class NurseryService {
                     SEV_MAP.get(EMDASH).soft(),
                     SEV_MAP.get(EMDASH).ink(),
                     TINTS.get("No concluyente"),
-                    s.ago(),
+                    agoPorZona.getOrDefault(s.zona(), "hace —"),
                     false
             ));
         }
@@ -354,39 +361,56 @@ public class NurseryService {
 
     @Transactional
     public void updateTelemetry(String zoneId, MqttTelemetryPayload payload) {
-        List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
-        if (sectors.isEmpty()) {
+        ZonaEntity zona = zonaRepository.findById(zoneId).orElse(null);
+        if (zona == null) {
             return;
         }
+        List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
+
+        // La lectura se persiste UNA vez, en la zona. Sólo se actualizan las métricas
+        // presentes en el payload: una lectura parcial (un sensor en falla, o un envío
+        // manual de una sola métrica) conserva el último valor de las demás.
+        MqttTelemetryPayload.MetricsPayload pm = payload.metrics();
+        if (pm != null) {
+            if (pm.humSus() != null) zona.setHumSusRaw(pm.humSus());
+            if (pm.humAmb() != null) zona.setHumAmbRaw(pm.humAmb());
+            if (pm.temp() != null) zona.setTempRaw(pm.temp());
+            if (pm.tempSuelo() != null) zona.setTempSueloRaw(pm.tempSuelo());
+            if (pm.uv() != null) zona.setUvRaw(pm.uv());
+            // Única conversión de unidad del sistema: el contrato manda µS/cm, la
+            // plataforma persiste dS/m (ver ContratoNodo).
+            if (pm.ce() != null) zona.setCeRaw(ContratoNodo.ceADsPorM(pm.ce()));
+            if (pm.phSuelo() != null) zona.setPhSueloRaw(pm.phSuelo());
+            if (pm.n() != null) zona.setNRaw(pm.n());
+            if (pm.p() != null) zona.setPRaw(pm.p());
+            if (pm.k() != null) zona.setKRaw(pm.k());
+        }
+        if (payload.mac() != null && !payload.mac().isBlank()) zona.setNodoMac(payload.mac().trim());
+        if (payload.battery() != null) zona.setNodoBattery(payload.battery());
+        if (payload.signal() != null) zona.setNodoSignal(payload.signal());
+        zona.setLastReadingTime(payload.timestamp() != null ? payload.timestamp() : System.currentTimeMillis());
+        zonaRepository.save(zona);
+
+        // El estado de cada sector se deriva de esa única lectura. Sólo las métricas no
+        // informativas mueven el estado: las de la sonda de suelo tienen rangos
+        // provisionales y no deben pintar el mapa de rojo hasta validarlos.
+        List<Metric> tempMetrics = buildMetricsList(zona);
+        boolean hasCritical = false;
+        boolean hasWarning = false;
+        for (Metric m : tempMetrics) {
+            if (!Boolean.TRUE.equals(m.spec().afectaEstado())) {
+                continue;
+            }
+            if ("critical".equals(m.status())) {
+                hasCritical = true;
+            } else if ("warning".equals(m.status())) {
+                hasWarning = true;
+            }
+        }
+        String finalStatus = hasCritical ? "critical" : (hasWarning ? "warning" : "ok");
 
         for (SectorEntity s : sectors) {
             String oldStatus = s.getStatus();
-
-            // Update raw readings. Sólo se actualizan las métricas presentes en el payload:
-            // una lectura parcial (p. ej. sólo radiación desde el simulador) conserva el
-            // último valor de las demás. El hardware real envía las cinco, así que su
-            // comportamiento no cambia.
-            MqttTelemetryPayload.MetricsPayload pm = payload.metrics();
-            if (pm.humSus() != null) s.setHumSusRaw(pm.humSus());
-            if (pm.humAmb() != null) s.setHumAmbRaw(pm.humAmb());
-            if (pm.temp() != null) s.setTempRaw(pm.temp());
-            if (pm.ce() != null) s.setCeRaw(pm.ce());
-            if (pm.uv() != null) s.setUvRaw(pm.uv());
-            s.setLastReadingTime(payload.timestamp());
-
-            // Build temporary metrics list to recompute status
-            boolean hasCritical = false;
-            boolean hasWarning = false;
-            List<Metric> tempMetrics = buildMetricsList(s);
-            for (Metric m : tempMetrics) {
-                if ("critical".equals(m.status())) {
-                    hasCritical = true;
-                } else if ("warning".equals(m.status())) {
-                    hasWarning = true;
-                }
-            }
-
-            String finalStatus = hasCritical ? "critical" : (hasWarning ? "warning" : "ok");
             s.setStatus(finalStatus);
             s.setColor(C.get(finalStatus));
             s.setStatusLabel(LAB.get(finalStatus));
@@ -412,11 +436,15 @@ public class NurseryService {
                 }
             }
 
-            // Reason
-            Metric bad = tempMetrics.stream()
+            // Reason: sólo sobre las métricas que efectivamente movieron el estado, para no
+            // justificar un "warning" citando una métrica informativa que no lo causó.
+            List<Metric> decisivas = tempMetrics.stream()
+                    .filter(m -> Boolean.TRUE.equals(m.spec().afectaEstado()))
+                    .toList();
+            Metric bad = decisivas.stream()
                     .filter(m -> finalStatus.equals(m.status()))
                     .findFirst()
-                    .orElseGet(() -> tempMetrics.stream().filter(m -> !"ok".equals(m.status())).findFirst().orElse(null));
+                    .orElseGet(() -> decisivas.stream().filter(m -> !"ok".equals(m.status())).findFirst().orElse(null));
             if (bad != null) {
                 s.setReason(bad.label() + " " + bad.value() + ("%".equals(bad.unit()) ? "%" : " " + bad.unit()));
             } else {
@@ -453,21 +481,11 @@ public class NurseryService {
         );
     }
 
-    private List<Metric> buildMetricsList(SectorEntity s) {
+    /** Evalúa la lectura de la macro-zona contra los umbrales vigentes. */
+    private List<Metric> buildMetricsList(ZonaEntity z) {
         List<Metric> metrics = new ArrayList<>();
         for (MetricSpec sp : configuracionService.getEffectiveSpecs()) {
-            Double val = null;
-            if ("humSus".equals(sp.key())) {
-                val = s.getHumSusRaw();
-            } else if ("humAmb".equals(sp.key())) {
-                val = s.getHumAmbRaw();
-            } else if ("temp".equals(sp.key())) {
-                val = s.getTempRaw();
-            } else if ("ce".equals(sp.key())) {
-                val = s.getCeRaw();
-            } else if ("uv".equals(sp.key())) {
-                val = s.getUvRaw();
-            }
+            Double val = z.raw(sp.key());
 
             if (val == null) {
                 metrics.add(new Metric(

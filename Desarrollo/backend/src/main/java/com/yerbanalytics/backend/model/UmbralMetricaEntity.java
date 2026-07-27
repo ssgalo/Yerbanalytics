@@ -22,7 +22,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class UmbralMetricaEntity {
 
-    /** Clave de la métrica: humSus | humAmb | temp | ce | uv. */
+    /** Clave de la métrica; una de las 10 de {@code NurseryConstants.SPECS}. */
     @Id
     @Column(name = "metric_key")
     private String metricKey;

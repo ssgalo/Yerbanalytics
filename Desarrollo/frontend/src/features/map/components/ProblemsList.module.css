@@ -1,16 +1,51 @@
 /* ProblemsList */
 
+/* Se queda con el alto que sobra en la columna; si hay más sectores que espacio,
+   scrollea la lista y no la página. */
+.card {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 15px;
+}
+
 .title {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
+  flex-shrink: 0;
+}
+
+.count {
+  margin-left: 7px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--faint);
 }
 
 .list {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Deja aire al scrollbar para que no se pegue al texto */
+  padding-right: 2px;
+}
+
+/* Nada que revisar: mensaje en lugar de una caja vacía */
+.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--faint);
 }
 
 /* Cada ítem es un botón full-width */

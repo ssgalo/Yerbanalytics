@@ -1,0 +1,182 @@
+/* Inspector del histórico de la métrica seleccionada.
+   El posicionamiento y la animación de entrada viven en MapPage.module.css
+   (`.inspector`); acá sólo el contenido de la tarjeta. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  /* Sombra hacia la izquierda: refuerza que está POR ENCIMA de la grilla.
+     Alcance = 18 + 40 = 58px; `--sombra-alcance` en MapPage.module.css lo compensa
+     al esconder el panel, si no la sombra asoma sobre la caja de la grilla. */
+  box-shadow: -18px 0 40px rgba(12, 35, 25, 0.13);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.titleWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.provisional {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a66a12;
+  background: var(--warn-soft);
+  border-radius: 6px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+/* Selector de rango */
+.rangeSelector {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 3px;
+  margin-left: auto;
+}
+
+.rangeBtn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 8px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.rangeBtn:hover {
+  color: var(--ink);
+}
+
+.rangeBtnActive {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.close:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Lectura actual, para no obligar a mirar el panel de al lado */
+.actual {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.actualValue {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.actualUnit {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.actualLabel {
+  margin-left: 8px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+/* Cuerpo: el gráfico se estira para llenar el alto disponible del inspector */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+}
+
+.chartWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.svg {
+  display: block;
+  height: 100%;
+}
+
+/* Labels inferiores */
+.labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+/* Métrica sin lectura: no hay serie que dibujar */
+.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  color: var(--faint);
+}

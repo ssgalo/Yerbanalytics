@@ -1,11 +1,11 @@
 /* Tarjeta de diagnóstico de IA en el detalle de sector */
 
 .card {
-  padding: 20px 22px;
+  padding: 18px 20px;
 }
 
 .title {
-  margin: 0 0 15px;
+  margin: 0 0 14px;
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 600;
@@ -17,10 +17,11 @@
   align-items: flex-start;
 }
 
-/* Thumbnail cenital */
+/* Miniatura cenital — es un botón: abre la captura a tamaño completo */
 .thumb {
   width: 150px;
   height: 150px;
+  border: none;
   border-radius: 14px;
   flex-shrink: 0;
   display: flex;
@@ -29,6 +30,8 @@
   padding: 10px;
   position: relative;
   overflow: hidden;
+  cursor: zoom-in;
+  font-family: var(--font-body);
 }
 
 .thumbLabel {
@@ -37,6 +40,26 @@
   font-weight: 600;
   position: relative;
   z-index: 1;
+}
+
+/* Pista de que se puede ampliar; aparece al pasar el mouse */
+.thumbHint {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(12, 35, 25, 0.45);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.thumb:hover .thumbHint,
+.thumb:focus-visible .thumbHint {
+  opacity: 1;
 }
 
 .thumbIcon {

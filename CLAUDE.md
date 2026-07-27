@@ -34,7 +34,21 @@ el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es 
 - **Plantín**: unidad de análisis. El modelo diagnostica UN plantín por imagen
   (el riel/gantry lo aísla y encuadra).
 - **Sector**: agrupación de ~100 tubetes con 1 microaspersor. El vivero tiene 600
-  sectores en 6 macro-zonas (MZ-1 … MZ-6).
+  sectores en 6 macro-zonas (MZ-1 … MZ-6). **Los actuadores son por sector; el
+  sensado NO.**
+- **Nodo testigo**: hay UNO por macro-zona. Su lectura vale para los 100 sectores
+  de esa MZ, así que las métricas se modelan y se muestran a nivel macro-zona
+  (`Zona.lectura`), no de sector. Lo que diferencia a un sector de otro dentro de
+  una zona es el diagnóstico de IA de su plantín.
+- **Métricas sensadas (10)**: humedad de sustrato, humedad ambiental, temperatura
+  del aire, luminosidad y temperatura del sustrato (ambiente); CE, pH, N, P y K
+  (nutrición). Las cinco de la sonda de suelo son **informativas**
+  (`afectaEstado: false`): se muestran y colorean, pero no cambian el estado de
+  los sectores hasta validar sus rangos con el vivero.
+  > Ojo con dos claves del contrato MQTT: `ce` llega en µS/cm y se persiste en
+  > dS/m; `uv` es **% de luz de un LDR**, no radiación UV (la clave se conserva
+  > por compatibilidad con el firmware). Fuente de verdad:
+  > `Desarrollo/embebido/comun/contrato.h`.
 - **Estados de salud**: `Saludable` · `En observación` (warning) · `Crítico` ·
   `Fuera de servicio` (offline).
 - **Diagnósticos de IA**: Sano, Clorosis (trastorno nutricional), Estrés solar,
@@ -129,6 +143,10 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 (con simulador). El esquema lo crea Hibernate (`ddl-auto=update`) y se siembra con
 `resources/data.sql` (600 sectores, 6 zonas).
 
+> **Migración manual pendiente**: el sensado se mudó de `sector` a `zona`.
+> `ddl-auto=update` agrega columnas pero no migra datos ni borra las obsoletas.
+> Ver `resources/migracion-manual.sql` y el README del backend.
+
 ### Arranque rápido
 ```bash
 cd Desarrollo/backend
@@ -136,7 +154,8 @@ cd Desarrollo/backend
 ```
 
 ### Endpoints principales
-- `GET /api/nursery` → snapshot del vivero (`NurseryData` en `frontend/src/types/domain.ts`)
+- `GET /api/nursery` → snapshot del vivero (`NurseryData` en `frontend/src/types/domain.ts`).
+  Cada zona trae `lectura` (las 10 métricas evaluadas) y `nodo` (batería/señal del testigo).
 
 ### Convenciones internas
 - Entidades con Lombok + `JpaRepository` + service + controller.

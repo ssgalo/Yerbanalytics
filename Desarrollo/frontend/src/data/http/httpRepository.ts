@@ -1,7 +1,7 @@
 /* ============================================================
-   Repositorio HTTP: consume el backend real. Se activa con
-   VITE_DATA_SOURCE=http. El backend aún no existe; este cliente
-   ya define el contrato esperado (GET {baseUrl}/nursery).
+   Repositorio HTTP: consume el backend Spring Boot real
+   (GET {baseUrl}/nursery y demás endpoints). Se activa con
+   VITE_DATA_SOURCE=http.
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
 import type {
@@ -77,7 +77,11 @@ export class HttpRepository implements DataRepository {
   }
 
   /** POST/PUT compartidos: el backend devuelve la flota actualizada o { error } (HU-18 CA-03). */
-  private async mutateDevice(method: 'POST' | 'PUT', url: string, device: NuevoDispositivo): Promise<HardwareData> {
+  private async mutateDevice(
+    method: 'POST' | 'PUT',
+    url: string,
+    device: NuevoDispositivo,
+  ): Promise<HardwareData> {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -129,7 +133,9 @@ export class HttpRepository implements DataRepository {
   async getSimulacionEstado(): Promise<SimulacionEstado> {
     const res = await fetch(`${this.baseUrl}/simulacion?t=${Date.now()}`);
     if (!res.ok) {
-      throw new Error(`Error ${res.status} al obtener el estado de simulación desde ${this.baseUrl}`);
+      throw new Error(
+        `Error ${res.status} al obtener el estado de simulación desde ${this.baseUrl}`,
+      );
     }
     return (await res.json()) as SimulacionEstado;
   }

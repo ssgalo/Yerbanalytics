@@ -1,6 +1,10 @@
-/* Tarjeta de un sensor simulado. Cada métrica se puede enviar por separado (con su propia
-   fecha/hora opcional) y también hay un botón "Enviar todo" que manda las cinco a la vez
-   con batería/señal y una fecha/hora a nivel tarjeta. Fecha/hora vacía = hora actual. */
+/* Tarjeta de un sensor simulado (nodo testigo de una macro-zona). Cada una de las 10
+   métricas se puede enviar por separado (con su propia fecha/hora opcional) y también hay
+   un botón "Enviar todo" que las manda juntas con batería/señal y una fecha/hora a nivel
+   tarjeta. Fecha/hora vacía = hora actual.
+
+   Los campos salen de `specs`, así que incorporar una métrica al contrato no requiere
+   tocar este formulario. */
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { specs } from '@/data/mock/specs';
@@ -17,7 +21,13 @@ interface SensorSimCardProps {
 
 type Feedback = { kind: 'ok' | 'error'; msg: string } | null;
 
-export function SensorSimCard({ sensor, disabled, sending, onEnviar, onEliminar }: SensorSimCardProps) {
+export function SensorSimCard({
+  sensor,
+  disabled,
+  sending,
+  onEnviar,
+  onEliminar,
+}: SensorSimCardProps) {
   // Valor y fecha/hora por métrica, precargados con la base de cada spec.
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(specs.map((s) => [s.key, String(s.base)])),
@@ -65,10 +75,10 @@ export function SensorSimCard({ sensor, disabled, sending, onEnviar, onEliminar 
     }
   };
 
-  /** Envía las cinco métricas juntas + batería/señal. */
+  /** Envía las 10 métricas juntas + batería/señal. */
   const enviarTodo = async () => {
     setFeedback(null);
-    const metrics: Record<string, number> = {};
+    const metrics: EnvioMetrics = {};
     for (const s of specs) {
       const raw = values[s.key];
       const n = Number(raw);
@@ -76,7 +86,8 @@ export function SensorSimCard({ sensor, disabled, sending, onEnviar, onEliminar 
         setFeedback({ kind: 'error', msg: `Valor inválido en ${s.label}.` });
         return;
       }
-      metrics[s.key] = n;
+      // Las claves de `specs` son exactamente las de EnvioMetrics.
+      metrics[s.key as keyof EnvioMetrics] = n;
     }
     const bat = parseOpt(battery);
     const sig = parseOpt(signal);
@@ -90,19 +101,15 @@ export function SensorSimCard({ sensor, disabled, sending, onEnviar, onEliminar 
       battery: bat,
       signal: sig,
       timestamp: tsDesde(fechaTodo),
-      metrics: {
-        humSus: metrics.humSus,
-        humAmb: metrics.humAmb,
-        temp: metrics.temp,
-        ce: metrics.ce,
-        uv: metrics.uv,
-      },
+      metrics,
     };
     try {
       await onEnviar(input);
       setFeedback({
         kind: 'ok',
-        msg: fechaTodo ? 'Lectura completa enviada con la fecha indicada.' : 'Lectura completa enviada con la hora actual.',
+        msg: fechaTodo
+          ? 'Lectura completa enviada con la fecha indicada.'
+          : 'Lectura completa enviada con la hora actual.',
       });
     } catch (e) {
       setFeedback({ kind: 'error', msg: e instanceof Error ? e.message : String(e) });
@@ -206,7 +213,9 @@ export function SensorSimCard({ sensor, disabled, sending, onEnviar, onEliminar 
           </div>
         </div>
         <div className={`${styles.field} ${styles.datetime}`}>
-          <label className={styles.label}>Fecha y hora del envío conjunto (opcional · vacío = ahora)</label>
+          <label className={styles.label}>
+            Fecha y hora del envío conjunto (opcional · vacío = ahora)
+          </label>
           <input
             className={styles.input}
             type="datetime-local"
@@ -219,7 +228,12 @@ export function SensorSimCard({ sensor, disabled, sending, onEnviar, onEliminar 
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.btnPrimary} disabled={disabled || sending} onClick={enviarTodo}>
+        <button
+          type="button"
+          className={styles.btnPrimary}
+          disabled={disabled || sending}
+          onClick={enviarTodo}
+        >
           {sending ? 'Enviando…' : 'Enviar todo'}
         </button>
         <span className={styles.feedback}>

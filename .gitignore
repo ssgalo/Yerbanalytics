@@ -61,3 +61,6 @@ Thumbs.db
 .idea/
 .vscode/
 GEMINI.md
+
+# Logs de sesiones de Playwright MCP (debugging local, no assets del repo)
+.playwright-mcp/

@@ -1,0 +1,174 @@
+/* Panel de valores sensados del nodo testigo de la macro-zona */
+
+/* Columna propia del layout: ocupa todo el alto y scrollea adentro si hiciera falta */
+.card {
+  padding: 14px 15px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.origen {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* Lectura vencida: lo primero que hay que ver */
+.stale {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: #a66a12;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Las 10 métricas, sin agrupar */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  flex: 1;
+  min-height: 0;
+  /* Las filas se reparten el alto disponible: sin hueco muerto abajo, y con más
+     aire para el sparkline cuando la pantalla lo permite. */
+  grid-auto-rows: minmax(62px, 1fr);
+  overflow-y: auto;
+}
+
+/* Cada métrica es clickable: abre su histórico en el inspector */
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.metric:hover {
+  border-color: var(--muted);
+}
+
+.metricActive {
+  border-color: var(--brand, #3fa06a);
+  background: var(--ok-soft);
+}
+
+.metricLabel {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Marca de rango provisional (métricas de la sonda de suelo sin validar) */
+.provisional {
+  margin-left: 2px;
+  color: var(--warn, #e0972c);
+  font-weight: 700;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.unit {
+  font-size: 10px;
+  color: var(--faint);
+}
+
+/* Rango óptimo al final de la fila del valor: ahorra una línea por métrica */
+.ideal {
+  margin-left: auto;
+  font-size: 9.5px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* El sparkline se lleva el alto que sobre dentro de la tarjeta */
+.metric > :global(svg) {
+  flex: 1;
+  min-height: 18px;
+  align-self: stretch;
+}
+
+/* Reserva el lugar del sparkline para que las tarjetas no bailen sin dato */
+.sinSerie {
+  display: block;
+  flex: 1;
+  min-height: 18px;
+}
+
+/* Estado del nodo */
+.nodo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.nodoItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.nodoAlerta {
+  color: var(--warn, #e0972c);
+  font-weight: 700;
+}
+
+.bateriaAviso {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a66a12;
+  font-weight: 600;
+}

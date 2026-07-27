@@ -18,6 +18,9 @@ export interface ColorPair {
   ink: string;
 }
 
+/** Agrupación visual de una métrica en el panel de sensado. */
+export type GrupoMetrica = 'ambiente' | 'nutricion';
+
 /** Especificación de una métrica (bandas ideal/warn/crit). */
 export interface MetricSpec {
   key: string;
@@ -28,14 +31,22 @@ export interface MetricSpec {
   crit: [number, number];
   dec: number;
   base: number;
+  grupo: GrupoMetrica;
+  /**
+   * Si la métrica participa del cálculo del estado de salud de los sectores. Las que
+   * llegaron con la sonda de suelo (tempSuelo, phSuelo, n, p, k) son informativas hasta
+   * validar sus rangos con el vivero: se muestran y colorean, pero no cambian el estado.
+   */
+  afectaEstado: boolean;
 }
 
-/** Lectura concreta de una métrica en un sector. */
+/** Lectura concreta de una métrica de la macro-zona. */
 export interface Metric {
   key: string;
   label: string;
   unit: string;
-  raw: number;
+  /** `null` si el nodo no reportó esa métrica (sensor en falla o lectura parcial). */
+  raw: number | null;
   value: string;
   status: Status;
   color: string;
@@ -56,7 +67,11 @@ export interface Actuadores {
   shade: number;
 }
 
-/** Un sector del vivero (~100 tubetes). */
+/**
+ * Un sector del vivero (~100 tubetes). No tiene métricas propias: la lectura pertenece a
+ * su macro-zona (`Zona.lectura`), porque hay un solo nodo sensor testigo por macro-zona.
+ * Sí son suyos el diagnóstico de IA del plantín y los actuadores.
+ */
 export interface Sector {
   id: string;
   zona: string;
@@ -66,15 +81,32 @@ export interface Sector {
   color: string;
   statusLabel: string;
   tip: string;
-  metrics: Metric[];
   diagnosis: Diagnosis;
   reason: string;
   actuadores: Actuadores;
+}
+
+/** Lectura sensada de una macro-zona: lo que reportó su nodo testigo. */
+export interface LecturaZona {
+  /** Las 10 métricas, ya evaluadas contra sus umbrales. */
+  metrics: Metric[];
+  /** Instante de la lectura (epoch ms); `null` si el nodo nunca reportó. */
+  ts: number | null;
+  /** Antigüedad legible: 'hace 4 min'. */
   ago: string;
+  /** El nodo superó el umbral de silencio: los valores no son vigentes. */
   stale: boolean;
 }
 
-/** Macro-zona (100 sectores). */
+/** Estado del nodo sensor testigo que produce la lectura de una macro-zona. */
+export interface NodoTestigo {
+  mac: string | null;
+  battery: number | null; // %
+  signal: number | null; // dBm
+  bateriaBaja: boolean;
+}
+
+/** Macro-zona (100 sectores). Dueña de la lectura sensada. */
 export interface Zona {
   id: string;
   name: string;
@@ -84,6 +116,8 @@ export interface Zona {
   alerta: number;
   off: number;
   total: number;
+  lectura: LecturaZona;
+  nodo: NodoTestigo;
 }
 
 /** KPIs y conteos globales del vivero. */
@@ -169,8 +203,9 @@ export interface Weather {
   forecast: ForecastSlot[];
 }
 
-/** Tile de métrica en el detalle de sector (con sparkline). */
+/** Tile de una métrica en el panel de sensado de la macro-zona (con sparkline). */
 export interface MetricTile {
+  key: string;
   label: string;
   value: string;
   unit: string;
@@ -179,6 +214,20 @@ export interface MetricTile {
   line: string;
   ideal: string;
   soft: string;
+  grupo: GrupoMetrica;
+  /** Rango provisional, pendiente de validación agronómica. */
+  provisional: boolean;
+}
+
+/** Serie histórica de una métrica de macro-zona para el gráfico del panel. */
+export interface SerieMetrica {
+  /** Path SVG de la línea. */
+  line: string;
+  /** Path SVG del área bajo la línea. */
+  area: string;
+  /** Extremos de la serie, ya formateados con la unidad. */
+  min: string;
+  max: string;
 }
 
 /** Fila de actuador en el detalle. */
@@ -252,13 +301,11 @@ export interface DiagnosisDetail {
   hasFoto: boolean;
 }
 
-/** Detalle derivado de un sector (gráficos, tiles, historial...). */
+/**
+ * Detalle derivado de un sector. Sin métricas ni gráfico de series: eso vive en el panel
+ * de sensado de la macro-zona.
+ */
 export interface SectorDetail {
-  mainLine: string;
-  mainArea: string;
-  mainMin: string;
-  mainMax: string;
-  metricTiles: MetricTile[];
   diag: DiagnosisDetail;
   actsRows: ActuatorRow[];
   hist: HistoryEntry[];
@@ -279,6 +326,8 @@ export interface MetricThreshold {
   warnMax: number;
   critMin: number;
   critMax: number;
+  /** Bandas todavía sin validar con el vivero (métricas de la sonda de suelo). */
+  provisional: boolean;
 }
 
 /** Límites operativos de actuadores y parámetros de seguimiento (HU-15). */
@@ -377,8 +426,15 @@ export interface EnvioMetrics {
   humSus?: number;
   humAmb?: number;
   temp?: number;
-  ce?: number;
+  tempSuelo?: number;
+  /** Luminosidad en %. */
   uv?: number;
+  /** Conductividad en dS/m — el backend la traduce a µS/cm para publicar. */
+  ce?: number;
+  phSuelo?: number;
+  n?: number;
+  p?: number;
+  k?: number;
 }
 
 /** Lectura manual a enviar por un sensor simulado. Espejo del DTO `EnvioTelemetria`. */

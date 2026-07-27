@@ -1,23 +1,90 @@
-/* MapPage */
+/* MapPage — detalle de macro-zona a pantalla completa, sin scroll de página */
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
+  /* Ocupa el alto del área de contenido: nada de esta vista debe scrollear */
+  height: 100%;
+  min-height: 0;
 }
 
-/* Dos columnas: grilla ocupa el espacio restante, sidebar fija 320px */
+/* Rastro de navegación: sólo la vuelta atrás, con lugar para breadcrumbs futuros */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 2px 4px 2px 0;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.backBtn:hover {
+  color: var(--ink);
+}
+
+/* Tres columnas: mapa · valores sensados · sectores a revisar.
+   `grid-template-columns` se fija inline: la primera columna mide exactamente lo
+   que ocupa la grilla, y lo que sobra se lo lleva el panel de sensado. */
 .layout {
   display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
-  margin-top: 16px;
-  align-items: start;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
 }
 
-/* Columna derecha: flex vertical */
-.sidebar {
+/* Aloja la grilla y el inspector, que entra por su borde derecho.
+   `overflow: hidden` es lo que lo mantiene fuera de cuadro mientras está cerrado. */
+.mapCol {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  border-radius: 16px;
+}
+
+/* Inspector del histórico: cubre la grilla, nunca la columna de sensado.
+   La misma transición sirve de entrada y de salida — el contenido se mantiene
+   montado mientras se cierra para que no se vacíe a mitad de camino.
+
+   El desplazamiento cerrado suma `--sombra-alcance` porque la tarjeta proyecta
+   una sombra hacia la IZQUIERDA (ver SensadoChart.module.css): con sólo 100% el
+   panel sale de cuadro pero su sombra vuelve a entrar y se ve como un borde
+   oscuro sobre la caja de la grilla. */
+.inspector {
+  --sombra-alcance: 60px;
+
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  transform: translateX(calc(100% + var(--sombra-alcance)));
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+  pointer-events: none;
+}
+
+.inspectorOpen {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector {
+    transition: none;
+  }
 }
