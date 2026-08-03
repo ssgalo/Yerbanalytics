@@ -1,50 +1,48 @@
 /* ============================================================
-   ZoneSummary — tarjeta con resumen numérico de la zona activa.
-   Tres cajas: Saludables (ok-soft), En alerta (warn-soft), Sin señal (#EEEDE5).
+   ZoneSummary — conteo de sectores por estado de salud.
+
+   Cumple además el rol de leyenda del mapa: cada chip lleva el color
+   con el que ese estado se pinta en la grilla, así que la grilla no
+   necesita repetirla.
    ============================================================ */
-import type { Zona } from '@/types/domain';
-import { Card } from '@/components/ui/Card';
+import type { Status, Zona } from '@/types/domain';
 import styles from './ZoneSummary.module.css';
 
 interface ZoneSummaryProps {
   zona: Zona;
 }
 
+/** Los cuatro estados, en el orden en que se degradan. */
+const ESTADOS: Array<{ status: Status; label: string; ink: string; bg: string; text: string }> = [
+  { status: 'ok', label: 'Saludables', ink: 'var(--ok)', bg: 'var(--ok-soft)', text: '#2E7A4F' },
+  {
+    status: 'warning',
+    label: 'Observación',
+    ink: 'var(--warn)',
+    bg: 'var(--warn-soft)',
+    text: '#A66A12',
+  },
+  { status: 'critical', label: 'Críticos', ink: 'var(--crit)', bg: 'var(--crit-soft)', text: '#A8331C' },
+  { status: 'offline', label: 'Sin señal', ink: 'var(--off)', bg: '#EEEDE5', text: '#6A776E' },
+];
+
 export function ZoneSummary({ zona }: ZoneSummaryProps) {
+  /* `zona.alerta` junta observación y críticos; acá hacen falta separados, así que
+     se cuentan sobre los sectores. */
+  const conteo = (status: Status) => zona.sectors.filter((s) => s.status === status).length;
+
   return (
-    <Card style={{ padding: '18px 19px' }}>
-      <h2 className={styles.title}>Resumen de zona</h2>
-      <div className={styles.grid}>
-        {/* Saludables */}
-        <div className={styles.box} style={{ background: 'var(--ok-soft)' }}>
-          <div className={styles.count} style={{ color: 'var(--ok)' }}>
-            {zona.sano}
-          </div>
-          <div className={styles.label} style={{ color: '#2E7A4F' }}>
-            Saludables
-          </div>
+    <div className={styles.strip}>
+      {ESTADOS.map((e) => (
+        <div key={e.status} className={styles.chip} style={{ background: e.bg }}>
+          <span className={styles.count} style={{ color: e.ink }}>
+            {conteo(e.status)}
+          </span>
+          <span className={styles.label} style={{ color: e.text }}>
+            {e.label}
+          </span>
         </div>
-
-        {/* En alerta */}
-        <div className={styles.box} style={{ background: 'var(--warn-soft)' }}>
-          <div className={styles.count} style={{ color: 'var(--warn)' }}>
-            {zona.alerta}
-          </div>
-          <div className={styles.label} style={{ color: '#A66A12' }}>
-            En alerta
-          </div>
-        </div>
-
-        {/* Sin señal */}
-        <div className={styles.box} style={{ background: '#EEEDE5' }}>
-          <div className={styles.count} style={{ color: 'var(--off)' }}>
-            {zona.off}
-          </div>
-          <div className={styles.label} style={{ color: '#6A776E' }}>
-            Sin señal
-          </div>
-        </div>
-      </div>
-    </Card>
+      ))}
+    </div>
   );
 }

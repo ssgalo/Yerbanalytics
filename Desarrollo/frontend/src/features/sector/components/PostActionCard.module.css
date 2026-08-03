@@ -1,7 +1,10 @@
 /* Tarjeta de seguimiento post-acción */
 
 .card {
-  padding: 20px 22px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .title {

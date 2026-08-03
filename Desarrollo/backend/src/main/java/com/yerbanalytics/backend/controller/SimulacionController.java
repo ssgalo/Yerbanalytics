@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.controller;
 import com.yerbanalytics.backend.dto.EnvioTelemetria;
 import com.yerbanalytics.backend.dto.SensorSimulado;
 import com.yerbanalytics.backend.dto.SimulacionEstado;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPublisher;
 import com.yerbanalytics.backend.service.SimulacionService;
@@ -100,10 +101,10 @@ public class SimulacionController {
         }
         EnvioTelemetria.Metrics m = envio.metrics();
         // Métricas parciales: cada una es opcional, pero debe venir al menos una (permite
-        // enviar una sola, p. ej. sólo radiación). La ingesta conserva las ausentes.
-        if (m == null || (m.humSus() == null && m.humAmb() == null && m.temp() == null
-                && m.ce() == null && m.uv() == null)) {
-            throw new IllegalArgumentException("Enviá al menos una métrica (humSus, humAmb, temp, ce o uv).");
+        // enviar una sola, p. ej. sólo luminosidad). La ingesta conserva las ausentes.
+        if (m == null || m.vacio()) {
+            throw new IllegalArgumentException(
+                    "Enviá al menos una métrica (humSus, humAmb, temp, tempSuelo, uv, ce, phSuelo, n, p o k).");
         }
 
         long ts = envio.timestamp() != null ? envio.timestamp() : System.currentTimeMillis();
@@ -112,7 +113,12 @@ public class SimulacionController {
                 envio.battery(),
                 envio.signal(),
                 ts,
-                new MqttTelemetryPayload.MetricsPayload(m.humSus(), m.humAmb(), m.temp(), m.ce(), m.uv())
+                // El formulario trabaja en unidades de la UI; el payload viaja en unidades
+                // del contrato para atravesar el mismo pipeline que el hardware real.
+                new MqttTelemetryPayload.MetricsPayload(
+                        m.humSus(), m.humAmb(), m.temp(), m.tempSuelo(), m.uv(),
+                        ContratoNodo.ceAMicroSPorCm(m.ce()),
+                        m.phSuelo(), m.n(), m.p(), m.k())
         );
 
         try {

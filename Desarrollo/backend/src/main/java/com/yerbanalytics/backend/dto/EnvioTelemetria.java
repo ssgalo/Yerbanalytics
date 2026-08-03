@@ -21,11 +21,27 @@ public record EnvioTelemetria(
         Long timestamp,
         Metrics metrics
 ) {
+    /**
+     * Valores en las <b>unidades de la UI</b> (ce en dS/m, uv en % de luminosidad). El
+     * controller los traduce a unidades del contrato antes de publicar.
+     */
     public record Metrics(
             Double humSus,
             Double humAmb,
             Double temp,
+            Double tempSuelo,
+            Double uv,
             Double ce,
-            Double uv
-    ) {}
+            Double phSuelo,
+            Double n,
+            Double p,
+            Double k
+    ) {
+        /** {@code true} si no vino ninguna métrica: el envío no tiene nada que aplicar. */
+        public boolean vacio() {
+            return humSus == null && humAmb == null && temp == null && tempSuelo == null
+                    && uv == null && ce == null && phSuelo == null && n == null && p == null
+                    && k == null;
+        }
+    }
 }

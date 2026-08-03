@@ -32,12 +32,40 @@ public final class NurseryConstants {
             EMDASH, new ColorPair("#EEEDE5", "#6A776E")
     );
 
+    /** Agrupaci\u00f3n visual del panel de sensado. */
+    public static final String GRUPO_AMBIENTE = "ambiente";
+    public static final String GRUPO_NUTRICION = "nutricion";
+
+    /**
+     * Las 10 m\u00e9tricas que publica el nodo testigo (claves espejadas de
+     * {@code Desarrollo/embebido/comun/contrato.h}).
+     *
+     * <p>Notas de unidad, resueltas contra el firmware:
+     * <ul>
+     *   <li>{@code ce} \u2014 la sonda emite \u00b5S/cm; la ingesta convierte a dS/m, que es la
+     *       unidad de estas bandas.</li>
+     *   <li>{@code uv} \u2014 el nodo mide % de luz con un LDR, no radiaci\u00f3n UV. La clave se
+     *       conserva por compatibilidad con el contrato MQTT, pero la m\u00e9trica es
+     *       luminosidad. Si se incorpora un sensor UV real hay que separar los conceptos
+     *       (ver design.md D5 de {@code move-sensado-macrozona}).</li>
+     * </ul>
+     *
+     * <p>Las cinco \u00faltimas son informativas ({@code afectaEstado = false}): sus rangos son
+     * provisionales y no deben mover el estado de los sectores hasta validarlos.
+     */
     public static final List<MetricSpec> SPECS = List.of(
-            new MetricSpec("humSus", "Humedad de sustrato", "%", arr(42.0, 68.0), arr(32.0, 80.0), arr(22.0, 90.0), 0, 55),
-            new MetricSpec("humAmb", "Humedad ambiental", "%", arr(62.0, 84.0), arr(52.0, 91.0), arr(42.0, 96.0), 0, 72),
-            new MetricSpec("temp", "Temperatura", "\u00b0C", arr(18.0, 27.0), arr(15.0, 31.0), arr(11.0, 35.0), 1, 23),
-            new MetricSpec("ce", "Nutrientes (CE)", "dS/m", arr(1.0, 1.9), arr(0.8, 2.5), arr(0.5, 3.1), 1, 1),
-            new MetricSpec("uv", "Radiaci\u00f3n UV", "UVI", arr(1.0, 6.0), arr(0.0, 8.0), arr(0.0, 12.0), 0, 4)
+            // --- Ambiente ---
+            new MetricSpec("humSus", "Humedad de sustrato", "%", arr(42.0, 68.0), arr(32.0, 80.0), arr(22.0, 90.0), 0, 55.0, GRUPO_AMBIENTE, true),
+            new MetricSpec("humAmb", "Humedad ambiental", "%", arr(62.0, 84.0), arr(52.0, 91.0), arr(42.0, 96.0), 0, 72.0, GRUPO_AMBIENTE, true),
+            new MetricSpec("temp", "Temperatura del aire", "\u00b0C", arr(18.0, 27.0), arr(15.0, 31.0), arr(11.0, 35.0), 1, 23.0, GRUPO_AMBIENTE, true),
+            new MetricSpec("uv", "Luminosidad", "%", arr(35.0, 70.0), arr(20.0, 85.0), arr(10.0, 95.0), 0, 50.0, GRUPO_AMBIENTE, true),
+            new MetricSpec("tempSuelo", "Temperatura del sustrato", "\u00b0C", arr(16.0, 24.0), arr(13.0, 28.0), arr(10.0, 32.0), 1, 20.0, GRUPO_AMBIENTE, false),
+            // --- Nutrici\u00f3n del sustrato ---
+            new MetricSpec("ce", "Nutrientes (CE)", "dS/m", arr(1.0, 1.9), arr(0.8, 2.5), arr(0.5, 3.1), 1, 1.4, GRUPO_NUTRICION, true),
+            new MetricSpec("phSuelo", "pH del sustrato", "pH", arr(5.0, 6.0), arr(4.5, 6.5), arr(4.0, 7.0), 1, 5.5, GRUPO_NUTRICION, false),
+            new MetricSpec("n", "Nitr\u00f3geno", "mg/kg", arr(100.0, 200.0), arr(70.0, 260.0), arr(40.0, 320.0), 0, 150.0, GRUPO_NUTRICION, false),
+            new MetricSpec("p", "F\u00f3sforo", "mg/kg", arr(30.0, 60.0), arr(20.0, 80.0), arr(10.0, 100.0), 0, 45.0, GRUPO_NUTRICION, false),
+            new MetricSpec("k", "Potasio", "mg/kg", arr(120.0, 240.0), arr(90.0, 300.0), arr(60.0, 380.0), 0, 180.0, GRUPO_NUTRICION, false)
     );
 
     public static final List<ZonaDef> ZONA_DEFS = List.of(

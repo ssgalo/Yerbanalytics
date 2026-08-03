@@ -1,0 +1,94 @@
+/* Captura cenital a tamaño completo */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(12, 35, 25, 0.62);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.16s ease-out;
+}
+
+/* El ancho también se acota por el alto disponible: la captura es cuadrada y así
+   entra entera sin deformarse ni desbordar en pantallas bajas.
+   (64px = padding del backdrop, 66px = encabezado + separación) */
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(760px, 100%, calc(100vh - 64px - 66px));
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sectorId {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.close:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* La captura es cuadrada, como la toma cenital del gantry */
+.imagen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation: none;
+  }
+}

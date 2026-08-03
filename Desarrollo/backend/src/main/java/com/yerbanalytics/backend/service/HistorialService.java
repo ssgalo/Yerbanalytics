@@ -63,7 +63,8 @@ public class HistorialService {
 
     /** Registra un riego autónomo por sector, con seguimiento de humedad de sustrato. */
     public void registrarRiego(SectorEntity s) {
-        double hum = s.getHumSusRaw() != null ? s.getHumSusRaw() : 0.0;
+        Double humSus = currentMetric(s, "humSus");
+        double hum = humSus != null ? humSus : 0.0;
         HistorialEventoEntity e = base(s, "Riego", "Efectiva");
         e.setLectura("Humedad de sustrato " + fmt0(hum) + "% bajo el umbral mínimo configurado.");
         e.setDecision("El motor de reglas ordena abrir la electroválvula del sector.");
@@ -74,7 +75,8 @@ public class HistorialService {
 
     /** Registra una dosificación de insumo, con seguimiento de la métrica afectada. */
     public void registrarInsumo(SectorEntity s) {
-        double hum = s.getHumSusRaw() != null ? s.getHumSusRaw() : 0.0;
+        Double humSus = currentMetric(s, "humSus");
+        double hum = humSus != null ? humSus : 0.0;
         Double conf = s.getDiagnosisConf();
         HistorialEventoEntity e = base(s, "Insumo", "En seguimiento");
         e.setLectura("Diagnóstico IA: " + s.getDiagnosisEstado()
@@ -220,16 +222,9 @@ public class HistorialService {
         }
     }
 
+    /** Lectura vigente de la métrica: viene de la macro-zona del sector, no del sector. */
     private Double currentMetric(SectorEntity s, String key) {
-        if (key == null) return null;
-        return switch (key) {
-            case "humSus" -> s.getHumSusRaw();
-            case "humAmb" -> s.getHumAmbRaw();
-            case "temp" -> s.getTempRaw();
-            case "ce" -> s.getCeRaw();
-            case "uv" -> s.getUvRaw();
-            default -> null;
-        };
+        return s.getZona() != null ? s.getZona().raw(key) : null;
     }
 
     // ------------------------------------------------------------------

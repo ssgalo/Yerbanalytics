@@ -7,7 +7,7 @@ import { HttpRepository } from './http/httpRepository';
 import { MockRepository } from './mock/mockRepository';
 
 export type { DataRepository } from './repository';
-export { selectSectorDetail } from './selectors';
+export { selectSectorDetail, selectSensadoTiles, selectSerieMetrica } from './selectors';
 
 let httpInstance: HttpRepository | null = null;
 let mockInstance: MockRepository | null = null;

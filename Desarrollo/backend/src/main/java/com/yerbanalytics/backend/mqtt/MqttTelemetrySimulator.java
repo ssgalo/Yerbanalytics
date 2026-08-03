@@ -43,12 +43,19 @@ public class MqttTelemetrySimulator {
                     battery,
                     signal,
                     System.currentTimeMillis(),
+                    // Valores en unidades del CONTRATO, como los publicaría el nodo real
+                    // (ver ContratoNodo): ce en µS/cm, uv en % de luz del LDR.
                     new MqttTelemetryPayload.MetricsPayload(
-                            38.0 + random.nextDouble() * 25, // humSus (ideal is 42-68)
-                            58.0 + random.nextDouble() * 22, // humAmb (ideal is 62-84)
-                            17.0 + random.nextDouble() * 11, // temp (ideal is 18-27)
-                            0.9 + random.nextDouble() * 0.9,  // ce (ideal is 1.0-1.9)
-                            0.5 + random.nextDouble() * 6.5  // uv (ideal is 1.0-6.0)
+                            38.0 + random.nextDouble() * 25,   // humSus  (ideal 42-68 %)
+                            58.0 + random.nextDouble() * 22,   // humAmb  (ideal 62-84 %)
+                            17.0 + random.nextDouble() * 11,   // temp    (ideal 18-27 °C)
+                            15.0 + random.nextDouble() * 10,   // tempSuelo (ideal 16-24 °C)
+                            30.0 + random.nextDouble() * 50,   // uv      (ideal 35-70 %)
+                            900.0 + random.nextDouble() * 900, // ce      (ideal 1,0-1,9 dS/m)
+                            4.8 + random.nextDouble() * 1.4,   // phSuelo (ideal 5,0-6,0)
+                            90.0 + random.nextDouble() * 120,  // n       (ideal 100-200 mg/kg)
+                            25.0 + random.nextDouble() * 40,   // p       (ideal 30-60 mg/kg)
+                            110.0 + random.nextDouble() * 140  // k       (ideal 120-240 mg/kg)
                     )
             );
             try {

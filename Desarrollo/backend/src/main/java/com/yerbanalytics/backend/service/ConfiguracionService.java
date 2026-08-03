@@ -43,7 +43,7 @@ public class ConfiguracionService {
     /** Metadatos de fábrica por clave de métrica (label, unit, dec, base, envelope). */
     private final Map<String, MetricSpec> factory;
 
-    /** Cache de las specs efectivas (5 filas, camino caliente de telemetría). */
+    /** Cache de las specs efectivas (10 filas, camino caliente de telemetría). */
     private volatile List<MetricSpec> effectiveSpecsCache;
     /** Cache de la configuración operativa. */
     private volatile ConfiguracionOperativaEntity operativaCache;
@@ -88,7 +88,8 @@ public class ConfiguracionService {
             double critMin = e != null ? e.getCritMin() : sp.crit()[0];
             double critMax = e != null ? e.getCritMax() : sp.crit()[1];
             out.add(new UmbralMetrica(sp.key(), sp.label(), sp.unit(), sp.dec(),
-                    idealMin, idealMax, warnMin, warnMax, critMin, critMax));
+                    idealMin, idealMax, warnMin, warnMax, critMin, critMax,
+                    !Boolean.TRUE.equals(sp.afectaEstado())));
         }
         return out;
     }
@@ -282,7 +283,7 @@ public class ConfiguracionService {
                         new Double[]{e.getIdealMin(), e.getIdealMax()},
                         new Double[]{e.getWarnMin(), e.getWarnMax()},
                         new Double[]{e.getCritMin(), e.getCritMax()},
-                        sp.dec(), sp.base()));
+                        sp.dec(), sp.base(), sp.grupo(), sp.afectaEstado()));
             }
         }
         return out;

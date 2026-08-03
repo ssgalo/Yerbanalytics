@@ -1,78 +1,41 @@
 /* SectorGrid */
 
+/* La tarjeta calza con la grilla: sin franjas vacías a los costados.
+   El padding se fija inline (GRID_PADDING) y el borde de 1px queda FUERA de la caja
+   de contenido por `content-box`; `anchoDeCaja` en gridLayout.ts lo suma para que la
+   columna no se lo recorte. Si cambia el grosor, actualizar GRID_BORDE. */
 .wrapper {
+  align-self: flex-start;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 22px 24px;
+  border-radius: 16px;
+  box-sizing: content-box;
 }
 
-/* Encabezado: título + leyenda en la misma fila */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 18px;
+/* Resumen de zona arriba de la grilla. Su alto debe coincidir con RESUMEN_ALTO
+   de SectorGrid.tsx, que es lo que se descuenta al calcular la celda. */
+.resumen {
+  height: 42px;
+  margin-bottom: 12px;
 }
 
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.subtitle {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-top: 3px;
-}
-
-/* Leyenda horizontal */
-.legend {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-
-.legendItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.legendDot {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-}
-
-/* Grilla 10 columnas */
+/* Las columnas y el gap se fijan inline con el tamaño de celda ya calculado. */
 .grid {
   display: grid;
-  /* grid-template-columns se fija inline según la disposición configurada (HU-18 CA-01) */
-  gap: 7px;
 }
 
-/* Celda de sector */
+/* Celda de sector — ancho/alto/tipografía se fijan inline (siempre cuadrada) */
 .cell {
-  aspect-ratio: 1;
   border: none;
-  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
-  font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.82);
   transition: transform 0.12s;
+  padding: 0;
 }
 
 .cell:hover {

@@ -28,6 +28,8 @@ export function buildConfig(): Configuracion {
       warnMax: s.warn[1],
       critMin: s.crit[0],
       critMax: s.crit[1],
+      // Las métricas informativas (sonda de suelo) tienen rangos aún sin validar.
+      provisional: !s.afectaEstado,
     })),
     operativa: {
       riegoTiempoMaxSeg: 120,
