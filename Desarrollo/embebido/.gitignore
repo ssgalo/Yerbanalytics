@@ -1,0 +1,13 @@
+# Configuración real con credenciales (NO versionar). Usar config.example.h como plantilla.
+comun/config.h
+
+# Artefactos de build de PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+
+# Artefactos de Arduino IDE
+*.bin
+*.elf
+build/
