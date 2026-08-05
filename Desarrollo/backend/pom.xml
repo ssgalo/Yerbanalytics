@@ -70,6 +70,19 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
+
+        <!--
+            JWT para los tokens de acceso de los dispositivos de captura.
+            Se suma sólo la librería de firma, NO spring-boot-starter-security: el backend
+            no tiene autenticación en ningún otro lado, y traer la cadena de filtros
+            completa protegería por defecto endpoints que hoy son abiertos.
+            La autenticación se acota por path en CamaraAuthFilter.
+        -->
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>4.4.0</version>
+        </dependency>
     </dependencies>
 
     <build>

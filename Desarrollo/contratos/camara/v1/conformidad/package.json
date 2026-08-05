@@ -1,0 +1,13 @@
+{
+  "name": "yerbanalytics-camara-conformidad",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Suite de conformidad del contrato de dispositivo de captura v1. Se ejecuta contra un backend levantado.",
+  "scripts": {
+    "test": "node --test conformidad.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

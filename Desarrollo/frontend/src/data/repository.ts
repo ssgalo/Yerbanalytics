@@ -4,14 +4,20 @@
    ============================================================ */
 import type {
   ActionRecord,
+  CodigoVinculacion,
   Configuracion,
+  DiagnosticoRegistrado,
+  DispositivoCamara,
   DisposicionTopologia,
   EnvioTelemetria,
   HardwareData,
   ModoSimulacion,
+  NuevaOrdenCaptura,
+  NuevoDiagnostico,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  OrdenCaptura,
   SensorSimulado,
   SimulacionEstado,
   TopologiaVivero,
@@ -50,4 +56,24 @@ export interface DataRepository {
   eliminarSensorSimulado(serial: string): Promise<SensorSimulado[]>;
   /** Envía una lectura manual de un sensor simulado (se publica por MQTT en el backend real). */
   enviarTelemetria(input: EnvioTelemetria): Promise<void>;
+
+  /* ----------------------------------------------------------------
+     Captura de imágenes (HU-04 CA-01).
+
+     Todos estos son endpoints PÚBLICOS de la plataforma, no del simulador: emitir una orden
+     es lo que hará el planificador de pasadas del riel, y dar de alta un diagnóstico es lo
+     que hará el servicio de inferencia. El panel de cámara del simulador no tiene ni un
+     endpoint propio.
+     ---------------------------------------------------------------- */
+
+  /** Lista los dispositivos de captura enrolados con su estado técnico. */
+  getDispositivosCamara(): Promise<DispositivoCamara[]>;
+  /** Emite un código de vinculación de un solo uso para enrolar un dispositivo. */
+  generarCodigoVinculacion(): Promise<CodigoVinculacion>;
+  /** Emite una orden de captura (mismo endpoint que usará el planificador). */
+  emitirOrdenCaptura(input: NuevaOrdenCaptura): Promise<OrdenCaptura>;
+  /** Consulta el avance de una orden hasta que se resuelve. */
+  getOrdenCaptura(ordenId: string): Promise<OrdenCaptura>;
+  /** Da de alta un diagnóstico (mismo endpoint que usará el servicio de inferencia). */
+  crearDiagnostico(input: NuevoDiagnostico): Promise<DiagnosticoRegistrado>;
 }

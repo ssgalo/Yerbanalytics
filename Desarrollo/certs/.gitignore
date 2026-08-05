@@ -1,0 +1,5 @@
+# Los certificados y las claves privadas NO se versionan. Regeneralos con
+# ./generar-certificados.sh <ip-de-la-maquina>
+*.pem
+*.p12
+*.srl

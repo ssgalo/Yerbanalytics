@@ -5,7 +5,7 @@
    o todas juntas—, simulando lo que enviaría el hardware. Los sensores simulados son
    emisores en memoria, desacoplados del registro de hardware del sistema.
    ============================================================ */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useSimulacion } from '@/hooks/useSimulacion';
@@ -15,6 +15,8 @@ import { ModoSwitch } from './components/ModoSwitch';
 import { NuevoSensorForm } from './components/NuevoSensorForm';
 import { RegenerarTopologiaForm } from './components/RegenerarTopologiaForm';
 import { SensorSimCard } from './components/SensorSimCard';
+import { CamaraPanel } from './components/CamaraPanel';
+import { getRepository } from '@/data';
 import styles from './Simulacion.module.css';
 
 export function SimulacionPage() {
@@ -29,6 +31,26 @@ export function SimulacionPage() {
   );
 
   const esSimulacion = estado?.modo === 'simulacion';
+
+  // Sectores de la topología vigente, para el panel de cámara. El pedido de captura NO
+  // depende del modo de operación: el planificador tampoco va a depender de él, y el ensayo
+  // tiene que parecerse a la operación real.
+  const [sectores, setSectores] = useState<{ id: string; zonaName: string }[]>([]);
+  const [sectoresLoading, setSectoresLoading] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+    getRepository()
+      .getNursery()
+      .then((n) => {
+        if (!activo) return;
+        setSectores(n.sectors.map((sec) => ({ id: sec.id, zonaName: sec.zonaName })));
+      })
+      .finally(() => activo && setSectoresLoading(false));
+    return () => {
+      activo = false;
+    };
+  }, []);
 
   usePageTitle(
     'Simulación de sensores',
@@ -110,6 +132,17 @@ export function SimulacionPage() {
           ))}
         </div>
       )}
+
+      {/* ---- Cámara ---- */}
+      <div className={styles.sectionHead} style={{ marginTop: 24 }}>
+        <span className={styles.sectionTitle}>Cámara del riel</span>
+        <span className={styles.sectionHint}>
+          Banco de pruebas del dispositivo de captura y del recorrido completo hasta el
+          diagnóstico
+        </span>
+      </div>
+
+      <CamaraPanel sectores={sectores} sectoresLoading={sectoresLoading} />
     </div>
   );
 }

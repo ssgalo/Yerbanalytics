@@ -33,6 +33,16 @@
   padding: 11px;
 }
 
+/* Fotografía real de la captura. Cubre el gradiente, que queda de respaldo debajo. */
+.thumbImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Ícono de hoja centrado sobre el thumbnail */
 .thumbIcon {
   position: absolute;

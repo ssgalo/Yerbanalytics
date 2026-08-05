@@ -157,9 +157,15 @@ export interface DiagnosisCard {
   sev: Severity;
   sevSoft: string;
   sevInk: string;
+  /** Gradiente CSS de respaldo. NO es una imagen: se usa cuando no hay captura asociada. */
   thumb: string;
   time: string;
   concluyente: boolean;
+  /**
+   * Ruta de la fotografía real de la captura que originó el diagnóstico. Viene vacía en los
+   * diagnósticos que se derivan del estado del sector, y entonces la vista usa `thumb`.
+   */
+  imagenUrl?: string | null;
 }
 
 /** Evento del feed de actividad del sistema. */
@@ -504,4 +510,94 @@ export interface NurseryData {
   specs: MetricSpec[];
   /** Disposición visual de la grilla (macro-zonas/sectores por fila) — HU-18 CA-01. */
   layout: DisposicionTopologia;
+}
+
+/* ============================================================
+   Captura de imágenes cenitales (HU-04 CA-01).
+
+   El panel de cámara del simulador consume estos tipos. Todos corresponden a endpoints
+   PÚBLICOS de la plataforma —los mismos que usarán el planificador de pasadas del riel y el
+   servicio de inferencia—: el simulador no tiene superficie de API propia.
+   ============================================================ */
+
+/** Estado del ciclo de vida de una orden de captura. */
+export type EstadoOrdenCaptura =
+  | 'PENDIENTE'
+  | 'ENTREGADA'
+  | 'RECIBIDA'
+  | 'FALLIDA'
+  | 'VENCIDA'
+  | 'ERROR';
+
+/** Orden de captura y su avance. Espejo del DTO `EstadoOrden`. */
+export interface OrdenCaptura {
+  ordenId: string;
+  sectorId: string;
+  zonaId: string;
+  posicionRiel: number;
+  estado: EstadoOrdenCaptura;
+  intentos: number;
+  motivoFallo: string | null;
+  detalleFallo: string | null;
+  /** Identificador de la captura resultante; null mientras la orden no se cumplió. */
+  capturaId: string | null;
+  imagenUrl: string | null;
+  creadaEn: number;
+  entregadaEn: number | null;
+  venceEn: number;
+}
+
+/** Petición de una captura de prueba. */
+export interface NuevaOrdenCaptura {
+  sectorId: string;
+  posicionRiel: number;
+}
+
+/** Estado técnico de un dispositivo de captura. Espejo del DTO `DispositivoCamara`. */
+export interface DispositivoCamara {
+  id: string;
+  nombre: string;
+  plataforma: string | null;
+  estado: 'operativo' | 'intermitente' | 'fuera_de_servicio';
+  estadoLabel: string;
+  estadoSoft: string;
+  estadoInk: string;
+  ultimoHeartbeat: number | null;
+  ultimoHeartbeatAgo: string;
+  capturaListo: boolean;
+  capturasOk: number;
+  capturasError: number;
+}
+
+/** Código de vinculación de un solo uso para enrolar un dispositivo. */
+export interface CodigoVinculacion {
+  codigo: string;
+  expiraEn: number;
+}
+
+/**
+ * Alta de un diagnóstico. Es la MISMA operación que usará el servicio de inferencia: no hay
+ * endpoint de simulación, ni marca de origen, ni compuerta por modo de operación.
+ */
+export interface NuevoDiagnostico {
+  capturaId: string;
+  sectorId?: string;
+  zonaId?: string;
+  estado: string;
+  conf: number;
+  sev: string;
+}
+
+/** Diagnóstico persistido. Espejo del DTO `Diagnostico`. */
+export interface DiagnosticoRegistrado {
+  id: string;
+  sectorId: string;
+  zonaId: string;
+  capturaId: string;
+  imagenUrl: string;
+  estado: string;
+  conf: number;
+  sev: string;
+  concluyente: boolean;
+  creadoEn: number;
 }

@@ -6,6 +6,12 @@
 import type { DataRepository } from '@/data/repository';
 import type {
   ActionRecord,
+  CodigoVinculacion,
+  DiagnosticoRegistrado,
+  DispositivoCamara,
+  NuevaOrdenCaptura,
+  NuevoDiagnostico,
+  OrdenCaptura,
   Configuracion,
   DisposicionTopologia,
   EnvioTelemetria,
@@ -22,12 +28,40 @@ import type {
 export class HttpRepository implements DataRepository {
   constructor(private readonly baseUrl: string) {}
 
+  /**
+   * Convierte la ruta de una imagen de captura en una URL absoluta contra el backend.
+   *
+   * El backend devuelve `/api/capturas/{id}/imagen`, una ruta relativa a la raíz — no puede
+   * hacer otra cosa: no conoce su propia URL pública. Pero el navegador la resuelve contra el
+   * origen de la PÁGINA, que es el servidor de Vite (`:5173`), no el backend (`:8000`). El
+   * resultado es un 404 silencioso: la tarjeta cae a su gradiente de respaldo y parece que el
+   * diagnóstico simplemente no tuviera foto.
+   *
+   * Este es el único lugar que sabe dónde vive el backend, así que la resolución va acá y no
+   * en los componentes.
+   */
+  private absolutizarImagen<T extends { imagenUrl?: string | null }>(item: T): T {
+    if (!item.imagenUrl || /^(https?:|data:|blob:)/.test(item.imagenUrl)) return item;
+    return { ...item, imagenUrl: new URL(item.imagenUrl, this.baseUrl).toString() };
+  }
+
   async getNursery(): Promise<NurseryData> {
     const res = await fetch(`${this.baseUrl}/nursery?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el vivero desde ${this.baseUrl}`);
     }
-    return (await res.json()) as NurseryData;
+    const data = (await res.json()) as NurseryData;
+
+    const diagnoses = data.diagnoses.map((d) => this.absolutizarImagen(d));
+    const diagById: NurseryData['diagById'] = {};
+    diagnoses.forEach((d) => (diagById[d.id] = d));
+
+    return {
+      ...data,
+      diagnoses,
+      diagById,
+      recentDiag: data.recentDiag.map((d) => this.absolutizarImagen(d)),
+    };
   }
 
   async getHistory(): Promise<ActionRecord[]> {
@@ -198,5 +232,64 @@ export class HttpRepository implements DataRepository {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? `Error ${res.status} al enviar la telemetría`);
     }
+  }
+
+  /* ----------------------------------------------------------------
+     Captura de imágenes (HU-04 CA-01).
+
+     Endpoints públicos de la plataforma. Ninguno es exclusivo del simulador: `ordenes` es
+     el que usará el planificador de pasadas del riel y `diagnosticos` el que usará el
+     servicio de inferencia. El contrato del dispositivo de captura (`/api/camara/v1/**`) NO
+     se toca desde acá — ese lo implementa la app de cámara.
+     ---------------------------------------------------------------- */
+
+  async getDispositivosCamara(): Promise<DispositivoCamara[]> {
+    const res = await fetch(`${this.baseUrl}/camara/dispositivos?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener los dispositivos de cámara`);
+    }
+    return (await res.json()) as DispositivoCamara[];
+  }
+
+  async generarCodigoVinculacion(): Promise<CodigoVinculacion> {
+    const res = await fetch(`${this.baseUrl}/camara/vinculacion`, { method: 'POST' });
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al generar el código de vinculación`);
+    }
+    return (await res.json()) as CodigoVinculacion;
+  }
+
+  async emitirOrdenCaptura(input: NuevaOrdenCaptura): Promise<OrdenCaptura> {
+    const res = await fetch(`${this.baseUrl}/capturas/ordenes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al pedir la captura`);
+    }
+    return this.absolutizarImagen((await res.json()) as OrdenCaptura);
+  }
+
+  async getOrdenCaptura(ordenId: string): Promise<OrdenCaptura> {
+    const res = await fetch(`${this.baseUrl}/capturas/ordenes/${encodeURIComponent(ordenId)}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al consultar la orden de captura`);
+    }
+    return this.absolutizarImagen((await res.json()) as OrdenCaptura);
+  }
+
+  async crearDiagnostico(input: NuevoDiagnostico): Promise<DiagnosticoRegistrado> {
+    const res = await fetch(`${this.baseUrl}/diagnosticos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al registrar el diagnóstico`);
+    }
+    return this.absolutizarImagen((await res.json()) as DiagnosticoRegistrado);
   }
 }

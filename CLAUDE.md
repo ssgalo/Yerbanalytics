@@ -8,6 +8,11 @@
 Proyecto universitario. Este archivo es la fuente de contexto para asistentes de IA
 y para cualquiera que llegue nuevo al repo. **Mantenelo actualizado.**
 
+> **Qué va acá y qué no.** Este archivo orienta: qué hay, dónde está, y qué decisiones
+> no conviene revertir sin entenderlas. El **cómo** —levantar cada cosa, configurarla,
+> depurarla, los trámites de entorno— vive en el README de cada área. Si algo se está
+> explicando en detalle acá, probablemente le falte un enlace y le sobre texto.
+
 ---
 
 ## 1. Mapa del repositorio
@@ -17,6 +22,9 @@ Yerbanalytics/
 ├── Desarrollo/
 │   ├── frontend/      Dashboard React + TS + Vite (ver §4)
 │   ├── backend/       API REST Spring Boot (Java 17, puerto 8000)
+│   ├── camara/        App de captura (PWA iOS) — proyecto propio (ver §6.1)
+│   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
+│   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
 │   └── Modelo_IA/     Modelo de visión: datasets, notebooks, resultados (ver §5)
 ├── Documentacion/     Documentos de negocio, alcance, arquitectura, entregas
 ├── openspec/          Spec-driven development (ver §3)
@@ -24,8 +32,12 @@ Yerbanalytics/
 └── README.md
 ```
 
-Tres áreas de trabajo: **frontend**, **backend** y **Modelo_IA**. El frontend consume
-el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es futura.
+Cuatro áreas de trabajo: **frontend**, **backend**, **camara** y **Modelo_IA**. El frontend
+consume el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es futura.
+
+`Desarrollo/camara/` es un **proyecto aparte a propósito**: es la implementación de referencia
+de un contrato, no la definitiva. Si mañana el cliente es una app Android, se borra el
+directorio y nada más se entera.
 
 ---
 
@@ -54,6 +66,14 @@ el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es 
 - **Diagnósticos de IA**: Sano, Clorosis (trastorno nutricional), Estrés solar,
   Daño biótico (plagas/hongos — ácaro, plaga foliar, daño fúngico), No concluyente.
 - **Actuadores**: electroválvula (riego), bomba peristáltica (insumos), mediasombra.
+- **Orden de captura**: pedido de una foto cenital, con el sector y la **posición de riel**.
+  Es la entidad de primera clase del pipeline de visión: la imagen se sube citando su
+  identificador, y sin esa correlación el sistema no sabría de qué sector es la foto.
+- **Captura**: la imagen recibida y archivada. El JPEG vive en el filesystem; en la base sólo
+  queda su metadata.
+- **Dispositivo de captura**: el equipo que toma las fotos (hoy un iPhone con la PWA de
+  `Desarrollo/camara/`). Distinto del **hardware** del vivero (nodos y actuadores), que se
+  registra aparte.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante
   (plan por días, regula mediasombra).
 
@@ -156,11 +176,52 @@ cd Desarrollo/backend
 ### Endpoints principales
 - `GET /api/nursery` → snapshot del vivero (`NurseryData` en `frontend/src/types/domain.ts`).
   Cada zona trae `lectura` (las 10 métricas evaluadas) y `nodo` (batería/señal del testigo).
+- `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa el panel de
+  simulación hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de
+  origen y sin depender del modo de operación (ver §6.1).
 
 ### Convenciones internas
 - Entidades con Lombok + `JpaRepository` + service + controller.
 - Datos iniciales en `src/main/resources/data.sql`.
 - Para features nuevas, espejar el patrón existente (entity → repo → service → controller → seed).
+- **`spring.jpa.open-in-view=false`.** No revertir sin leer el porqué en el README del
+  backend: con el stream SSE de órdenes, cada dispositivo conectado retendría una conexión
+  JDBC permanente.
+
+---
+
+## 6.1 Captura de imágenes (`Desarrollo/camara/` + `Desarrollo/contratos/`)
+
+Un iPhone montado en el riel hace de cámara cenital. Cubre HU-04 CA-01 y habilita HU-05 CA-02.
+**No incluye el modelo de IA**: hasta que exista, el diagnóstico se carga a mano desde el
+simulador, por el mismo camino exacto que va a usar el modelo.
+
+**El entregable es el contrato, no la PWA.** El cliente final probablemente sea una app
+Android, y el criterio de aceptación es literal: *escribir esa app no debe requerir tocar el
+backend.*
+
+Invariantes a respetar al tocar esta área:
+
+- **`/api/camara/v1/**` es superficie versionada.** La fuente de verdad es
+  `Desarrollo/contratos/camara/v1/openapi.yaml`, igual que `contrato.h` lo es para el MQTT
+  del ESP32. Agregar o cambiar rutas ahí **es cambiar el contrato**: se actualiza el OpenAPI
+  y se corre la suite de conformidad. El resto de la API (dashboard, simulador, futuro
+  planificador) queda fuera del contrato y un dispositivo no debe usarla.
+- **Órdenes por SSE, imágenes por REST.** Se descartó MQTT-over-WebSockets a propósito,
+  aunque el broker ya exista.
+- **Los JPEG van al filesystem, no a `bytea`.**
+- **La tabla `diagnostico` no tiene columna de origen** y `captura_id` es `NOT NULL`: un
+  diagnóstico manual y uno del modelo son la misma fila porque son la misma operación.
+- **El simulador no tiene ni un endpoint propio**: usa el de emisión de órdenes (el del futuro
+  planificador) y el de alta de diagnósticos (el de la futura inferencia).
+- **HTTPS no es opcional** para la app de cámara: el backend abre un conector adicional en el
+  8443 y deja el 8000 en HTTP. Los certificados no se versionan, así que **en un clon nuevo
+  hay que generarlos** (`Desarrollo/certs/generar-certificados.sh`). Sin ellos el backend
+  arranca y el dashboard funciona; sólo la cámara queda sin poder conectarse.
+
+El porqué de cada una, cómo levantarlo, el trámite de la CA en el iPhone y el diagnóstico de
+fallas: `Desarrollo/camara/README.md`, `Desarrollo/contratos/camara/v1/README.md` y el README
+del backend.
 
 ---
 
@@ -182,5 +243,7 @@ cd Desarrollo/backend
 | Diseño del dashboard | `Desarrollo/frontend/Yerbanalytics.dc.html` |
 | Cómo correr el frontend | `Desarrollo/frontend/README.md` |
 | Plan del frontend (SDD) | `openspec/changes/add-monitoring-frontend/` |
+| Contrato de la cámara | `Desarrollo/contratos/camara/v1/` (OpenAPI + referencia) |
+| Cómo correr la app de cámara | `Desarrollo/camara/README.md` |
 | Curación de datasets | `Desarrollo/Modelo_IA/informe-curacion-datasets.md` |
 | Negocio / alcance | `Documentacion/` |
