@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.controller;
 
 import com.yerbanalytics.backend.dto.Configuracion;
-import com.yerbanalytics.backend.service.ConfiguracionInvalidaException;
+import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,9 +41,9 @@ public class ConfiguracionController {
         return ResponseEntity.ok(configuracionService.updateConfiguracion(cfg, usuario));
     }
 
-    /** Validación fisiológica fallida (HU-15 CA-03) → 400 con el mensaje del error. */
-    @ExceptionHandler(ConfiguracionInvalidaException.class)
-    public ResponseEntity<Map<String, String>> handleInvalida(ConfiguracionInvalidaException ex) {
+    /** Physiological validation failure (HU-15 CA-03) → 400 with the error message. */
+    @ExceptionHandler(InvalidConfigurationException.class)
+    public ResponseEntity<Map<String, String>> handleInvalida(InvalidConfigurationException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
 }

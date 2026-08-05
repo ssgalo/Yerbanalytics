@@ -11,6 +11,8 @@ import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.exception.InvalidTopologyException;
+import com.yerbanalytics.backend.exception.TopologyConflictException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,11 +124,11 @@ public class TopologiaService {
     private void validarDisposicion(int macroZonasPorFila, int sectoresPorFila,
                                     int macroZonas, int sectoresPorMacroZona) {
         if (macroZonasPorFila <= 0 || (macroZonas > 0 && macroZonasPorFila > macroZonas)) {
-            throw new TopologiaInvalidaException(
+            throw new InvalidTopologyException(
                     "Las macro-zonas por fila deben estar entre 1 y " + Math.max(1, macroZonas) + ".");
         }
         if (sectoresPorFila <= 0 || (sectoresPorMacroZona > 0 && sectoresPorFila > sectoresPorMacroZona)) {
-            throw new TopologiaInvalidaException(
+            throw new InvalidTopologyException(
                     "Los sectores por fila deben estar entre 1 y " + Math.max(1, sectoresPorMacroZona) + ".");
         }
     }
@@ -136,17 +138,17 @@ public class TopologiaService {
         int macroZonas = dto.macroZonas();
         int sectoresPorMacroZona = dto.sectoresPorMacroZona();
         if (macroZonas <= 0 || macroZonas > MAX_MACRO_ZONAS) {
-            throw new TopologiaInvalidaException(
+            throw new InvalidTopologyException(
                     "La cantidad de macro-zonas debe estar entre 1 y " + MAX_MACRO_ZONAS + ".");
         }
         if (sectoresPorMacroZona <= 0 || sectoresPorMacroZona > MAX_SECTORES_POR_ZONA) {
-            throw new TopologiaInvalidaException(
+            throw new InvalidTopologyException(
                     "La cantidad de sectores por macro-zona debe estar entre 1 y " + MAX_SECTORES_POR_ZONA + ".");
         }
 
         boolean existeTopologia = zonaRepository.count() > 0;
         if (existeTopologia && !dto.regenerar()) {
-            throw new TopologiaConflictoException(
+            throw new TopologyConflictException(
                     "El vivero ya tiene una topología cargada. Confirmá la regeneración para reemplazarla.");
         }
         if (existeTopologia) {

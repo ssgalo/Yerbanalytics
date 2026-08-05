@@ -19,9 +19,21 @@ public enum ActionType {
     /** Activar la bomba peristáltica de insumo del sector. */
     ACTIVAR_BOMBA,
 
+    /**
+     * Mover la mediasombra al porcentaje de apertura indicado en el motivo de la acción.
+     * El porcentaje objetivo se transporta en {@link RuleAction#motivo()}.
+     */
+    MOVER_MEDIASOMBRA,
+
     // --- Bloqueantes ---
     /** Abortar el riego (la evaluación de reglas ejecutoras de riego se detiene). */
     ABORT_RIEGO,
+
+    /**
+     * Postponer el riego por condición climática (lluvia inminente).
+     * Semánticamente bloqueante: cancela la cadena de riego sin considerarlo un error.
+     */
+    POSTPONE_RIEGO,
 
     /** Abortar la dosificación de insumo. */
     ABORT_INSUMO,
@@ -42,6 +54,7 @@ public enum ActionType {
 
     /** @return true si esta acción debe detener la cadena de evaluación. */
     public boolean isBlocking() {
-        return this == ABORT_RIEGO || this == ABORT_INSUMO || this == ABORT_ALL;
+        return this == ABORT_RIEGO || this == ABORT_INSUMO || this == ABORT_ALL
+                || this == POSTPONE_RIEGO;
     }
 }

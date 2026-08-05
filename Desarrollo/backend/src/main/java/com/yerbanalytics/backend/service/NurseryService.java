@@ -5,11 +5,14 @@ import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.weather.WeatherForecast;
+import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
+import com.yerbanalytics.backend.repository.BloqueoManualRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
@@ -36,6 +39,8 @@ public class NurseryService {
     private final TopologiaLayoutRepository layoutRepository;
     private final RuleOrchestrator ruleOrchestrator;
     private final ActionExecutor actionExecutor;
+    private final WeatherService weatherService;
+    private final BloqueoManualRepository bloqueoManualRepository;
     private final long staleThresholdMs;
     private final int bateriaMinPct;
 
@@ -48,6 +53,8 @@ public class NurseryService {
                           TopologiaLayoutRepository layoutRepository,
                           RuleOrchestrator ruleOrchestrator,
                           ActionExecutor actionExecutor,
+                          WeatherService weatherService,
+                          BloqueoManualRepository bloqueoManualRepository,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -58,6 +65,8 @@ public class NurseryService {
         this.layoutRepository = layoutRepository;
         this.ruleOrchestrator = ruleOrchestrator;
         this.actionExecutor = actionExecutor;
+        this.weatherService = weatherService;
+        this.bloqueoManualRepository = bloqueoManualRepository;
         this.staleThresholdMs = staleThresholdMs;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -466,18 +475,35 @@ public class NurseryService {
     /**
      * Construye el {@link RuleContext} para un sector en el ciclo de evaluación actual.
      *
-     * <p>Los campos de fases futuras (forecast, diagnosis, bloqueoManualActivo, sensorStale)
-     * se incorporarán progresivamente conforme avancen los releases.
+     * <p>Puebla todos los campos del snapshot:
+     * <ul>
+     *   <li>{@code sensorStale} — derivado del {@code lastReadingTime} de la zona.</li>
+     *   <li>{@code forecast} — obtenido de {@link WeatherService} (puede ser null en modo degradado).</li>
+     *   <li>{@code bloqueoManualActivo} — consulta {@link BloqueoManualRepository} por sector y zona.</li>
+     * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus) {
+        ZonaEntity zona = s.getZona();
+        boolean sensorStale = zona == null
+                || zona.getLastReadingTime() == null
+                || (System.currentTimeMillis() - zona.getLastReadingTime() > staleThresholdMs);
+
+        WeatherForecast forecast = weatherService.getForecast();
+
+        boolean bloqueoActivo = !bloqueoManualRepository.findBySectorIdAndActivoTrue(s.getId()).isEmpty()
+                || (zona != null && !bloqueoManualRepository.findByZonaIdAndActivoTrue(zona.getId()).isEmpty());
+
         return new RuleContext(
                 s,
-                s.getZona(),
+                zona,
                 configuracionService.getEffectiveSpecs(),
                 metrics,
                 configuracionService.getConfiguracionOperativa(),
                 finalStatus,
-                Instant.now()
+                Instant.now(),
+                sensorStale,
+                forecast,
+                bloqueoActivo
         );
     }
 
