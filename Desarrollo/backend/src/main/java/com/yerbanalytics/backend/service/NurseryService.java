@@ -41,6 +41,7 @@ public class NurseryService {
     private final ActionExecutor actionExecutor;
     private final WeatherService weatherService;
     private final BloqueoManualRepository bloqueoManualRepository;
+    private final DiagnosticoService diagnosticoService;
     private final long staleThresholdMs;
     private final int bateriaMinPct;
 
@@ -55,6 +56,7 @@ public class NurseryService {
                           ActionExecutor actionExecutor,
                           WeatherService weatherService,
                           BloqueoManualRepository bloqueoManualRepository,
+                          DiagnosticoService diagnosticoService,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -67,6 +69,7 @@ public class NurseryService {
         this.actionExecutor = actionExecutor;
         this.weatherService = weatherService;
         this.bloqueoManualRepository = bloqueoManualRepository;
+        this.diagnosticoService = diagnosticoService;
         this.staleThresholdMs = staleThresholdMs;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -211,7 +214,8 @@ public class NurseryService {
                     SEV_MAP.get(d.sev()).ink(),
                     TINTS.getOrDefault(d.estado(), TINTS.get("Sin diagnóstico")),
                     agoPorZona.getOrDefault(s.zona(), "hace —"),
-                    d.conf() != null && d.conf() >= 85
+                    d.conf() != null && d.conf() >= 85,
+                    null // derivada del sector: no tiene captura asociada
             ));
         }
 
@@ -233,11 +237,18 @@ public class NurseryService {
                     SEV_MAP.get(EMDASH).ink(),
                     TINTS.get("No concluyente"),
                     agoPorZona.getOrDefault(s.zona(), "hace —"),
-                    false
+                    false,
+                    null // derivada del sector: no tiene captura asociada
             ));
         }
 
         diagnoses.sort(Comparator.comparing(DiagnosisCard::time));
+
+        // Diagnósticos persistidos (los que nacieron de una captura real) al frente de la
+        // lista: son los más recientes y los únicos con fotografía. La vista no los distingue
+        // de los derivados — así, cuando el modelo emita el diagnóstico en lugar del operario,
+        // el dashboard no cambia en absoluto.
+        diagnoses.addAll(0, cardsPersistidas());
 
         int totalSectores = allSectors.size();
         double pctSano = totalSectores > 0 ? Math.round((totalSano / (double) totalSectores) * 100) : 0;
@@ -565,6 +576,43 @@ public class NurseryService {
             ));
         }
         return metrics;
+    }
+
+    /**
+     * Diagnósticos persistidos convertidos a tarjetas de la vista.
+     *
+     * <p>Estos son los que nacieron de una captura real y traen {@code imagenUrl}. Comparten
+     * lista con los que se derivan del estado del sector, y la vista no puede distinguirlos:
+     * es la propiedad que hace que enchufar el modelo de IA no requiera tocar el frontend.
+     *
+     * <p>Sus identificadores usan el prefijo {@code DX-} justamente para no colisionar con el
+     * {@code DG-###} sintético, porque ambos conjuntos alimentan el mismo índice
+     * {@code diagById}.
+     */
+    private List<DiagnosisCard> cardsPersistidas() {
+        Map<String, String> nombrePorZona = new HashMap<>();
+        zonaRepository.findAll().forEach(z -> nombrePorZona.put(z.getId(), z.getName()));
+
+        List<DiagnosisCard> out = new ArrayList<>();
+        for (var e : diagnosticoService.entidadesRecientes()) {
+            String sev = e.getSev();
+            ColorPair color = SEV_MAP.getOrDefault(sev, SEV_MAP.get(EMDASH));
+            out.add(new DiagnosisCard(
+                    e.getId(),
+                    e.getSectorId(),
+                    nombrePorZona.getOrDefault(e.getZonaId(), e.getZonaId()),
+                    e.getEstado(),
+                    e.getConf(),
+                    sev,
+                    color.soft(),
+                    color.ink(),
+                    TINTS.getOrDefault(e.getEstado(), TINTS.get("Sin diagnóstico")),
+                    formatAgo(e.getCreadoEn()),
+                    diagnosticoService.esConcluyente(e.getConf()),
+                    CapturaService.imagenUrl(e.getCapturaId())
+            ));
+        }
+        return out;
     }
 
     private String formatAgo(long timestamp) {

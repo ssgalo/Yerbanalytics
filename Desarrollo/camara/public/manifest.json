@@ -1,0 +1,16 @@
+{
+  "name": "Yerbanalytics · Cámara",
+  "short_name": "Cámara",
+  "description": "Dispositivo de captura de imágenes cenitales del vivero.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12301F",
+  "theme_color": "#12301F",
+  "icons": [
+    { "src": "/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

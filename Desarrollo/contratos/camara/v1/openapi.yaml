@@ -1,0 +1,630 @@
+openapi: 3.0.3
+
+info:
+  title: Yerbanalytics — Contrato de dispositivo de captura
+  version: "1.0.0"
+  description: |
+    Superficie que un dispositivo de captura de imágenes cenitales debe implementar para
+    operar contra la plataforma Yerbanalytics.
+
+    **Este archivo es la fuente de verdad.** El backend se implementa contra el contrato;
+    si el comportamiento del backend difiere de lo que acá se declara, el defecto es del
+    backend.
+
+    ## Alcance
+
+    Todo lo que un dispositivo necesita vive bajo `/api/camara/v1`. Ningún otro endpoint
+    de la plataforma forma parte del contrato: la emisión de órdenes, el servido de
+    imágenes, la generación de códigos de vinculación y el alta de diagnósticos los
+    consume la plataforma, no el dispositivo.
+
+    Implementar un cliente para otra plataforma (por ejemplo una app Android nativa)
+    requiere únicamente cumplir estos siete endpoints y las obligaciones de comportamiento
+    documentadas en `README.md`. No requiere modificar el backend.
+
+    ## Autenticación
+
+    El header `Authorization: Bearer <accessToken>` es la vía **canónica y obligatoria** en
+    todos los endpoints salvo `/enrolar`.
+
+    `GET /ordenes/stream` admite **además** el token por query string (`?token=`), como
+    alternativa para clientes que no pueden fijar headers en su canal de eventos — es una
+    limitación de `EventSource` en el navegador, no del protocolo. Un cliente que puede
+    fijar headers debe usar el header también en ese endpoint.
+
+    ## Neutralidad de plataforma
+
+    El contrato no exige capacidades de ningún navegador ni sistema operativo concreto.
+    No presupone almacenamiento web, service workers, ni ningún ciclo de vida de pestaña.
+
+servers:
+  - url: https://{host}/api/camara/v1
+    description: Namespace versionado del contrato de dispositivo
+    variables:
+      host:
+        default: localhost:8000
+
+tags:
+  - name: Credenciales
+    description: Enrolamiento del dispositivo y obtención de tokens de acceso.
+  - name: Operación
+    description: Configuración, señal de vida y canal de órdenes.
+  - name: Captura
+    description: Entrega del resultado de una orden de captura.
+
+paths:
+
+  # ------------------------------------------------------------------
+  # Credenciales
+  # ------------------------------------------------------------------
+
+  /enrolar:
+    post:
+      tags: [Credenciales]
+      summary: Enrolar el dispositivo consumiendo un código de vinculación
+      description: |
+        Único endpoint del contrato que no requiere token. Consume un código de vinculación
+        de un solo uso emitido por la plataforma y devuelve la credencial de renovación del
+        dispositivo.
+
+        La credencial devuelta debe persistirse en el dispositivo. No es un secreto que
+        deba embeberse en el código del cliente: se obtiene en tiempo de ejecución.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrolarRequest'
+      responses:
+        '201':
+          description: Dispositivo enrolado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrolarResponse'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          description: Código inexistente, ya consumido o vencido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /token:
+    post:
+      tags: [Credenciales]
+      summary: Obtener un token de acceso de vida corta
+      description: |
+        Se invoca en cada arranque y antes de cada expiración. El cliente debe renovar de
+        forma proactiva, sin esperar a recibir un `401`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: Token emitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          description: Credencial de renovación inexistente, revocada o vencida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ------------------------------------------------------------------
+  # Operación
+  # ------------------------------------------------------------------
+
+  /config:
+    get:
+      tags: [Operación]
+      summary: Configuración de captura vigente
+      description: |
+        La resolución, la calidad JPEG y los parámetros de operación son propiedad del
+        backend. El cliente **no** debe fijarlos en su código: los toma de acá al arrancar
+        y los actualiza cuando recibe el evento `config` por el canal de órdenes.
+      responses:
+        '200':
+          description: Configuración vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigCaptura'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+  /heartbeat:
+    post:
+      tags: [Operación]
+      summary: Señal de vida del dispositivo
+      description: |
+        El cliente debe emitirla con la cadencia que indica `heartbeatSeg`. El backend
+        deriva el estado operativo del dispositivo del silencio transcurrido, sin esperar
+        a que falle una captura para detectar una caída.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Heartbeat'
+      responses:
+        '204':
+          description: Señal registrada.
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+  /ordenes/stream:
+    get:
+      tags: [Operación]
+      summary: Canal de órdenes (Server-Sent Events)
+      description: |
+        Stream `text/event-stream` por el que el backend entrega las órdenes de captura.
+
+        Al abrirse, el backend entrega primero las órdenes pendientes acumuladas, en orden
+        de creación. El cliente debe sostener el canal abierto mientras esté operativo y
+        reconectarlo automáticamente ante cortes.
+
+        ### Eventos
+
+        | Evento   | Cuándo | Dato |
+        |----------|--------|------|
+        | `orden`  | Hay una captura para ejecutar | `Orden` |
+        | `config` | Cambió la configuración de captura | `ConfigCaptura` |
+        | `ping`   | Keep-alive periódico | `{"ts": <epoch ms>}` |
+
+        El `ping` existe para que proxies y NAT intermedios no cierren la conexión ociosa.
+        El cliente no necesita responderlo, pero su ausencia prolongada es señal de que el
+        canal murió y conviene reconectar.
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Alternativa al header `Authorization`, admitida **sólo** en este endpoint para
+            clientes que no pueden fijar headers en su canal de eventos. Si se envía el
+            header, este parámetro se ignora.
+      responses:
+        '200':
+          description: Stream abierto.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                orden:
+                  summary: Entrega de una orden
+                  value: |
+                    event: orden
+                    id: 018f3a2b-7c41-7e10-9b3d-2f5a8c1d4e60
+                    data: {"ordenId":"018f3a2b-7c41-7e10-9b3d-2f5a8c1d4e60","sectorId":"S-042","zonaId":"MZ-1","posicionRiel":1420,"emitidaEn":1754308800000,"venceEn":1754308860000,"intento":1}
+
+                    event: ping
+                    data: {"ts":1754308820000}
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+  # ------------------------------------------------------------------
+  # Captura
+  # ------------------------------------------------------------------
+
+  /ordenes/{ordenId}/imagen:
+    post:
+      tags: [Captura]
+      summary: Subir la imagen de una orden
+      description: |
+        La correlación es explícita: el `ordenId` de la URL es lo que permite al backend
+        saber en qué posición del riel se tomó la imagen. No hay correlación implícita por
+        sector ni por timestamp.
+
+        El cliente declara el `sha256` de los bytes; el backend lo verifica y rechaza con
+        `422` si no coincide, devolviendo la orden al circuito de reintento.
+
+        **Regla de idempotencia:** un `409` significa que la orden ya recibió su imagen —
+        típicamente porque una subida anterior llegó y la respuesta se perdió. El cliente
+        **debe tratarlo como éxito**, quitar la imagen de su cola y no contarlo como fallo.
+      parameters:
+        - $ref: '#/components/parameters/OrdenId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [imagen, meta]
+              properties:
+                imagen:
+                  type: string
+                  format: binary
+                  description: JPEG de la captura.
+                meta:
+                  $ref: '#/components/schemas/MetadataImagen'
+            encoding:
+              imagen:
+                contentType: image/jpeg
+              meta:
+                contentType: application/json
+      responses:
+        '201':
+          description: Imagen recibida y correlacionada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapturaCreada'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: |
+            La orden fue entregada a otro dispositivo. La imagen se descarta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: La orden no existe. La imagen se descarta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: |
+            La orden ya recibió su imagen. **Tratar como éxito.** La respuesta incluye el
+            `capturaId` de la captura que ya existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapturaCreada'
+        '413':
+          description: La imagen supera el tamaño máximo admitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: |
+            El hash de los bytes recibidos no coincide con el declarado. La imagen se
+            descarta y la orden vuelve al circuito de reintento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ordenes/{ordenId}/fallo:
+    post:
+      tags: [Captura]
+      summary: Acusar que una orden no pudo cumplirse
+      description: |
+        Permite al backend enterarse de una captura fallida sin esperar al vencimiento de
+        la orden. El cliente **debe** acusar todo fallo, incluidas las órdenes que descarta
+        por cola llena.
+      parameters:
+        - $ref: '#/components/parameters/OrdenId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcuseFallo'
+      responses:
+        '202':
+          description: Fallo registrado. La orden entra al circuito de reintento.
+        '400':
+          description: |
+            Motivo fuera del conjunto cerrado, o solicitud inválida. El conjunto de motivos
+            es cerrado a propósito, para que el backend pueda clasificar sin interpretar
+            texto libre.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: La orden fue entregada a otro dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: La orden no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: La orden ya está en un estado terminal y no admite acuse.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token de acceso de vida corta obtenido en `POST /token`. Vía canónica en todos los
+        endpoints del contrato salvo `/enrolar` y `/token`.
+
+  parameters:
+    OrdenId:
+      name: ordenId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Identificador de la orden que originó la captura.
+
+  responses:
+    NoAutenticado:
+      description: Token ausente, vencido o inválido. El cliente debe renovarlo y reintentar.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SolicitudInvalida:
+      description: Datos faltantes o inválidos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Mensaje legible del motivo del rechazo.
+          example: "La orden no existe."
+
+    EnrolarRequest:
+      type: object
+      required: [codigo, nombre]
+      properties:
+        codigo:
+          type: string
+          description: Código de vinculación de un solo uso emitido por la plataforma.
+          example: "7F3K-2M9Q"
+        nombre:
+          type: string
+          description: Nombre legible del dispositivo, para identificarlo en el panel.
+          example: "iPhone riel norte"
+        plataforma:
+          type: string
+          description: |
+            Descripción libre de la plataforma del cliente, sólo informativa. El backend
+            **no** condiciona su comportamiento a este valor.
+          example: "PWA/Safari iOS 17.4"
+
+    EnrolarResponse:
+      type: object
+      required: [dispositivoId, refreshToken]
+      properties:
+        dispositivoId:
+          type: string
+          example: "CAM-001"
+        refreshToken:
+          type: string
+          description: |
+            Credencial de renovación del dispositivo. Persistirla localmente. El backend
+            guarda sólo su huella, así que este valor no puede recuperarse después.
+
+    TokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    TokenResponse:
+      type: object
+      required: [accessToken, expiraEnSeg]
+      properties:
+        accessToken:
+          type: string
+          description: JWT a enviar en `Authorization: Bearer`.
+        expiraEnSeg:
+          type: integer
+          description: Segundos de validez restantes. Renovar antes de agotarlos.
+          example: 900
+
+    ConfigCaptura:
+      type: object
+      required:
+        [anchoMax, altoMax, calidadJpeg, warmupMs, heartbeatSeg, timeoutOrdenSeg, maxColaOrdenes]
+      properties:
+        anchoMax:
+          type: integer
+          description: Ancho máximo del JPEG en píxeles. El cliente preserva la relación de aspecto.
+          example: 1920
+        altoMax:
+          type: integer
+          description: Alto máximo del JPEG en píxeles.
+          example: 1080
+        calidadJpeg:
+          type: number
+          format: float
+          minimum: 0.1
+          maximum: 1.0
+          description: Calidad de compresión JPEG.
+          example: 0.85
+        warmupMs:
+          type: integer
+          description: |
+            Milisegundos a descartar tras abrir la cámara antes de considerarla lista. Los
+            primeros fotogramas salen con la exposición sin converger.
+          example: 500
+        heartbeatSeg:
+          type: integer
+          description: Cadencia con la que el cliente debe emitir su señal de vida.
+          example: 15
+        timeoutOrdenSeg:
+          type: integer
+          description: |
+            Plazo que el backend le da a una orden antes de vencerla. Informativo para el
+            cliente: le dice cuánto sentido tiene seguir intentando una captura.
+          example: 60
+        maxColaOrdenes:
+          type: integer
+          description: |
+            Tope de órdenes que el cliente debe encolar. Al superarlo debe descartar y
+            acusar el fallo con motivo `COLA_LLENA`.
+          example: 20
+
+    Orden:
+      type: object
+      required: [ordenId, sectorId, zonaId, posicionRiel, emitidaEn, venceEn, intento]
+      properties:
+        ordenId:
+          type: string
+          format: uuid
+          description: Identificador a citar al subir la imagen o acusar el fallo.
+        sectorId:
+          type: string
+          example: "S-042"
+        zonaId:
+          type: string
+          example: "MZ-1"
+        posicionRiel:
+          type: integer
+          description: |
+            Posición del riel donde debe tomarse la captura. El dispositivo no la usa para
+            moverse —no controla el riel— pero la recibe para poder registrarla y depurar.
+          example: 1420
+        emitidaEn:
+          type: integer
+          format: int64
+          description: Epoch ms de emisión de la orden.
+        venceEn:
+          type: integer
+          format: int64
+          description: Epoch ms a partir del cual el backend vence la orden.
+        intento:
+          type: integer
+          description: Número de intento, empezando en 1. Un valor mayor indica reentrega.
+          example: 1
+
+    MetadataImagen:
+      type: object
+      required: [ancho, alto, sha256, capturadaEn]
+      properties:
+        ancho:
+          type: integer
+          description: Ancho real del JPEG adjunto, en píxeles.
+          example: 1920
+        alto:
+          type: integer
+          example: 1080
+        sha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: |
+            Hash hexadecimal en minúsculas de los bytes del JPEG. El backend lo verifica
+            contra lo recibido.
+        capturadaEn:
+          type: integer
+          format: int64
+          description: |
+            Epoch ms en que el cliente tomó el fotograma, según su propio reloj. Es
+            informativo: el backend sella la recepción con su reloj, que es la autoridad.
+        constraints:
+          type: object
+          additionalProperties: true
+          description: |
+            Opcional. Ajustes de cámara que el cliente pudo aplicar realmente (exposición,
+            balance de blancos) y los que no. Sirve para evaluar la consistencia
+            fotométrica entre capturas. Formato libre: el backend lo registra sin
+            interpretarlo.
+
+    CapturaCreada:
+      type: object
+      required: [capturaId, ordenId, imagenUrl]
+      properties:
+        capturaId:
+          type: string
+        ordenId:
+          type: string
+          format: uuid
+        imagenUrl:
+          type: string
+          description: Ruta desde la que la plataforma sirve la imagen.
+          example: "/api/capturas/CAP-001/imagen"
+
+    AcuseFallo:
+      type: object
+      required: [motivo]
+      properties:
+        motivo:
+          $ref: '#/components/schemas/MotivoFallo'
+        detalle:
+          type: string
+          description: Texto libre complementario, para depuración. Opcional.
+          example: "getUserMedia: NotReadableError"
+
+    MotivoFallo:
+      type: string
+      description: |
+        Conjunto **cerrado**. Un motivo fuera de esta lista se rechaza con `400`, para que
+        el conjunto no se degrade en texto libre y el backend pueda clasificar los fallos.
+
+        | Motivo | Significado |
+        |---|---|
+        | `CAMARA_NO_LISTA` | La cámara no estaba inicializada, calentando o sin permiso |
+        | `EXPORTACION_FALLIDA` | El fotograma no pudo exportarse a JPEG |
+        | `COLA_LLENA` | La orden se descartó porque la cola del cliente estaba en su tope |
+        | `TIMEOUT_LOCAL` | El cliente abandonó la captura por exceder su propio plazo |
+        | `ENVIO_AGOTADO` | La imagen se capturó pero se agotaron los reintentos de envío |
+        | `ERROR_DESCONOCIDO` | Cualquier otro fallo; usar `detalle` para describirlo |
+      enum:
+        - CAMARA_NO_LISTA
+        - EXPORTACION_FALLIDA
+        - COLA_LLENA
+        - TIMEOUT_LOCAL
+        - ENVIO_AGOTADO
+        - ERROR_DESCONOCIDO
+
+    Heartbeat:
+      type: object
+      required: [capturaListo]
+      properties:
+        capturaListo:
+          type: boolean
+          description: Si el dispositivo está en condiciones de ejecutar una captura ahora.
+        capturasOk:
+          type: integer
+          description: Capturas exitosas acumuladas en la sesión del cliente.
+        capturasError:
+          type: integer
+          description: Capturas fallidas acumuladas en la sesión del cliente.
+        pendientesEnvio:
+          type: integer
+          description: Imágenes capturadas que el cliente aún no pudo entregar.
+        detalle:
+          type: string
+          description: Texto libre sobre el estado del cliente. Opcional.
+
+security:
+  - bearerAuth: []

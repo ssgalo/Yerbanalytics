@@ -41,6 +41,17 @@
 }
 
 /* Botón cerrar (esquina superior derecha) */
+/* Fotografía real de la captura, sobre el gradiente de respaldo. */
+.headerImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.35);
+  display: block;
+}
+
 .closeBtn {
   position: absolute;
   top: 16px;
