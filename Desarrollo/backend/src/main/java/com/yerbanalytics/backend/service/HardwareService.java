@@ -8,6 +8,8 @@ import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.exception.HardwareConflictException;
+import com.yerbanalytics.backend.exception.InvalidHardwareException;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -198,14 +200,14 @@ public class HardwareService {
     public HardwareData registrarDispositivo(Dispositivo dto) {
         String serial = trim(dto.serial());
         if (serial == null) {
-            throw new HardwareInvalidoException("El serial/MAC es obligatorio.");
+            throw new InvalidHardwareException("El serial/MAC es obligatorio.");
         }
         String tipo = dto.tipo();
         if (tipo == null || !TIPO_LABEL.containsKey(tipo)) {
-            throw new HardwareInvalidoException("Tipo de dispositivo inválido.");
+            throw new InvalidHardwareException("Tipo de dispositivo inválido.");
         }
         if (dispositivoRepository.findBySerial(serial).isPresent()) {
-            throw new HardwareConflictoException("Ya existe un dispositivo con el serial/MAC «" + serial + "».");
+            throw new HardwareConflictException("Ya existe un dispositivo con el serial/MAC «" + serial + "».");
         }
 
         String zonaId = null;
@@ -213,24 +215,24 @@ public class HardwareService {
         if (NODO_TESTIGO.equals(tipo)) {
             zonaId = trim(dto.zonaId());
             if (zonaId == null) {
-                throw new HardwareInvalidoException("El nodo testigo debe asociarse a una macro-zona.");
+                throw new InvalidHardwareException("El nodo testigo debe asociarse a una macro-zona.");
             }
             if (zonaRepository.findById(zonaId).isEmpty()) {
-                throw new HardwareInvalidoException("La macro-zona «" + zonaId + "» no existe.");
+                throw new InvalidHardwareException("La macro-zona «" + zonaId + "» no existe.");
             }
             if (!dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO).isEmpty()) {
-                throw new HardwareConflictoException("La macro-zona «" + zonaId + "» ya tiene un nodo testigo.");
+                throw new HardwareConflictException("La macro-zona «" + zonaId + "» ya tiene un nodo testigo.");
             }
         } else {
             sectorId = trim(dto.sectorId());
             if (sectorId == null) {
-                throw new HardwareInvalidoException("El actuador debe asociarse a un sector.");
+                throw new InvalidHardwareException("El actuador debe asociarse a un sector.");
             }
             if (sectorRepository.findById(sectorId).isEmpty()) {
-                throw new HardwareInvalidoException("El sector «" + sectorId + "» no existe.");
+                throw new InvalidHardwareException("El sector «" + sectorId + "» no existe.");
             }
             if (!dispositivoRepository.findBySectorIdAndTipo(sectorId, tipo).isEmpty()) {
-                throw new HardwareConflictoException(
+                throw new HardwareConflictException(
                         "El sector «" + sectorId + "» ya tiene asignada una " + TIPO_LABEL.get(tipo) + ".");
             }
         }
@@ -248,14 +250,14 @@ public class HardwareService {
     @Transactional
     public HardwareData recambiarDispositivo(String id, Dispositivo dto) {
         DispositivoEntity e = dispositivoRepository.findById(id)
-                .orElseThrow(() -> new HardwareInvalidoException("El dispositivo «" + id + "» no existe."));
+                .orElseThrow(() -> new InvalidHardwareException("El dispositivo «" + id + "» no existe."));
         String nuevoSerial = trim(dto.serial());
         if (nuevoSerial == null) {
-            throw new HardwareInvalidoException("El serial/MAC de la pieza nueva es obligatorio.");
+            throw new InvalidHardwareException("El serial/MAC de la pieza nueva es obligatorio.");
         }
         if (!nuevoSerial.equals(e.getSerial())
                 && dispositivoRepository.findBySerial(nuevoSerial).isPresent()) {
-            throw new HardwareConflictoException("Ya existe un dispositivo con el serial/MAC «" + nuevoSerial + "».");
+            throw new HardwareConflictException("Ya existe un dispositivo con el serial/MAC «" + nuevoSerial + "».");
         }
         // Reutiliza el registro: pieza nueva, avería limpia, heartbeat reiniciado (HU-21 CA-05).
         e.setSerial(nuevoSerial);

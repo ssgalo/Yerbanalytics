@@ -3,8 +3,8 @@ package com.yerbanalytics.backend.controller;
 import com.yerbanalytics.backend.dto.DisposicionTopologia;
 import com.yerbanalytics.backend.dto.NuevaTopologia;
 import com.yerbanalytics.backend.dto.TopologiaVivero;
-import com.yerbanalytics.backend.service.TopologiaConflictoException;
-import com.yerbanalytics.backend.service.TopologiaInvalidaException;
+import com.yerbanalytics.backend.exception.InvalidTopologyException;
+import com.yerbanalytics.backend.exception.TopologyConflictException;
 import com.yerbanalytics.backend.service.TopologiaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,15 +49,15 @@ public class TopologiaController {
         return ResponseEntity.ok(topologiaService.actualizarDisposicion(dto));
     }
 
-    /** Cantidad de macro-zonas/sectores fuera de los límites válidos (HU-18 CA-01) → 400. */
-    @ExceptionHandler(TopologiaInvalidaException.class)
-    public ResponseEntity<Map<String, String>> handleInvalida(TopologiaInvalidaException ex) {
+    /** Zone/sector count outside valid limits (HU-18 CA-01) → 400. */
+    @ExceptionHandler(InvalidTopologyException.class)
+    public ResponseEntity<Map<String, String>> handleInvalida(InvalidTopologyException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
 
-    /** Topología ya cargada y no se pidió regenerar (HU-18 CA-01) → 409. */
-    @ExceptionHandler(TopologiaConflictoException.class)
-    public ResponseEntity<Map<String, String>> handleConflicto(TopologiaConflictoException ex) {
+    /** Topology already loaded and regeneration was not requested (HU-18 CA-01) → 409. */
+    @ExceptionHandler(TopologyConflictException.class)
+    public ResponseEntity<Map<String, String>> handleConflicto(TopologyConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
 }

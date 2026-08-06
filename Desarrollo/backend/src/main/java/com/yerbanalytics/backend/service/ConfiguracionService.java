@@ -11,6 +11,7 @@ import com.yerbanalytics.backend.model.UmbralMetricaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
 import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
+import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import static com.yerbanalytics.backend.constant.NurseryConstants.SPECS;
 
 import org.springframework.context.annotation.Lazy;
@@ -163,7 +164,7 @@ public class ConfiguracionService {
 
     private void validar(Configuracion cfg) {
         if (cfg == null) {
-            throw new ConfiguracionInvalidaException("La configuración es obligatoria.");
+            throw new InvalidConfigurationException("La configuración es obligatoria.");
         }
         validarUmbrales(cfg.umbrales());
         validarOperativa(cfg.operativa());
@@ -173,13 +174,13 @@ public class ConfiguracionService {
 
     private void validarUmbrales(List<UmbralMetrica> umbrales) {
         if (umbrales == null || umbrales.size() != factory.size()) {
-            throw new ConfiguracionInvalidaException(
+            throw new InvalidConfigurationException(
                     "Se esperan los umbrales de las " + factory.size() + " métricas.");
         }
         for (UmbralMetrica u : umbrales) {
             MetricSpec f = factory.get(u.key());
             if (f == null) {
-                throw new ConfiguracionInvalidaException("Métrica desconocida: " + u.key());
+                throw new InvalidConfigurationException("Métrica desconocida: " + u.key());
             }
             // Coherencia de bandas anidadas (HU-15 CA-03).
             boolean coherente = u.critMin() <= u.warnMin()
@@ -188,7 +189,7 @@ public class ConfiguracionService {
                     && u.idealMax() <= u.warnMax()
                     && u.warnMax() <= u.critMax();
             if (!coherente) {
-                throw new ConfiguracionInvalidaException(
+                throw new InvalidConfigurationException(
                         "Bandas incoherentes para «" + f.label() + "»: debe cumplirse "
                                 + "crit mín ≤ warn mín ≤ ideal mín < ideal máx ≤ warn máx ≤ crit máx.");
             }
@@ -196,7 +197,7 @@ public class ConfiguracionService {
             double envMin = f.crit()[0];
             double envMax = f.crit()[1];
             if (u.critMin() < envMin || u.critMax() > envMax) {
-                throw new ConfiguracionInvalidaException(
+                throw new InvalidConfigurationException(
                         "Valor fuera del rango fisiológico permitido para «" + f.label()
                                 + "» (" + fmt(envMin) + " a " + fmt(envMax) + " " + f.unit() + ").");
             }
@@ -205,7 +206,7 @@ public class ConfiguracionService {
 
     private void validarOperativa(ConfiguracionOperativa op) {
         if (op == null) {
-            throw new ConfiguracionInvalidaException("Faltan los límites operativos.");
+            throw new InvalidConfigurationException("Faltan los límites operativos.");
         }
         requirePositive(op.riegoTiempoMaxSeg(), "el tiempo máximo de apertura de riego");
         requirePositive(op.riegoVolMaxDiarioMl(), "el volumen máximo diario de riego");
@@ -213,7 +214,7 @@ public class ConfiguracionService {
         requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
         requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
         if (op.mediasombraAperturaMaxPct() <= 0 || op.mediasombraAperturaMaxPct() > 100) {
-            throw new ConfiguracionInvalidaException(
+            throw new InvalidConfigurationException(
                     "La apertura máxima de mediasombra debe estar entre 0 y 100 %.");
         }
     }
@@ -227,15 +228,15 @@ public class ConfiguracionService {
         int prevHasta = 0;
         for (RustificacionEtapa et : ordenadas) {
             if (et.diaDesde() < 1 || et.diaDesde() > et.diaHasta()) {
-                throw new ConfiguracionInvalidaException(
+                throw new InvalidConfigurationException(
                         "Etapa de rustificación inválida: «día desde» debe ser ≥ 1 y ≤ «día hasta».");
             }
             if (et.diaDesde() <= prevHasta) {
-                throw new ConfiguracionInvalidaException(
+                throw new InvalidConfigurationException(
                         "Las etapas de rustificación no pueden solaparse en el cronograma.");
             }
             if (et.aperturaPct() < 0 || et.aperturaPct() > aperturaMax) {
-                throw new ConfiguracionInvalidaException(
+                throw new InvalidConfigurationException(
                         "La apertura de cada etapa debe estar entre 0 % y la apertura máxima ("
                                 + fmt(aperturaMax) + " %).");
             }
@@ -245,7 +246,7 @@ public class ConfiguracionService {
 
     private void requirePositive(double value, String nombre) {
         if (value <= 0) {
-            throw new ConfiguracionInvalidaException("El valor de " + nombre + " debe ser mayor a 0.");
+            throw new InvalidConfigurationException("El valor de " + nombre + " debe ser mayor a 0.");
         }
     }
 

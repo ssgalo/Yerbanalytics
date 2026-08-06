@@ -2,8 +2,8 @@ package com.yerbanalytics.backend.controller;
 
 import com.yerbanalytics.backend.dto.Dispositivo;
 import com.yerbanalytics.backend.dto.HardwareData;
-import com.yerbanalytics.backend.service.HardwareConflictoException;
-import com.yerbanalytics.backend.service.HardwareInvalidoException;
+import com.yerbanalytics.backend.exception.HardwareConflictException;
+import com.yerbanalytics.backend.exception.InvalidHardwareException;
 import com.yerbanalytics.backend.service.HardwareService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,15 +47,15 @@ public class HardwareController {
         return ResponseEntity.ok(hardwareService.recambiarDispositivo(id, dto));
     }
 
-    /** Dato faltante o inválido en el alta/recambio (HU-18 CA-02) → 400. */
-    @ExceptionHandler(HardwareInvalidoException.class)
-    public ResponseEntity<Map<String, String>> handleInvalido(HardwareInvalidoException ex) {
+    /** Missing or invalid data on hardware registration/replacement (HU-18 CA-02) → 400. */
+    @ExceptionHandler(InvalidHardwareException.class)
+    public ResponseEntity<Map<String, String>> handleInvalido(InvalidHardwareException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
 
-    /** Conflicto de unicidad: serial/MAC o actuador duplicado (HU-18 CA-03) → 409. */
-    @ExceptionHandler(HardwareConflictoException.class)
-    public ResponseEntity<Map<String, String>> handleConflicto(HardwareConflictoException ex) {
+    /** Uniqueness conflict: duplicate serial/MAC or actuator (HU-18 CA-03) → 409. */
+    @ExceptionHandler(HardwareConflictException.class)
+    public ResponseEntity<Map<String, String>> handleConflicto(HardwareConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
 }
