@@ -3,7 +3,6 @@ package com.yerbanalytics.backend.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.service.AlmacenamientoImagenService;
 import com.yerbanalytics.backend.service.CapturaService;
-import com.yerbanalytics.backend.service.SimulacionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +38,6 @@ class DiagnosticoControllerTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
     @Autowired private CapturaService capturaService;
-    @Autowired private SimulacionService simulacionService;
 
     private static final byte[] JPEG = "jpeg-para-diagnostico".getBytes(StandardCharsets.UTF_8);
 
@@ -181,35 +179,26 @@ class DiagnosticoControllerTest {
     }
 
     @Test
-    void alta_daElMismoResultadoEnModoEstaticoYEnSimulacion() throws Exception {
-        // El modelo de IA no va a consultar el modo de operación antes de emitir un
-        // diagnóstico, así que el alta tampoco puede depender de él. Si alguien agrega una
-        // compuerta por modo, este test falla.
-        SimulacionService.Modo original = simulacionService.getModo();
-        try {
-            simulacionService.setModo(SimulacionService.Modo.ESTATICO);
-            String estatico = alta(Map.of("capturaId", capturaExistente(),
-                    "estado", "Estrés solar", "conf", 88.0, "sev", "Media"));
+    void alta_daElMismoResultadoParaCualquierEmisor() throws Exception {
+        // El servicio de inferencia y una carga manual son el mismo camino: no hay estado
+        // global en el backend que condicione el alta, ni marca que distinga el origen. Si
+        // alguien agrega una compuerta o un campo de procedencia, este test falla.
+        String primera = alta(Map.of("capturaId", capturaExistente(),
+                "estado", "Estrés solar", "conf", 88.0, "sev", "Media"));
+        String segunda = alta(Map.of("capturaId", capturaExistente(),
+                "estado", "Estrés solar", "conf", 88.0, "sev", "Media"));
 
-            simulacionService.setModo(SimulacionService.Modo.SIMULACION);
-            String simulacion = alta(Map.of("capturaId", capturaExistente(),
-                    "estado", "Estrés solar", "conf", 88.0, "sev", "Media"));
+        var a = json.readTree(primera);
+        var b = json.readTree(segunda);
 
-            var a = json.readTree(estatico);
-            var b = json.readTree(simulacion);
-
-            // Mismos campos, mismos valores: sólo cambian el id y la captura.
-            org.junit.jupiter.api.Assertions.assertEquals(a.get("estado"), b.get("estado"));
-            org.junit.jupiter.api.Assertions.assertEquals(a.get("conf"), b.get("conf"));
-            org.junit.jupiter.api.Assertions.assertEquals(a.get("sev"), b.get("sev"));
-            org.junit.jupiter.api.Assertions.assertEquals(
-                    a.get("concluyente"), b.get("concluyente"));
-            // Y ninguno lleva marca de origen.
-            org.junit.jupiter.api.Assertions.assertFalse(a.has("origen"));
-            org.junit.jupiter.api.Assertions.assertFalse(b.has("origen"));
-        } finally {
-            simulacionService.setModo(original);
-        }
+        // Mismos campos, mismos valores: sólo cambian el id y la captura.
+        org.junit.jupiter.api.Assertions.assertEquals(a.get("estado"), b.get("estado"));
+        org.junit.jupiter.api.Assertions.assertEquals(a.get("conf"), b.get("conf"));
+        org.junit.jupiter.api.Assertions.assertEquals(a.get("sev"), b.get("sev"));
+        org.junit.jupiter.api.Assertions.assertEquals(a.get("concluyente"), b.get("concluyente"));
+        // Y ninguno lleva marca de origen.
+        org.junit.jupiter.api.Assertions.assertFalse(a.has("origen"));
+        org.junit.jupiter.api.Assertions.assertFalse(b.has("origen"));
     }
 
     @Test

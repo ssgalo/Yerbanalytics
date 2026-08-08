@@ -6,11 +6,10 @@
   "description": "Frontend de monitoreo IA del vivero de yerba mate Yerbanalytics",
   "scripts": {
     "dev": "vite",
-    "dev:sim": "vite --config vite.simulador.config.ts",
+    "dev:demo": "vite --mode demo",
     "build": "tsc -b && vite build",
-    "build:sim": "tsc -b && vite build --config vite.simulador.config.ts",
+    "build:demo": "tsc -b && vite build --mode demo",
     "preview": "vite preview",
-    "preview:sim": "vite preview --config vite.simulador.config.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",

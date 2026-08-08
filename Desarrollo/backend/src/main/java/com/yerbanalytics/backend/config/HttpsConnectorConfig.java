@@ -26,7 +26,7 @@ import java.nio.file.Paths;
  *
  * <p>Se agrega un conector en lugar de configurar {@code server.ssl.*} sobre el puerto
  * principal porque eso convertiría el 8000 en HTTPS y rompería lo que ya funciona: el
- * dashboard y el simulador apuntan a {@code http://localhost:8000/api}. Así el 8000 sigue
+ * dashboard apunta a {@code http://localhost:8000/api}. Así el 8000 sigue
  * siendo HTTP y el 8443 atiende TLS con el mismo certificado que usa Vite.
  *
  * <p>Se activa sólo si hay un keystore configurado, para que el arranque por defecto no

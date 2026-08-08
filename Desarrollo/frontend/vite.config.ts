@@ -12,6 +12,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: true,
+    // Sin `open`: el navegador lo abre `start-all`, que es el único que sabe cuántas
+    // pestañas hacen falta (dashboard y, si está instalado, simulador). Con `open: true`
+    // acá se abría una pestaña de más cada vez que se levantaba todo junto.
   },
 });

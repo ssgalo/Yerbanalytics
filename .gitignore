@@ -64,3 +64,9 @@ GEMINI.md
 
 # Logs de sesiones de Playwright MCP (debugging local, no assets del repo)
 .playwright-mcp/
+
+# ─────────────────────────────────────────────────────────────
+# Imágenes capturadas — el backend las guarda en el filesystem
+# (no en la base). Son datos de cada instalación, no del repo.
+# ─────────────────────────────────────────────────────────────
+Desarrollo/backend/capturas/

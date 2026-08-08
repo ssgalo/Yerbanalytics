@@ -9,7 +9,7 @@ package com.yerbanalytics.backend.mqtt;
  *
  * <p><b>Invariante:</b> todo {@code MqttTelemetryPayload} viaja en unidades del contrato.
  * La ingesta es el único punto que convierte a las unidades canónicas de la plataforma, y
- * quien publica (simulador automático o envío manual del dashboard) traduce al salir. Así
+ * quien publica (el firmware del nodo, o el simulador que lo reemplaza) traduce al salir. Así
  * no hay payloads en unidades mixtas dando vueltas.
  *
  * <p><b>Unidades tal como las publica el nodo:</b>

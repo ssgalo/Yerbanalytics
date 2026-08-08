@@ -1,6 +1,6 @@
 package com.yerbanalytics.backend.dto;
 
-/** Estado tecnico de un dispositivo de captura, para el panel de simulacion. */
+/** Estado tecnico de un dispositivo de captura. */
 public record DispositivoCamara(
         String id,
         String nombre,

@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  *
  * <p><strong>Camino único de escritura.</strong> Este servicio es el único lugar por el que
  * entra un diagnóstico al sistema, y no distingue quién lo emite. Hoy lo llama el panel de
- * simulación con valores cargados a mano; mañana lo llamará el servicio de inferencia con la
+ * con valores cargados a mano; mañana lo llamará el servicio de inferencia con la
  * salida del modelo. Es la misma operación, con las mismas validaciones y el mismo resultado.
  *
  * <p>Por eso <strong>no hay marca de origen</strong>: una bandera que distinguiera el ensayo
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * literalmente el que va a correr solo.
  *
  * <p>El modelo es Keras/Python y no corre dentro del JVM aunque comparta la máquina, así que
- * el diagnóstico va a entrar por HTTP de todas formas: este camino existe con o sin simulador.
+ * el diagnóstico va a entrar por HTTP de todas formas: este camino no depende del emisor.
  */
 @Service
 public class DiagnosticoService {

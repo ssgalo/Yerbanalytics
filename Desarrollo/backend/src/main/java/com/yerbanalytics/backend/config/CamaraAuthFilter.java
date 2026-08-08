@@ -109,8 +109,8 @@ public class CamaraAuthFilter {
          *
          * <p>Todo lo que no está bajo {@code /api/camara/v1/} es API de plataforma —emitir una
          * orden, seguirla, servir la imagen, generar un código de vinculación, listar
-         * dispositivos— y la consumen el dashboard y el simulador, que no son dispositivos de
-         * captura. Queda abierta como el resto de la API.
+         * dispositivos— y la consumen clientes que no son dispositivos de captura (hoy el
+         * dashboard; mañana el planificador de pasadas). Queda abierta como el resto de la API.
          *
          * <p>La regla se expresa por prefijo, no por lista blanca, para que agregar un endpoint
          * al contrato lo deje protegido por omisión en vez de abierto por descuido.

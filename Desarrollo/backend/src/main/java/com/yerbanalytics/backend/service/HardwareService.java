@@ -278,7 +278,7 @@ public class HardwareService {
      * coincide con el de la telemetría. Si ningún dispositivo tiene ese serial/MAC, no hace
      * nada: el equipo emite pero el sistema aún no lo reconoce (los sectores de la zona sí se
      * actualizan por separado, en {@code NurseryService.updateTelemetry}). Es lo que ata un
-     * sensor simulado a un nodo registrado con el mismo serial/MAC.
+     * lectura entrante a un nodo registrado con el mismo serial/MAC.
      */
     @Transactional
     public void actualizarHeartbeat(String zonaId, String mac, Integer bateria, Integer senal, Long ts) {

@@ -1,9 +1,6 @@
 -- Yerbanalytics Database Initial Seed
 -- 6 Macro-zonas and 600 Sectors initialized in 'offline' state (sensors as NULL)
 
--- Modo de operación del vivero (fila única). Default de fábrica: estático.
-INSERT INTO modo_operacion (id, modo) VALUES (1, 'estatico') ON CONFLICT (id) DO NOTHING;
-
 -- Insert Zones
 INSERT INTO zona (id, name, sub) VALUES ('MZ-1', 'Macro-zona 1', 'Sector norte') ON CONFLICT (id) DO NOTHING;
 INSERT INTO zona (id, name, sub) VALUES ('MZ-2', 'Macro-zona 2', 'Sector norte') ON CONFLICT (id) DO NOTHING;
@@ -680,7 +677,8 @@ INSERT INTO rustificacion_etapa (orden, dia_desde, dia_hasta, apertura_pct) VALU
 -- ============================================================
 -- Flota de hardware (HU-18 / HU-21) — seed de ejemplo.
 -- Nodos testigo (uno por macro-zona) + actuadores de algunos sectores.
--- ultimo_update NULL: el simulador MQTT refresca el heartbeat de los nodos.
+-- ultimo_update NULL: el heartbeat lo refresca la ingesta de telemetría, cuando llega la
+-- primera lectura cuyo serial/MAC coincide con el del nodo.
 -- Casos demostrativos: MZ-2 batería baja · MZ-1-003 y MZ-3-010 incompletos · MZ-5-042 averiado.
 -- ============================================================
 

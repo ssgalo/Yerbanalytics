@@ -5,7 +5,16 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "strict": true,
+
+    // Un proyecto referenciado (`composite`) no puede usar `noEmit`, así que la salida se
+    // manda a node_modules en vez de dejarla al lado del fuente.
+    //
+    // Por qué importa: `tsc -b` compilaba `vite.config.ts` y escribía `vite.config.js` acá
+    // nomás. Y Vite RESUELVE `vite.config.js` ANTES que el `.ts`, así que pasaba a leer el
+    // compilado y toda edición del `.ts` quedaba ignorada en silencio hasta el próximo build.
+    "outDir": "./node_modules/.tmp",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
   "include": ["vite.config.ts"]
 }

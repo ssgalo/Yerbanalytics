@@ -1,0 +1,15 @@
+# Dependencies and build
+node_modules/
+dist/
+
+# Simulator state: the sensors registered on this machine.
+# Not versioned — it belongs to whoever runs the simulator, not to the project.
+data/
+
+# Local configuration
+.env
+.env.local
+
+# Editor noise
+*.log
+.DS_Store

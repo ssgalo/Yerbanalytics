@@ -25,21 +25,35 @@ npm run dev              # http://localhost:5173
 
 | Script | Qué hace |
 |--------|----------|
-| `npm run dev` | Servidor de desarrollo del dashboard (HMR) — http://localhost:5173 |
-| `npm run dev:sim` | Servidor del **simulador de sensores** (app aparte) — http://localhost:5180 |
-| `npm run build` | Type-check + build de producción del dashboard (`dist/`) |
-| `npm run build:sim` | Build de producción del simulador (`dist-simulador/`) |
-| `npm run preview` | Sirve el build del dashboard |
-| `npm run preview:sim` | Sirve el build del simulador |
+| `npm run dev` | Dashboard contra el **backend real** (HMR) — http://localhost:5173 |
+| `npm run dev:demo` | Dashboard en **modo estático**: demo ilustrativa, sin backend |
+| `npm run build` | Type-check + build de producción (`dist/`) |
+| `npm run build:demo` | Build de la demo estática |
+| `npm run preview` | Sirve el build |
 | `npm run lint` | ESLint (0 warnings permitidos) |
 | `npm run format` | Prettier |
 | `npm test` | Tests (Vitest) |
 
-> **Simulador de sensores** (`npm run dev:sim`, puerto **5180**): app standalone,
-> separada del dashboard principal. Permite alternar entre datos estáticos y
-> simulación, crear sensores (nodos testigo) y enviar telemetría manual por MQTT.
-> Comparte la capa de datos y componentes del frontend, pero se sirve en su propio
-> puerto y no aparece en la navegación del dashboard.
+### Los dos modos
+
+`VITE_DATA_SOURCE` es el modo de operación de la app, y es el **único** punto de decisión del
+origen de datos: rige para *todas* las secciones —vivero, mapa, sector, diagnósticos, hardware,
+configuración, historial y topología—, así que nunca conviven en pantalla datos mock con datos
+del backend.
+
+| | `npm run dev` | `npm run dev:demo` |
+|---|---|---|
+| `VITE_DATA_SOURCE` | `http` | `mock` (preconfigurado en `.env.demo`) |
+| Qué muestra | el vivero real | una demo determinística |
+| Para qué | operar y probar el sistema | mostrar cómo se vería, sin levantar nada |
+| Necesita backend | sí | no |
+
+Se resuelve **al arrancar**, así que cambiar de modo exige reiniciar el dashboard. A cambio,
+ninguna vista consulta el modo al backend: el backend no tiene modos.
+
+> ¿Querés probar el sistema real sin hardware físico? Eso no es el modo estático: es el
+> **simulador** (`Desarrollo/simulador/`), una app aparte que publica telemetría al broker
+> como si fuera un nodo ESP32. Corré `npm run dev` acá y el simulador en su carpeta.
 
 ## Variables de entorno
 
@@ -47,7 +61,7 @@ Solo las variables con prefijo `VITE_` llegan al navegador.
 
 | Variable | Default | Descripción |
 |----------|---------|-------------|
-| `VITE_DATA_SOURCE` | `mock` | Origen de datos: `mock` (determinístico) o `http` (backend) |
+| `VITE_DATA_SOURCE` | `mock` | Modo de la app: `http` (backend real) o `mock` (demo estática). Rige para todas las secciones |
 | `VITE_API_BASE_URL` | `http://localhost:8000/api` | URL del backend (modo `http`) |
 | `VITE_MOCK_SEED` | `20260613` | Semilla del generador determinístico (modo `mock`) |
 
