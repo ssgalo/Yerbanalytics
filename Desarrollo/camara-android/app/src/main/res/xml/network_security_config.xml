@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Política de red del dispositivo de captura.
+
+  Tráfico en claro PERMITIDO: la app habla con el backend del vivero por HTTP en la LAN.
+  La CA local y el conector TLS del 8443 existen porque el NAVEGADOR los exige (getUserMedia
+  requiere origen seguro y una página HTTPS no puede llamar a un endpoint HTTP). Un cliente
+  nativo no tiene ninguna de esas restricciones.
+
+  Es un desvío deliberado del §8 del contrato, que pide HTTPS igual porque sin TLS el token
+  de acceso viaja en claro. Se asume: red privada, token de 15 minutos, alcance acotado.
+  Está documentado en el README.
+
+  Anclas de confianza SYSTEM + USER: con esto la MISMA APK sirve para el modo cifrado. Si se
+  instala `ca.pem` en Android (Ajustes -> Seguridad -> Cifrado y credenciales -> Instalar
+  certificado -> Certificado de CA) y se tipea `https://<ip>:8443` al vincular, funciona sin
+  recompilar nada.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

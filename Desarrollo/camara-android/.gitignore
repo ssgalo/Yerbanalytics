@@ -1,0 +1,27 @@
+# Build
+build/
+.gradle/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# El wrapper de Gradle SÍ se versiona: sin él, `./gradlew` no existe en un clon nuevo y el
+# proyecto no compila. Hace falta la negación explícita porque el .gitignore de la raíz del
+# repositorio ignora *.jar.
+!gradle/wrapper/gradle-wrapper.jar
+
+# Configuración local del SDK: la ruta del SDK es de cada máquina, no del proyecto
+local.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Firma: ninguna credencial de firma se versiona
+*.jks
+*.keystore
+keystore.properties

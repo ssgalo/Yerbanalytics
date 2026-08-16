@@ -3,8 +3,11 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
+import com.yerbanalytics.backend.model.BloqueoManualEntity;
+import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.BloqueoManualRepository;
@@ -19,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Watchdog proactivo del motor de reglas (HU-02 CA-03/04, HU-08).
@@ -89,27 +95,44 @@ public class NurseryWatchdog {
 
         List<ZonaEntity> zonas = zonaRepository.findAllWithSectors();
         WeatherForecast forecast = weatherService.getForecast();
+
+        // Todo lo que no depende del sector se resuelve UNA vez, fuera del barrido: con 600
+        // sectores, lo que acá parece una llamada más adentro del bucle son 1200 consultas por
+        // ciclo. Los bloqueos activos son un puñado y entran holgados como dos conjuntos.
+        List<MetricSpec> specs = configuracionService.getEffectiveSpecs();
+        ConfiguracionOperativaEntity operativa = configuracionService.getConfiguracionOperativa();
+        List<BloqueoManualEntity> bloqueos = bloqueoManualRepository.findByActivoTrue();
+        Set<String> sectoresBloqueados = bloqueos.stream()
+                .map(BloqueoManualEntity::getSectorId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<String> zonasBloqueadas = bloqueos.stream()
+                .map(BloqueoManualEntity::getZonaId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Un único instante para todo el barrido: los 600 sectores se evalúan contra la misma
+        // foto del tiempo, en vez de contra un reloj que se corre mientras el ciclo avanza.
+        long ahoraMs = System.currentTimeMillis();
+        Instant ahora = Instant.ofEpochMilli(ahoraMs);
         int totalSectores = 0;
 
         for (ZonaEntity zona : zonas) {
             boolean sensorStale = zona.getLastReadingTime() == null
-                    || (System.currentTimeMillis() - zona.getLastReadingTime() > staleThresholdMs);
+                    || (ahoraMs - zona.getLastReadingTime() > staleThresholdMs);
+            boolean zonaBloqueada = zonasBloqueadas.contains(zona.getId());
 
             for (SectorEntity sector : zona.getSectors()) {
-                boolean bloqueoActivo =
-                        !bloqueoManualRepository.findBySectorIdAndActivoTrue(sector.getId()).isEmpty()
-                        || !bloqueoManualRepository.findByZonaIdAndActivoTrue(zona.getId()).isEmpty();
+                boolean bloqueoActivo = zonaBloqueada || sectoresBloqueados.contains(sector.getId());
 
                 // En el ciclo proactivo usamos las métricas derivadas del último estado conocido.
                 // Si el sensor está stale, las métricas serán nulas y StaleSensorRule actuará.
                 RuleContext ctx = new RuleContext(
                         sector,
                         zona,
-                        configuracionService.getEffectiveSpecs(),
+                        specs,
                         List.of(),   // sin métricas frescas — el StaleSensorRule gestiona este caso
-                        configuracionService.getConfiguracionOperativa(),
+                        operativa,
                         sector.getStatus(),
-                        Instant.now(),
+                        ahora,
                         sensorStale,
                         forecast,
                         bloqueoActivo

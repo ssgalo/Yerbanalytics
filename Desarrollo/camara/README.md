@@ -6,10 +6,17 @@ captura que le manda el backend.
 
 No es una vista del dashboard. Es un proyecto propio, hermano de `frontend/` y `backend/`, y
 la razón es concreta: **es la implementación de referencia de un contrato, no la
-implementación definitiva**. Es probable que el cliente final sea una app Android nativa —
-donde un foreground service puede sostener la operación sin depender de que la pantalla esté
-encendida. Cuando eso pase, este directorio se borra entero y nada más en el repositorio se
-entera.
+implementación definitiva**.
+
+> **Ya existe el cliente nativo.** [`Desarrollo/camara-android/`](../camara-android/README.md) es
+> una app Android que cumple el mismo contrato **sin que se haya tocado una línea del backend** —
+> que era el criterio de aceptación. Es el cliente pensado para producción: un foreground service
+> le permite operar con la pantalla apagada y el teléfono bloqueado, la cámara se enciende sólo
+> para las capturas, y no necesita la CA local (esa restricción es del navegador, no del sistema).
+>
+> Esta PWA **no se da de baja**: se sigue manteniendo como implementación de referencia, y que dos
+> clientes independientes convivan contra la misma superficie es la evidencia de que el contrato
+> sirve. Sigue siendo además la única opción para un iPhone.
 
 > **Contrato:** [`Desarrollo/contratos/camara/v1/`](../contratos/camara/v1/README.md).
 > Esa es la fuente de verdad. Esta app implementa ese contrato y nada más: si necesitara un

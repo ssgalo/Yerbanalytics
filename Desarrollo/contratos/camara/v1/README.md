@@ -15,14 +15,20 @@ orden, las obligaciones de comportamiento del cliente y las reglas de evolución
 
 ## 1. Por qué existe este contrato
 
-La primera implementación es una PWA que corre en Safari sobre un iPhone montado en el riel.
-**No es la definitiva.** Es probable que termine siendo una app Android nativa, donde un
-foreground service puede sostener la operación sin depender de que la pantalla esté encendida
-y la app en primer plano.
+La primera implementación fue una PWA que corre en Safari sobre un iPhone montado en el riel.
+**No era la definitiva.** Hoy existe además una app Android nativa
+(`Desarrollo/camara-android/`), donde un foreground service sostiene la operación sin depender de
+que la pantalla esté encendida y la app en primer plano.
 
-El criterio de aceptación del contrato es literal:
+El criterio de aceptación del contrato era literal:
 
 > **Escribir la app Android no debe requerir tocar una línea del backend.**
+
+**Quedó ejercido.** La app nativa entró sin modificar el backend, sin agregar endpoints y sin
+subir la versión del contrato. Los dos clientes conviven contra la misma superficie, y el único
+punto donde la app nativa se aparta del contrato está declarado: opera sin TLS (§8), porque la CA
+local y el conector 8443 existen por una restricción del navegador que un cliente nativo no
+tiene. Admite igual una URL cifrada sin recompilar.
 
 De ahí se derivan tres propiedades que el contrato mantiene deliberadamente:
 

@@ -476,7 +476,12 @@ components:
           description: |
             Milisegundos a descartar tras abrir la cámara antes de considerarla lista. Los
             primeros fotogramas salen con la exposición sin converger.
-          example: 500
+
+            Es un **techo, no una espera fija**. Un cliente que pueda observar la convergencia
+            real del 3A (exposición, foco y balance de blancos) debe disparar en cuanto converja
+            y usar este valor sólo como plazo máximo. Uno que no pueda observarla —un canvas de
+            navegador, por caso— no tiene más remedio que esperar el plazo completo.
+          example: 1500
         heartbeatSeg:
           type: integer
           description: Cadencia con la que el cliente debe emitir su señal de vida.

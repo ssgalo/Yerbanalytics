@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Tema oscuro del sistema: la app es un panel de log que vive encendido en un riel, y un
+      fondo claro dispara un flash blanco en cada arranque. El color real lo pone Compose.
+    -->
+    <style name="Theme.YerbanalyticsCamara" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/fondo</item>
+        <item name="android:navigationBarColor">@color/fondo</item>
+        <item name="android:windowBackground">@color/fondo</item>
+    </style>
+</resources>
