@@ -194,8 +194,16 @@ public class CapturaService {
         }
     }
 
-    /** Keep-alive: sin esto, proxies y NAT cierran la conexión ociosa. */
-    @Scheduled(fixedDelayString = "${yerbanalytics.capturas.sse-keep-alive-ms:20000}")
+    /**
+     * Keep-alive: sin esto, proxies y NAT cierran la conexión ociosa.
+     *
+     * <p>Corre en el carril de captura, no en el del motor de reglas. El dispositivo declara
+     * muerto un canal que lleva 45 s sin recibir nada, así que estos 20 s no son negociables:
+     * compartir hilo con un barrido de 600 sectores le costaba dos latidos y una reconexión.
+     * Ver {@link com.yerbanalytics.backend.config.SchedulersConfig}.
+     */
+    @Scheduled(fixedDelayString = "${yerbanalytics.capturas.sse-keep-alive-ms:20000}",
+            scheduler = "capturaScheduler")
     public void latido() {
         long ts = System.currentTimeMillis();
         emisores.forEach((id, emitter) -> {
@@ -433,7 +441,8 @@ public class CapturaService {
      * así el vencimiento sobrevive a un reinicio del backend y no depende de que el
      * dispositivo avise. Un cliente que se cae sin decir nada no deja órdenes colgadas.
      */
-    @Scheduled(fixedDelayString = "${yerbanalytics.capturas.watchdog-interval-ms:10000}")
+    @Scheduled(fixedDelayString = "${yerbanalytics.capturas.watchdog-interval-ms:10000}",
+            scheduler = "capturaScheduler")
     public void vencerOrdenes() {
         long ahora = System.currentTimeMillis();
         List<OrdenCapturaEntity> vencidas =

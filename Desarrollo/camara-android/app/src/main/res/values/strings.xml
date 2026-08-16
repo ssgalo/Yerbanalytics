@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Yerbanalytics Cámara</string>
+    <string name="canal_notificaciones">Estado del dispositivo</string>
+    <string name="canal_notificaciones_desc">Notificación permanente que mantiene vivo el dispositivo de captura.</string>
+</resources>

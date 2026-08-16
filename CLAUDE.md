@@ -23,6 +23,7 @@ Yerbanalytics/
 │   ├── frontend/      Dashboard React + TS + Vite (ver §4)
 │   ├── backend/       API REST Spring Boot (Java 17, puerto 8000)
 │   ├── camara/        App de captura (PWA iOS) — proyecto propio (ver §6.1)
+│   ├── camara-android/ App de captura nativa Android — proyecto propio (ver §6.1)
 │   ├── simulador/     Simulador de hardware — proyecto propio y borrable (ver §6.2)
 │   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
 │   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
@@ -209,15 +210,24 @@ cd Desarrollo/backend
 
 ---
 
-## 6.1 Captura de imágenes (`Desarrollo/camara/` + `Desarrollo/contratos/`)
+## 6.1 Captura de imágenes (`Desarrollo/camara*/` + `Desarrollo/contratos/`)
 
-Un iPhone montado en el riel hace de cámara cenital. Cubre HU-04 CA-01 y habilita HU-05 CA-02.
+Un teléfono montado en el riel hace de cámara cenital. Cubre HU-04 CA-01 y habilita HU-05 CA-02.
 **No incluye el modelo de IA**: hasta que exista, el diagnóstico se carga a mano desde el
 simulador, por el mismo camino exacto que va a usar el modelo.
 
-**El entregable es el contrato, no la PWA.** El cliente final probablemente sea una app
-Android, y el criterio de aceptación es literal: *escribir esa app no debe requerir tocar el
-backend.*
+**El entregable es el contrato, no una app.** Hay **dos clientes** del mismo contrato, y conviven
+a propósito:
+
+| Cliente | Qué es | Para qué está |
+|---|---|---|
+| `Desarrollo/camara/` | PWA sobre Safari iOS | Primera implementación; se hizo para un iPhone, sin herramientas para compilar nativo |
+| `Desarrollo/camara-android/` | App Android nativa (Kotlin, CameraX) | El cliente de producción: opera con la pantalla apagada vía foreground service |
+
+El criterio de aceptación del contrato era literal —*escribir la app Android no debe requerir
+tocar el backend*— y **quedó ejercido**: la app nativa entró sin modificar una línea del backend
+ni subir la versión del contrato. Dos clientes independientes contra la misma superficie es la
+evidencia de que el contrato sirve; dar de baja la PWA es una decisión posterior, no una deuda.
 
 Invariantes a respetar al tocar esta área:
 
@@ -233,14 +243,17 @@ Invariantes a respetar al tocar esta área:
   diagnóstico manual y uno del modelo son la misma fila porque son la misma operación.
 - **El simulador no tiene ni un endpoint propio**: usa el de emisión de órdenes (el del futuro
   planificador) y el de alta de diagnósticos (el de la futura inferencia).
-- **HTTPS no es opcional** para la app de cámara: el backend abre un conector adicional en el
-  8443 y deja el 8000 en HTTP. Los certificados no se versionan, así que **en un clon nuevo
-  hay que generarlos** (`Desarrollo/certs/generar-certificados.sh`). Sin ellos el backend
-  arranca y el dashboard funciona; sólo la cámara queda sin poder conectarse.
+- **HTTPS no es opcional para la PWA**, y sí lo es para la app nativa. La restricción es del
+  navegador, no del sistema: `getUserMedia` exige origen seguro y una página HTTPS no puede
+  llamar a un endpoint HTTP. Por eso el backend abre un conector adicional en el 8443 y deja el
+  8000 en HTTP. Los certificados no se versionan, así que **en un clon nuevo hay que generarlos**
+  (`Desarrollo/certs/generar-certificados.sh`). La app Android no los necesita: habla HTTP contra
+  el 8000 y admite igual `https://…:8443` sin recompilar, si se instala la CA en el teléfono.
+  Es un desvío deliberado del §8 del contrato, documentado en el README de la app.
 
 El porqué de cada una, cómo levantarlo, el trámite de la CA en el iPhone y el diagnóstico de
-fallas: `Desarrollo/camara/README.md`, `Desarrollo/contratos/camara/v1/README.md` y el README
-del backend.
+fallas: `Desarrollo/camara/README.md`, `Desarrollo/camara-android/README.md`,
+`Desarrollo/contratos/camara/v1/README.md` y el README del backend.
 
 ---
 
@@ -298,6 +311,7 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Cómo correr el frontend | `Desarrollo/frontend/README.md` |
 | Plan del frontend (SDD) | `openspec/changes/add-monitoring-frontend/` |
 | Contrato de la cámara | `Desarrollo/contratos/camara/v1/` (OpenAPI + referencia) |
-| Cómo correr la app de cámara | `Desarrollo/camara/README.md` |
+| Cómo correr la app de cámara (PWA) | `Desarrollo/camara/README.md` |
+| Cómo generar la APK de cámara | `Desarrollo/camara-android/README.md` |
 | Curación de datasets | `Desarrollo/Modelo_IA/informe-curacion-datasets.md` |
 | Negocio / alcance | `Documentacion/` |

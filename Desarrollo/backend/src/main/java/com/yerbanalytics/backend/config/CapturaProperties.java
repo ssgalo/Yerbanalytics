@@ -57,7 +57,8 @@ public class CapturaProperties {
     private int anchoMax = 1920;
     private int altoMax = 1080;
     private double calidadJpeg = 0.85;
-    private int warmupMs = 500;
+    /** Techo de calentamiento, no espera fija. Ver la nota en {@code application.properties}. */
+    private int warmupMs = 1500;
     private int maxColaOrdenes = 20;
 
     public String getDir() { return dir; }

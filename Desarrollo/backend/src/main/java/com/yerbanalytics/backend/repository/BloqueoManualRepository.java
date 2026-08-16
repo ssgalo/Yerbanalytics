@@ -20,4 +20,14 @@ public interface BloqueoManualRepository extends JpaRepository<BloqueoManualEnti
 
     /** Bloqueos activos para una zona completa (aplican a todos sus sectores). */
     List<BloqueoManualEntity> findByZonaIdAndActivoTrue(String zonaId);
+
+    /**
+     * Todos los bloqueos activos, de una sola consulta.
+     *
+     * <p>Para el barrido proactivo del watchdog, que recorre los 600 sectores: preguntar por
+     * sector y por zona uno por uno son 1200 consultas por ciclo, y el ciclo comparte hilo con
+     * el keep-alive del canal SSE de las cámaras. Los bloqueos activos son un puñado — entran
+     * holgados en memoria y se consultan como conjuntos.
+     */
+    List<BloqueoManualEntity> findByActivoTrue();
 }
