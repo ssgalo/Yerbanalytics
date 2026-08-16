@@ -13,7 +13,7 @@ import lombok.Setter;
  * Diagnóstico emitido sobre una captura (HU-04 / HU-05).
  *
  * <p><strong>No hay columna de origen.</strong> Un diagnóstico cargado a mano desde el panel
- * de simulación y uno emitido por el modelo de IA son la misma fila, porque entran por la
+ * cargado a mano y uno emitido por el modelo de IA son la misma fila, porque entran por la
  * misma operación: {@code POST /api/diagnosticos}. Una marca que distinguiera el ensayo de la
  * operación real volvería infiel el ensayo, y quedaría para siempre en el esquema como
  * residuo de una etapa de pruebas.

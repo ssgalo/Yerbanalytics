@@ -48,6 +48,35 @@ El script traslada las lecturas, recupera el estado de los nodos desde el regist
 hardware, convierte `ce` a dS/m y re-escala los umbrales de `uv`. Los `DROP COLUMN` quedan
 comentados a propósito: descomentalos recién después de verificar el resultado.
 
+### Migración manual pendiente · baja del estado del simulador
+
+El simulador se extrajo a `Desarrollo/simulador/`, un proyecto independiente, y con él salieron
+del backend el **modo de operación** y los **sensores simulados**. `ddl-auto=update` crea y
+modifica tablas pero **nunca las elimina**, así que `modo_operacion` y `sensor_simulado` quedan
+huérfanas en la base.
+
+Corré `src/main/resources/migracion-quitar-simulador.sql`:
+
+1. Detener la app.
+2. Ejecutar el script.
+3. Volver a arrancar.
+
+Se pierden los sensores de prueba y un modo que ya no existe. **Ningún dato del vivero**: zonas,
+sectores, lecturas, hardware, historial, capturas y diagnósticos quedan intactos. Los sensores
+de prueba se vuelven a dar de alta en el simulador, que ahora los guarda en su propia carpeta.
+
+Qué cambió, en concreto:
+
+- **El modo estático/simulación ya no es estado del backend.** Pasó a ser `VITE_DATA_SOURCE`
+  del dashboard, que se resuelve al arrancar. El backend se comporta siempre como en
+  producción.
+- **El envío manual de telemetría ya no pasa por acá.** `POST /api/simulacion/telemetria`
+  desapareció junto con todo `/api/simulacion/**`. El simulador publica **directo al broker**,
+  en el mismo topic y con el mismo payload que el firmware, así que la lectura entra por la
+  ingesta de siempre.
+- **El backend dejó de tener publicador MQTT.** Sólo consume. Existía únicamente para que el
+  backend se publicara telemetría a sí mismo.
+
 ## Arquitectura
 
 El proyecto sigue el patrón multicapa clásico de Spring Boot:
@@ -94,26 +123,26 @@ cd Desarrollo/contratos/camara/v1/conformidad && npm test
 
 ### API de plataforma — fuera del contrato
 
-La consumen el dashboard, el simulador y —en el futuro— el planificador de pasadas del riel
-y el servicio de inferencia. Un dispositivo de captura no debe usarlas.
+La consumen el dashboard y —en el futuro— el planificador de pasadas del riel y el servicio
+de inferencia. Un dispositivo de captura no debe usarlas.
 
 | Método | Ruta | Quién la usa |
 |---|---|---|
-| `POST` | `/api/camara/vinculacion` | Backoffice/simulador: emite el código de un solo uso |
+| `POST` | `/api/camara/vinculacion` | Backoffice: emite el código de un solo uso |
 | `GET` | `/api/camara/dispositivos` | Estado técnico de la flota de cámaras |
-| `POST` | `/api/capturas/ordenes` | Emisor de órdenes (hoy el simulador) |
+| `POST` | `/api/capturas/ordenes` | Emisor de órdenes (mañana, el planificador de pasadas) |
 | `GET` | `/api/capturas/ordenes/{id}` | Seguimiento de una orden |
 | `GET` | `/api/capturas/{capturaId}/imagen` | El dashboard, para mostrar la foto |
 | `POST` | `/api/diagnosticos` | **Alta de diagnóstico** |
 | `GET` | `/api/diagnosticos` | Listado de diagnósticos persistidos |
 
 > **`POST /api/diagnosticos` es un camino único, sin variantes.** Es el mismo endpoint que va
-> a usar el servicio de inferencia y el mismo que usa hoy el panel de simulación para cargar
-> un diagnóstico a mano. No hay endpoint de simulación, no hay columna que marque el origen y
-> el alta **no** depende del modo estático/simulación — el modelo tampoco va a depender de él.
+> a usar el servicio de inferencia y el mismo que usa hoy una carga manual. No hay endpoint
+> alternativo, no hay columna que marque el origen y no hay ningún estado global del backend
+> que condicione el alta — el modelo tampoco va a depender de uno.
 >
 > El modelo es Keras/Python: aunque corra en la misma máquina, no vive dentro del JVM. El
-> diagnóstico entra por HTTP con o sin simulador.
+> diagnóstico entra por HTTP en cualquier caso.
 >
 > Consecuencia asumida: no se pueden purgar selectivamente los diagnósticos de prueba. La
 > purga posible es por fecha o por sector, que alcanza porque todo diagnóstico está anclado a
@@ -148,7 +177,7 @@ arrancar** — mejor eso que descubrirlo en la primera subida, con una pasada de
 ### HTTPS para la app de cámara
 
 El backend expone un **conector TLS adicional en el 8443**; el 8000 sigue siendo HTTP, así que
-el dashboard y el simulador no se enteran. Es necesario porque la PWA de cámara se sirve por
+el dashboard no se entera. Es necesario porque la PWA de cámara se sirve por
 HTTPS (`getUserMedia` exige origen seguro) y una página HTTPS no puede llamar a un endpoint
 HTTP.
 

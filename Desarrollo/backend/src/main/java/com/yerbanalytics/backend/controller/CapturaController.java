@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
  *       (hoy la PWA; mañana una app Android). Fuente de verdad:
  *       {@code Desarrollo/contratos/camara/v1/openapi.yaml}.</li>
  *   <li>{@code /api/capturas/**} — API de plataforma: emitir una orden, seguirla y servir la
- *       imagen. La consumen el simulador, el dashboard y mañana el planificador.</li>
+ *       imagen. La consumen el dashboard y mañana el planificador de pasadas del riel.</li>
  * </ul>
  *
  * Un cliente de captura no debe usar nunca las rutas de plataforma.
@@ -63,8 +63,8 @@ public class CapturaController {
     public record NuevaOrden(String sectorId, Integer posicionRiel) {}
 
     /**
-     * Emisor único de órdenes. Hoy lo llama el panel de simulación; mañana el planificador de
-     * pasadas del riel hará exactamente esta misma llamada.
+     * Emisor único de órdenes: el planificador de pasadas del riel hará exactamente esta
+     * misma llamada que hace hoy cualquier otro emisor.
      */
     @PostMapping("/api/capturas/ordenes")
     public ResponseEntity<EstadoOrden> emitir(@RequestBody NuevaOrden body) {

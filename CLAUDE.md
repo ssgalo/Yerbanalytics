@@ -23,6 +23,7 @@ Yerbanalytics/
 │   ├── frontend/      Dashboard React + TS + Vite (ver §4)
 │   ├── backend/       API REST Spring Boot (Java 17, puerto 8000)
 │   ├── camara/        App de captura (PWA iOS) — proyecto propio (ver §6.1)
+│   ├── simulador/     Simulador de hardware — proyecto propio y borrable (ver §6.2)
 │   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
 │   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
 │   └── Modelo_IA/     Modelo de visión: datasets, notebooks, resultados (ver §5)
@@ -35,9 +36,12 @@ Yerbanalytics/
 Cuatro áreas de trabajo: **frontend**, **backend**, **camara** y **Modelo_IA**. El frontend
 consume el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es futura.
 
-`Desarrollo/camara/` es un **proyecto aparte a propósito**: es la implementación de referencia
-de un contrato, no la definitiva. Si mañana el cliente es una app Android, se borra el
-directorio y nada más se entera.
+`Desarrollo/camara/` y `Desarrollo/simulador/` son **proyectos aparte a propósito**, y por
+motivos distintos. La cámara es la implementación de referencia de un contrato, no la
+definitiva: si mañana el cliente es una app Android, se borra el directorio y nada más se
+entera. El simulador es una herramienta de prueba que no debería tener presencia en el
+sistema: se borra la carpeta y el vivero sigue funcionando igual, esperando telemetría de
+hardware real.
 
 ---
 
@@ -115,6 +119,12 @@ npm run dev          # http://localhost:5173
   `DataRepository`; no sabe si detrás hay un mock determinístico o el backend real.
   Se elige con `VITE_DATA_SOURCE` (`mock` | `http`). Migrar a backend = cambiar una
   variable de entorno, sin tocar componentes.
+  > **`VITE_DATA_SOURCE` es el modo de operación de la app**, y es el **único** punto de
+  > decisión: rige para *todas* las secciones, así que nunca conviven en pantalla datos mock
+  > con datos del backend. `http` es el sistema real (producción); `mock` es la demo
+  > ilustrativa, no funcional y sin backend (`npm run dev:demo`, preconfigurado en
+  > `.env.demo`). Se resuelve al arrancar: cambiar de modo exige reiniciar el dashboard.
+  > Ninguna vista consulta el modo al backend — el backend no tiene modos.
 - **Tipos de dominio** (`src/types/domain.ts`): contratos compartidos.
 - **Átomos UI** (`src/components/ui/`): Card, Badge, StatusDot, ProgressBar,
   Sparkline, Icon.
@@ -131,7 +141,8 @@ npm run dev          # http://localhost:5173
   (`--font-body`, cuerpo).
 
 ### Scripts
-`npm run dev` · `build` · `preview` · `lint` (0 warnings) · `format` · `test`.
+`npm run dev` (sistema real) · `dev:demo` (demo estática) · `build` · `build:demo` ·
+`preview` · `lint` (0 warnings) · `format` · `test`.
 
 Detalle completo en `Desarrollo/frontend/README.md`.
 
@@ -163,9 +174,13 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 (con simulador). El esquema lo crea Hibernate (`ddl-auto=update`) y se siembra con
 `resources/data.sql` (600 sectores, 6 zonas).
 
-> **Migración manual pendiente**: el sensado se mudó de `sector` a `zona`.
-> `ddl-auto=update` agrega columnas pero no migra datos ni borra las obsoletas.
-> Ver `resources/migracion-manual.sql` y el README del backend.
+> **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
+> ni borra lo obsoleto, así que hay dos scripts para correr a mano:
+> - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
+> - `resources/migracion-quitar-simulador.sql` — baja de `modo_operacion` y `sensor_simulado`,
+>   que eran estado de una herramienta de prueba dentro de la base de producción (ver §6.2).
+>
+> Detalle en el README del backend.
 
 ### Arranque rápido
 ```bash
@@ -176,9 +191,9 @@ cd Desarrollo/backend
 ### Endpoints principales
 - `GET /api/nursery` → snapshot del vivero (`NurseryData` en `frontend/src/types/domain.ts`).
   Cada zona trae `lectura` (las 10 métricas evaluadas) y `nodo` (batería/señal del testigo).
-- `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa el panel de
-  simulación hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de
-  origen y sin depender del modo de operación (ver §6.1).
+- `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa una carga manual
+  hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de origen y sin
+  ningún estado global que lo condicione (ver §6.1).
 
 ### Convenciones internas
 - Entidades con Lombok + `JpaRepository` + service + controller.
@@ -187,6 +202,10 @@ cd Desarrollo/backend
 - **`spring.jpa.open-in-view=false`.** No revertir sin leer el porqué en el README del
   backend: con el stream SSE de órdenes, cada dispositivo conectado retendría una conexión
   JDBC permanente.
+- **El backend sólo *consume* MQTT.** No tiene publicador ni debería tenerlo: quien publica es
+  el hardware, o el simulador que lo reemplaza (§6.2).
+- **El backend no tiene modos de operación.** Ningún endpoint, tabla ni propiedad depende de
+  que el sistema esté "en simulación": se comporta siempre como en producción.
 
 ---
 
@@ -225,6 +244,40 @@ del backend.
 
 ---
 
+## 6.2 Simulador de hardware (`Desarrollo/simulador/`)
+
+Ocupa el lugar del hardware físico: publica telemetría en el broker como si fuera un nodo
+ESP32, y ejercita el ciclo de captura del riel. Es una app Node independiente (React + Vite
+para la UI, Express + cliente MQTT del lado servidor), en el `:5180`.
+
+**El criterio de aceptación es literal: borrar la carpeta no debe requerir tocar nada.**
+
+Invariantes a respetar al tocar esta área:
+
+- **El backend no conoce al simulador.** Ni endpoint, ni entidad, ni tabla, ni propiedad, ni
+  origen CORS, ni rama de código. Si arreglar algo del simulador parece requerir tocar el
+  backend, la solución está mal.
+- **Publica directo al broker**, en `nursery/zone/{zonaId}/telemetry`, con el mismo payload y
+  las mismas unidades que el firmware. El backend lo ingiere sin distinguirlo de un nodo real.
+  Se descartó pasar por un endpoint del backend: ése era el acoplamiento que se vino a sacar.
+- **La UI habla con el backend a través de `/backend/**`**, el proxy de su propio servidor. Si
+  llamara directo, el backend tendría que permitir su origen por CORS — y eso sería un rastro.
+- **Su estado vive en `simulador/data/`**, nunca en la base del vivero.
+- **No tiene superficie de API propia en el sistema**: topología, órdenes de captura,
+  dispositivos y diagnósticos son endpoints públicos, los mismos que usarán el planificador de
+  pasadas y el servicio de inferencia. **No toca `/api/camara/v1/**`**, que es el contrato del
+  dispositivo.
+- **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
+  `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
+
+No confundir el simulador con el **modo estático** del dashboard: ése es
+`VITE_DATA_SOURCE=mock` (§4), una demo ilustrativa sin backend. El simulador es lo contrario —
+sirve para probar el sistema **real** inyectándole hardware simulado.
+
+Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
+
+---
+
 ## 7. Convenciones del repo
 
 - **Commits**: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`…). Sin
@@ -241,6 +294,7 @@ del backend.
 | Tema | Dónde |
 |------|-------|
 | Diseño del dashboard | `Desarrollo/frontend/Yerbanalytics.dc.html` |
+| Cómo correr el simulador | `Desarrollo/simulador/README.md` |
 | Cómo correr el frontend | `Desarrollo/frontend/README.md` |
 | Plan del frontend (SDD) | `openspec/changes/add-monitoring-frontend/` |
 | Contrato de la cámara | `Desarrollo/contratos/camara/v1/` (OpenAPI + referencia) |

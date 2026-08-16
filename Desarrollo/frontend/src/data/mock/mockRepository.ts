@@ -5,22 +5,12 @@
 import type { DataRepository } from '@/data/repository';
 import type {
   ActionRecord,
-  CodigoVinculacion,
   Configuracion,
-  DiagnosticoRegistrado,
-  DispositivoCamara,
-  NuevaOrdenCaptura,
-  NuevoDiagnostico,
-  OrdenCaptura,
   DisposicionTopologia,
-  EnvioTelemetria,
   HardwareData,
-  ModoSimulacion,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
-  SensorSimulado,
-  SimulacionEstado,
   TopologiaVivero,
 } from '@/types/domain';
 import { validateConfig } from '@/lib/configValidation';
@@ -35,8 +25,6 @@ import {
   setZonasDisponibles,
   type RawDispositivo,
 } from './hardware';
-import { aplicarEnvioMock } from './simulacion';
-import { CapturaMock } from './captura';
 import {
   clampDisposicion,
   DEFAULT_MACRO_ZONAS,
@@ -57,12 +45,6 @@ export class MockRepository implements DataRepository {
   private topologiaOverride: TopologiaGrid | null = null;
   /** Disposición visual elegida por el Administrador; null = defaults (HU-18 CA-01). */
   private disposicionOverride: DisposicionTopologia | null = null;
-  /** Modo de operación (dashboard de simulación). En memoria, default estático. */
-  private modoSimulacion: ModoSimulacion = 'estatico';
-  private autoSimulador = false;
-  /** Sensores simulados en memoria, desacoplados del registro de hardware. */
-  private sensoresSimulados: SensorSimulado[] = [];
-  private readonly captura = new CapturaMock();
 
   constructor(private readonly seed: number) {}
 
@@ -74,43 +56,7 @@ export class MockRepository implements DataRepository {
         this.disposicionOverride ?? undefined,
       );
     }
-    return this.conDiagnosticosCargados(this.cache);
-  }
-
-  /**
-   * Antepone los diagnósticos cargados a las tarjetas generadas, igual que hace
-   * `NurseryService` en el backend. La vista no los distingue: es lo que hace que enchufar
-   * el modelo de IA no requiera tocar el frontend.
-   */
-  private conDiagnosticosCargados(base: NurseryData): NurseryData {
-    const cargados = this.captura.listarDiagnosticos();
-    if (cargados.length === 0) return base;
-
-    const cards = cargados.map((d) => ({
-      id: d.id,
-      sectorId: d.sectorId,
-      zonaName: base.byId[d.sectorId]?.zonaName ?? d.zonaId,
-      estado: d.estado,
-      conf: d.conf,
-      sev: d.sev as NurseryData['diagnoses'][number]['sev'],
-      sevSoft: base.sevMap[d.sev as keyof typeof base.sevMap]?.soft ?? base.sevMap['—'].soft,
-      sevInk: base.sevMap[d.sev as keyof typeof base.sevMap]?.ink ?? base.sevMap['—'].ink,
-      thumb: base.tints[d.estado] ?? base.tints['Sin diagnóstico'],
-      time: 'recién',
-      concluyente: d.concluyente,
-      imagenUrl: d.imagenUrl,
-    }));
-
-    const diagnoses = [...cards, ...base.diagnoses];
-    const diagById = { ...base.diagById };
-    cards.forEach((c) => (diagById[c.id] = c));
-
-    return {
-      ...base,
-      diagnoses,
-      diagById,
-      stats: { ...base.stats, diagCount: diagnoses.length },
-    };
+    return this.cache;
   }
 
   async getHistory(): Promise<ActionRecord[]> {
@@ -243,90 +189,5 @@ export class MockRepository implements DataRepository {
     this.cache = null;
 
     return topologiaSummary(t.macroZonas, t.sectoresPorMacroZona, this.disposicionOverride);
-  }
-
-  async getSimulacionEstado(): Promise<SimulacionEstado> {
-    return { modo: this.modoSimulacion, autoSimulador: this.autoSimulador };
-  }
-
-  async setModoSimulacion(modo: ModoSimulacion): Promise<SimulacionEstado> {
-    this.modoSimulacion = modo;
-    // Al volver a estático se apaga el simulador automático (igual que el backend).
-    if (modo === 'estatico') this.autoSimulador = false;
-    return { modo: this.modoSimulacion, autoSimulador: this.autoSimulador };
-  }
-
-  async getSensoresSimulados(): Promise<SensorSimulado[]> {
-    return this.sensoresSimulados.map((s) => ({ ...s }));
-  }
-
-  async crearSensorSimulado(input: SensorSimulado): Promise<SensorSimulado[]> {
-    const serial = input.serial.trim();
-    const zonaId = input.zonaId.trim();
-    if (!serial) throw new Error('El serial/MAC del sensor es obligatorio.');
-    if (!zonaId) throw new Error('La macro-zona del sensor es obligatoria.');
-    if (this.sensoresSimulados.some((s) => s.serial.toLowerCase() === serial.toLowerCase())) {
-      throw new Error(`Ya existe un sensor simulado con el serial/MAC «${serial}».`);
-    }
-    this.sensoresSimulados = [...this.sensoresSimulados, { serial, zonaId }];
-    return this.getSensoresSimulados();
-  }
-
-  async eliminarSensorSimulado(serial: string): Promise<SensorSimulado[]> {
-    this.sensoresSimulados = this.sensoresSimulados.filter(
-      (s) => s.serial.toLowerCase() !== serial.trim().toLowerCase(),
-    );
-    return this.getSensoresSimulados();
-  }
-
-  async enviarTelemetria(input: EnvioTelemetria): Promise<void> {
-    // Mismo comportamiento que el backend: sólo se acepta en modo simulación (409).
-    if (this.modoSimulacion !== 'simulacion') {
-      throw new Error('La simulación está inactiva. Activá el modo simulación para enviar lecturas.');
-    }
-    // Sin broker: se refleja el envío actualizando los sectores de la zona en el snapshot.
-    const nursery = await this.getNursery();
-    this.cache = aplicarEnvioMock(nursery, input);
-  }
-
-  /* ----------------------------------------------------------------
-     Captura de imágenes (HU-04 CA-01).
-
-     Sin backend no hay dispositivo: `CapturaMock` finge el ciclo de la orden con el paso del
-     tiempo. Lo que NO se finge es la forma — mismos estados, campos y validaciones que el
-     backend real, para que el panel no descubra diferencias al cambiar VITE_DATA_SOURCE.
-     ---------------------------------------------------------------- */
-
-  async getDispositivosCamara(): Promise<DispositivoCamara[]> {
-    return this.captura.getDispositivos();
-  }
-
-  async generarCodigoVinculacion(): Promise<CodigoVinculacion> {
-    return this.captura.generarCodigo();
-  }
-
-  async emitirOrdenCaptura(input: NuevaOrdenCaptura): Promise<OrdenCaptura> {
-    const nursery = await this.getNursery();
-    const sector = nursery.byId[input.sectorId];
-    if (!sector) {
-      throw new Error(`El sector '${input.sectorId}' no existe en la topología vigente.`);
-    }
-    return this.captura.emitirOrden(input, sector.zona);
-  }
-
-  async getOrdenCaptura(ordenId: string): Promise<OrdenCaptura> {
-    return this.captura.getOrden(ordenId);
-  }
-
-  async crearDiagnostico(input: NuevoDiagnostico): Promise<DiagnosticoRegistrado> {
-    const nursery = await this.getNursery();
-    const sectorId = input.sectorId?.trim();
-    if (sectorId && !nursery.byId[sectorId]) {
-      throw new Error(`El sector '${sectorId}' no existe en la topología vigente.`);
-    }
-    const creado = await this.captura.crearDiagnostico(input);
-    // Se invalida la caché para que el poll del provider vea la tarjeta nueva.
-    this.cache = this.cache ? { ...this.cache } : this.cache;
-    return creado;
   }
 }

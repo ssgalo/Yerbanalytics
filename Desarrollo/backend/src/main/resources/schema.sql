@@ -105,14 +105,5 @@ CREATE TABLE IF NOT EXISTS topologia_layout (
     sectores_por_fila INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS modo_operacion (
-    id INTEGER PRIMARY KEY,
-    modo VARCHAR(255) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS sensor_simulado (
-    id BIGSERIAL PRIMARY KEY,
-    serial_key VARCHAR(255) NOT NULL UNIQUE,
-    serial VARCHAR(255) NOT NULL,
-    zona_id VARCHAR(255) NOT NULL
-);
+-- `modo_operacion` y `sensor_simulado` se dieron de baja: eran estado de una herramienta de
+-- prueba dentro de la base de producción. Ver `migracion-quitar-simulador.sql`.

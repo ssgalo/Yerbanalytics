@@ -30,7 +30,7 @@ import java.util.Map;
  *       cliente (hoy la PWA; mañana una app Android). Definido en
  *       {@code Desarrollo/contratos/camara/v1/openapi.yaml}, que es la fuente de verdad.</li>
  *   <li>{@code /api/camara/vinculacion} y {@code /api/camara/dispositivos} — API de
- *       plataforma. La consume el backoffice/simulador, no el dispositivo.</li>
+ *       plataforma. La consume el backoffice, no el dispositivo.</li>
  * </ul>
  *
  * Agregar rutas al primer grupo cambia el contrato y exige actualizar el OpenAPI.

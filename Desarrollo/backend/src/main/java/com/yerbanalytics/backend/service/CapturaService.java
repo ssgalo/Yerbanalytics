@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * dos órdenes seguidas sobre el mismo sector se volverían indistinguibles y el reloj del
  * dispositivo no es autoridad.
  *
- * <p>Este servicio no sabe quién emite las órdenes. Hoy las emite el panel de simulación;
+ * <p>Este servicio no sabe quién emite las órdenes. Hoy las emite un operador a mano;
  * mañana un planificador o el motor de reglas. Todos entran por {@link #emitirOrden}.
  */
 @Service

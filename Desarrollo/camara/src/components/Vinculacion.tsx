@@ -34,8 +34,8 @@ export function Vinculacion({
       <div>
         <h1 style={{ margin: '0 0 6px', fontSize: 26 }}>Vincular dispositivo</h1>
         <p style={{ margin: 0, color: 'var(--texto-2)', lineHeight: 1.5 }}>
-          Generá un código en el panel de simulación de Yerbanalytics y escribilo acá. Se hace una
-          sola vez.
+          Generá un código de vinculación en Yerbanalytics y escribilo acá. Se hace una sola
+          vez.
         </p>
       </div>
 

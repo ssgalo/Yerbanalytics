@@ -18,13 +18,12 @@ import java.util.Map;
  * Alta y consulta de diagnósticos.
  *
  * <p><strong>Un único camino de escritura, sin variantes.</strong> Este endpoint es el mismo
- * que va a usar el servicio de inferencia cuando exista el modelo, y el mismo que usa hoy el
- * panel de simulación para cargar un diagnóstico a mano. No hay endpoint de simulación, no hay
- * parámetro de origen, y el alta <strong>no</strong> depende del modo estático/simulación:
- * el modelo tampoco va a depender de él.
+ * que va a usar el servicio de inferencia cuando exista el modelo, y el mismo que usa hoy una
+ * carga manual. No hay endpoint alternativo, no hay parámetro de origen y no hay ningún estado
+ * global del backend que condicione el alta: el modelo tampoco va a depender de uno.
  *
  * <p>El modelo es Keras/Python; aunque corra en la misma máquina, no vive dentro del JVM. El
- * diagnóstico entra por HTTP con o sin simulador.
+ * diagnóstico entra por HTTP en cualquier caso.
  */
 @RestController
 @RequestMapping("/api/diagnosticos")

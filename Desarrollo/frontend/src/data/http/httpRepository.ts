@@ -6,22 +6,12 @@
 import type { DataRepository } from '@/data/repository';
 import type {
   ActionRecord,
-  CodigoVinculacion,
-  DiagnosticoRegistrado,
-  DispositivoCamara,
-  NuevaOrdenCaptura,
-  NuevoDiagnostico,
-  OrdenCaptura,
   Configuracion,
   DisposicionTopologia,
-  EnvioTelemetria,
   HardwareData,
-  ModoSimulacion,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
-  SensorSimulado,
-  SimulacionEstado,
   TopologiaVivero,
 } from '@/types/domain';
 
@@ -162,134 +152,5 @@ export class HttpRepository implements DataRepository {
       throw new Error(body?.error ?? `Error ${res.status} al guardar la disposición`);
     }
     return (await res.json()) as TopologiaVivero;
-  }
-
-  async getSimulacionEstado(): Promise<SimulacionEstado> {
-    const res = await fetch(`${this.baseUrl}/simulacion?t=${Date.now()}`);
-    if (!res.ok) {
-      throw new Error(
-        `Error ${res.status} al obtener el estado de simulación desde ${this.baseUrl}`,
-      );
-    }
-    return (await res.json()) as SimulacionEstado;
-  }
-
-  async setModoSimulacion(modo: ModoSimulacion): Promise<SimulacionEstado> {
-    const res = await fetch(`${this.baseUrl}/simulacion`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modo }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Error ${res.status} al cambiar el modo de simulación`);
-    }
-    return (await res.json()) as SimulacionEstado;
-  }
-
-  async getSensoresSimulados(): Promise<SensorSimulado[]> {
-    const res = await fetch(`${this.baseUrl}/simulacion/sensores?t=${Date.now()}`);
-    if (!res.ok) {
-      throw new Error(`Error ${res.status} al listar los sensores simulados desde ${this.baseUrl}`);
-    }
-    return (await res.json()) as SensorSimulado[];
-  }
-
-  async crearSensorSimulado(input: SensorSimulado): Promise<SensorSimulado[]> {
-    const res = await fetch(`${this.baseUrl}/simulacion/sensores`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      // 400 si el serial/MAC ya existe o falta la zona.
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Error ${res.status} al crear el sensor simulado`);
-    }
-    return this.getSensoresSimulados();
-  }
-
-  async eliminarSensorSimulado(serial: string): Promise<SensorSimulado[]> {
-    const res = await fetch(
-      `${this.baseUrl}/simulacion/sensores?serial=${encodeURIComponent(serial)}`,
-      { method: 'DELETE' },
-    );
-    if (!res.ok) {
-      throw new Error(`Error ${res.status} al eliminar el sensor simulado`);
-    }
-    return this.getSensoresSimulados();
-  }
-
-  async enviarTelemetria(input: EnvioTelemetria): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/simulacion/telemetria`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      // El backend devuelve { error }: 409 si la simulación está inactiva, 400 dato inválido,
-      // 502 si falla la publicación al broker.
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Error ${res.status} al enviar la telemetría`);
-    }
-  }
-
-  /* ----------------------------------------------------------------
-     Captura de imágenes (HU-04 CA-01).
-
-     Endpoints públicos de la plataforma. Ninguno es exclusivo del simulador: `ordenes` es
-     el que usará el planificador de pasadas del riel y `diagnosticos` el que usará el
-     servicio de inferencia. El contrato del dispositivo de captura (`/api/camara/v1/**`) NO
-     se toca desde acá — ese lo implementa la app de cámara.
-     ---------------------------------------------------------------- */
-
-  async getDispositivosCamara(): Promise<DispositivoCamara[]> {
-    const res = await fetch(`${this.baseUrl}/camara/dispositivos?t=${Date.now()}`);
-    if (!res.ok) {
-      throw new Error(`Error ${res.status} al obtener los dispositivos de cámara`);
-    }
-    return (await res.json()) as DispositivoCamara[];
-  }
-
-  async generarCodigoVinculacion(): Promise<CodigoVinculacion> {
-    const res = await fetch(`${this.baseUrl}/camara/vinculacion`, { method: 'POST' });
-    if (!res.ok) {
-      throw new Error(`Error ${res.status} al generar el código de vinculación`);
-    }
-    return (await res.json()) as CodigoVinculacion;
-  }
-
-  async emitirOrdenCaptura(input: NuevaOrdenCaptura): Promise<OrdenCaptura> {
-    const res = await fetch(`${this.baseUrl}/capturas/ordenes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Error ${res.status} al pedir la captura`);
-    }
-    return this.absolutizarImagen((await res.json()) as OrdenCaptura);
-  }
-
-  async getOrdenCaptura(ordenId: string): Promise<OrdenCaptura> {
-    const res = await fetch(`${this.baseUrl}/capturas/ordenes/${encodeURIComponent(ordenId)}`);
-    if (!res.ok) {
-      throw new Error(`Error ${res.status} al consultar la orden de captura`);
-    }
-    return this.absolutizarImagen((await res.json()) as OrdenCaptura);
-  }
-
-  async crearDiagnostico(input: NuevoDiagnostico): Promise<DiagnosticoRegistrado> {
-    const res = await fetch(`${this.baseUrl}/diagnosticos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Error ${res.status} al registrar el diagnóstico`);
-    }
-    return this.absolutizarImagen((await res.json()) as DiagnosticoRegistrado);
   }
 }

@@ -1,0 +1,320 @@
+/* ============================================================
+   Simulator styles. Deliberately its own and minimal.
+
+   The dashboard's tokens and atoms are NOT imported: the simulator is a test tool, not a
+   view of the product, and sharing its UI would tie it to refactors of a project that is not
+   its own. The accepted trade-off is that it does not look like the dashboard.
+   ============================================================ */
+
+:root {
+  --bg: #f4f5f2;
+  --paper: #ffffff;
+  --ink: #1e2420;
+  --muted: #6a776e;
+  --line: #dcdfd8;
+  --accent: #2e7a4f;
+  --accent-soft: #e7f1ea;
+  --error: #a8331c;
+  --error-soft: #fbe6e0;
+  --warn: #a66a12;
+  --warn-soft: #fbf0dc;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---- Layout ---- */
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.header .brand {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.intro {
+  color: var(--muted);
+  margin: 8px 0 20px;
+  max-width: 76ch;
+}
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sectionHint {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 2px 0 14px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ---- Controls ---- */
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 9px;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input:disabled,
+select:disabled,
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.num {
+  width: 100px;
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 7px 13px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.primary:hover:not(:disabled) {
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+.small {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
+.danger {
+  color: var(--error);
+}
+
+/* ---- Signals ---- */
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeOk {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.note {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.errorText {
+  color: var(--error);
+  font-size: 13px;
+}
+
+.okText {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+/* ---- Status bar ---- */
+
+.statusBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 10px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 12.5px;
+}
+
+.statusDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.up {
+  background: var(--accent);
+}
+
+.down {
+  background: var(--error);
+}
+
+/* ---- Sensors ---- */
+
+.sensors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+  gap: 16px;
+}
+
+.sensorHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sensorHead .serial {
+  font-weight: 600;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.metricRow {
+  display: grid;
+  grid-template-columns: 1fr 108px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.metricRow + .metricRow {
+  border-top: 1px solid var(--line);
+}
+
+.metricRow .name {
+  font-size: 13px;
+}
+
+.metricRow .unit {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-left: 4px;
+}
+
+.divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 14px 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- Camera ---- */
+
+.capture {
+  max-width: 380px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  display: block;
+  margin-top: 12px;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 8px 0;
+}
