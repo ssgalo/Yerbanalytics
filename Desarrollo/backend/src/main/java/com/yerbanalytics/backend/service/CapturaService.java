@@ -520,9 +520,16 @@ public class CapturaService {
         return capturaRepo.findById(capturaId);
     }
 
+    /** Capturas completadas sin diagnóstico. Las consume el servicio de inferencia. */
+    @Transactional(readOnly = true)
+    public List<CapturaEntity> capturassinDiagnostico() {
+        return capturaRepo.findSinDiagnostico();
+    }
+
     public byte[] leerImagen(CapturaEntity c) throws IOException {
         return almacenamiento.leer(c.getRutaArchivo());
     }
+
 
     public boolean hayCanalAbierto() {
         return !emisores.isEmpty();

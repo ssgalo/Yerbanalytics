@@ -132,13 +132,30 @@ if (-not (Test-Path $frontEnv)) {
     Write-Host ""
 }
 
+$inferenciaDir = Join-Path $ScriptRoot "Desarrollo\servicio-inferencia"
+$hayInferencia = Test-Path $inferenciaDir
+
+# Si el servicio de inferencia existe pero no tiene .env, copiar el ejemplo.
+# Sin .env, el contenedor crashea en el primer arranque porque MODEL_PATH es obligatoria.
+# El script no fuerza el arranque del servicio: Docker Compose lo levanta junto con los otros.
+if ($hayInferencia) {
+    $infEnv = Join-Path $inferenciaDir ".env"
+    if (-not (Test-Path $infEnv)) {
+        Copy-Item (Join-Path $inferenciaDir ".env.example") $infEnv
+        Write-Host "[setup] .env del servicio de inferencia creado desde .env.example." -ForegroundColor Yellow
+        Write-Host "        IMPORTANTE: editá MODEL_PATH y MODEL_CLASSES en:" -ForegroundColor Yellow
+        Write-Host "        $infEnv" -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
+
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host "  Iniciando servicios...                   " -ForegroundColor Green
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""
 
 # 1. Docker
-Write-Host "[1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto)..." -ForegroundColor Cyan
+Write-Host "[1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto + Inferencia)..." -ForegroundColor Cyan
 Push-Location $ScriptRoot
 docker-compose up -d
 $dcExit = $LASTEXITCODE
@@ -200,6 +217,10 @@ Write-Host "  - Backend:    http://localhost:8000      " -ForegroundColor Green
 Write-Host "  - Frontend:   http://localhost:5173      " -ForegroundColor Green
 if ($haySimulador) {
     Write-Host "  - Simulador:  http://localhost:5180      " -ForegroundColor Green
+}
+if ($hayInferencia) {
+    Write-Host "  - Inferencia: (daemon Docker, ver logs con:)" -ForegroundColor Green
+    Write-Host "                docker logs -f servicio-inferencia" -ForegroundColor DarkGray
 }
 Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""

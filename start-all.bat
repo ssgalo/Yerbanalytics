@@ -89,13 +89,25 @@ if not exist "Desarrollo\frontend\.env" (
     echo.
 )
 
+:: Si el servicio de inferencia existe pero no tiene .env, copiar el ejemplo.
+:: Sin .env el contenedor crashea porque MODEL_PATH es obligatoria.
+set "HAY_INFERENCIA=0"
+if exist "Desarrollo\servicio-inferencia" set "HAY_INFERENCIA=1"
+if "%HAY_INFERENCIA%"=="1" if not exist "Desarrollo\servicio-inferencia\.env" (
+    copy /y "Desarrollo\servicio-inferencia\.env.example" "Desarrollo\servicio-inferencia\.env" >nul
+    echo [setup] .env del servicio de inferencia creado desde .env.example.
+    echo         IMPORTANTE: edita MODEL_PATH y MODEL_CLASSES en:
+    echo         %~dp0Desarrollo\servicio-inferencia\.env
+    echo.
+)
+
 echo ===========================================
 echo   Iniciando servicios...
 echo ===========================================
 echo.
 
 :: 1. Docker
-echo [1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto)...
+echo [1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto + Inferencia)...
 docker-compose up -d
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Fallo al iniciar Docker. Asegurate de que Docker Desktop este corriendo.
@@ -148,6 +160,10 @@ echo   Servicios iniciando en segundo plano.
 echo   - Backend:    http://localhost:8000
 echo   - Frontend:   http://localhost:5173
 if "%HAY_SIMULADOR%"=="1" echo   - Simulador:  http://localhost:5180
+if "%HAY_INFERENCIA%"=="1" (
+    echo   - Inferencia: daemon Docker. Ver logs con:
+    echo                 docker logs -f servicio-inferencia
+)
 echo ===========================================
 echo.
 popd
