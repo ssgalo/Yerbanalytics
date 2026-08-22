@@ -10,7 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copiar e instalar dependencias Python primero (optimiza cache de capas)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Forzamos la instalación de la versión ligera de CPU para PyTorch
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copiar código fuente
 COPY src/ ./src/
