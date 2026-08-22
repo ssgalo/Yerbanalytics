@@ -31,9 +31,8 @@ services:
     container_name: servicio-inferencia
     restart: unless-stopped
     environment:
-      # URL del backend dentro de la red Docker.
-      # Reemplazar 'backend' por el nombre de servicio real si cambia.
-      BACKEND_URL: http://backend:8080
+      # URL del backend (Spring Boot) que corre en la máquina host en el puerto 8000
+      BACKEND_URL: http://host.docker.internal:8000
       # Directorio de capturas montado como volumen compartido.
       CAPTURAS_DIR: /capturas
       # Intervalo de polling en segundos (default 4 horas = 14400).
