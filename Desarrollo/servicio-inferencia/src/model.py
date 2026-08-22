@@ -3,15 +3,8 @@ model.py — Carga del modelo .pt y pipeline de inferencia.
 
 Responsabilidades:
   - Leer MODEL_PATH y MODEL_CLASSES desde el entorno en la inicialización.
-  - Cargar el modelo MobileNetV3-Large una única vez y mantenerlo en memoria.
+  - Cargar el modelo YOLO (Ultralytics) una única vez y mantenerlo en memoria.
   - Exponer predict(image_path) que devuelve (estado, confianza_pct, severidad).
-
-Transformaciones de imagen:
-  Se usan las transforms estándar de ImageNet requeridas por MobileNetV3-Large:
-    - Resize a 256×256, CenterCrop a 224×224
-    - ToTensor + Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])
-  Si el modelo fue fine-tuneado con transformaciones distintas, ajustar
-  la función _build_transforms() en este módulo.
 """
 
 from __future__ import annotations
@@ -20,10 +13,7 @@ import logging
 import os
 from pathlib import Path
 
-import torch
-import torch.nn.functional as F
-from PIL import Image
-from torchvision import transforms
+from ultralytics import YOLO
 
 logger = logging.getLogger(__name__)
 
@@ -43,22 +33,6 @@ ESTADOS_VALIDOS = frozenset({
 # de negocio estable que no varía por modelo.
 _UMBRAL_SEVERIDAD_ALTA = 80.0
 _UMBRAL_SEVERIDAD_MEDIA = 50.0
-
-
-def _build_transforms() -> transforms.Compose:
-    """
-    Transforms estándar de ImageNet para MobileNetV3-Large.
-    Ajustar aquí si el entrenamiento usó un pipeline distinto.
-    """
-    return transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225],
-        ),
-    ])
 
 
 def _parse_classes(raw: str) -> list[str]:
@@ -86,7 +60,7 @@ def _map_severidad(confianza_pct: float) -> str:
 
 class InferenceModel:
     """
-    Singleton del modelo cargado en memoria.
+    Singleton del modelo YOLO cargado en memoria.
     Instanciar una única vez al arranque del daemon.
     """
 
@@ -110,19 +84,18 @@ class InferenceModel:
             )
         self._classes = _parse_classes(raw_classes)
 
-        logger.info("Cargando modelo desde %s …", model_path)
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._model = torch.load(model_path, map_location=self._device, weights_only=False)
-        self._model.eval()
-        self._transforms = _build_transforms()
+        logger.info("Cargando modelo YOLO desde %s …", model_path)
+        self._model = YOLO(model_path)
+        
+        # Opcional: mostrar las clases que traía el modelo original vs las nuestras
         logger.info(
-            "Modelo listo en %s — %d clases: %s",
-            self._device, len(self._classes), self._classes,
+            "Modelo listo. Clases configuradas (%d): %s",
+            len(self._classes), self._classes,
         )
 
     def predict(self, image_path: str) -> tuple[str, float, str]:
         """
-        Ejecuta la inferencia sobre una imagen JPEG local.
+        Ejecuta la inferencia sobre una imagen JPEG local usando YOLO.
 
         Args:
             image_path: Ruta absoluta al archivo JPEG.
@@ -135,26 +108,31 @@ class InferenceModel:
 
         Raises:
             FileNotFoundError: si el archivo no existe en disco.
-            OSError: si el archivo no es una imagen válida.
         """
         path = Path(image_path)
         if not path.is_file():
             raise FileNotFoundError(f"Imagen no encontrada en disco: {image_path}")
 
-        image = Image.open(path).convert("RGB")
-        tensor = self._transforms(image).unsqueeze(0).to(self._device)
+        # Ejecuta la predicción (YOLO se encarga internamente del preprocesamiento y dispositivo)
+        results = self._model(str(path), verbose=False)
+        result = results[0]
 
-        with torch.no_grad():
-            logits = self._model(tensor)
-            probas = F.softmax(logits, dim=1).squeeze(0)
+        # Validación por si cargan un modelo de detección de objetos en vez de clasificación
+        if not hasattr(result, 'probs') or result.probs is None:
+            logger.error(
+                "El modelo no devolvió probabilidades (probs). "
+                "Esto suele pasar si se subió un modelo de detección de objetos (YOLO-Det) "
+                "en lugar de uno de clasificación de imágenes (YOLO-Cls)."
+            )
+            return "No concluyente", 0.0, "Baja"
 
-        idx = int(probas.argmax().item())
-        confianza_pct = round(float(probas[idx].item()) * 100, 2)
+        # YOLO classification logic
+        idx = int(result.probs.top1)
+        confianza_pct = round(float(result.probs.top1conf) * 100, 2)
 
         if idx >= len(self._classes):
             logger.error(
-                "El modelo devolvió el índice %d pero solo hay %d clases configuradas. "
-                "Revisá MODEL_CLASSES en el .env.",
+                "El modelo YOLO devolvió el índice %d pero solo hay %d clases configuradas en MODEL_CLASSES.",
                 idx, len(self._classes),
             )
             estado = "No concluyente"
