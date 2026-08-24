@@ -117,18 +117,21 @@ class InferenceModel:
         results = self._model(str(path), verbose=False)
         result = results[0]
 
-        # Validación por si cargan un modelo de detección de objetos en vez de clasificación
-        if not hasattr(result, 'probs') or result.probs is None:
+        if hasattr(result, 'probs') and result.probs is not None:
+            # YOLO classification logic
+            idx = int(result.probs.top1)
+            confianza_pct = round(float(result.probs.top1conf) * 100, 2)
+        elif hasattr(result, 'boxes') and result.boxes is not None and len(result.boxes.conf) > 0:
+            # YOLO object detection logic: tomar el bounding box con mayor confianza
+            max_idx = result.boxes.conf.argmax().item()
+            idx = int(result.boxes.cls[max_idx].item())
+            confianza_pct = round(float(result.boxes.conf[max_idx].item()) * 100, 2)
+        else:
             logger.error(
-                "El modelo no devolvió probabilidades (probs). "
-                "Esto suele pasar si se subió un modelo de detección de objetos (YOLO-Det) "
-                "en lugar de uno de clasificación de imágenes (YOLO-Cls)."
+                "El modelo no devolvió ni clasificaciones (probs) ni detecciones (boxes). "
+                "No se pudo determinar el estado de la hoja."
             )
             return "No concluyente", 0.0, "Baja"
-
-        # YOLO classification logic
-        idx = int(result.probs.top1)
-        confianza_pct = round(float(result.probs.top1conf) * 100, 2)
 
         if idx >= len(self._classes):
             logger.error(

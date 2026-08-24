@@ -22,7 +22,9 @@ export function selectSectorDetail(data: NurseryData, sectorId: string): SectorD
   if (!sector) return null;
   const zona = data.zonas.find((z) => z.id === sector.zona);
   if (!zona) return null;
-  return buildSectorDetail(sector, zona.lectura);
+  // Find the latest diagnosis for this sector that has an image
+  const latestDiag = data.diagnoses.find(d => d.sectorId === sectorId && d.imagenUrl);
+  return buildSectorDetail(sector, zona.lectura, latestDiag?.imagenUrl);
 }
 
 /**

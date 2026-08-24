@@ -97,11 +97,7 @@ public class CapturaController {
     @GetMapping("/api/capturas/pendientes-diagnostico")
     public ResponseEntity<List<CapturaPendiente>> pendientesDiagnostico() {
         List<CapturaPendiente> pendientes = service.capturassinDiagnostico().stream()
-                .map(c -> {
-                    String[] partes = c.getRutaArchivo().replace('\\', '/').split("/");
-                    String fileName = partes[partes.length - 1];
-                    return new CapturaPendiente(c.getId(), fileName);
-                })
+                .map(c -> new CapturaPendiente(c.getId(), c.getRutaArchivo().replace('\\', '/')))
                 .toList();
         return ResponseEntity.ok(pendientes);
     }

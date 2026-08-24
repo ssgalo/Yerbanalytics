@@ -160,7 +160,6 @@ export async function getCaptureOrder(ordenId: string): Promise<CaptureOrder> {
   return absolutizeImage(await json<CaptureOrder>(res, 'consultar la orden de captura'));
 }
 
-/** Same endpoint the inference service will use. */
 export async function createDiagnosis(input: NewDiagnosis): Promise<RegisteredDiagnosis> {
   const res = await fetch(`${BACKEND}/api/diagnosticos`, {
     method: 'POST',
@@ -169,3 +168,57 @@ export async function createDiagnosis(input: NewDiagnosis): Promise<RegisteredDi
   });
   return absolutizeImage(await json<RegisteredDiagnosis>(res, 'registrar el diagnóstico'));
 }
+
+/* ----------------------------------------------------------------
+   Camera Device API (Simulating the physical device)
+   ---------------------------------------------------------------- */
+
+export async function enrollDevice(codigo: string): Promise<{ refreshToken: string; dispositivoId: string }> {
+  const res = await fetch(`${BACKEND}/api/camara/v1/enrolar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      codigo,
+      nombre: 'Cámara Simulada Web',
+      plataforma: 'web-simulator',
+    }),
+  });
+  return json(res, 'enrolar el dispositivo simulado');
+}
+
+export async function getDeviceToken(refreshToken: string): Promise<{ accessToken: string }> {
+  const res = await fetch(`${BACKEND}/api/camara/v1/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  });
+  return json(res, 'obtener el token de acceso del dispositivo');
+}
+
+export async function uploadImage(ordenId: string, file: File, token: string): Promise<void> {
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const sha256 = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+  const formData = new FormData();
+  formData.append('imagen', file);
+  
+  const meta = {
+    ancho: 1920,
+    alto: 1080,
+    sha256,
+    capturadaEn: Date.now(),
+  };
+  formData.append('meta', JSON.stringify(meta));
+
+  const res = await fetch(`${BACKEND}/api/camara/v1/ordenes/${encodeURIComponent(ordenId)}/imagen`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    body: formData,
+  });
+  await check(res, 'subir la imagen capturada');
+}
+

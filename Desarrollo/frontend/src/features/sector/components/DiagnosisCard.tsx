@@ -30,18 +30,20 @@ export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
           onClick={() => setCapturaAbierta(true)}
           aria-label={`Ver la captura cenital de ${sectorId} a tamaño completo`}
         >
-          <Icon
-            name="leaf-simple"
-            size={60}
-            stroke="rgba(255,255,255,.55)"
-            strokeWidth={1.3}
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%,-50%)',
-            }}
-          />
+          {!diag.imagenUrl && (
+            <Icon
+              name="leaf-simple"
+              size={60}
+              stroke="rgba(255,255,255,.55)"
+              strokeWidth={1.3}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%,-50%)',
+              }}
+            />
+          )}
           <span className={styles.thumbLabel}>Imagen cenital · {ago}</span>
           <span className={styles.thumbHint}>Ampliar</span>
         </button>

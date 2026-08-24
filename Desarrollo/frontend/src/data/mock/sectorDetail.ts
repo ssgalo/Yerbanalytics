@@ -13,7 +13,7 @@ import { sevMap, tints } from './specs';
  * Recibe la `lectura` de su macro-zona porque el seguimiento post-acción compara la
  * humedad de sustrato antes y ahora, y ese valor es de la zona.
  */
-export function buildSectorDetail(s: Sector, lectura: LecturaZona): SectorDetail {
+export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: string): SectorDetail {
   // presentación del diagnóstico
   const diag = {
     estado: s.diagnosis.estado,
@@ -21,9 +21,10 @@ export function buildSectorDetail(s: Sector, lectura: LecturaZona): SectorDetail
     sev: s.diagnosis.sev,
     sevSoft: sevMap[s.diagnosis.sev].soft,
     sevInk: sevMap[s.diagnosis.sev].ink,
-    thumb: tints[s.diagnosis.estado] || tints['Sin diagnóstico'],
+    thumb: imagenUrl ? `url("${imagenUrl}") center/cover no-repeat` : (tints[s.diagnosis.estado] || tints['Sin diagnóstico']),
     concluyente: s.diagnosis.conf != null && s.diagnosis.conf >= 85,
-    hasFoto: s.status !== 'offline',
+    hasFoto: !!imagenUrl || s.status !== 'offline',
+    imagenUrl,
   };
 
   // actuadores

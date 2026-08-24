@@ -43,9 +43,11 @@ services:
       MODEL_CLASSES: "Sano,Clorosis,Estrés solar,Daño biótico,No concluyente,Ácaro,Plaga foliar,Daño fúngico"
     volumes:
       # Volumen compartido de imágenes con el backend.
-      - capturas-data:/capturas
+      - ./Desarrollo/backend/capturas:/capturas
       # Bind-mount del archivo .pt desde el host a la raíz del contenedor.
       - ./best.pt:/best.pt:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - yerbanalytics-db
 

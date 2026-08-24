@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.constant.NurseryConstants;
 import com.yerbanalytics.backend.dto.Diagnostico;
 import com.yerbanalytics.backend.model.CapturaEntity;
 import com.yerbanalytics.backend.model.DiagnosticoEntity;
+import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.CapturaRepository;
 import com.yerbanalytics.backend.repository.DiagnosticoRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
@@ -101,6 +102,14 @@ public class DiagnosticoService {
         e.setSev(sevFinal);
         e.setCreadoEn(System.currentTimeMillis());
         repo.save(e);
+
+        // Actualizar el estado del sector para reflejar este nuevo diagnóstico
+        SectorEntity sector = sectorRepo.findById(sectorFinal)
+                .orElseThrow(() -> new IllegalArgumentException("Sector no encontrado"));
+        sector.setDiagnosisEstado(estado.trim());
+        sector.setDiagnosisConf(conf);
+        sector.setDiagnosisSev(sevFinal);
+        sectorRepo.save(sector);
 
         return aDto(e);
     }
