@@ -67,7 +67,12 @@ export function SectorPage() {
       {/* Diagnóstico e historial a la izquierda; actuadores y seguimiento a la derecha */}
       <div className={styles.layout}>
         <div className={styles.col}>
-          <DiagnosisCard diag={detail.diag} ago={ago} sectorId={sector.id} />
+          <DiagnosisCard
+            diag={detail.diag}
+            ago={ago}
+            sectorId={sector.id}
+            isOffline={sector.status === 'offline'}
+          />
           <SectorHistory hist={detail.hist} />
         </div>
         <div className={styles.col}>

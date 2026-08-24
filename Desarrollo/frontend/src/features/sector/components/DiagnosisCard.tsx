@@ -12,9 +12,10 @@ interface DiagnosisCardProps {
   diag: DiagnosisDetail;
   ago: string;
   sectorId: string;
+  isOffline?: boolean;
 }
 
-export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
+export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardProps) {
   const [capturaAbierta, setCapturaAbierta] = useState(false);
 
   return (
@@ -88,6 +89,22 @@ export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
               />
               <span className={styles.conclusionText}>
                 Confianza por encima del umbral (85%). El motor de reglas puede ejecutar acciones correctivas automáticas.
+              </span>
+            </div>
+          )}
+
+          {/* Caja de advertencia para modo offline */}
+          {isOffline && diag.estado !== 'Sin diagnóstico' && (
+            <div className={styles.warningBox}>
+              <Icon
+                name="warning"
+                size={17}
+                stroke="#856404"
+                strokeWidth={2.2}
+                style={{ flexShrink: 0, marginTop: 1 }}
+              />
+              <span className={styles.warningText}>
+                El sector está fuera de servicio. Este fue el último diagnóstico antes de perder conexión y podría estar desactualizado.
               </span>
             </div>
           )}
