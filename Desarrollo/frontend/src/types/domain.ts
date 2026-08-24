@@ -305,6 +305,7 @@ export interface DiagnosisDetail {
   thumb: string;
   concluyente: boolean;
   hasFoto: boolean;
+  imagenUrl?: string;
 }
 
 /**

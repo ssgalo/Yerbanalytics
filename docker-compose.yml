@@ -24,7 +24,36 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  servicio-inferencia:
+    build:
+      context: ./Desarrollo/servicio-inferencia
+      dockerfile: Dockerfile
+    container_name: servicio-inferencia
+    restart: unless-stopped
+    environment:
+      # URL del backend (Spring Boot) que corre en la máquina host en el puerto 8000
+      BACKEND_URL: http://host.docker.internal:8000
+      # Directorio de capturas montado como volumen compartido.
+      CAPTURAS_DIR: /capturas
+      # Intervalo de polling en segundos (default 4 horas = 14400).
+      POLLING_INTERVAL_SECONDS: 14400
+      # Ruta al .pt dentro del contenedor (montado en volumes más abajo).
+      MODEL_PATH: /best.pt
+      # Orden de clases del modelo entrenado — AJUSTAR al entrenamiento real.
+      MODEL_CLASSES: "Sano,Clorosis,Estrés solar,Daño biótico,No concluyente,Ácaro,Plaga foliar,Daño fúngico"
+    volumes:
+      # Volumen compartido de imágenes con el backend.
+      - ./Desarrollo/backend/capturas:/capturas
+      # Bind-mount del archivo .pt desde el host a la raíz del contenedor.
+      - ./best.pt:/best.pt:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - yerbanalytics-db
+
 volumes:
   mosquitto-data:
   mosquitto-log:
   postgres-data:
+  # Volumen compartido entre backend y servicio de inferencia.
+  capturas-data:

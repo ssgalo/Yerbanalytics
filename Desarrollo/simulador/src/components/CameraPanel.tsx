@@ -22,6 +22,9 @@ import {
   generatePairingCode,
   getCameraDevices,
   getCaptureOrder,
+  enrollDevice,
+  getDeviceToken,
+  uploadImage,
 } from '../api';
 import { DIAGNOSIS_STATES, SEVERITIES } from '../metrics';
 import type { CameraDevice, CaptureOrder, CaptureOrderState, PairingCode, SectorRef } from '../types';
@@ -65,6 +68,10 @@ export function CameraPanel({ sectors }: Props) {
   const [diagSector, setDiagSector] = useState('');
   const [diagZone, setDiagZone] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [directFile, setDirectFile] = useState<File | null>(null);
+  const [directUploading, setDirectUploading] = useState(false);
+  const directTokenRef = useRef<string | null>(null);
 
   const pollRef = useRef<number | null>(null);
   const deadlineRef = useRef(0);
@@ -210,6 +217,48 @@ export function CameraPanel({ sectors }: Props) {
     }
   };
 
+  const handleDirectUpload = async () => {
+    if (!directFile || !sectorId) return;
+    setDirectUploading(true);
+    setError(null);
+    setNotice(null);
+    stopPoll();
+
+    try {
+      if (!directTokenRef.current) {
+        const codeRes = await generatePairingCode();
+        const enrollRes = await enrollDevice(codeRes.codigo);
+        const tokenRes = await getDeviceToken(enrollRes.refreshToken);
+        directTokenRef.current = tokenRes.accessToken;
+      }
+
+      const rail = Number(railPosition) || 1200;
+      const emitted = await emitCaptureOrder(sectorId, rail);
+      setOrder(emitted);
+
+      await uploadImage(emitted.ordenId, directFile, directTokenRef.current);
+      setNotice('¡Imagen subida exitosamente como dispositivo!');
+
+      deadlineRef.current = Date.now() + MAX_WAIT_MS;
+      pollRef.current = window.setInterval(async () => {
+        try {
+          const current = await getCaptureOrder(emitted.ordenId);
+          setOrder(current);
+          if (TERMINAL.includes(current.estado) || (current.estado === 'RECIBIDA' && current.imagenUrl)) {
+            stopPoll();
+          }
+        } catch (e) {
+          stopPoll();
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      }, POLL_MS);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDirectUploading(false);
+    }
+  };
+
   return (
     <>
       <Section
@@ -261,6 +310,44 @@ export function CameraPanel({ sectors }: Props) {
               </strong>
             </div>
           )}
+        </div>
+      </Section>
+
+      <Section
+        title="Subida directa (Auto-simulada)"
+        hint="Genera la orden y sube la imagen automáticamente sin esperar a un dispositivo externo."
+      >
+        <div className="row">
+          <label className="field">
+            <span className="label">Sector</span>
+            <select
+              value={sectorId}
+              onChange={(e) => setSectorId(e.target.value)}
+              disabled={sectors.length === 0}
+            >
+              {sectors.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.id} · {s.zonaName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="label">Imagen a subir</span>
+            <input
+              type="file"
+              accept="image/jpeg, image/png"
+              onChange={(e) => setDirectFile(e.target.files?.[0] || null)}
+            />
+          </label>
+          <button
+            type="button"
+            className="primary"
+            onClick={handleDirectUpload}
+            disabled={directUploading || !sectorId || !directFile}
+          >
+            {directUploading ? 'Subiendo...' : 'Capturar y Subir'}
+          </button>
         </div>
       </Section>
 

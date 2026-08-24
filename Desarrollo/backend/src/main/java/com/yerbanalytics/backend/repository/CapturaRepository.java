@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.repository;
 
 import com.yerbanalytics.backend.model.CapturaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,4 +15,12 @@ public interface CapturaRepository extends JpaRepository<CapturaEntity, String> 
     Optional<CapturaEntity> findByOrdenId(String ordenId);
 
     List<CapturaEntity> findBySectorIdOrderByRecibidaEnDesc(String sectorId);
+
+    /**
+     * Capturas completadas que aún no tienen un diagnóstico asociado.
+     * Fuente de trabajo para el servicio de inferencia.
+     */
+    @Query("SELECT c FROM CapturaEntity c WHERE NOT EXISTS " +
+           "(SELECT 1 FROM DiagnosticoEntity d WHERE d.capturaId = c.id)")
+    List<CapturaEntity> findSinDiagnostico();
 }

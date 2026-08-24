@@ -12,9 +12,10 @@ interface DiagnosisCardProps {
   diag: DiagnosisDetail;
   ago: string;
   sectorId: string;
+  isOffline?: boolean;
 }
 
-export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
+export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardProps) {
   const [capturaAbierta, setCapturaAbierta] = useState(false);
 
   return (
@@ -30,18 +31,20 @@ export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
           onClick={() => setCapturaAbierta(true)}
           aria-label={`Ver la captura cenital de ${sectorId} a tamaño completo`}
         >
-          <Icon
-            name="leaf-simple"
-            size={60}
-            stroke="rgba(255,255,255,.55)"
-            strokeWidth={1.3}
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%,-50%)',
-            }}
-          />
+          {!diag.imagenUrl && (
+            <Icon
+              name="leaf-simple"
+              size={60}
+              stroke="rgba(255,255,255,.55)"
+              strokeWidth={1.3}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%,-50%)',
+              }}
+            />
+          )}
           <span className={styles.thumbLabel}>Imagen cenital · {ago}</span>
           <span className={styles.thumbHint}>Ampliar</span>
         </button>
@@ -86,6 +89,22 @@ export function DiagnosisCard({ diag, ago, sectorId }: DiagnosisCardProps) {
               />
               <span className={styles.conclusionText}>
                 Confianza por encima del umbral (85%). El motor de reglas puede ejecutar acciones correctivas automáticas.
+              </span>
+            </div>
+          )}
+
+          {/* Caja de advertencia para modo offline */}
+          {isOffline && diag.estado !== 'Sin diagnóstico' && (
+            <div className={styles.warningBox}>
+              <Icon
+                name="warning"
+                size={17}
+                stroke="#856404"
+                strokeWidth={2.2}
+                style={{ flexShrink: 0, marginTop: 1 }}
+              />
+              <span className={styles.warningText}>
+                El sector está fuera de servicio. Este fue el último diagnóstico antes de perder conexión y podría estar desactualizado.
               </span>
             </div>
           )}

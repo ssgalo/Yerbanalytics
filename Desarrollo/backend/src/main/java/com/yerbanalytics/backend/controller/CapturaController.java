@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+
 /**
  * Órdenes de captura e imágenes.
  *
@@ -82,6 +83,23 @@ public class CapturaController {
     @GetMapping("/api/capturas/ordenes/{ordenId}")
     public ResponseEntity<EstadoOrden> consultar(@PathVariable String ordenId) {
         return ResponseEntity.ok(service.consultarOrden(ordenId));
+    }
+
+    /**
+     * Lista de capturas completadas sin diagnóstico, consumida por el servicio de inferencia.
+     *
+     * <p>Devuelve el {@code capturaId} y el nombre de archivo ({@code fileName}) extraído de la
+     * ruta persistida. El servicio de inferencia lo combina con su directorio raíz de capturas
+     * configurado por {@code CAPTURAS_DIR}.
+     */
+    public record CapturaPendiente(String capturaId, String fileName) {}
+
+    @GetMapping("/api/capturas/pendientes-diagnostico")
+    public ResponseEntity<List<CapturaPendiente>> pendientesDiagnostico() {
+        List<CapturaPendiente> pendientes = service.capturassinDiagnostico().stream()
+                .map(c -> new CapturaPendiente(c.getId(), c.getRutaArchivo().replace('\\', '/')))
+                .toList();
+        return ResponseEntity.ok(pendientes);
     }
 
     /**

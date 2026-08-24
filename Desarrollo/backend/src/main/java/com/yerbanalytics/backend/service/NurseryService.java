@@ -112,7 +112,11 @@ public class NurseryService {
                     finalColor = C.get("offline");
                     finalStatusLabel = LAB.get("offline");
                     finalTip = se.getId() + " · " + finalStatusLabel;
-                    diagnosis = new Diagnosis("Sin diagnóstico", null, EMDASH);
+                    diagnosis = new Diagnosis(
+                            se.getDiagnosisEstado(),
+                            se.getDiagnosisConf(),
+                            se.getDiagnosisSev()
+                    );
                     reason = "Fuera de servicio";
                     actuators = new Actuadores("Cerrada", "En espera", se.getActuadorShade());
                 } else {

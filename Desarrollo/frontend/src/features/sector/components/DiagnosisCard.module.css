@@ -121,3 +121,19 @@
   color: #2e7a4f;
   line-height: 1.45;
 }
+
+/* Caja de advertencia para diagnósticos retenidos en modo offline */
+.warningBox {
+  display: flex;
+  gap: 9px;
+  margin-top: 15px;
+  padding: 11px 13px;
+  background: #fff3cd;
+  border-radius: 11px;
+}
+
+.warningText {
+  font-size: 12.5px;
+  color: #856404;
+  line-height: 1.45;
+}
