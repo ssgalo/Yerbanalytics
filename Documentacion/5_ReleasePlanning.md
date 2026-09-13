@@ -69,60 +69,88 @@ Se usa Fibonacci porque, a medida que una historia es más grande, crece tambié
 
 ## 5.2 Plan de versiones
 
-### Release 1 - Monitoreo y Visualización Base
+### Release 1 - Sensado, Diagnóstico Visual y Riego Automático
 
-**Objetivo:** Disponer de una primera versión capaz de capturar la información del vivero de forma automática y visualizarla en una plataforma web centralizada, validando el funcionamiento de la infraestructura IoT.
+**HUs Incluidas:** HU-02, HU-03, HU-04, HU-06
 
-**Alcance:** Esta versión permite al productor comenzar a monitorear su vivero de forma remota, consultando las métricas de sustrato y ambiente de cada sector y el estado general de la producción sobre un mapa. Incorpora la captura periódica y autónoma de datos de suelo y clima, el acceso seguro por rol desde cualquier dispositivo y el registro espacial del hardware instalado.
+**Objetivo:** Disponer de una primera versión capaz de capturar de forma autónoma la información del vivero, analizarla mediante visión por inteligencia artificial y ejecutar el riego automáticamente, validando el funcionamiento integral de la infraestructura IoT y el motor de acción.
+
+**Alcance:** Esta versión permite al productor comenzar a monitorear su vivero de forma remota y consultar las métricas de sustrato y ambiente más recientes de cada sector, obtener un diagnóstico visual temprano de anomalías (hongos, clorosis, plagas y estrés solar) y contar con el riego autónomo por sector que mantiene la humedad del sustrato dentro de los umbrales. Incorpora la captura periódica y autónoma de datos de suelo como base del flujo de información.
 
 **Observaciones:**
-- Sienta la base de sensado y la plataforma web sobre la que se construyen las versiones siguientes.
-- Habilita la trazabilidad espacial al asociar cada equipo físico con su sector dentro del vivero.
-- Incluye el monitoreo del estado técnico del hardware (batería, señal y fallas) para el recambio preventivo.
+- Sienta la base de sensado y combina el monitoreo con la primera acción correctiva automática (riego).
+- Integra el modelo de IA de visión para el diagnóstico temprano de la yerba mate sin necesidad de recorrer el vivero.
+- Mantiene el flujo de datos sin intervención manual mediante la captura periódica y autónoma de datos de suelo.
 
-**Fecha estimada:** Julio (31/07)
+**Desglose y Planificación de Sprints:**
+- Sprint 1 (30/05 al 13/06): HU-04
+- Sprint 2 (13/06 al 27/06): HU-03, HU-04
+- Sprint 3 (28/06 al 11/07): HU-03, HU-04
+- Sprint 4 (11/07 al 25/07): HU-02, HU-04, HU-06
+- Sprint 5 (25/07 al 01/08): HU-04, HU-06
+
+**Fecha de entrega estimada:** 01/08
 
 ---
 
-### Release 2 - Diagnóstico Inteligente y Alertas
+### Release 2 - Automatización Agronómica Configurable y Alertas Inteligentes
 
-**Objetivo:** Incorporar visión computacional e inteligencia artificial para detectar problemas sanitarios de la yerba mate.
+**HUs Incluidas:** HU-05, HU-07, HU-08, HU-09, HU-10, HU-15, HU-19
 
-**Alcance:** Esta versión transforma al sistema de un simple monitor de variables en una herramienta de diagnóstico temprano, analizando las imágenes de los plantines para identificar estrés solar, clorosis, daño fúngico y plagas foliares. El productor puede consultar cada diagnóstico con su nivel de confianza y severidad, y recibir alertas clasificadas sin necesidad de recorrer el vivero.
+**Objetivo:** Convertir los diagnósticos del sistema en acciones agronómicas automáticas, calibrables por el agrónomo y supervisables de forma segura por el operario, manteniendo informado al productor mediante alertas e incorporando el pronóstico climático como insumo de decisión.
+
+**Alcance:** Esta versión transforma al sistema en una herramienta de diagnóstico accionable: el productor consulta cada diagnóstico con su nivel de confianza y severidad, y el sistema dosifica pesticidas y nutrientes automáticamente sobre el sector comprometido y controla la mediasombra de forma gradual para ejecutar el plan de rustificación. El ingeniero agrónomo calibra umbrales para ajustar las decisiones a la realidad del vivero, mientras que el operario puede forzar o interrumpir manualmente el accionamiento de un sector ante emergencias o mantenimiento. Además, se suma la integración de pronósticos meteorológicos externos para anticipar condiciones de riesgo y un sistema de alertas clasificadas por severidad que comunica anomalías y acciones críticas sin necesidad de recorrer el vivero.
 
 **Observaciones:**
-- Integra el modelo de IA entrenado específicamente para los estados sanitarios de la yerba mate.
-- Suma la información meteorológica externa como insumo para anticipar condiciones de riesgo.
+- Cierra el ciclo diagnóstico-acción al dosificar insumos en el sector afectado y ejecutar la rustificación controlada como diferencial agronómico propio del producto.
+- Suma la información meteorológica externa como insumo para anticipar condiciones de riesgo y ajustar las decisiones automáticas.
 - Establece el sistema de notificaciones y alertas por severidad como canal de comunicación con el productor.
+- Incorpora la operación manual y umbrales configurables.
 
-**Fecha estimada:** Agosto (31/08)
+**Desglose y Planificación de Sprints:**
+- Sprint 1 (01/08 al 08/08): HU-05
+- Sprint 2 (08/08 al 22/08): HU-08, HU-09, HU-15
+- Sprint 3 (22/08 al 05/09): HU-07, HU-10, HU-15
+- Sprint 4 (05/09 al 19/09): HU-15, HU-19
 
----
-
-### Release 3 - Automatización Agronómica
-
-**Objetivo:** Permitir que el sistema tome decisiones y actúe automáticamente sobre el cultivo a partir de los datos y diagnósticos recolectados.
-
-**Alcance:** Esta versión cierra el ciclo operativo al ejecutar acciones correctivas localizadas sobre los sectores afectados, incluyendo riego por microaspersión, dosificación de nutrientes y fitosanitarios, y control gradual de la mediasombra para la rustificación. El motor de decisiones combina sensores, visión y pronóstico climático, y el agrónomo puede calibrar umbrales, límites operativos y planes de rustificación.
-
-**Observaciones:**
-- El productor deja de sólo recibir información y diagnósticos: el sistema interviene físicamente y de forma autónoma.
-- Incorpora la operación manual y los límites de seguridad para que el operario pueda forzar o interrumpir un actuador ante emergencias.
-- Ejecuta la lógica de rustificación controlada como diferencial agronómico propio del producto.
-
-**Fecha estimada:** 17/10
+**Fecha de entrega estimada:** 19/09
 
 ---
 
-### Release 4 - Trazabilidad Completa y Operación Offline
+### Release 3 - Trazabilidad Espacial, Monitoreo de Hardware y Operación Offline
 
-**Objetivo:** Completar la visión integral de Yerbanalytics incorporando trazabilidad avanzada y resiliencia operativa ante cortes de conectividad.
+**HUs Incluidas:** HU-13, HU-14, HU-18, HU-21
 
-**Alcance:** Esta versión alcanza la propuesta de valor completa del producto, con un historial auditable de cada acción ejecutada junto a la condición que la originó y la evaluación de su efectividad luego de un tiempo prudencial. Garantiza que el sistema físico siga operando y decidiendo sin conexión a internet, sincronizando al recuperarla, y habilita la exportación de reportes para auditorías y control de calidad.
+**Objetivo:** Dotar al sistema de la trazabilidad espacial, el monitoreo del estado técnico del hardware y la resiliencia ante cortes de conectividad necesarios para su puesta en marcha y su operación confiable en campo.
+
+**Alcance:** Esta versión consolida la infraestructura y la robustez operativa del sistema en el vivero. El administrador mapea la distribución del vivero y registra el hardware instalado, habilitando la trazabilidad espacial, y el productor visualiza el estado de la producción sobre un mapa de sectores para localizar dónde están los problemas. Incorpora el monitoreo del estado técnico del hardware para el recambio preventivo de equipos caídos o rotos, y garantiza que el sistema físico siga operando y tomando decisiones sin conexión a internet, sincronizando los datos al recuperar la red.
 
 **Observaciones:**
-- Consolida la trazabilidad de decisiones agronómicas como respaldo técnico para auditorías y mejora continua.
+- Habilita la trazabilidad espacial al asociar cada equipo físico con su sector dentro del vivero y al localizar visualmente los problemas sobre el mapa.
+- Incluye el monitoreo del estado técnico del hardware (batería, señal y fallas) para anticipar el recambio preventivo de equipos.
 - El modo offline corre el modelo y almacena datos localmente, mitigando el riesgo de conectividad intermitente en el campo.
-- Incluye la gestión de roles y permisos para proteger la infraestructura de modificaciones no autorizadas.
 
-**Fecha estimada:** 07/11
+**Desglose y Planificación de Sprints:**
+- Sprint 1 (19/09 al 03/10): HU-13, HU-18
+- Sprint 2 (03/10 al 17/10): HU-14, HU-21
+
+**Fecha de entrega estimada:** 17/10
+
+---
+
+### Release 4 - Trazabilidad Completa, Reportes y Seguridad de Acceso
+
+**HUs Incluidas:** HU-01, HU-11, HU-12, HU-16, HU-17, HU-20
+
+**Objetivo:** Incorporar trazabilidad auditable de las decisiones, la evaluación de su efectividad, reportes exportables y un esquema de acceso seguro y multiplataforma.
+
+**Alcance:** Esta versión alcanza la propuesta de valor completa del producto. Provee un historial auditable de cada acción ejecutada junto a la condición que la originó y permite evaluar la evolución del sector luego de un tiempo prudencial post-acción para medir la efectividad real de la intervención. Habilita la exportación de reportes de trazabilidad en distintos formatos para auditorías y control de calidad. En el plano de acceso, incorpora el inicio de sesión seguro por rol, la gestión de roles y permisos de los usuarios y el acceso a la plataforma desde distintos dispositivos y tamaños de pantalla.
+
+**Observaciones:**
+- Consolida la trazabilidad de decisiones agronómicas y la evaluación de su efectividad como respaldo técnico para auditorías y mejora continua.
+- Incluye la gestión de roles y permisos y el inicio de sesión seguro para proteger la infraestructura de modificaciones agronómicas no autorizadas.
+- Habilita el acceso remoto multiplataforma para supervisar la producción desde cualquier dispositivo.
+
+**Desglose y Planificación de Sprints:**
+- Sprint 1 (17/10 al 31/10): HU-11, HU-12, HU-16, HU-20
+- Sprint 2 (31/10 al 07/11): HU-01, HU-17
