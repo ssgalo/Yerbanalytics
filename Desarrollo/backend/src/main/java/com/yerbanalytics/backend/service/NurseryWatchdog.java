@@ -6,11 +6,11 @@ import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
-import com.yerbanalytics.backend.model.BloqueoManualEntity;
+import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
-import com.yerbanalytics.backend.repository.BloqueoManualRepository;
+import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
@@ -61,7 +61,7 @@ public class NurseryWatchdog {
     private final ActionExecutor actionExecutor;
     private final ConfiguracionService configuracionService;
     private final WeatherService weatherService;
-    private final BloqueoManualRepository bloqueoManualRepository;
+    private final ManualLockRepository manualLockRepository;
     private final long staleThresholdMs;
 
     public NurseryWatchdog(ZonaRepository zonaRepository,
@@ -70,7 +70,7 @@ public class NurseryWatchdog {
                            ActionExecutor actionExecutor,
                            ConfiguracionService configuracionService,
                            WeatherService weatherService,
-                           BloqueoManualRepository bloqueoManualRepository,
+                           ManualLockRepository manualLockRepository,
                            @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
@@ -78,7 +78,7 @@ public class NurseryWatchdog {
         this.actionExecutor = actionExecutor;
         this.configuracionService = configuracionService;
         this.weatherService = weatherService;
-        this.bloqueoManualRepository = bloqueoManualRepository;
+        this.manualLockRepository = manualLockRepository;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -101,12 +101,12 @@ public class NurseryWatchdog {
         // ciclo. Los bloqueos activos son un puñado y entran holgados como dos conjuntos.
         List<MetricSpec> specs = configuracionService.getEffectiveSpecs();
         ConfiguracionOperativaEntity operativa = configuracionService.getConfiguracionOperativa();
-        List<BloqueoManualEntity> bloqueos = bloqueoManualRepository.findByActivoTrue();
+        List<ManualLockEntity> bloqueos = manualLockRepository.findByActiveTrue();
         Set<String> sectoresBloqueados = bloqueos.stream()
-                .map(BloqueoManualEntity::getSectorId).filter(Objects::nonNull)
+                .map(ManualLockEntity::getSectorId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Set<String> zonasBloqueadas = bloqueos.stream()
-                .map(BloqueoManualEntity::getZonaId).filter(Objects::nonNull)
+                .map(ManualLockEntity::getZonaId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
         // Un único instante para todo el barrido: los 600 sectores se evalúan contra la misma

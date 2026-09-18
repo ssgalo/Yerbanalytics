@@ -12,7 +12,7 @@ import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
-import com.yerbanalytics.backend.repository.BloqueoManualRepository;
+import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
@@ -40,7 +40,7 @@ public class NurseryService {
     private final RuleOrchestrator ruleOrchestrator;
     private final ActionExecutor actionExecutor;
     private final WeatherService weatherService;
-    private final BloqueoManualRepository bloqueoManualRepository;
+    private final ManualLockRepository manualLockRepository;
     private final DiagnosticoService diagnosticoService;
     private final long staleThresholdMs;
     private final int bateriaMinPct;
@@ -55,7 +55,7 @@ public class NurseryService {
                           RuleOrchestrator ruleOrchestrator,
                           ActionExecutor actionExecutor,
                           WeatherService weatherService,
-                          BloqueoManualRepository bloqueoManualRepository,
+                          ManualLockRepository manualLockRepository,
                           DiagnosticoService diagnosticoService,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
@@ -68,7 +68,7 @@ public class NurseryService {
         this.ruleOrchestrator = ruleOrchestrator;
         this.actionExecutor = actionExecutor;
         this.weatherService = weatherService;
-        this.bloqueoManualRepository = bloqueoManualRepository;
+        this.manualLockRepository = manualLockRepository;
         this.diagnosticoService = diagnosticoService;
         this.staleThresholdMs = staleThresholdMs;
         this.bateriaMinPct = bateriaMinPct;
@@ -494,7 +494,7 @@ public class NurseryService {
      * <ul>
      *   <li>{@code sensorStale} — derivado del {@code lastReadingTime} de la zona.</li>
      *   <li>{@code forecast} — obtenido de {@link WeatherService} (puede ser null en modo degradado).</li>
-     *   <li>{@code bloqueoManualActivo} — consulta {@link BloqueoManualRepository} por sector y zona.</li>
+     *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
      * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus) {
@@ -505,8 +505,8 @@ public class NurseryService {
 
         WeatherForecast forecast = weatherService.getForecast();
 
-        boolean bloqueoActivo = !bloqueoManualRepository.findBySectorIdAndActivoTrue(s.getId()).isEmpty()
-                || (zona != null && !bloqueoManualRepository.findByZonaIdAndActivoTrue(zona.getId()).isEmpty());
+        boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
+                || (zona != null && !manualLockRepository.findByZonaIdAndActiveTrue(zona.getId()).isEmpty());
 
         return new RuleContext(
                 s,

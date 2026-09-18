@@ -20,4 +20,14 @@ public interface ManualLockRepository extends JpaRepository<ManualLockEntity, Lo
 
     /** Active locks for an entire zone (apply to all its sectors). */
     List<ManualLockEntity> findByZonaIdAndActiveTrue(String zonaId);
+
+    /**
+     * All active locks in a single query.
+     *
+     * <p>Used by the proactive watchdog sweep: iterating 600 sectors and querying per-sector
+     * and per-zone would be 1200 queries per cycle. Active locks are few and fit comfortably
+     * in memory as two sets.
+     */
+    List<ManualLockEntity> findByActiveTrue();
 }
+

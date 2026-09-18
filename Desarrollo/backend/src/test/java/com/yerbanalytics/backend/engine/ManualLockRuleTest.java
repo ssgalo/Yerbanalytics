@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.rules.ManualLockRule;
-import com.yerbanalytics.backend.model.BloqueoManualEntity;
+import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
