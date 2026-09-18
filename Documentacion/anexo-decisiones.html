@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hoja de decisiones — Motor de reglas</title>
+<style>
+  :root {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+    --maxw: 1080px; --readw: 70ch;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+      --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+      --border: #29301F; --border-strong: #3A4330;
+      --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+      --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+      --code-bg: #191E14; --code-ink: #C6D0BB;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+    --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+    --border: #29301F; --border-strong: #3A4330;
+    --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+    --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+    --code-bg: #191E14; --code-ink: #C6D0BB;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  .page { max-width: var(--maxw); margin: 0 auto; padding: 0 24px 100px; }
+  .backbar { max-width: var(--maxw); margin: 0 auto; padding: 22px 24px 0; font-family: var(--font-display); font-size: 14px; display: flex; gap: 20px; flex-wrap: wrap; }
+  .back { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; font-weight: 500; transition: color .15s, gap .15s; }
+  .back:hover { color: var(--accent); gap: 10px; }
+
+  header.hero { padding: 30px 0 26px; max-width: var(--readw); }
+  .eyebrow { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 16px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 4.6vw, 2.6rem); line-height: 1.07; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .lede { font-size: 1.1rem; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.25rem, 2.6vw, 1.55rem); line-height: 1.14; letter-spacing: -0.015em; margin: 40px 0 6px; }
+  .sub { font-family: var(--font-body); color: var(--muted); font-size: 15px; margin: 0 0 18px; max-width: var(--readw); }
+  strong { color: var(--ink); font-weight: 700; }
+  em { color: var(--ink-soft); }
+  code { font-family: var(--font-mono); font-size: 0.82em; background: var(--code-bg); color: var(--code-ink); padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--border); }
+  a { color: var(--accent); text-underline-offset: 2px; }
+
+  /* callout — necesita decisión */
+  .callout { border-radius: 14px; padding: 20px 24px; margin: 0 0 12px; border: 1px solid color-mix(in srgb, var(--warn) 34%, var(--border)); border-left: 5px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); box-shadow: var(--shadow); }
+  .callout .tag { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--warn); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .callout ul { margin: 0; padding-left: 0; list-style: none; }
+  .callout li { margin-bottom: 12px; padding-left: 20px; position: relative; }
+  .callout li:last-child { margin-bottom: 0; }
+  .callout li::before { content: "▸"; position: absolute; left: 0; color: var(--warn); font-weight: 700; }
+  .callout .q { font-family: var(--font-display); font-weight: 700; color: var(--ink); display: block; margin-bottom: 2px; }
+
+  /* decision table */
+  .dwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); margin: 0 0 10px; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 15px; background: var(--surface); min-width: 720px; }
+  thead th { font-family: var(--font-display); font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface-2); text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+  td { padding: 15px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 3%, transparent); }
+  .regla a { font-family: var(--font-display); font-weight: 700; color: var(--ink); font-size: 15px; text-decoration: none; border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent); transition: border-color .15s; }
+  .regla a:hover { border-color: var(--accent); }
+  .prio { display: block; font-family: var(--font-display); font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: var(--faint); margin-top: 4px; text-transform: uppercase; }
+  .rname { font-family: var(--font-display); font-weight: 700; color: var(--ink); font-size: 15px; }
+  .detail-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 11px; font-family: var(--font-display); font-weight: 600; font-size: 11.5px; color: var(--accent); text-decoration: none; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border)); border-radius: 999px; padding: 4px 11px; background: color-mix(in srgb, var(--accent) 7%, transparent); transition: background .15s, gap .15s; white-space: nowrap; }
+  .detail-btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); gap: 8px; }
+  td ol { margin: 0; padding-left: 17px; }
+  td li { margin-bottom: 6px; }
+  td li:last-child { margin-bottom: 0; }
+  td .one { display: block; }
+  .to-debate { color: var(--warn); font-weight: 700; }
+
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; letter-spacing: .02em; }
+  .chip.done { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); border: 1px solid color-mix(in srgb, var(--ok) 32%, var(--border)); }
+  .chip.debate { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 34%, var(--border)); }
+  .chip.err { color: var(--crit); background: color-mix(in srgb, var(--crit) 13%, transparent); border: 1px solid color-mix(in srgb, var(--crit) 32%, var(--border)); }
+  .chip.gap { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 32%, var(--border)); }
+  .chip.minor { color: var(--offline); background: color-mix(in srgb, var(--offline) 14%, transparent); border: 1px solid color-mix(in srgb, var(--offline) 30%, var(--border)); }
+  .chip.capa { color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); }
+  .chip.dep { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--border)); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--font-display); font-size: 12px; color: var(--muted); margin: 12px 2px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+  .dot.ok { background: var(--ok); } .dot.wr { background: var(--warn); } .dot.cr { background: var(--crit); } .dot.of { background: var(--offline); }
+
+  .note { border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 20px 0 0; font-size: 15px; max-width: var(--readw); }
+  .note strong { color: var(--ink); }
+
+  footer.end { margin-top: 52px; padding-top: 26px; border-top: 1px solid var(--border); font-size: 13px; color: var(--faint); font-family: var(--font-display); max-width: var(--readw); }
+  ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div class="backbar">
+  <a class="back" href="informe-motor-reglas.html">← Informe completo</a>
+  <a class="back" href="anexo-reglas.html">Anexo · detalle de cada regla →</a>
+</div>
+
+<div class="page">
+  <header class="hero">
+    <div class="eyebrow">Hoja de decisiones · Motor de reglas</div>
+    <h1>Lo que definimos, en una página</h1>
+    <p class="lede">Resumen para el equipo: cada regla con su riesgo y la decisión tomada, más los problemas técnicos a corregir en el PR. Para el detalle completo de cualquier fila, el nombre de la regla linkea a su sección en el anexo.</p>
+  </header>
+
+  <!-- ============ NECESITA DECISIÓN ============ -->
+  <section>
+    <div class="callout">
+      <span class="tag">⚠ Necesita decisión del equipo — leer esto primero</span>
+      <ul>
+        <li><span class="q">Mediasombra / rustificación — ¿validamos el modelo de 3 capas?</span> El plan quiere sol (endurecer) y la regla de UV quiere sombra (proteger): metas opuestas. Sugerencia a debatir: <strong>(1)</strong> calendario (<code>@Scheduled</code> diario) define el objetivo de exposición del día; <strong>(2)</strong> reactivo por telemetría mueve la sombra siguiendo el sol (abre a la mañana, cierra al mediodía); <strong>(3)</strong> techo de UV crítico innegociable; <strong>(4)</strong> control manual del productor por encima de todo. Los umbrales los define el agrónomo.</li>
+        <li><span class="q">Insumo — ¿sumamos revisión humana en los casos borde?</span> El desempate hongo/plaga usa solo la humedad. Queda abierto si, cuando la humedad cae cerca del corte (zona gris), la regla manda el caso a revisión humana en vez de inyectar sola. <strong>Pendiente de revisar con el equipo.</strong></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ TABLA DE REGLAS ============ -->
+  <section>
+    <h2>Decisiones por regla</h2>
+    <p class="sub">Las 8 reglas del motor + el paso de clasificación. Riesgo detectado → resolución acordada.</p>
+    <div class="dwrap">
+      <table>
+        <thead>
+          <tr><th style="width:16%">Regla</th><th style="width:34%">Riesgo</th><th style="width:40%">Resolución del equipo</th><th style="width:10%">Estado</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="regla"><span class="rname">Clasificación</span><span class="prio">Paso base</span><a class="detail-btn" href="anexo-reglas.html#regla-clasificacion">Ver detalle →</a></td>
+            <td>El diagnóstico es sintético (mapa fijo <code>PATHOS</code>), no viene del modelo de IA real. Las reglas con <code>confidence &gt; 85%</code> operan sobre datos falsos.</td>
+            <td>Usar el diagnóstico sintético (opción B) hasta integrar el modelo, que está próximo. Se revisa la decisión al conectar la IA real.</td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Bloqueo manual</span><span class="prio">Prio 0</span><a class="detail-btn" href="anexo-reglas.html#regla-bloqueo">Ver detalle →</a></td>
+            <td><ol><li>¿El bloqueo vence? (riesgo de sector sin protección para siempre)</li><li>¿Quién puede desbloquear? Sin trazabilidad.</li></ol></td>
+            <td><ol><li>No vence — lo desbloquea el productor.</li><li>Agregar <code>desactivado_por</code> para registrar quién lo levanta.</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Sensor mudo</span><span class="prio">Prio 1</span><a class="detail-btn" href="anexo-reglas.html#regla-stale">Ver detalle →</a></td>
+            <td><ol><li>Umbral de frescura fijo y global (2h/24h) para las 5 métricas.</li><li>Punto único de falla: 1 sensor por MZ ≈ 10.000 plantines.</li></ol></td>
+            <td><ol><li>Umbral de frescura <strong>por métrica</strong> (valores del agrónomo).</li><li>Sin sensor de respaldo, por costos — se asume el riesgo.</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Clima override</span><span class="prio">Prio 2</span><a class="detail-btn" href="anexo-reglas.html#regla-clima">Ver detalle →</a></td>
+            <td><ol><li>Variable meteo imprecisa: probabilidad ≠ mm de lluvia.</li><li>Riego pospuesto sin re-evaluar si después no llueve.</li></ol></td>
+            <td><ol><li>Consultar <strong>mm de precipitación</strong> en una ventana de tiempo.</li><li>Re-evaluar releyendo el <strong>sensor de humedad</strong> (no la API).</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Dosis límite</span><span class="prio">Prio 5</span><a class="detail-btn" href="anexo-reglas.html#regla-dosis">Ver detalle →</a></td>
+            <td><ol><li>Límite "balde común": mezcla insumos distintos.</li><li>Ventana de 24h fija, no calza con la ficha del producto.</li><li>Tratamiento bloqueado, ¿se pierde?</li></ol></td>
+            <td><ol><li>Cupo <strong>por tipo de insumo</strong>.</li><li>Ventana <strong>configurable por producto</strong> (día / semana / ciclo).</li><li>Bloquear = <strong>re-agendar + avisar</strong>, no descartar.</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Riego</span><span class="prio">Prio 10</span><a class="detail-btn" href="anexo-reglas.html#regla-riego">Ver detalle →</a></td>
+            <td><ol><li>Umbral de humedad fijo: ignora que el calor y el UV cambian la necesidad de agua.</li><li>Un solo sensor asume riego parejo; los bordes pueden secarse.</li></ol></td>
+            <td><ol><li>Umbral fijo para el prototipo; umbral dinámico (evapotranspiración) <em>opcional a futuro</em>.</li><li>Un sensor tal cual; evaluar la uniformidad en campo.</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Insumo</span><span class="prio">Prio 11 · fusión</span><a class="detail-btn" href="anexo-reglas.html#regla-insumo">Ver detalle →</a></td>
+            <td><ol><li>Umbral 85% único para todo químico (nutriente = veneno).</li><li>Desempate hongo/plaga solo por humedad (grueso).</li><li>Autonomía química vs. OK humano (responsabilidad legal).</li></ol></td>
+            <td><ol><li>Umbral de confianza <strong>por agresividad</strong> del químico.</li><li>Humedad para el prototipo; <span class="to-debate">revisión humana en casos borde: a debatir.</span></li><li>Interruptor configurable por el productor (inyecta solo / requiere confirmación), default seguro, trazabilidad, escalado.</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Mediasombra</span><span class="prio">Prio 12 · rustificación</span><a class="detail-btn" href="anexo-reglas.html#regla-mediasombra">Ver detalle →</a></td>
+            <td><ol><li>Conflicto: el plan quiere sol, la regla de UV quiere sombra.</li><li>Calendario vs. telemetría: la regla se dispara por dato, pero el plan avanza por día.</li></ol></td>
+            <td><strong>Sugerencia (a debatir):</strong> modelo de 3 capas — calendario define el objetivo del día · reactivo mueve la sombra siguiendo el sol · techo de UV crítico. Más control manual del productor. <em>Ver detalle arriba.</em></td>
+            <td><span class="chip debate">⚠ A debatir</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Seguimiento</span><span class="prio">Prio 20</span><a class="detail-btn" href="anexo-reglas.html#regla-seguimiento">Ver detalle →</a></td>
+            <td><span class="one">Latencia de seguimiento única → falsos negativos: marca "Sin Efectividad" un tratamiento que todavía no hizo efecto y bloquea repetirlo.</span></td>
+            <td><ol><li><strong>Latencia + métrica + umbral por tipo de acción</strong> (los químicos se verifican re-diagnosticando con la IA, no con sensores).</li><li>Reset manual y trazable del bloqueo "Sin Efectividad".</li></ol></td>
+            <td><span class="chip done">✓ Decidido</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><span class="dot ok"></span> Decidido · listo</span>
+      <span><span class="dot wr"></span> A debatir · necesita al equipo o al agrónomo</span>
+    </div>
+  </section>
+
+  <!-- ============ PROBLEMAS TÉCNICOS ============ -->
+  <section>
+    <h2>Problemas técnicos de hoy (PR #12)</h2>
+    <p class="sub">Detectados en la evaluación del diseño. No tocan la estructura de la propuesta —el esqueleto es correcto— son ajustes de rigor y completitud antes de implementar.</p>
+    <div class="dwrap">
+      <table>
+        <thead>
+          <tr><th style="width:22%">Problema</th><th style="width:42%">Qué es</th><th style="width:26%">Cómo resolverlo</th><th style="width:10%">Tipo</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="regla"><span style="font-family:var(--font-display);font-weight:700">schema.sql no existe</span></td>
+            <td>El <code>design.md</code> propone crear la tabla con un <code>schema.sql</code> que no existe en el repo. El patrón real es el opuesto: entidades JPA y Hibernate crea las tablas solo (<code>ddl-auto=update</code>).</td>
+            <td>Reemplazar por <code>BloqueoManualEntity</code> + <code>BloqueoManualRepository</code>, el patrón real del repo. Dos clases, cero SQL de estructura.</td>
+            <td><span class="chip err">Error</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span style="font-family:var(--font-display);font-weight:700">Spring no ordena las reglas</span></td>
+            <td>El orquestador asume que la lista de reglas llega ordenada por prioridad. Spring no lo hace: correrían en orden arbitrario y la prioridad (el corte de la cadena) no funcionaría. Bug silencioso.</td>
+            <td>Ordenar explícito con <code>Comparator.comparingInt(Rule::priority)</code> en el constructor + un test que lo verifique.</td>
+            <td><span class="chip err">Error</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span style="font-family:var(--font-display);font-weight:700">Canal a actuadores no existe</span></td>
+            <td>Se asume un canal MQTT backend → actuador que hoy no existe (solo hay ingesta sensor → backend). No figura en <code>tasks.md</code>. Es un vacío de diseño, no solo de implementación.</td>
+            <td>Diseñarlo como pieza de primera clase: topic, payload de comando, QoS (evaluar QoS 2), y cómo convive con el simulador. Agregar a <code>tasks.md</code>.</td>
+            <td><span class="chip gap">Vacío</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span style="font-family:var(--font-display);font-weight:700">Concurrencia / idempotencia</span></td>
+            <td>Cache del clima mutable sin sincronizar (race con 2 disparadores) y QoS 1 puede duplicar mensajes → dos hilos ejecutan la misma acción dos veces. En "inyectar fungicida" eso es <strong>doble dosis</strong>. Es seguridad.</td>
+            <td>Lock por sector o deduplicación por <code>(sector, ventana de tiempo)</code>, y hacer thread-safe la cache del clima.</td>
+            <td><span class="chip gap">Vacío</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span style="font-family:var(--font-display);font-weight:700">Terminología del patrón</span></td>
+            <td>Lo llaman "Strategy + Chain of Responsibility", pero el orquestador posee el loop y corta desde afuera: es más bien un pipeline / Specification con corte anticipado.</td>
+            <td>Ajustar la terminología. Suma rigor en un proyecto que se jacta de conceptos &gt; código.</td>
+            <td><span class="chip minor">Menor</span></td>
+          </tr>
+          <tr>
+            <td class="regla"><span style="font-family:var(--font-display);font-weight:700">Firma de updateTelemetry()</span></td>
+            <td>El <code>design.md</code> no muestra cómo queda el método tras el refactor: ambigüedad que puede hacer que quien implemente improvise.</td>
+            <td>Mostrar la nueva firma en el design antes de codear.</td>
+            <td><span class="chip minor">Menor</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><span class="dot cr"></span> Error · afirmación falsa a corregir</span>
+      <span><span class="dot wr"></span> Vacío · falta diseñar</span>
+      <span><span class="dot of"></span> Menor · rigor</span>
+    </div>
+    <div class="note">
+      <strong>Veredicto:</strong> el esqueleto de la propuesta (reglas como componentes, contexto inmutable, orquestador + ejecutor) es correcto y se mantiene. <strong>Listo para <code>apply</code>: todavía no</strong> — cerrar antes los dos errores y los dos vacíos. Los "menores" suman rigor pero no bloquean.
+    </div>
+  </section>
+
+  <!-- ============ TRABAJO TÉCNICO DE LAS DECISIONES ============ -->
+  <section>
+    <h2>Trabajo técnico que generan las decisiones de hoy</h2>
+    <p class="sub">Cada decisión de arriba implica construir algo que hoy no es tarea de nadie. Esta tabla lo traduce en trabajo concreto. No reemplaza el <code>tasks.md</code> del PR — lo alimenta.</p>
+    <div class="dwrap">
+      <table>
+        <thead>
+          <tr><th style="width:20%">Origen</th><th style="width:52%">Qué hay que construir</th><th style="width:28%">Toca</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="regla"><span class="rname">Mediasombra + Clima</span></td>
+            <td>Un disparador <strong><code>@Scheduled</code></strong> que corra por reloj: avanza el plan de rustificación por día y re-evalúa los riegos pospuestos releyendo el sensor. <em>Una pieza que sirve a dos reglas.</em></td>
+            <td><div class="chips"><span class="chip capa">Scheduler</span><span class="chip capa">Backend</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Bloqueo manual</span></td>
+            <td>Agregar el campo <code>desactivado_por</code> a la entidad de bloqueo (quién levanta el bloqueo).</td>
+            <td><div class="chips"><span class="chip capa">Modelo de datos</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Sensor mudo</span></td>
+            <td>Umbral de frescura <strong>configurable por métrica</strong>, en vez del 2h/24h global.</td>
+            <td><div class="chips"><span class="chip capa">Modelo de datos</span><span class="chip capa">Config</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Clima override</span></td>
+            <td>Consultar al <code>WeatherService</code> por <strong>mm de precipitación en una ventana</strong>, y parametrizar el umbral (mm, N horas, probabilidad).</td>
+            <td><div class="chips"><span class="chip capa">Backend</span><span class="chip capa">Integración API</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Dosis límite</span></td>
+            <td>Modelar límites <strong>por tipo de insumo</strong> y <strong>ventana configurable</strong> (día / semana / ciclo), acumulando por tipo. <em>La más costosa de modelar (tabla de insumos con ventana y tope).</em></td>
+            <td><div class="chips"><span class="chip capa">Modelo de datos</span><span class="chip capa">Backend</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Insumo</span></td>
+            <td>Umbral de confianza <strong>por agresividad del químico</strong> (nutriente ~85%, agresivo ~92%).</td>
+            <td><div class="chips"><span class="chip capa">Modelo de datos</span><span class="chip capa">Config</span><span class="chip dep">Gated por IA</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Insumo</span></td>
+            <td><strong>Interruptor de confirmación del productor</strong> por tipo de acción (inyecta solo / requiere OK), con default seguro, flujo de confirmación humana, escalado si no llega, y registro de quién confirma. <em>La más grande — human-in-the-loop.</em></td>
+            <td><div class="chips"><span class="chip capa">Backend</span><span class="chip capa">UI</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Seguimiento</span></td>
+            <td>Config de seguimiento <strong>por tipo de acción</strong> (latencia + qué se mide + umbral). Para químicos, "volver a medir" es <strong>re-diagnosticar con la IA</strong>, no leer un sensor. Más el <strong>reset trazable</strong> del bloqueo "Sin Efectividad".</td>
+            <td><div class="chips"><span class="chip capa">Backend</span><span class="chip capa">Modelo de datos</span><span class="chip dep">Gated por IA</span></div></td>
+          </tr>
+          <tr>
+            <td class="regla"><span class="rname">Mediasombra</span><span class="prio to-debate">si se aprueba</span></td>
+            <td>Si se adopta el modelo de 3 capas: separar disparadores (calendario vs. reactivo), techo de UV crítico, y <strong>control manual del productor</strong> con override + registro. <em>Condicionado al debate del equipo.</em></td>
+            <td><div class="chips"><span class="chip capa">Backend</span><span class="chip capa">UI</span></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <strong>Dos patrones se repiten</strong> — conviene construirlos como piezas reutilizables, no una vez por regla: <strong>(1) "config por tipo"</strong> (dosis, latencia, frescura, umbral de confianza) y <strong>(2) "control manual + trazabilidad"</strong> (<code>desactivado_por</code>, confirmación del productor, mediasombra manual). Además, varias tareas están <strong>gated por la integración de la IA</strong> (el umbral por confianza y el re-diagnóstico de seguimiento no operan de verdad hasta que el modelo esté conectado).
+    </div>
+  </section>
+
+  <footer class="end">
+    Hoja de decisiones · Motor de reglas · Proyecto Yerbanalytics · Julio 2026 · Detalle completo en <a href="anexo-reglas.html">anexo de reglas</a> e <a href="informe-motor-reglas.html">informe</a>.
+  </footer>
+</div>
+</html>

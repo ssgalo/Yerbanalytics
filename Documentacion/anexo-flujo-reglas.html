@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador del motor de reglas</title>
+<style>
+  :root {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+    --maxw: 980px; --readw: 68ch;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+      --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+      --border: #29301F; --border-strong: #3A4330;
+      --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+      --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+      --code-bg: #191E14; --code-ink: #C6D0BB;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+    --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+    --border: #29301F; --border-strong: #3A4330;
+    --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+    --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+    --code-bg: #191E14; --code-ink: #C6D0BB;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  .page { max-width: var(--maxw); margin: 0 auto; padding: 0 24px 100px; }
+  .backbar { max-width: var(--maxw); margin: 0 auto; padding: 22px 24px 0; font-family: var(--font-display); font-size: 14px; display: flex; gap: 20px; flex-wrap: wrap; }
+  .back { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; font-weight: 500; transition: color .15s, gap .15s; }
+  .back:hover { color: var(--accent); gap: 10px; }
+
+  header.hero { padding: 30px 0 22px; max-width: var(--readw); }
+  .eyebrow { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 16px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 4.6vw, 2.6rem); line-height: 1.07; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .lede { font-size: 1.1rem; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+  strong { color: var(--ink); font-weight: 700; }
+  code { font-family: var(--font-mono); font-size: 0.82em; background: var(--code-bg); color: var(--code-ink); padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--border); }
+  a { color: var(--accent); text-underline-offset: 2px; }
+
+  /* controls */
+  .panel-label { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+  .scn-btn { font-family: var(--font-display); font-weight: 600; font-size: 13.5px; color: var(--ink-soft); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px; padding: 8px 15px; cursor: pointer; transition: all .15s; }
+  .scn-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .scn-btn.active { background: var(--accent); border-color: var(--accent-ink); color: #fff; }
+  @media (prefers-color-scheme: dark) { .scn-btn.active { color: #0F120D; } }
+  :root[data-theme="dark"] .scn-btn.active { color: #0F120D; }
+  :root[data-theme="light"] .scn-btn.active { color: #fff; }
+
+  .readings { font-family: var(--font-mono); font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 14px; margin: 0 0 14px; min-height: 40px; display: flex; align-items: center; }
+  .readings .k { color: var(--faint); margin-right: 8px; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+
+  .result { border-radius: 11px; padding: 13px 18px; margin: 0 0 26px; font-family: var(--font-display); font-weight: 600; font-size: 15px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); min-height: 46px; display: flex; align-items: center; gap: 10px; }
+  .result::before { content: "→"; font-weight: 700; opacity: .5; }
+  .result.ok, .result.act { border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); background: color-mix(in srgb, var(--ok) 9%, var(--surface)); color: var(--ok); }
+  .result.warn { border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--warn); }
+  .result.block { border-color: color-mix(in srgb, var(--crit) 40%, var(--border)); background: color-mix(in srgb, var(--crit) 9%, var(--surface)); color: var(--crit); }
+
+  /* flow */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 0 0 8px; }
+  .node { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 16px; cursor: pointer; transition: border-color .15s, box-shadow .15s, opacity .3s, transform .15s; opacity: .5; }
+  .node:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+  .node.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .node.lit { opacity: 1; }
+  .node.cut { opacity: .38; }
+  .connector { width: 2px; height: 16px; background: var(--border-strong); margin: 0 auto; transition: background .3s; }
+  .connector.dead { background: color-mix(in srgb, var(--crit) 50%, var(--border)); }
+  .n-prio { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; text-align: center; padding: 6px 0; }
+  .n-name { font-family: var(--font-display); font-weight: 700; font-size: 15.5px; color: var(--ink); display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .n-type { font-family: var(--font-display); font-weight: 600; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+  .n-type.block { color: var(--crit); background: color-mix(in srgb, var(--crit) 12%, transparent); }
+  .n-type.action { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+  .n-type.base { color: var(--offline); background: color-mix(in srgb, var(--offline) 13%, transparent); }
+  .n-desc { font-size: 13.5px; color: var(--muted); margin-top: 2px; }
+  .verdict { font-family: var(--font-display); font-weight: 700; font-size: 11.5px; letter-spacing: .02em; padding: 5px 11px; border-radius: 999px; white-space: nowrap; opacity: 0; transition: opacity .3s; text-align: center; }
+  .verdict.show { opacity: 1; }
+  .verdict.base { color: var(--offline); background: color-mix(in srgb, var(--offline) 13%, transparent); }
+  .verdict.na { color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
+  .verdict.act { color: #fff; background: var(--ok); }
+  @media (prefers-color-scheme: dark) { .verdict.act { color: #0F120D; } }
+  :root[data-theme="dark"] .verdict.act { color: #0F120D; }
+  .verdict.block { color: #fff; background: var(--crit); }
+  @media (prefers-color-scheme: dark) { .verdict.block { color: #0F120D; } }
+  :root[data-theme="dark"] .verdict.block { color: #0F120D; }
+  .verdict.warn { color: #fff; background: var(--warn); }
+  @media (prefers-color-scheme: dark) { .verdict.warn { color: #0F120D; } }
+  :root[data-theme="dark"] .verdict.warn { color: #0F120D; }
+  .verdict.cut { color: var(--faint); background: transparent; border: 1px dashed var(--border-strong); }
+
+  /* detail */
+  .detail { border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; padding: 16px 20px; margin: 22px 0 0; background: var(--surface); box-shadow: var(--shadow); }
+  .detail .dtag { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; display: block; }
+  .detail h3 { font-family: var(--font-display); margin: 0 0 8px; font-size: 18px; }
+  .detail p { margin: 0 0 8px; font-size: 15px; }
+  .detail .row { font-size: 14.5px; margin-bottom: 6px; }
+  .detail .row b { font-family: var(--font-display); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); display: inline-block; min-width: 74px; }
+  .detail a.more { font-family: var(--font-display); font-weight: 600; font-size: 13px; text-decoration: none; display: inline-flex; gap: 5px; margin-top: 6px; }
+  .detail.empty { border-left-color: var(--border-strong); color: var(--muted); font-family: var(--font-display); font-size: 14px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--font-display); font-size: 12px; color: var(--muted); margin: 18px 2px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 999px; display: inline-block; }
+
+  footer.end { margin-top: 44px; padding-top: 26px; border-top: 1px solid var(--border); font-size: 13px; color: var(--faint); font-family: var(--font-display); max-width: var(--readw); }
+  ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 560px) { .node { grid-template-columns: 40px 1fr; } .verdict { grid-column: 2; justify-self: start; margin-top: 6px; } }
+</style>
+
+<div class="backbar">
+  <a class="back" href="anexo-decisiones.html">← Hoja de decisiones</a>
+  <a class="back" href="anexo-reglas.html">Detalle de cada regla →</a>
+</div>
+
+<div class="page">
+  <header class="hero">
+    <div class="eyebrow">Simulador · Motor de reglas</div>
+    <h1>Cómo fluye una decisión por el motor</h1>
+    <p class="lede">El motor no es una máquina de estados: es un <strong>pipeline con prioridades</strong>. Llega un paquete de telemetría y las reglas se evalúan en orden (0 → 20); las <strong>bloqueantes</strong> pueden cortar la cadena, las de <strong>acción</strong> ejecutan. Elegí un escenario y mirá qué pasa. Tocá cualquier regla para ver su detalle.</p>
+  </header>
+
+  <p class="panel-label">1 · Elegí un escenario</p>
+  <div class="scenarios" id="scenarios"></div>
+
+  <p class="panel-label">2 · Entrada (telemetría del sector)</p>
+  <div class="readings" id="readings"><span class="k">esperando</span> elegí un escenario arriba…</div>
+
+  <div class="result" id="result" style="display:none"></div>
+
+  <p class="panel-label">3 · El paquete recorre las reglas</p>
+  <div class="flow" id="flow"></div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--offline)"></span> Clasifica (base)</span>
+    <span><span class="dot" style="background:var(--muted)"></span> Pasa (no se dispara)</span>
+    <span><span class="dot" style="background:var(--ok)"></span> Actúa</span>
+    <span><span class="dot" style="background:var(--warn)"></span> Pospone / no concluyente</span>
+    <span><span class="dot" style="background:var(--crit)"></span> Bloquea</span>
+    <span><span class="dot" style="border:1px dashed var(--border-strong);background:transparent"></span> No se evalúa</span>
+  </div>
+
+  <div class="detail empty" id="detail">Tocá una regla de arriba para ver qué hace, su riesgo y la decisión del equipo.</div>
+
+  <footer class="end">
+    Simulador del motor de reglas · Proyecto Yerbanalytics · Julio 2026 · Detalle completo en <a href="anexo-reglas.html">anexo de reglas</a>.
+  </footer>
+</div>
+
+<script>
+  const RULES = [
+    { id:'clasif', prio:'Base', name:'Clasificación', type:'base', anchor:'regla-clasificacion',
+      desc:'Compara las 5 métricas contra sus bandas y asigna status + diagnóstico. Alimenta a todas las demás.',
+      risk:'El diagnóstico es sintético (mapa fijo), no viene del modelo de IA real.',
+      decision:'Usar el diagnóstico sintético hasta integrar el modelo, próximo a implementarse.' },
+    { id:'bloqueo', prio:'0', name:'Bloqueo manual', type:'block', anchor:'regla-bloqueo',
+      desc:'Si un operario marcó el sector (o la zona) como bloqueado, corta toda la cadena.',
+      risk:'No vence y no hay trazabilidad de quién desbloquea.',
+      decision:'No vence (lo desbloquea el productor) + agregar el campo desactivado_por.' },
+    { id:'stale', prio:'1', name:'Sensor mudo', type:'block', anchor:'regla-stale',
+      desc:'Si la última lectura del sensor testigo es muy vieja (>2h / >24h), anula la actuación de la MZ.',
+      risk:'Umbral de frescura fijo y global; un solo sensor por MZ (punto único de falla).',
+      decision:'Umbral de frescura por métrica; sin sensor de respaldo, por costos.' },
+    { id:'clima', prio:'2', name:'Clima override', type:'block', anchor:'regla-clima',
+      desc:'Antes de regar, consulta el pronóstico. Si va a llover fuerte, pospone el riego.',
+      risk:'Variable meteo imprecisa; el riego pospuesto puede quedar sin re-evaluar.',
+      decision:'Consultar mm en una ventana de tiempo; re-evaluar releyendo el sensor de humedad.' },
+    { id:'dosis', prio:'5', name:'Dosis límite', type:'block', anchor:'regla-dosis',
+      desc:'Antes de inyectar un insumo, verifica que no se supere el tope químico. Si sí, bloquea la inyección.',
+      risk:'Tope "balde común" que mezcla insumos; ventana de 24h fija; el tratamiento bloqueado se pierde.',
+      decision:'Cupo por tipo de insumo; ventana configurable por producto; bloquear = re-agendar + avisar.' },
+    { id:'riego', prio:'10', name:'Riego', type:'action', anchor:'regla-riego',
+      desc:'Si el sustrato está bajo el umbral de humedad, abre la electroválvula.',
+      risk:'Umbral fijo que ignora temp/UV; un sensor asume riego parejo en todo el sector.',
+      decision:'Umbral fijo para el prototipo; uniformidad a evaluar en campo.' },
+    { id:'insumo', prio:'11', name:'Insumo (fusión multimodal)', type:'action', anchor:'regla-insumo',
+      desc:'Si el confidence de la IA supera el 85%, inyecta químico. La humedad decide hongo (fungicida) vs. plaga (insecticida).',
+      risk:'Umbral 85% único para todo químico; desempate solo por humedad; autonomía química (legal).',
+      decision:'Umbral por agresividad del químico; interruptor de confirmación del productor.' },
+    { id:'sombra', prio:'12', name:'Mediasombra', type:'action', anchor:'regla-mediasombra',
+      desc:'Mueve la mediasombra por el plan de rustificación (calendario) o por un pico de UV.',
+      risk:'Conflicto: el plan quiere sol, el UV quiere sombra; calendario vs. telemetría.',
+      decision:'A debatir: modelo de 3 capas (calendario + reactivo + techo UV) + control manual.' },
+    { id:'seguim', prio:'20', name:'Seguimiento', type:'action', anchor:'regla-seguimiento',
+      desc:'Tras ejecutar una acción, espera y vuelve a medir: si mejoró, "Efectiva"; si no, bloquea repetir y alerta.',
+      risk:'Latencia de seguimiento única genera falsos negativos.',
+      decision:'Latencia + métrica + umbral por tipo de acción; reset trazable del bloqueo.' },
+  ];
+
+  // outcome puede ser un string (clave) o un objeto {cls,label}
+  const OUT = {
+    base:  { cls:'base', label:'clasifica' },
+    na:    { cls:'na',   label:'pasa' },
+    act:   { cls:'act',  label:'ACTÚA' },
+    block: { cls:'block',label:'BLOQUEA' },
+    warn:  { cls:'warn', label:'—' },
+    cut:   { cls:'cut',  label:'no se evalúa' },
+  };
+  const resolve = o => typeof o === 'string' ? OUT[o] : { cls: o.cls, label: o.label };
+
+  const SCEN = [
+    { id:'normal', btn:'Todo normal',
+      readings:'Humedad 55% · temp 23° · UV 4 · dato fresco · sin bloqueo · sin diagnóstico',
+      result:{ tone:'ok', text:'Status OK. Ninguna regla de actuación se dispara.' },
+      out:{ clasif:{cls:'base',label:'status: OK'}, bloqueo:'na', stale:'na', clima:'na', dosis:'na',
+            riego:{cls:'na',label:'humedad ok'}, insumo:{cls:'na',label:'sano'}, sombra:'na', seguim:'na' } },
+
+    { id:'seco', btn:'Sustrato seco',
+      readings:'Humedad 38% (bajo el ideal 42) · dato fresco · sin lluvia · sin bloqueo',
+      result:{ tone:'act', text:'Riega el sector. Seguimiento agendado para verificar.' },
+      out:{ clasif:{cls:'base',label:'status: crítico'}, bloqueo:'na', stale:'na', clima:{cls:'na',label:'sin lluvia'}, dosis:'na',
+            riego:{cls:'act',label:'ACTÚA · abre válvula'}, insumo:'na', sombra:'na', seguim:{cls:'act',label:'re-mide'} } },
+
+    { id:'lluvia', btn:'Seco + lluvia inminente',
+      readings:'Humedad 38% · pronóstico: 8mm en 1h',
+      result:{ tone:'warn', text:'Riego pospuesto por lluvia. Se re-evalúa cuando pase la ventana.' },
+      out:{ clasif:{cls:'base',label:'status: crítico'}, bloqueo:'na', stale:'na', clima:{cls:'warn',label:'POSPONE el riego'}, dosis:'na',
+            riego:{cls:'cut',label:'no riega (pospuesto)'}, insumo:'na', sombra:'na', seguim:'na' } },
+
+    { id:'mudo', btn:'Sensor mudo (3h)',
+      readings:'Última lectura del sensor testigo: hace 3 horas',
+      result:{ tone:'block', text:'Cadena cortada: sensor desactualizado. Cero actuación autónoma en la MZ.' },
+      out:{ clasif:{cls:'base',label:'dato viejo'}, bloqueo:'na', stale:{cls:'block',label:'BLOQUEA · corta la MZ'}, clima:'cut', dosis:'cut',
+            riego:'cut', insumo:'cut', sombra:'cut', seguim:'cut' }, cutFrom:'stale' },
+
+    { id:'bloqueado', btn:'Sector bloqueado',
+      readings:'Un operario bloqueó la MZ para mantenimiento',
+      result:{ tone:'block', text:'Cadena cortada por bloqueo manual. Ninguna regla actúa sobre el sector.' },
+      out:{ clasif:{cls:'base',label:'clasifica'}, bloqueo:{cls:'block',label:'BLOQUEA · corta todo'}, stale:'cut', clima:'cut', dosis:'cut',
+            riego:'cut', insumo:'cut', sombra:'cut', seguim:'cut' }, cutFrom:'bloqueo' },
+
+    { id:'hongo', btn:'Daño biótico · 91% · húmedo',
+      readings:'Diagnóstico: Daño biótico · confidence 91% · humedad 84%',
+      result:{ tone:'act', text:'Inyecta fungicida: humedad alta ⇒ sospecha de hongo. Seguimiento con re-diagnóstico.' },
+      out:{ clasif:{cls:'base',label:'+ diagnóstico'}, bloqueo:'na', stale:'na', clima:'na', dosis:{cls:'na',label:'dentro del límite'},
+            riego:{cls:'na',label:'humedad alta'}, insumo:{cls:'act',label:'ACTÚA · fungicida'}, sombra:'na', seguim:{cls:'act',label:'re-diagnostica'} } },
+
+    { id:'noconc', btn:'Daño biótico · 78%',
+      readings:'Diagnóstico: Daño biótico · confidence 78% (bajo el 85%)',
+      result:{ tone:'warn', text:'No concluyente (<85%). No inyecta nada. Alerta al agrónomo para revisión manual.' },
+      out:{ clasif:{cls:'base',label:'+ diagnóstico'}, bloqueo:'na', stale:'na', clima:'na', dosis:'na',
+            riego:'na', insumo:{cls:'warn',label:'NO CONCLUYENTE'}, sombra:'na', seguim:'na' } },
+
+    { id:'tope', btn:'Dosis diaria alcanzada',
+      readings:'Daño biótico 91% · humedad 84% · el sector ya llegó al tope de dosis del día',
+      result:{ tone:'block', text:'Insumo bloqueado: límite químico diario alcanzado. Alerta CRITICAL, no inyecta.' },
+      out:{ clasif:{cls:'base',label:'+ diagnóstico'}, bloqueo:'na', stale:'na', clima:'na', dosis:{cls:'block',label:'BLOQUEA el insumo'},
+            riego:{cls:'na',label:'humedad alta'}, insumo:{cls:'cut',label:'no inyecta (tope)'}, sombra:'na', seguim:'na' } },
+  ];
+
+  const $ = s => document.querySelector(s);
+  const flow = $('#flow'), scnBox = $('#scenarios'), readings = $('#readings'), result = $('#result'), detail = $('#detail');
+  let selectedId = null, timers = [];
+
+  // construir el pipeline
+  RULES.forEach((r, i) => {
+    const node = document.createElement('div');
+    node.className = 'node'; node.dataset.id = r.id; node.tabIndex = 0; node.setAttribute('role','button');
+    const typeLabel = r.type === 'block' ? 'bloqueante' : r.type === 'action' ? 'acción' : 'base';
+    node.innerHTML =
+      '<div class="n-prio">' + r.prio + '</div>' +
+      '<div><div class="n-name">' + r.name + ' <span class="n-type ' + r.type + '">' + typeLabel + '</span></div>' +
+      '<div class="n-desc">' + r.desc + '</div></div>' +
+      '<div class="verdict"></div>';
+    node.addEventListener('click', () => showDetail(r.id));
+    node.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showDetail(r.id); } });
+    flow.appendChild(node);
+    if (i < RULES.length - 1) { const c = document.createElement('div'); c.className = 'connector'; c.dataset.after = r.id; flow.appendChild(c); }
+  });
+
+  // botones de escenario
+  SCEN.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'scn-btn'; b.textContent = s.btn; b.dataset.id = s.id;
+    b.addEventListener('click', () => runScenario(s.id));
+    scnBox.appendChild(b);
+  });
+
+  function clearFlow() {
+    timers.forEach(clearTimeout); timers = [];
+    flow.querySelectorAll('.node').forEach(n => { n.classList.remove('lit','cut'); const v = n.querySelector('.verdict'); v.className = 'verdict'; v.textContent = ''; });
+    flow.querySelectorAll('.connector').forEach(c => c.classList.remove('dead'));
+  }
+
+  function runScenario(id) {
+    const s = SCEN.find(x => x.id === id);
+    scnBox.querySelectorAll('.scn-btn').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+    readings.innerHTML = '<span class="k">entrada</span> ' + s.readings;
+    result.style.display = 'none';
+    clearFlow();
+
+    let cutReached = false;
+    RULES.forEach((r, i) => {
+      const t = setTimeout(() => {
+        const node = flow.querySelector('.node[data-id="' + r.id + '"]');
+        const o = resolve(s.out[r.id] || 'na');
+        const v = node.querySelector('.verdict');
+        v.textContent = o.label; v.className = 'verdict ' + o.cls + ' show';
+        node.classList.add(o.cls === 'cut' ? 'cut' : 'lit');
+        // marcar el corte de cadena
+        if (s.cutFrom === r.id) {
+          const conn = flow.querySelector('.connector[data-after="' + r.id + '"]');
+          if (conn) conn.classList.add('dead');
+        }
+      }, i * 260);
+      timers.push(t);
+    });
+    // resultado final
+    const tf = setTimeout(() => {
+      result.className = 'result ' + s.result.tone;
+      result.textContent = s.result.text;
+      result.style.display = 'flex';
+    }, RULES.length * 260 + 120);
+    timers.push(tf);
+  }
+
+  function showDetail(id) {
+    const r = RULES.find(x => x.id === id);
+    selectedId = id;
+    flow.querySelectorAll('.node').forEach(n => n.classList.toggle('selected', n.dataset.id === id));
+    detail.className = 'detail';
+    detail.innerHTML =
+      '<span class="dtag">' + (r.prio === 'Base' ? 'Paso base' : 'Prioridad ' + r.prio) + '</span>' +
+      '<h3>' + r.name + '</h3>' +
+      '<p>' + r.desc + '</p>' +
+      '<div class="row"><b>Riesgo</b> ' + r.risk + '</div>' +
+      '<div class="row"><b>Decisión</b> ' + r.decision + '</div>' +
+      '<a class="more" href="anexo-reglas.html#' + r.anchor + '">Ver detalle completo →</a>';
+  }
+</script>
+</html>

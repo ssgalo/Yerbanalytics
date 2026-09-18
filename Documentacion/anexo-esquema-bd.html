@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anexo — Gestión del esquema de base de datos</title>
+<style>
+  :root {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+    --maxw: 74ch;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+      --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+      --border: #29301F; --border-strong: #3A4330;
+      --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+      --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+      --code-bg: #191E14; --code-ink: #C6D0BB;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F120D; --surface: #161A12; --surface-2: #1D2218;
+    --ink: #E9ECE2; --ink-soft: #CFD5C7; --muted: #9BA593; --faint: #737D6C;
+    --border: #29301F; --border-strong: #3A4330;
+    --accent: #64B274; --accent-soft: #1C2A1C; --accent-ink: #9CD3A6;
+    --ok: #63B473; --warn: #D69C3E; --crit: #E0645E; --offline: #8A93A0;
+    --code-bg: #191E14; --code-ink: #C6D0BB;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #FAFBF7; --surface: #FFFFFF; --surface-2: #F1F4EC;
+    --ink: #1A211B; --ink-soft: #37423A; --muted: #5D685E; --faint: #869084;
+    --border: #E1E6DA; --border-strong: #CBD3C2;
+    --accent: #2E6B3B; --accent-soft: #E7F0E4; --accent-ink: #245531;
+    --ok: #3E8E4F; --warn: #B9791A; --crit: #C0413B; --offline: #6B7280;
+    --code-bg: #F3F5EF; --code-ink: #2C3A2E;
+    --shadow: 0 1px 2px rgba(26,33,27,.05), 0 8px 24px rgba(26,33,27,.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--font-body); font-size: 18px; line-height: 1.66;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .page { max-width: var(--maxw); margin: 0 auto; padding: 0 24px 120px; }
+
+  .backbar {
+    max-width: var(--maxw); margin: 0 auto; padding: 22px 24px 0;
+    font-family: var(--font-display); font-size: 14px;
+  }
+  .back {
+    display: inline-flex; align-items: center; gap: 7px; color: var(--muted);
+    text-decoration: none; font-weight: 500; transition: color .15s, gap .15s;
+  }
+  .back:hover { color: var(--accent); gap: 10px; }
+
+  header.hero { padding: 34px 0 40px; }
+  .eyebrow {
+    font-family: var(--font-display); text-transform: uppercase;
+    letter-spacing: .16em; font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 16px;
+  }
+  h1 {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.9rem, 4.6vw, 2.7rem); line-height: 1.07;
+    letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance; color: var(--ink);
+  }
+  .lede { font-size: 1.18rem; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+
+  section { margin-bottom: 52px; scroll-margin-top: 24px; }
+  .num {
+    font-family: var(--font-display); font-weight: 700; font-size: 13px;
+    letter-spacing: .12em; color: var(--accent); display: block; margin-bottom: 8px;
+  }
+  h2 {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.14;
+    letter-spacing: -0.015em; margin: 0 0 18px; color: var(--ink); text-wrap: balance;
+  }
+  h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.2rem; margin: 34px 0 12px; color: var(--ink); }
+  h4 { font-family: var(--font-display); font-weight: 600; font-size: 1rem; margin: 26px 0 9px; color: var(--ink-soft); }
+  p { margin: 0 0 18px; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  strong { color: var(--ink); font-weight: 700; }
+  em { color: var(--ink-soft); }
+  ul, ol { margin: 0 0 18px; padding-left: 24px; }
+  li { margin: 0 0 9px; }
+  li::marker { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 46px 0; }
+
+  code {
+    font-family: var(--font-mono); font-size: 0.85em; background: var(--code-bg); color: var(--code-ink);
+    padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--border);
+  }
+  pre {
+    font-family: var(--font-mono); font-size: 13.5px; line-height: 1.55;
+    background: var(--code-bg); color: var(--code-ink);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; margin: 0 0 22px;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
+
+  .call {
+    border-radius: 12px; padding: 18px 20px 18px 22px; margin: 0 0 24px;
+    border: 1px solid var(--border); background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .call .tag {
+    font-family: var(--font-display); font-weight: 700; font-size: 11.5px;
+    letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 8px;
+  }
+  .call p:last-child, .call ul:last-child, .call ol:last-child { margin-bottom: 0; }
+  .call.here { border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  .call.here .tag { color: var(--accent-ink); }
+  .call.warnbox { border-left: 4px solid var(--warn); }
+  .call.warnbox .tag { color: var(--warn); }
+  .call.verdict { border-left: 4px solid var(--ink); }
+  .call.verdict .tag { color: var(--ink); }
+
+  .table-scroll { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; font-family: var(--font-display); }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { background: var(--surface-2); color: var(--ink); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+  td code { white-space: nowrap; }
+
+  .pill { font-family: var(--font-display); font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+  .pill.crit { color: var(--crit); background: color-mix(in srgb, var(--crit) 13%, transparent); }
+  .pill.neutral { color: var(--muted); background: var(--surface-2); }
+
+  .plus { color: var(--ok); font-weight: 700; }
+  .minus { color: var(--crit); font-weight: 700; }
+
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin: 0 0 24px; overflow-x: auto; box-shadow: var(--shadow); }
+  pre.mermaid { background: none; border: none; padding: 0; text-align: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: var(--font-display); font-weight: 600; font-size: 15px;
+    color: #fff; background: var(--accent); padding: 13px 22px; border-radius: 11px;
+    text-decoration: none; border: 1px solid var(--accent-ink);
+    box-shadow: var(--shadow); transition: transform .12s, background .15s;
+  }
+  .btn:hover { background: var(--accent-ink); transform: translateY(-1px); }
+  @media (prefers-color-scheme: dark) { .btn { color: #0F120D; } }
+  :root[data-theme="dark"] .btn { color: #0F120D; }
+  :root[data-theme="light"] .btn { color: #fff; }
+
+  footer.end { margin-top: 40px; padding-top: 26px; border-top: 1px solid var(--border); font-size: 13px; color: var(--faint); font-family: var(--font-display); }
+
+  ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+  html { scroll-behavior: smooth; }
+</style>
+
+<div class="backbar">
+  <a class="back" href="informe-motor-reglas.html">← Volver al informe principal</a>
+</div>
+
+<div class="page">
+  <header class="hero">
+    <div class="eyebrow">Anexo del Error 1 · Persistencia</div>
+    <h1>Gestión del esquema de base de datos: de la maqueta a producción</h1>
+    <p class="lede">Cómo Spring Boot crea y evoluciona las tablas, qué queries se disparan cuando cambiás el modelo, qué conviene en producción, y la recomendación concreta para Yerbanalytics como maqueta de tesis.</p>
+  </header>
+
+  <!-- 1 -->
+  <section>
+    <span class="num">01 — LA DISTINCIÓN BASE</span>
+    <h2>DDL vs. DML: dos tipos de queries que no son lo mismo</h2>
+    <p>Antes de todo, esta distinción te sirve para siempre. Toda instrucción SQL cae en una de dos familias:</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Familia</th><th>Qué toca</th><th>Ejemplos</th><th>¿Cuándo corre?</th></tr></thead>
+        <tbody>
+          <tr><td><strong>DDL</strong><br><span style="font-weight:400;color:var(--muted)">Data Definition Language</span></td><td>La <em>estructura</em> (las tablas y columnas)</td><td><code>CREATE TABLE</code>, <code>ALTER TABLE</code>, <code>DROP</code></td><td>Al arrancar la app (Hibernate reconcilia el esquema)</td></tr>
+          <tr><td><strong>DML</strong><br><span style="font-weight:400;color:var(--muted)">Data Manipulation Language</span></td><td>Los <em>datos</em> (las filas)</td><td><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>SELECT</code></td><td>En runtime, cada vez que se ejecuta la lógica</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Cuando el motor de reglas guarde un bloqueo o lea sectores, dispara <strong>DML en runtime</strong>. Cuando modificás una entidad Java, Hibernate dispara <strong>DDL al arrancar</strong>. Son dos momentos distintos — no los confundas.</p>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <span class="num">02 — LAS DOS ESTRATEGIAS</span>
+    <h2>Cómo se crean las tablas, y los modos de <code>ddl-auto</code></h2>
+    <p>Hay dos formas de crear el esquema, y son excluyentes: <strong>(A)</strong> entidades <code>@Entity</code> en Java y Hibernate genera el <code>CREATE TABLE</code> solo, o <strong>(B)</strong> SQL crudo a mano en <code>schema.sql</code>. Yerbanalytics usa la <strong>(A)</strong>, y su comportamiento lo controla una sola propiedad:</p>
+    <pre><code>spring.jpa.hibernate.ddl-auto=update</code></pre>
+    <p>Esa propiedad tiene varios valores posibles, y elegir el correcto <em>es</em> la decisión de fondo:</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Valor</th><th>Qué hace al arrancar</th><th>Dónde encaja</th></tr></thead>
+        <tbody>
+          <tr><td><code>none</code></td><td>No toca el esquema. Vos lo gestionás por fuera.</td><td><span class="pill ok">Producción</span> con migraciones</td></tr>
+          <tr><td><code>validate</code></td><td>Verifica que las tablas coincidan con las entidades. No modifica nada; <strong>falla el arranque si no matchean</strong>.</td><td><span class="pill ok">Producción</span> con migraciones</td></tr>
+          <tr><td><code>update</code></td><td>Agrega tablas y columnas nuevas. <strong>No borra, no renombra, no cambia tipos.</strong></td><td><span class="pill warn">Solo desarrollo</span></td></tr>
+          <tr><td><code>create</code></td><td>Dropea y recrea TODO el esquema al arrancar (perdés los datos).</td><td><span class="pill neutral">Tests / dev efímero</span></td></tr>
+          <tr><td><code>create-drop</code></td><td>Como <code>create</code>, y además dropea al cerrar la app.</td><td><span class="pill neutral">Tests</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El proyecto está en <code>update</code>: cómodo, cero fricción... pero con una letra chica importante, que es de lo que va la próxima sección.</p>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <span class="num">03 — LA LETRA CHICA</span>
+    <h2>Qué queries se disparan cuando cambiás una entidad</h2>
+    <p>Sí, cambiar una entidad dispara DDL al arrancar. Pero <code>update</code> <strong>solo hace cambios aditivos</strong>. Mirá los cuatro casos:</p>
+
+    <h4><span class="plus">✓</span> Agregás un campo</h4>
+    <pre><code>@Entity @Table(name = "bloqueo_manual")
+public class BloqueoManualEntity {
+    // ... campos existentes
+    private String observaciones;   // ← campo nuevo
+}</code></pre>
+    <p>Al próximo arranque Hibernate corre solo, sin que escribas SQL:</p>
+    <pre><code>ALTER TABLE bloqueo_manual ADD COLUMN observaciones VARCHAR(255);</code></pre>
+
+    <h4><span class="minus">✗</span> Borrás ese campo del Java</h4>
+    <p>Hibernate con <code>update</code> <strong>NO corre</strong> <code>DROP COLUMN</code>. La columna <code>observaciones</code> queda <strong>huérfana</strong> en la base para siempre, con sus datos adentro. La app deja de usarla, pero sigue ahí.</p>
+
+    <h4><span class="minus">✗</span> Renombrás un campo (<code>observaciones</code> → <code>notas</code>)</h4>
+    <p>Hibernate no entiende que es un rename: <strong>crea una columna nueva <code>notas</code> y deja la vieja <code>observaciones</code></strong> con los datos estancados. Terminás con las dos.</p>
+
+    <h4><span class="minus">✗</span> Cambiás el tipo (<code>String</code> → <code>Integer</code>)</h4>
+    <p><code>update</code> normalmente <strong>no altera</strong> el tipo de una columna existente — es conservador. Podés quedar con un desajuste entre lo que espera Java y lo que hay en la base.</p>
+
+    <div class="call warnbox">
+      <span class="tag">El problema real: schema drift</span>
+      <p>A esto se le llama <em>deriva del esquema</em>: la base y el código se van separando de a poco, y <code>update</code> no te avisa. En una maqueta que reseteás seguido no duele; en una base con datos reales que no podés perder, es una bomba de tiempo.</p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <span class="num">04 — PRODUCCIÓN</span>
+    <h2>La mejor práctica: migraciones versionadas</h2>
+    <p>En producción real, el estándar de la industria no es <code>update</code> — son las <strong>migraciones versionadas</strong> con <strong>Flyway</strong> o <strong>Liquibase</strong>. La idea: cada cambio de esquema es un script explícito, numerado, que corre una sola vez y queda registrado.</p>
+    <pre><code>src/main/resources/db/migration/
+  ├── V1__crea_tablas_base.sql
+  ├── V2__crea_bloqueo_manual.sql
+  └── V3__agrega_columna_observaciones.sql</code></pre>
+    <p>Flyway lleva una tabla de control (<code>flyway_schema_history</code>) donde anota qué migraciones ya aplicó. Al arrancar, corre solo las que faltan, en orden. Y ahí se combina con <code>ddl-auto=validate</code>: las migraciones <em>crean</em> el esquema, y Hibernate solo <em>verifica</em> que las entidades coincidan.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Criterio</th><th><code>ddl-auto=update</code></th><th>Flyway / Liquibase</th></tr></thead>
+        <tbody>
+          <tr><td>Historial de cambios</td><td><span class="minus">✗</span> Ninguno</td><td><span class="plus">✓</span> Versionado, en git</td></tr>
+          <tr><td>Revisable antes de correr</td><td><span class="minus">✗</span> No lo ves</td><td><span class="plus">✓</span> Es un archivo que revisás en el PR</td></tr>
+          <tr><td>Borra / renombra / cambia tipos</td><td><span class="minus">✗</span> No puede</td><td><span class="plus">✓</span> Vos lo escribís, a propósito</td></tr>
+          <tr><td>Rollback</td><td><span class="minus">✗</span> No existe</td><td><span class="plus">✓</span> Migración de reversa</td></tr>
+          <tr><td>Varias instancias arrancando</td><td><span class="minus">✗</span> Pueden competir</td><td><span class="plus">✓</span> Lock de migración</td></tr>
+          <tr><td>Esfuerzo de setup</td><td><span class="plus">✓</span> Cero</td><td><span class="minus">~</span> Requiere escribir scripts</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Best practices de gestión de esquema</h3>
+    <ul>
+      <li><strong>Una sola fuente de verdad.</strong> O entidades (dev), o migraciones (prod). Nunca las dos definiendo la misma tabla.</li>
+      <li><strong>Nunca <code>update</code> ni <code>create</code> en producción.</strong> Ahí va <code>validate</code> (o <code>none</code>) + migraciones.</li>
+      <li><strong>Cada cambio de esquema = una migración numerada</strong>, inmutable una vez mergeada. Si te equivocaste, va una migración nueva, no editás la vieja.</li>
+      <li><strong>Migraciones y datos separados</strong> de la lógica de la app, revisadas en el PR como código.</li>
+      <li><strong>Probá la migración</strong> contra una copia de datos reales antes de producción, no solo contra una base vacía.</li>
+    </ul>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <span class="num">05 — PARA ESTE PROYECTO</span>
+    <h2>Mi recomendación final para Yerbanalytics</h2>
+    <p>Acá está la clave que planteaste vos: <strong>esto es una maqueta para tesis, no el producto que van a vender.</strong> Eso cambia la respuesta por completo. No apliques best practices de producción por reflejo — aplicá lo que tu contexto <em>necesita</em>.</p>
+
+    <div class="call here">
+      <span class="tag">Recomendación</span>
+      <p><strong>Dejá <code>ddl-auto=update</code> tal como está.</strong> Para una maqueta de tesis es la decisión <em>correcta</em>: cero fricción, la base se recrea y se resiembra con <code>data.sql</code> cuando querés, y no hay datos reales que perder. Meter Flyway ahora sería resolver un problema que no tenés — sobre-ingeniería pura.</p>
+    </div>
+
+    <p>Ahora, dos cosas de bajo costo que <strong>suben tu nota sin casi esfuerzo</strong>, porque demuestran criterio ante el tribunal:</p>
+    <ol>
+      <li><strong>Documentá la decisión.</strong> Dejá escrito (en el README del backend o en la defensa) una línea como: <em>"El esquema se gestiona con entidades JPA + <code>ddl-auto=update</code>, apropiado para el alcance de maqueta; una puesta en producción migraría a Flyway con <code>validate</code>."</em> Eso demuestra que <strong>sabés la diferencia</strong> — que es exactamente lo que un tribunal quiere ver. No saberlo es el problema; elegir <code>update</code> sabiendo, no lo es.</li>
+      <li><strong>Corregí el <code>design.md</code> del PR #12:</strong> sacá la mención a <code>schema.sql</code> y usá el patrón real (<code>BloqueoManualEntity</code> + repository). Coherencia con el resto del código.</li>
+    </ol>
+
+    <div class="call verdict">
+      <span class="tag">En una frase</span>
+      <p>Para la tesis, <code>ddl-auto=update</code> es la elección pragmática y correcta. La madurez no está en usar Flyway sí o sí — está en <strong>saber por qué no lo necesitás todavía</strong> y poder explicarlo. Concepto &gt; código.</p>
+    </div>
+
+    <p>¿Y si el objetivo de la tesis fuera <em>demostrar</em> arquitectura lista para producción? Ahí sí valdría agregar Flyway con una migración baseline y switchear a <code>validate</code>. Pero eso es una decisión del <em>alcance de la tesis</em>, no una obligación técnica. Definilo vos según qué querés mostrar.</p>
+  </section>
+
+  <hr>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;">
+    <a class="btn" href="informe-motor-reglas.html"><span>←</span> Volver al informe principal</a>
+  </div>
+
+  <footer class="end">
+    Anexo del informe Motor de Reglas · Proyecto Yerbanalytics · Julio 2026
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, securityLevel: "loose",
+    theme: dark ? "dark" : "neutral" });
+</script>
+</html>
