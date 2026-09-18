@@ -43,8 +43,8 @@ public record RuleContext(
         WeatherForecast forecast,
 
         /**
-         * {@code true} si existe un {@code BloqueoManualEntity} activo para este sector
-         * o su zona (R3/HU-19). Evaluado por {@code BloqueoManualRule}.
+         * {@code true} si existe un {@code ManualLockEntity} activo para este sector
+         * o su zona (R2/HU-19). Evaluado por {@code ManualLockRule}.
          */
         boolean bloqueoManualActivo
 

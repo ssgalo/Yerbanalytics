@@ -47,13 +47,13 @@ public class ManualLockEntity {
     private Long activatedAt;
 
     /** Human-readable reason for the lock, persisted in the history. */
-    @Column(nullable = false)
+    @Column(name = "motivo", nullable = false)
     private String reason;
 
     /**
      * {@code true} while the lock is active. Set to {@code false} when the operator
      * manually deactivates it.
      */
-    @Column(nullable = false)
+    @Column(name = "activo", nullable = false)
     private Boolean active = Boolean.TRUE;
 }

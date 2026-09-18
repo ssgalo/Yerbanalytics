@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Regla de seguridad por antigüedad de telemetría (HU-02 CA-03/04).
  *
- * <p><b>Prioridad:</b> 1 (segunda en correr, después de {@link BloqueoManualRule}).
+ * <p><b>Prioridad:</b> 1 (segunda en correr, después de {@link ManualLockRule}).
  *
  * <p><b>Condición:</b> {@link RuleContext#sensorStale()} es {@code true}, es decir,
  * el nodo testigo de la macro-zona no reportó dentro del umbral configurado en

@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Regla de postergación de riego por pronóstico de lluvia inminente (HU-09).
  *
- * <p><b>Prioridad:</b> 2 (corre después de {@link BloqueoManualRule} y {@link StaleSensorRule},
+ * <p><b>Prioridad:</b> 2 (corre después de {@link ManualLockRule} y {@link StaleSensorRule},
  * antes de las reglas ejecutoras de riego e insumo).
  *
  * <p><b>Condición:</b> el pronóstico climático ({@link RuleContext#forecast()}) no es
