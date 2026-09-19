@@ -347,6 +347,8 @@ export interface ConfigOperativa {
   mediasombraAperturaMaxPct: number;
   seguimientoLatenciaMin: number;
   seguimientoDeltaMin: number;
+  intervaloSensadoMinutos: number;
+  intervaloEvaluacionMinutos: number;
   updatedBy: string | null;
   updatedTs: number | null;
 }

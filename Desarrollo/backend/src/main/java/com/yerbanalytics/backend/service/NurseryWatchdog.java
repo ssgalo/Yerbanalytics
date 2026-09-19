@@ -16,11 +16,13 @@ import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -34,24 +36,14 @@ import java.util.stream.Collectors;
  * telemetría, el motor nunca se evaluaría y las condiciones críticas pasarían
  * desapercibidas.
  *
- * <h3>Funciones</h3>
- * <ul>
- *   <li><b>Detección de nodo caído:</b> itera todas las zonas y evalúa el motor
- *       aunque no haya telemetría reciente. El {@code StaleSensorRule} detectará
- *       la antigüedad y emitirá {@code ABORT_RIEGO} o la alerta correspondiente.</li>
- *   <li><b>Reglas independientes de telemetría:</b> evaluación periódica de
- *       {@code MediasombraRule} (plan de rustificación por día del ciclo) y
- *       {@code ClimaOverrideRule} (pronóstico climático actualizado).</li>
- * </ul>
- *
  * <h3>Configuración</h3>
  * <ul>
- *   <li>{@code yerbanalytics.engine.watchdog-interval-ms} — intervalo del scheduler
+ *   <li>{@code intervaloEvaluacionMinutos} (en base de datos) — intervalo dinámico del scheduler
  *       (default: 5 minutos)</li>
  * </ul>
  */
 @Service
-public class NurseryWatchdog {
+public class NurseryWatchdog implements SchedulingConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(NurseryWatchdog.class);
 
@@ -82,13 +74,35 @@ public class NurseryWatchdog {
         this.staleThresholdMs = staleThresholdMs;
     }
 
+    @Override
+    public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+        taskRegistrar.addTriggerTask(
+                this::evaluarTodos,
+                triggerContext -> {
+                    // Obtener el intervalo dinámico de la base de datos (por defecto 5 minutos si falla/no existe)
+                    long intervaloMs = 300000L;
+                    try {
+                        ConfiguracionOperativaEntity op = configuracionService.getConfiguracionOperativa();
+                        if (op != null && op.getIntervaloEvaluacionMinutos() != null && op.getIntervaloEvaluacionMinutos() > 0) {
+                            intervaloMs = op.getIntervaloEvaluacionMinutos() * 60000L;
+                        }
+                    } catch (Exception e) {
+                        log.warn("NurseryWatchdog: no se pudo leer la configuración, usando 5 minutos por defecto. {}", e.getMessage());
+                    }
+
+                    Date lastCompletion = triggerContext.lastCompletionTime();
+                    Date nextExecution = new Date((lastCompletion != null ? lastCompletion.getTime() : System.currentTimeMillis()) + intervaloMs);
+                    return nextExecution.toInstant();
+                }
+        );
+    }
+
     /**
      * Evaluación proactiva periódica del motor de reglas para todos los sectores.
      *
      * <p>Corre en el hilo del scheduler de Spring. Cada zona y sus sectores se evalúan
      * en orden, usando el último estado conocido de la base de datos.
      */
-    @Scheduled(fixedDelayString = "${yerbanalytics.engine.watchdog-interval-ms:300000}")
     @Transactional
     public void evaluarTodos() {
         log.debug("NurseryWatchdog: iniciando evaluación proactiva de todos los sectores.");

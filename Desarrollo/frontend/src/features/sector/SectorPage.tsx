@@ -9,11 +9,14 @@
    Ocupa el alto de la pantalla repartiendo las tarjetas, para no dejar
    media vista vacía.
    ============================================================ */
+import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSectorDetail } from '@/hooks/useSectorDetail';
+import { useHistory } from '@/hooks/useHistory';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
+import type { HistoryEntry } from '@/types/domain';
 
 import { DiagnosisCard } from './components/DiagnosisCard';
 import { ActuatorsCard } from './components/ActuatorsCard';
@@ -26,11 +29,28 @@ export function SectorPage() {
   /* ── Hooks — todos antes de cualquier return temprano ── */
   const { id } = useParams();
   const { sector, zona, detail } = useSectorDetail(id);
+  const { records } = useHistory();
   const navigate = useNavigate();
   usePageTitle(
     sector ? `Sector ${sector.id}` : 'Sector',
     sector ? `${sector.zonaName} · ${sector.statusLabel}` : '',
   );
+
+  const realHistory = useMemo(() => {
+    if (!sector) return [];
+    return records
+      .filter((r) => r.sectorId === sector.id)
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 5)
+      .map((r) => ({
+        tipo: r.tipo,
+        t: r.time,
+        d: r.accion && r.accion !== '—' ? `${r.decision} · ${r.accion}` : r.decision,
+        res: r.res,
+        soft: r.resSoft,
+        ink: r.resInk,
+      } as HistoryEntry));
+  }, [records, sector]);
 
   /* Return temprano DESPUÉS de todos los hooks */
   if (!sector || !detail) return null;
@@ -73,7 +93,7 @@ export function SectorPage() {
             sectorId={sector.id}
             isOffline={sector.status === 'offline'}
           />
-          <SectorHistory hist={detail.hist} />
+          <SectorHistory hist={realHistory} />
         </div>
         <div className={styles.col}>
           <ActuatorsCard rows={detail.actsRows} />

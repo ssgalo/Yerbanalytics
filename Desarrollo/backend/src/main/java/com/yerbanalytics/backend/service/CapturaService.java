@@ -522,7 +522,24 @@ public class CapturaService {
 
     /** Capturas completadas sin diagnóstico. Las consume el servicio de inferencia. */
     @Transactional(readOnly = true)
-    public List<CapturaEntity> capturassinDiagnostico() {
+    public List<CapturaEntity> capturasSinDiagnostico() {
+        return capturaRepo.findSinDiagnostico();
+    }
+
+    /**
+     * Retorna las capturas pendientes de diagnóstico SÓLO si la más reciente
+     * fue recibida hace más de X minutos. Esto permite procesar en lote al
+     * final del ciclo de fotos.
+     */
+    @Transactional(readOnly = true)
+    public List<CapturaEntity> capturasInactivas(int minutosQuietos) {
+        Long maxTime = capturaRepo.findMaxRecibidaEnSinDiagnostico();
+        if (maxTime == null) {
+            return List.of(); // no hay pendientes
+        }
+        if (System.currentTimeMillis() - maxTime < minutosQuietos * 60000L) {
+            return List.of(); // todavía hay actividad reciente
+        }
         return capturaRepo.findSinDiagnostico();
     }
 

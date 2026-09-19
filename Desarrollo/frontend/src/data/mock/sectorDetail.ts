@@ -55,42 +55,8 @@ export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: s
     dot: a.active ? '#3FA06A' : '#A9B2AB',
   }));
 
-  // historial
+  // historial (ahora se maneja desde SectorPage con useHistory)
   const hist: HistoryEntry[] = [];
-  if (A.valve === 'Regando')
-    hist.push({
-      tipo: 'Riego',
-      t: 'hace 12 min',
-      d: 'Microaspersor abierto 92 s · 0,41 L emitidos.',
-      res: 'Efectiva',
-      soft: '#E7F1EA',
-      ink: '#2E7A4F',
-    });
-  if (A.pump === 'Dosificando')
-    hist.push({
-      tipo: 'Insumo',
-      t: 'hace 44 min',
-      d: 'Inyección de 4,5 ml de fungicida en línea del sector.',
-      res: 'En seguimiento',
-      soft: '#F3ECDD',
-      ink: '#8A6A22',
-    });
-  hist.push({
-    tipo: 'Mediasombra',
-    t: 'hace 2 h',
-    d: 'Cobertura ajustada a ' + A.shade + '% por plan de rustificación (día 12).',
-    res: 'Efectiva',
-    soft: '#E7F1EA',
-    ink: '#2E7A4F',
-  });
-  hist.push({
-    tipo: 'Riego',
-    t: 'hace 5 h',
-    d: 'Riego matinal · 110 s · 0,5 L. Condición: humedad 37%.',
-    res: 'Efectiva',
-    soft: '#E7F1EA',
-    ink: '#2E7A4F',
-  });
 
   // seguimiento post-acción — sobre la humedad de sustrato de la macro-zona
   const hs = lectura.metrics.find((m) => m.key === 'humSus');

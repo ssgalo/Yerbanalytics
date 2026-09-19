@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
 import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
@@ -226,6 +227,60 @@ public class HistorialService {
     /** Lectura vigente de la métrica: viene de la macro-zona del sector, no del sector. */
     private Double currentMetric(SectorEntity s, String key) {
         return s.getZona() != null ? s.getZona().raw(key) : null;
+    }
+
+    // ------------------------------------------------------------------
+    // Consulta para el panel general (NurseryService)
+    // ------------------------------------------------------------------
+
+    /**
+     * Devuelve las últimas {@code limit} acciones reales del historial (excluye Info/Configuración)
+     * mapeadas al formato {@link ActionEvent} que espera el feed de actividad del dashboard.
+     *
+     * <p>Si el historial está vacío, retorna una lista vacía — el frontend muestra entonces
+     * el mensaje "Sin actividad registrada".
+     *
+     * @param limit cantidad máxima de eventos a retornar
+     */
+    @Transactional(readOnly = true)
+    public List<ActionEvent> getRecentActions(int limit) {
+        return historialRepository.findRecentActions(limit)
+                .stream()
+                .map(e -> {
+                    ColorPair rm = RES_MAP.getOrDefault(e.getRes(), new ColorPair("#EEEDE5", "#6A776E"));
+                    ActMeta meta = ACT.getOrDefault(e.getTipo(), ACT.get("Info"));
+                    String titulo = e.getTipo() + " · " + e.getSectorId();
+                    return new ActionEvent(
+                            titulo,
+                            e.getDecision() != null ? e.getDecision() : e.getLectura(),
+                            formatAgo(e.getTs()),
+                            e.getRes(),
+                            rm.soft(),
+                            rm.ink(),
+                            meta.tint(),
+                            meta.ink(),
+                            meta.path()
+                    );
+                })
+                .toList();
+    }
+
+    /**
+     * Cuenta las acciones autónomas del día por tipo.
+     *
+     * @return mapa tipo → cantidad (ej. {"Riego": 12, "Insumo": 4, "Mediasombra": 2})
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> countToday() {
+        long startOfDay = java.time.LocalDate.now()
+                .atStartOfDay(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli();
+        return Map.of(
+                "Riego",       historialRepository.countByTipoSinceTs("Riego",       startOfDay),
+                "Insumo",      historialRepository.countByTipoSinceTs("Insumo",      startOfDay),
+                "Mediasombra", historialRepository.countByTipoSinceTs("Mediasombra", startOfDay)
+        );
     }
 
     // ------------------------------------------------------------------

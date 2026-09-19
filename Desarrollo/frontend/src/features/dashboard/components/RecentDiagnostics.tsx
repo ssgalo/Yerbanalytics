@@ -32,25 +32,26 @@ export function RecentDiagnostics({ recentDiag }: RecentDiagnosticsProps) {
             onClick={() => navigate('/sector/' + d.sectorId)}
             type="button"
           >
-            {/* Thumbnail: gradiente de la imagen del diagnóstico */}
+            {/* Thumbnail: gradiente de la imagen del diagnóstico o foto real */}
             <span
               className={styles.thumb}
-              style={{ background: d.thumb }}
+              style={d.imagenUrl ? { background: `url("${d.imagenUrl}") center/cover no-repeat` } : { background: d.thumb }}
             >
-              {/* Ícono hoja del diseño original */}
-              <svg
-                width={20}
-                height={20}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(255,255,255,.9)"
-                strokeWidth={1.7}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 4 .5 11-4.5 15" />
-                <path d="M5 21c.5-4.5 2.5-8 4.5-10" />
-              </svg>
+              {!d.imagenUrl && (
+                <svg
+                  width={20}
+                  height={20}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="rgba(255,255,255,.9)"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 4 .5 11-4.5 15" />
+                  <path d="M5 21c.5-4.5 2.5-8 4.5-10" />
+                </svg>
+              )}
             </span>
 
             <div className={styles.itemBody}>

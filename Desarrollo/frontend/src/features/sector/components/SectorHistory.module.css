@@ -90,3 +90,14 @@
   margin-top: 3px;
   line-height: 1.45;
 }
+
+.empty {
+  margin-top: 24px;
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--faint);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+}

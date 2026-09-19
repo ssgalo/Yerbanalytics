@@ -8,6 +8,8 @@ public record ConfiguracionOperativa(
         double mediasombraAperturaMaxPct,
         int seguimientoLatenciaMin,
         double seguimientoDeltaMin,
+        int intervaloSensadoMinutos,
+        int intervaloEvaluacionMinutos,
         String updatedBy,
         Long updatedTs
 ) {}

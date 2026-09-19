@@ -50,7 +50,7 @@ class WeatherOverrideRuleTest {
     @Test
     @DisplayName("lluvia < umbral → NOOP_INFO, no se pospone")
     void conLluviaBajoUmbral_emiteNoopInfo() {
-        WeatherForecast forecast = new WeatherForecast(30.0, 3.0, Instant.now());
+        WeatherForecast forecast = new WeatherForecast(30.0, 3.0, Instant.now(), 20.0, "Nublado", 50.0, java.util.List.of());
         RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
 
         List<RuleAction> acciones = rule.evaluate(ctx);
@@ -63,7 +63,7 @@ class WeatherOverrideRuleTest {
     @Test
     @DisplayName("lluvia == umbral → POSTPONE_RIEGO")
     void conLluviaExactoUmbral_emitePostpone() {
-        WeatherForecast forecast = new WeatherForecast(UMBRAL, 2.0, Instant.now());
+        WeatherForecast forecast = new WeatherForecast(UMBRAL, 2.0, Instant.now(), 20.0, "Lluvia", 80.0, java.util.List.of());
         RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
 
         List<RuleAction> acciones = rule.evaluate(ctx);
@@ -75,7 +75,7 @@ class WeatherOverrideRuleTest {
     @Test
     @DisplayName("lluvia > umbral → POSTPONE_RIEGO con motivo descriptivo")
     void conLluviaSupeorUmbral_emitePostponeConMotivo() {
-        WeatherForecast forecast = new WeatherForecast(85.0, 1.0, Instant.now());
+        WeatherForecast forecast = new WeatherForecast(85.0, 1.0, Instant.now(), 20.0, "Tormenta", 90.0, java.util.List.of());
         RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
 
         List<RuleAction> acciones = rule.evaluate(ctx);
