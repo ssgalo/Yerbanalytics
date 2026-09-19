@@ -67,7 +67,13 @@ export class HttpRepository implements DataRepository {
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener la configuración desde ${this.baseUrl}`);
     }
-    return (await res.json()) as Configuracion;
+    const data = (await res.json()) as Configuracion;
+    // Normalizar campos nuevos que pueden venir null si la fila existía antes de la migración
+    if (data.operativa) {
+      data.operativa.intervaloSensadoMinutos = data.operativa.intervaloSensadoMinutos ?? 240;
+      data.operativa.intervaloEvaluacionMinutos = data.operativa.intervaloEvaluacionMinutos ?? 5;
+    }
+    return data;
   }
 
   async saveConfig(config: Configuracion): Promise<Configuracion> {

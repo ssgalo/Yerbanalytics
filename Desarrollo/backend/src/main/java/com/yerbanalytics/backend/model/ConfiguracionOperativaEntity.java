@@ -46,6 +46,13 @@ public class ConfiguracionOperativaEntity {
     @Column(name = "seguimiento_delta_min", nullable = false)
     private double seguimientoDeltaMin;
 
+    // --- Tiempos y Frecuencias ---
+    @Column(name = "intervalo_sensado_minutos")
+    private Integer intervaloSensadoMinutos = 240;
+
+    @Column(name = "intervalo_evaluacion_minutos")
+    private Integer intervaloEvaluacionMinutos = 5;
+
     // --- Auditoría (HU-15 CA-02) ---
     @Column(name = "updated_by")
     private String updatedBy;
