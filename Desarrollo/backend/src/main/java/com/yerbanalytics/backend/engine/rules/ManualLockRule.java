@@ -49,6 +49,11 @@ public class ManualLockRule implements Rule {
     }
 
     @Override
+    public String label() {
+        return "🔒 Bloqueo manual";
+    }
+
+    @Override
     public List<RuleAction> evaluate(RuleContext ctx) {
         if (ctx.bloqueoManualActivo()) {
             String reason = String.format(

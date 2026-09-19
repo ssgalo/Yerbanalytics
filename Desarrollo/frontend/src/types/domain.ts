@@ -106,6 +106,8 @@ export interface NodoTestigo {
   bateriaBaja: boolean;
 }
 
+
+
 /** Macro-zona (100 sectores). Dueña de la lectura sensada. */
 export interface Zona {
   id: string;
@@ -462,3 +464,43 @@ export interface NurseryData {
   /** Disposición visual de la grilla (macro-zonas/sectores por fila) — HU-18 CA-01. */
   layout: DisposicionTopologia;
 }
+
+// -----------------------------------------------------------------------
+// Tipos del Inspector de Decisiones (DAG del motor de reglas)
+// -----------------------------------------------------------------------
+
+/** Nodo del DAG de reglas. Espejo de `RuleNodeDto` del backend. */
+export interface RuleNode {
+  /** ID único. Para reglas: nombre de la clase (ej: "ClimaOverrideRule"). */
+  id: string;
+  /** Etiqueta legible para el usuario. */
+  label: string;
+  /** Tipo de nodo para el renderizador: "input" | "default" | "output". */
+  type: string;
+  /**
+   * Prioridad del nodo. -1 para "start", 999 para "abort", 1000 para "success".
+   * El frontend usa este valor para determinar el estado visual de cada nodo
+   * al seleccionar un evento del historial.
+   */
+  priority: number;
+  /** Rama del DAG a la que pertenece este nodo (ej. RIEGO, INSUMO). */
+  branch: string;
+}
+
+/** Arista dirigida entre dos nodos del DAG. Espejo de `RuleEdgeDto` del backend. */
+export interface RuleEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+}
+
+/**
+ * Esquema base del DAG del motor de reglas.
+ * Espejo de `DagSchemaDto` del backend. Devuelto por GET /api/rules/schema.
+ */
+export interface DagSchema {
+  nodes: RuleNode[];
+  edges: RuleEdge[];
+}
+

@@ -41,6 +41,11 @@ public class StaleSensorRule implements Rule {
     }
 
     @Override
+    public String label() {
+        return "📵 Sensor sin datos recientes";
+    }
+
+    @Override
     public List<RuleAction> evaluate(RuleContext ctx) {
         if (ctx.sensorStale()) {
             String zonaId = ctx.zona() != null ? ctx.zona().getId() : "desconocida";

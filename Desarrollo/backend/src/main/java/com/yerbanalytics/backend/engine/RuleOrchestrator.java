@@ -44,6 +44,9 @@ public class RuleOrchestrator {
 
     /**
      * Evalúa todas las reglas en orden de prioridad para el sector dado.
+     * En lugar de detenerse completamente ante el primer bloqueo,
+     * utiliza un modelo de ramas (DAG) donde el bloqueo de un subsistema
+     * (ej. RIEGO) no afecta a los demás (ej. MEDIASOMBRA).
      *
      * @param ctx snapshot inmutable del sector (nunca null)
      * @return lista de acciones acumuladas; puede estar vacía pero nunca es null
@@ -52,17 +55,45 @@ public class RuleOrchestrator {
         List<RuleAction> accumulated = new ArrayList<>();
         String sectorId = ctx.sector().getId();
 
+        boolean abortAll = false;
+        boolean abortRiego = false;
+        boolean abortInsumo = false;
+
         for (Rule rule : rules) {
+            // Si hay un bloqueo global, no se evalúa nada más.
+            if (abortAll) {
+                break;
+            }
+
+            RuleBranch branch = rule.branch();
+
+            // Saltear evaluación si la rama específica ya fue bloqueada por una regla anterior
+            if (branch == RuleBranch.RIEGO && abortRiego) {
+                continue;
+            }
+            if (branch == RuleBranch.INSUMO && abortInsumo) {
+                continue;
+            }
+
             List<RuleAction> actions = rule.evaluate(ctx);
             accumulated.addAll(actions);
 
-            boolean hasBlocking = actions.stream()
-                    .anyMatch(a -> a.type().isBlocking());
-
-            if (hasBlocking) {
-                log.debug("Sector {}: regla '{}' emitió acción bloqueante — cadena detenida.",
-                        sectorId, rule.name());
-                break;
+            // Analizar acciones para actualizar el estado de los bloqueos de rama
+            for (RuleAction action : actions) {
+                ActionType type = action.type();
+                if (type == ActionType.ABORT_ALL) {
+                    log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_ALL — ejecución global detenida.",
+                            sectorId, rule.name(), branch);
+                    abortAll = true;
+                } else if (type == ActionType.ABORT_RIEGO || type == ActionType.POSTPONE_RIEGO) {
+                    log.debug("Sector {}: regla '{}' (rama {}) emitió {} — rama RIEGO detenida.",
+                            sectorId, rule.name(), branch, type);
+                    abortRiego = true;
+                } else if (type == ActionType.ABORT_INSUMO) {
+                    log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_INSUMO — rama INSUMO detenida.",
+                            sectorId, rule.name(), branch);
+                    abortInsumo = true;
+                }
             }
         }
 

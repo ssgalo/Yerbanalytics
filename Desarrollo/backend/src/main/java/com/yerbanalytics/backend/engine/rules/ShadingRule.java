@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.rules;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
@@ -65,6 +66,16 @@ public class ShadingRule implements Rule {
     @Override
     public String name() {
         return NAME;
+    }
+
+    @Override
+    public String label() {
+        return "⛅ Control de mediasombra";
+    }
+
+    @Override
+    public RuleBranch branch() {
+        return RuleBranch.MEDIASOMBRA;
     }
 
     @Override

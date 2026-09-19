@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.rules;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,16 @@ public class WeatherOverrideRule implements Rule {
     @Override
     public String name() {
         return NAME;
+    }
+
+    @Override
+    public String label() {
+        return "🌧️ Condición climática (lluvia)";
+    }
+
+    @Override
+    public RuleBranch branch() {
+        return RuleBranch.RIEGO;
     }
 
     @Override

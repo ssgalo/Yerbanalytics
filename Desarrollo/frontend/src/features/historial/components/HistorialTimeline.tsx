@@ -1,20 +1,73 @@
-/* Timeline global del historial de acciones. Cada entrada expande su cadena de
-   justificación (lectura → decisión → acción) y el seguimiento post-acción.
-   Vista de solo lectura: no expone edición ni borrado (HU-11 CA-03). */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Glyph, Icon } from '@/components/ui/Icon';
-import type { ActionRecord, Evolution } from '@/types/domain';
+import { RuleGraph } from '@/components/DAGViewer/RuleGraph';
+import type { ActionRecord, Evolution, DagSchema } from '@/types/domain';
 import styles from './HistorialTimeline.module.css';
 
 interface HistorialTimelineProps {
   records: ActionRecord[];
+  schema: DagSchema | null;
+  schemaLoading: boolean;
 }
 
-export function HistorialTimeline({ records }: HistorialTimelineProps) {
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+interface SectorGroup {
+  sectorId: string;
+  zonaName: string;
+  actions: ActionRecord[];
+}
+
+interface ZonaGroup {
+  zonaName: string;
+  sectors: Record<string, SectorGroup>;
+}
+
+interface CycleGroup {
+  fecha: string;
+  ts: number;
+  zonas: Record<string, ZonaGroup>;
+}
+
+export function HistorialTimeline({ records, schema, schemaLoading }: HistorialTimelineProps) {
+  const [openCycles, setOpenCycles] = useState<Record<string, boolean>>({});
+  const toggleCycle = (fecha: string) => setOpenCycles((o) => ({ ...o, [fecha]: !o[fecha] }));
+
+  const [openZonas, setOpenZonas] = useState<Record<string, boolean>>({});
+  const toggleZona = (id: string) => setOpenZonas((o) => ({ ...o, [id]: !o[id] }));
+
+  const [openSectors, setOpenSectors] = useState<Record<string, boolean>>({});
+  const toggleSector = (id: string) => setOpenSectors((o) => ({ ...o, [id]: !o[id] }));
+
+  const groupedCycles = useMemo(() => {
+    const cycles: Record<string, CycleGroup> = {};
+    const order: string[] = [];
+
+    records.forEach((r) => {
+      if (!cycles[r.fecha]) {
+        cycles[r.fecha] = { fecha: r.fecha, ts: r.ts, zonas: {} };
+        order.push(r.fecha);
+      }
+      
+      const cycle = cycles[r.fecha];
+      if (!cycle.zonas[r.zonaName]) {
+        cycle.zonas[r.zonaName] = { zonaName: r.zonaName, sectors: {} };
+      }
+      
+      const zona = cycle.zonas[r.zonaName];
+      if (!zona.sectors[r.sectorId]) {
+        zona.sectors[r.sectorId] = {
+          sectorId: r.sectorId,
+          zonaName: r.zonaName,
+          actions: [],
+        };
+      }
+      
+      zona.sectors[r.sectorId].actions.push(r);
+    });
+
+    return order.map((f) => cycles[f]);
+  }, [records]);
 
   if (records.length === 0) {
     return (
@@ -28,59 +81,153 @@ export function HistorialTimeline({ records }: HistorialTimelineProps) {
 
   return (
     <Card className={styles.card}>
-      <h3 className={styles.title}>Historial de acciones</h3>
+      <h3 className={styles.title}>Historial de acciones por Ciclo</h3>
       <div className={styles.subtitle}>
-        Registro inalterable · lectura → decisión → acción ejecutada
+        Evaluaciones agrupadas por fecha y hora · Clic en un ciclo para ver los sectores · Clic en un sector para ver el DAG
       </div>
 
       <div className={styles.feed}>
-        {records.map((r, i) => {
-          const isOpen = !!open[r.id];
+        {groupedCycles.map((cycle, cycleIndex) => {
+          const isCycleOpen = !!openCycles[cycle.fecha];
+          const zonaList = Object.values(cycle.zonas).sort((a, b) => a.zonaName.localeCompare(b.zonaName));
+          
+          let totalSectorsCycle = 0;
+          let totalDecisionsCycle = 0;
+          zonaList.forEach(z => {
+            const sectors = Object.values(z.sectors);
+            totalSectorsCycle += sectors.length;
+            totalDecisionsCycle += sectors.reduce((acc, s) => acc + s.actions.length, 0);
+          });
+
           return (
-            <div key={r.id} className={styles.entry}>
-              {/* Columna ícono + conector */}
-              <div className={styles.timeline}>
-                <span className={styles.iconWrap} style={{ background: r.tint, color: r.ink }}>
-                  <Glyph path={r.path} stroke="currentColor" size={16} />
+            <div key={cycle.fecha} className={styles.cycleBlock}>
+              <button
+                type="button"
+                className={styles.cycleHeader}
+                onClick={() => toggleCycle(cycle.fecha)}
+                aria-expanded={isCycleOpen}
+              >
+                <Icon name="calendar" size={18} stroke="var(--ink)" />
+                <span className={styles.cycleTitle}>Ciclo {cycle.fecha}</span>
+                <span className={styles.cycleCount}>
+                  {totalSectorsCycle} sector{totalSectorsCycle !== 1 ? 'es' : ''} evaluados · {totalDecisionsCycle} decisión{totalDecisionsCycle !== 1 ? 'es' : ''}
                 </span>
-                {i < records.length - 1 && <span className={styles.connector} />}
-              </div>
+                <span className={styles.spacer} />
+                <Icon
+                  name="chevron-down"
+                  size={18}
+                  stroke="var(--faint)"
+                  style={{ transform: isCycleOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
+                />
+              </button>
 
-              {/* Cuerpo */}
-              <div className={styles.body}>
-                <button
-                  type="button"
-                  className={styles.header}
-                  onClick={() => toggle(r.id)}
-                  aria-expanded={isOpen}
-                >
-                  <span className={styles.tipo}>{r.tipo}</span>
-                  <span className={styles.sector}>{r.sectorId}</span>
-                  <span className={styles.zona}>· {r.zonaName}</span>
-                  <Badge soft={r.resSoft} ink={r.resInk} style={{ fontSize: '10.5px', fontWeight: 700, padding: '1px 8px' }}>
-                    {r.res}
-                  </Badge>
-                  <span className={styles.spacer} />
-                  <span className={styles.time}>{r.time}</span>
-                  <Icon
-                    name="arrow-right"
-                    size={15}
-                    stroke="var(--faint)"
-                    style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}
-                  />
-                </button>
+              {isCycleOpen && (
+                <div className={styles.zonasContainer} style={{ paddingLeft: '16px' }}>
+                  {zonaList.map((zona) => {
+                    const zonaId = `${cycle.fecha}_${zona.zonaName}`;
+                    const isZonaOpen = !!openZonas[zonaId];
+                    const sectorList = Object.values(zona.sectors).sort((a, b) => a.sectorId.localeCompare(b.sectorId));
+                    const totalDecisionsZona = sectorList.reduce((acc, s) => acc + s.actions.length, 0);
 
-                <div className={styles.accion}>{r.accion}</div>
+                    return (
+                      <div key={zonaId} className={styles.zonaBlock} style={{ marginBottom: '8px', borderLeft: '2px solid var(--border)', paddingLeft: '12px' }}>
+                        <button
+                          type="button"
+                          className={styles.cycleHeader}
+                          onClick={() => toggleZona(zonaId)}
+                          style={{ background: 'var(--surface-sunken)', borderRadius: '6px' }}
+                        >
+                          <Icon name="map-pin" size={16} stroke="var(--ink)" />
+                          <span className={styles.cycleTitle} style={{ fontSize: '13px' }}>{zona.zonaName}</span>
+                          <span className={styles.cycleCount}>
+                            {sectorList.length} sector{sectorList.length !== 1 ? 'es' : ''} evaluados · {totalDecisionsZona} decisión{totalDecisionsZona !== 1 ? 'es' : ''}
+                          </span>
+                          <span className={styles.spacer} />
+                          <Icon
+                            name="chevron-down"
+                            size={16}
+                            stroke="var(--faint)"
+                            style={{ transform: isZonaOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
+                          />
+                        </button>
 
-                {isOpen && (
-                  <div className={styles.detail}>
-                    <Chain label="Lectura / diagnóstico" text={r.lectura} />
-                    <Chain label="Decisión del motor" text={r.decision} />
-                    <Chain label="Acción ejecutada" text={r.accion} />
-                    {r.evo && <EvoBlock evo={r.evo} />}
-                  </div>
-                )}
-              </div>
+                        {isZonaOpen && (
+                          <div className={styles.sectorsContainer} style={{ marginTop: '8px' }}>
+                            {sectorList.map((sector) => {
+                              const secId = `${cycle.fecha}_${sector.sectorId}`;
+                              const isSectorOpen = !!openSectors[secId];
+
+                              return (
+                                <div key={secId} className={styles.sectorBlock}>
+                                  <button
+                                    type="button"
+                                    className={styles.sectorHeader}
+                                    onClick={() => toggleSector(secId)}
+                                  >
+                                    <span className={styles.sectorName}>{sector.sectorId}</span>
+                                    <span className={styles.spacer} />
+                                    <div className={styles.badges}>
+                                      {sector.actions.map((r) => (
+                                        <Badge key={r.id} soft={r.resSoft} ink={r.resInk} style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 6px' }}>
+                                          {r.tipo}: {r.res}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                    <Icon
+                                      name="arrow-right"
+                                      size={16}
+                                      stroke="var(--faint)"
+                                      style={{ transform: isSectorOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s', marginLeft: 12 }}
+                                    />
+                                  </button>
+
+                                  {isSectorOpen && (
+                                    <div className={styles.sectorContent}>
+                                      <div className={styles.dagContainer}>
+                                        <div className={styles.dagHeader}>DAG de Decisión</div>
+                                        {schemaLoading ? (
+                                          <div className={styles.dagLoading}>Cargando motor de reglas…</div>
+                                        ) : schema ? (
+                                          <RuleGraph schema={schema} activeEvents={sector.actions} />
+                                        ) : (
+                                          <div className={styles.dagError}>Error al cargar el motor</div>
+                                        )}
+                                      </div>
+
+                                      <div className={styles.actionList}>
+                                        {sector.actions.map((r) => (
+                                          <div key={r.id} className={styles.actionDetail}>
+                                            <div className={styles.actionHeader}>
+                                              <span className={styles.iconWrap} style={{ background: r.tint, color: r.ink }}>
+                                                <Glyph path={r.path} stroke="currentColor" size={14} />
+                                              </span>
+                                              <span style={{ fontWeight: 600 }}>{r.tipo}</span>
+                                            </div>
+                                            <Chain 
+                                              label="Lectura / diagnóstico" 
+                                              text={r.lectura.replace(/Ciclo de evaluaci[oó]n:\s*(\w+)\.?/i, (match, ruleName) => {
+                                                const node = schema?.nodes.find((n) => n.id === ruleName);
+                                                return `Evaluando: ${node ? node.label : ruleName}`;
+                                              })} 
+                                            />
+                                            <Chain label="Decisión del motor" text={r.decision} />
+                                            <Chain label="Acción ejecutada" text={r.accion} />
+                                            {r.evo && <EvoBlock evo={r.evo} />}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}

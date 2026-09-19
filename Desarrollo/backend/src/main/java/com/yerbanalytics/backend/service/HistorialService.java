@@ -139,10 +139,11 @@ public class HistorialService {
      * por qué el sistema no actuó, distinguiéndolo de un fallo o desconexión.
      *
      * @param s        sector evaluado
+     * @param type     tipo de acción (ej. NOOP_INFO, ABORT_ALL)
      * @param ruleName nombre de la regla que tomó la decisión
      * @param motivo   explicación legible de la decisión
      */
-    public void registrarInaccion(SectorEntity s, String ruleName, String motivo) {
+    public void registrarInaccion(SectorEntity s, com.yerbanalytics.backend.engine.ActionType type, String ruleName, String motivo) {
         HistorialEventoEntity e = new HistorialEventoEntity();
         e.setId(UUID.randomUUID().toString());
         e.setSectorId(s.getId());
@@ -152,7 +153,7 @@ public class HistorialService {
         e.setTs(System.currentTimeMillis());
         e.setLectura("Ciclo de evaluación: " + ruleName + ".");
         e.setDecision(motivo);
-        e.setAccion("Sin actuación — condición no cumplida.");
+        e.setAccion(type.isBlocking() ? "Evaluación bloqueada." : "Condición normal — sin actuación.");
         e.setRes("Informativo");
         e.setSev(s.getDiagnosisSev());
         e.setEvoShow(false);
