@@ -256,9 +256,17 @@ public class NurseryService {
 
         int totalSectores = allSectors.size();
         double pctSano = totalSectores > 0 ? Math.round((totalSano / (double) totalSectores) * 100) : 0;
+
+        // KPIs de actividad autónoma: conteo real del historial del día de hoy.
+        Map<String, Long> todayCounts = historialService.countToday();
+        long actRiego   = todayCounts.getOrDefault("Riego", 0L);
+        long actInsumo  = todayCounts.getOrDefault("Insumo", 0L);
+        long actSombra  = todayCounts.getOrDefault("Mediasombra", 0L);
+        long actToday   = actRiego + actInsumo + actSombra;
+
         Stats stats = new Stats(
                 totalSectores, totalSano, totalWarning, totalCritical, totalOffline, totalAlerta,
-                pctSano, 41, 28, 7, 6, diagnoses.size()
+                pctSano, (int) actToday, (int) actRiego, (int) actInsumo, (int) actSombra, diagnoses.size()
         );
 
         Map<String, DiagnosisCard> diagById = new LinkedHashMap<>();
@@ -290,59 +298,18 @@ public class NurseryService {
                 ))
                 .toList();
 
-        // Re-build action event list based on alert sectors
-        List<Sector> actSrc = allSectors.stream()
-                .filter(s -> !"ok".equals(s.status()) && !"offline".equals(s.status()))
-                .toList();
-        List<ActionEvent> actions = new ArrayList<>();
-        for (int i = 0; i < ACT_TPL.size(); i++) {
-            ActTemplate a = ACT_TPL.get(i);
-            Sector sec = actSrc.isEmpty() ? null : actSrc.get(i % actSrc.size());
-            var meta = ACT.get(a.tipo());
-            var rm = RES_MAP.get(a.res());
-            actions.add(new ActionEvent(
-                    a.title() + " · " + (sec != null ? sec.id() : "MZ-2-014"),
-                    a.detail(),
-                    a.time(),
-                    a.res(),
-                    rm.soft(),
-                    rm.ink(),
-                    meta.tint(),
-                    meta.ink(),
-                    meta.path()
-            ));
-        }
+        // Feed de actividad del sistema: las últimas 8 acciones reales del historial.
+        // Si el historial está vacío, la lista llega vacía — el frontend muestra
+        // "Sin actividad registrada" en ese caso.
+        List<ActionEvent> actions = historialService.getRecentActions(8);
 
-        // Re-build alerts list
-        List<Alert> alerts = List.of(
-                new Alert("CRITICAL", C.get("critical"), "14:08",
-                        priority.isEmpty() ? "MZ-3-077" : priority.get(0).id(),
-                        "Daño fúngico confirmado + humedad de sustrato 84%. Dosificación de fungicida en curso.", false),
-                new Alert("CRITICAL", C.get("critical"), "13:41", "MZ-5-042",
-                        "Falla hidráulica: caudalímetro sin flujo tras abrir electroválvula. Sector marcado para revisión.", false),
-                new Alert("WARNING", C.get("warning"), "13:20", "MZ-2-091",
-                        "Nodo testigo con batería baja (18%). Recambio preventivo sugerido.", false),
-                new Alert("WARNING", C.get("warning"), "12:55",
-                        priority.size() > 2 ? priority.get(2).id() : "MZ-1-033",
-                        "Clorosis detectada (confianza 88%). A la espera de validación de dosis nutricional.", false),
-                new Alert("WARNING", C.get("warning"), "11:30", "MZ-4-005",
-                        "Sensor sin reporte hace 2 h — señal intermitente. Mostrando último dato conocido.", false)
-        );
+        // Alertas: sectores críticos/warning más recientes del historial real.
+        // Se toma del historial reciente y se limita a 5 para la campana de la topbar.
+        List<Alert> alerts = buildAlertsFromHistorial(priority);
 
-        Weather weather = new Weather(
-                21.0,
-                "Parcial nublado",
-                78.0,
-                7.0,
-                "Alto",
-                "Lluvia probable en ~3 h — riego autónomo pospuesto en 2 macro-zonas.",
-                List.of(
-                        new ForecastSlot("15 h", 7.0, 10.0),
-                        new ForecastSlot("18 h", 3.0, 60.0),
-                        new ForecastSlot("21 h", 0.0, 80.0),
-                        new ForecastSlot("Mañana", 6.0, 25.0)
-                )
-        );
+        // Clima: datos reales de Open-Meteo. En modo degradado (API caída) se
+        // usa fallback con —, nunca valores hardcodeados.
+        Weather weather = buildWeatherFromForecast(weatherService.getForecast());
 
         // Disposición visual configurada, acotada a la grilla actual (HU-18 CA-01).
         int macroZonas = zonas.size();
@@ -381,6 +348,68 @@ public class NurseryService {
             return 1;
         }
         return max > 0 ? Math.min(value, max) : value;
+    }
+
+    /**
+     * Construye el DTO {@link Weather} a partir del pronóstico real de Open-Meteo.
+     *
+     * <p>Si la API climática está caída ({@code forecast} es {@code null}), todos los
+     * campos muestran "N/A" o "—" — nunca valores hardcodeados que podrían confundir
+     * al usuario creyendo que son datos reales.
+     */
+    private static Weather buildWeatherFromForecast(com.yerbanalytics.backend.engine.weather.WeatherForecast forecast) {
+        if (forecast == null) {
+            return new Weather(
+                    0.0, "Sin datos", 0.0, 0.0, "N/A",
+                    "Pronóstico no disponible (API climática degradada).",
+                    List.of()
+            );
+        }
+
+        double uv = forecast.uvIndex();
+        String uvLabel = uv >= 8 ? "Muy Alto" : uv >= 6 ? "Alto" : uv >= 3 ? "Moderado" : "Bajo";
+
+        // Texto de aviso de lluvia para el widget de riesgo
+        double rainPct = forecast.probLluviaPct();
+        String rainText;
+        if (rainPct >= 60) {
+            rainText = String.format("Lluvia probable (%.0f%%) — riego autónomo puede posponerse.", rainPct);
+        } else if (rainPct >= 30) {
+            rainText = String.format("Lluvia posible (%.0f%%). Monitoreo activo.", rainPct);
+        } else {
+            rainText = String.format("Sin lluvia inminente (%.0f%%). Operación normal.", rainPct);
+        }
+
+        List<ForecastSlot> slots = forecast.forecastSlots().stream()
+                .map(s -> new ForecastSlot(s.label(), s.uv(), s.rain()))
+                .toList();
+
+        return new Weather(
+                forecast.tempC(),
+                forecast.cond(),
+                forecast.humRel(),
+                uv,
+                uvLabel,
+                rainText,
+                slots
+        );
+    }
+
+    /**
+     * Construye la lista de alertas de la campana a partir de los sectores en estado crítico/warning.
+     * Limita a 5 alertas, ordenadas por severidad.
+     */
+    private static List<Alert> buildAlertsFromHistorial(List<PriorityItem> priority) {
+        return priority.stream()
+                .limit(5)
+                .map(p -> {
+                    boolean isCritical = "Alta".equals(p.sev());
+                    String level = isCritical ? "CRITICAL" : "WARNING";
+                    String color = isCritical ? C.get("critical") : C.get("warning");
+                    String msg = "Sector " + p.id() + ": " + p.reason();
+                    return new Alert(level, color, "ahora", p.id(), msg, false);
+                })
+                .toList();
     }
 
     @Transactional

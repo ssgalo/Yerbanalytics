@@ -51,4 +51,34 @@ public interface HistorialRepository extends JpaRepository<HistorialEventoEntity
             @Param("sectorId") String sectorId,
             @Param("tipo") String tipo,
             @Param("desde") long desde);
+
+    /**
+     * Los {@code limit} eventos de acción más recientes (excluye tipos Info y Configuración),
+     * ordenados del más reciente al más antiguo. Usado por {@code NurseryService} para
+     * poblar el feed de actividad del panel general con datos reales.
+     */
+    @Query("""
+            SELECT h FROM HistorialEventoEntity h
+            WHERE h.tipo NOT IN ('Info', 'Configuraci\u00f3n')
+            ORDER BY h.ts DESC
+            LIMIT :limit
+            """)
+    List<HistorialEventoEntity> findRecentActions(@Param("limit") int limit);
+
+    /**
+     * Cuenta los eventos de un tipo desde un timestamp dado (para los KPIs diarios).
+     * Los tipos INFO y Configuraci\u00f3n se excluyen; solo cuentan las acciones reales.
+     *
+     * @param tipo  tipo de evento (ej. {@code "Riego"}, {@code "Insumo"})
+     * @param desde timestamp de inicio del per\u00edodo (epoch ms, inicio del d\u00eda local)
+     * @return cantidad de eventos del tipo en el per\u00edodo
+     */
+    @Query("""
+            SELECT COUNT(h) FROM HistorialEventoEntity h
+            WHERE h.tipo = :tipo
+              AND h.ts >= :desde
+            """)
+    long countByTipoSinceTs(
+            @Param("tipo") String tipo,
+            @Param("desde") long desde);
 }

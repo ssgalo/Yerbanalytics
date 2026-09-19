@@ -16,37 +16,43 @@ export function ActivityFeed({ actions }: ActivityFeedProps) {
         Decisiones autónomas y sus condiciones desencadenantes
       </div>
 
-      <div className={styles.feed}>
-        {actions.map((ev, i) => (
-          <div key={i} className={styles.entry}>
-            {/* Columna izquierda: ícono + línea vertical */}
-            <div className={styles.timeline}>
-              <span
-                className={styles.iconWrap}
-                style={{ background: ev.tint, color: ev.ink }}
-              >
-                <Glyph path={ev.path} stroke="currentColor" size={16} />
-              </span>
-              {/* Línea solo entre entradas, no la última */}
-              {i < actions.length - 1 && (
-                <span className={styles.connector} />
-              )}
-            </div>
-
-            {/* Cuerpo del evento */}
-            <div className={styles.body}>
-              <div className={styles.metaRow}>
-                <span className={styles.evTitle}>{ev.title}</span>
-                <span className={styles.evTime}>{ev.time}</span>
-                <Badge soft={ev.resSoft} ink={ev.resInk}>
-                  {ev.result}
-                </Badge>
+      {actions.length === 0 ? (
+        <div className={styles.empty}>
+          Sin actividad registrada — el motor aún no ejecutó acciones en este ciclo.
+        </div>
+      ) : (
+        <div className={styles.feed}>
+          {actions.map((ev, i) => (
+            <div key={i} className={styles.entry}>
+              {/* Columna izquierda: ícono + línea vertical */}
+              <div className={styles.timeline}>
+                <span
+                  className={styles.iconWrap}
+                  style={{ background: ev.tint, color: ev.ink }}
+                >
+                  <Glyph path={ev.path} stroke="currentColor" size={16} />
+                </span>
+                {/* Línea solo entre entradas, no la última */}
+                {i < actions.length - 1 && (
+                  <span className={styles.connector} />
+                )}
               </div>
-              <div className={styles.evDetail}>{ev.detail}</div>
+
+              {/* Cuerpo del evento */}
+              <div className={styles.body}>
+                <div className={styles.metaRow}>
+                  <span className={styles.evTitle}>{ev.title}</span>
+                  <span className={styles.evTime}>{ev.time}</span>
+                  <Badge soft={ev.resSoft} ink={ev.resInk}>
+                    {ev.result}
+                  </Badge>
+                </div>
+                <div className={styles.evDetail}>{ev.detail}</div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
