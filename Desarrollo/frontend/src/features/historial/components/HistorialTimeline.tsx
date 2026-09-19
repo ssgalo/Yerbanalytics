@@ -39,6 +39,9 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
   const [openSectors, setOpenSectors] = useState<Record<string, boolean>>({});
   const toggleSector = (id: string) => setOpenSectors((o) => ({ ...o, [id]: !o[id] }));
 
+  const [openDag, setOpenDag] = useState<Record<string, boolean>>({});
+  const toggleDag = (id: string) => setOpenDag((o) => ({ ...o, [id]: !o[id] }));
+
   const groupedCycles = useMemo(() => {
     const cycles: Record<string, CycleGroup> = {};
     const order: string[] = [];
@@ -183,16 +186,31 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
 
                                   {isSectorOpen && (
                                     <div className={styles.sectorContent}>
-                                      <div className={styles.dagContainer}>
-                                        <div className={styles.dagHeader}>DAG de Decisión</div>
-                                        {schemaLoading ? (
-                                          <div className={styles.dagLoading}>Cargando motor de reglas…</div>
-                                        ) : schema ? (
-                                          <RuleGraph schema={schema} activeEvents={sector.actions} />
-                                        ) : (
-                                          <div className={styles.dagError}>Error al cargar el motor</div>
-                                        )}
-                                      </div>
+                                      {/* Boton para ver el DAG del motor de reglas */}
+                                      <button
+                                        type="button"
+                                        className={styles.dagToggleBtn}
+                                        onClick={() => toggleDag(secId)}
+                                        aria-expanded={!!openDag[secId]}
+                                      >
+                                        <span className={styles.dagToggleIcon}>{openDag[secId] ? '▲' : '▼'}</span>
+                                        {openDag[secId]
+                                          ? 'Ocultar razonamiento del motor'
+                                          : '🧠 Ver razonamiento del motor — cómo se tomó esta decisión'}
+                                      </button>
+
+                                      {openDag[secId] && (
+                                        <div className={styles.dagContainer}>
+                                          <div className={styles.dagHeader}>Pipeline de decisión automática</div>
+                                          {schemaLoading ? (
+                                            <div className={styles.dagLoading}>Cargando motor de reglas…</div>
+                                          ) : schema ? (
+                                            <RuleGraph schema={schema} activeEvents={sector.actions} />
+                                          ) : (
+                                            <div className={styles.dagError}>Error al cargar el motor</div>
+                                          )}
+                                        </div>
+                                      )}
 
                                       <div className={styles.actionList}>
                                         {sector.actions.map((r) => (

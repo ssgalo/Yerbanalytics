@@ -213,11 +213,14 @@ interface RuleGraphProps {
 
 function RuleGraphInner({ schema, activeEvents }: RuleGraphProps) {
   const filteredSchema = useMemo(() => {
-    if (!activeEvents || activeEvents.length === 0) return schema;
-
-    // Mostrar siempre todas las ramas presentes en el esquema para que el usuario 
-    // pueda ver qué camino tomó (incluso si no hubo acción).
-    return schema;
+    // Excluir nodos abort-* (terminales de bloqueo de rama) — solo aportan ruido visual.
+    // La información de bloqueo ya está representada en el nodo que generó el bloqueo
+    // (coloreado en rojo) y en las aristas correspondientes.
+    const nodes = schema.nodes.filter((n) => !n.id.startsWith('abort-'));
+    const edges = schema.edges.filter(
+      (e) => !e.target.startsWith('abort-') && !e.source.startsWith('abort-')
+    );
+    return { nodes, edges };
   }, [schema, activeEvents]);
 
   const positions = useMemo(() => computeLayout(filteredSchema), [filteredSchema]);

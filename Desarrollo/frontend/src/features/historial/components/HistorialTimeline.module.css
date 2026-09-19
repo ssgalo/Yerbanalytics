@@ -265,3 +265,35 @@
 .dagError {
   color: #f87171;
 }
+
+/* ── Botón "Ver razonamiento del motor" ───────────────────────────────── */
+.dagToggleBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.06);
+  color: #a5b4fc;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  margin-bottom: 12px;
+}
+
+.dagToggleBtn:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.55);
+  color: #c7d2fe;
+}
+
+.dagToggleIcon {
+  font-size: 10px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
