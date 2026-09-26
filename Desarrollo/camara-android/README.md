@@ -11,6 +11,10 @@ obliga a tocar nada más del repositorio.
 > Esa es la fuente de verdad. Esta app implementa ese contrato y nada más: si necesitara un
 > endpoint fuera de `/api/camara/v1/**`, el problema sería del contrato, no de la app.
 
+> **Conexión por cable:** [`transporte-usb.md`](transporte-usb.md). Cómo conectar el teléfono al
+> backend por USB en vez de por WiFi, en Linux y en Windows. El cable lleva alimentación y red a
+> la vez, que es lo que necesita un teléfono montado en un riel.
+
 ---
 
 ## Por qué existe, si ya está la PWA
@@ -178,6 +182,10 @@ camino que va a usar el planificador de pasadas del riel.
 
 > `localhost` **no sirve** como dirección del backend: desde el teléfono, localhost es el
 > teléfono.
+
+> **¿Sin WiFi, o con WiFi poco confiable?** El teléfono se puede conectar al backend **por el
+> cable USB**, que además lo mantiene cargado. El procedimiento para Linux y Windows está en
+> [`transporte-usb.md`](transporte-usb.md). La app no cambia: sólo cambia la URL que se tipea acá.
 
 ---
 

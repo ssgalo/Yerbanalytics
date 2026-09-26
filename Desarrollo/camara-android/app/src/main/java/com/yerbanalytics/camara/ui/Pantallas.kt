@@ -3,6 +3,7 @@ package com.yerbanalytics.camara.ui
 import androidx.camera.core.Preview
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -133,6 +134,7 @@ fun PantallaOperacion(
     onVisor: (Preview.SurfaceProvider?) -> Unit,
     onPrueba: () -> Unit,
     onExportarLog: () -> Unit,
+    onAjustes: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -141,7 +143,7 @@ fun PantallaOperacion(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        TarjetaEstado(estado, resolucion)
+        TarjetaEstado(estado, resolucion, onAjustes)
 
         // El visor se monta siempre que la pantalla esté visible, incluso con la cámara en
         // reposo: la superficie tiene que estar ofrecida ANTES de la primera orden, o la sesión
@@ -158,7 +160,7 @@ fun PantallaOperacion(
 }
 
 @Composable
-private fun TarjetaEstado(estado: EstadoDispositivo, resolucion: String) {
+private fun TarjetaEstado(estado: EstadoDispositivo, resolucion: String, onAjustes: () -> Unit) {
     val (color, etiqueta) = when {
         !estado.vinculado -> TextoTenue to "SIN VINCULAR"
         estado.degradado -> Ambar to "DEGRADADO"
@@ -184,6 +186,15 @@ private fun TarjetaEstado(estado: EstadoDispositivo, resolucion: String) {
                     if (estado.camaraAbierta) "cámara abierta" else "cámara en reposo",
                     color = if (estado.camaraAbierta) Verde else TextoTenue,
                     fontSize = 12.sp,
+                )
+                Spacer(Modifier.size(10.dp))
+                // Discreto a propósito: se toca una vez cada tanto (cambiar de red), no es una
+                // acción del flujo normal de operación.
+                Text(
+                    "⚙",
+                    color = TextoTenue,
+                    fontSize = 18.sp,
+                    modifier = Modifier.clickable(onClick = onAjustes),
                 )
             }
 
@@ -299,6 +310,83 @@ private fun LogEnPantalla(entradas: List<Entrada>, modifier: Modifier = Modifier
                     fontFamily = FontFamily.Monospace,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Cambiar la URL del backend **sin** volver a enrolar el dispositivo.
+ *
+ * Existe porque la URL queda pegada al enrolamiento (ver `AlmacenCredenciales`), y con USB
+ * tethering la IP de la PC puede cambiar de una sesión a otra. Antes de esta pantalla, la única
+ * salida era borrar los datos de la app y generar un código nuevo — de un lado y del otro.
+ *
+ * El botón "Guardar" prueba la conexión antes de persistir. Si el backend no responde, no se
+ * bloquea el guardado: se pide una confirmación explícita, porque puede ser una URL configurada
+ * por adelantado (por ejemplo, para cuando el técnico llegue al vivero con otra IP).
+ */
+@Composable
+fun PantallaAjustes(
+    urlActual: String,
+    ocupado: Boolean,
+    error: String?,
+    aviso: String?,
+    onGuardar: (url: String, forzar: Boolean) -> Unit,
+    onVolver: () -> Unit,
+) {
+    var url by remember { mutableStateOf(urlActual) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Fondo)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Ajustes", color = Texto, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Cambiá la URL del backend sin volver a vincular el dispositivo. Sirve cuando " +
+                "cambia la IP de la PC (por ejemplo, por USB tethering).",
+            color = TextoTenue,
+            fontSize = 14.sp,
+        )
+
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text("Backend") },
+            supportingText = { Text("http://<ip-de-la-pc>:8000 · o https://<ip>:8443") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (error != null) {
+            Text(error, color = Rojo, fontSize = 14.sp)
+        }
+
+        if (aviso != null) {
+            Text(aviso, color = Ambar, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onGuardar(url.trim(), true) }, enabled = !ocupado) {
+                    Text("Guardar igual")
+                }
+                TextButton(onClick = { onGuardar(url.trim(), false) }, enabled = !ocupado) {
+                    Text("Reintentar")
+                }
+            }
+        } else {
+            Button(
+                onClick = { onGuardar(url.trim(), false) },
+                enabled = !ocupado && url.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (ocupado) "Probando conexión…" else "Guardar")
+            }
+        }
+
+        TextButton(onClick = onVolver, enabled = !ocupado) {
+            Text("Volver")
         }
     }
 }

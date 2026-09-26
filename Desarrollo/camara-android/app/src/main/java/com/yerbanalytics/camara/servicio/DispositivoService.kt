@@ -594,7 +594,33 @@ class DispositivoService : LifecycleService() {
     }
 
     /** Tras vincular desde la interfaz, el servicio arranca la operación sin reiniciarse. */
-    fun revincular() {
+    fun revincular() = reiniciarConexion()
+
+    /**
+     * Reconstruye cliente HTTP, sesión de token y canal SSE contra la credencial vigente en
+     * disco, sin recrear el `Service` ni perder colas ni visor.
+     *
+     * La usa Ajustes después de [AlmacenCredenciales.actualizarUrl]: la URL cambió, pero el
+     * cliente HTTP y el canal SSE que ya están corriendo apuntan a la URL vieja, así que hay
+     * que rehacerlos.
+     *
+     * Se descartaron dos alternativas más obvias:
+     * - **Reiniciar el proceso** (`stopSelf` + relanzar el `Service`): tira también la cola de
+     *   envío en memoria, el estado que lee la UI y el visor de cámara abierto — mucho más
+     *   costoso que lo que hace falta para cambiar una URL.
+     * - **Un observador reactivo del DataStore** (`context.dataStore.data.collect { ... }`):
+     *   dispararía también con la escritura de [AlmacenCredenciales.borrar] (que vacía las
+     *   preferencias) y con la de [AlmacenCredenciales.guardar] al vincular, duplicando el
+     *   camino que ya recorren `arrancar()`/`revincular()` y complicando cuál de los dos
+     *   gana. Como quien cambia la URL ya sabe exactamente cuándo cambió —es la propia acción
+     *   de guardar en Ajustes—, alcanza con que esa acción llame a este método explícitamente.
+     *
+     * Cancelar sólo los bucles de red (canal, heartbeat, drenaje, captura) y volver a llamar
+     * `arrancar()` reutiliza el mismo camino que ya recorre un enrolamiento nuevo: no hay dos
+     * formas distintas de "arrancar la operación", sólo cambia qué credencial encuentra
+     * [AlmacenCredenciales.leer] en el momento de leer.
+     */
+    fun reiniciarConexion() {
         arrancado = false
         bucles.forEach { it.cancel() }
         bucles = mutableListOf()
