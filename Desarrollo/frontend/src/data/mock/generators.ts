@@ -22,6 +22,7 @@ import type {
   Weather,
   Zona,
 } from '@/types/domain';
+import { capturaDemo } from './capturasDemo';
 import { ACT, C, LAB, actTpl, pathos, resMap, sevMap, specs, tints, zonaDefs } from './specs';
 import {
   clampDisposicion,
@@ -379,6 +380,7 @@ export function buildNursery(
         sevSoft: sevMap[d.sev].soft,
         sevInk: sevMap[d.sev].ink,
         thumb: tints[d.estado] || tints['Sin diagnóstico'],
+        imagenUrl: capturaDemo(d.estado, dn),
         time: agoPorZona[s.zona] ?? 'hace —',
         concluyente: (d.conf as number) >= 85,
       };
@@ -397,6 +399,7 @@ export function buildNursery(
       sevSoft: sevMap['—'].soft,
       sevInk: sevMap['—'].ink,
       thumb: tints['No concluyente'],
+      imagenUrl: capturaDemo('No concluyente', dn),
       time: agoPorZona[s.zona] ?? 'hace —',
       concluyente: false,
     });
