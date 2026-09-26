@@ -24,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import com.yerbanalytics.camara.contrato.AlmacenCredenciales
 import com.yerbanalytics.camara.contrato.ContratoClient
 import com.yerbanalytics.camara.contrato.Credencial
+import com.yerbanalytics.camara.contrato.ValidadorUrl
 import com.yerbanalytics.camara.servicio.DispositivoService
 import kotlinx.coroutines.launch
 
@@ -40,6 +41,13 @@ class MainActivity : ComponentActivity() {
     private var vinculando by mutableStateOf(false)
     private var errorVinculacion by mutableStateOf<String?>(null)
     private var yaVinculado by mutableStateOf(false)
+
+    // ---------------------------------------------------------------- Ajustes (cambiar URL)
+    private var mostrarAjustes by mutableStateOf(false)
+    private var urlActual by mutableStateOf("")
+    private var ajustesOcupado by mutableStateOf(false)
+    private var ajustesError by mutableStateOf<String?>(null)
+    private var ajustesAviso by mutableStateOf<String?>(null)
 
     private lateinit var almacen: AlmacenCredenciales
 
@@ -71,7 +79,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         almacen = AlmacenCredenciales(applicationContext)
 
-        lifecycleScope.launch { yaVinculado = almacen.leer() != null }
+        lifecycleScope.launch {
+            val credencial = almacen.leer()
+            yaVinculado = credencial != null
+            urlActual = credencial?.baseUrl ?: ""
+        }
 
         setContent {
             TemaCamara {
@@ -80,7 +92,20 @@ class MainActivity : ComponentActivity() {
                 val config = s?.config?.collectAsState()?.value
                 val entradas = s?.registro?.entradas?.collectAsState()?.value.orEmpty()
 
-                if (estado != null && estado.vinculado) {
+                if (mostrarAjustes) {
+                    PantallaAjustes(
+                        urlActual = urlActual,
+                        ocupado = ajustesOcupado,
+                        error = ajustesError,
+                        aviso = ajustesAviso,
+                        onGuardar = ::guardarUrl,
+                        onVolver = {
+                            mostrarAjustes = false
+                            ajustesError = null
+                            ajustesAviso = null
+                        },
+                    )
+                } else if (estado != null && estado.vinculado) {
                     PantallaOperacion(
                         estado = estado,
                         entradas = entradas,
@@ -95,6 +120,11 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         onExportarLog = { compartirLog() },
+                        onAjustes = {
+                            ajustesError = null
+                            ajustesAviso = null
+                            mostrarAjustes = true
+                        },
                     )
                 } else {
                     PantallaVinculacion(
@@ -202,6 +232,61 @@ class MainActivity : ComponentActivity() {
                 }
             }
             vinculando = false
+        }
+    }
+
+    // ------------------------------------------------------------------ Ajustes (cambiar URL)
+
+    /**
+     * Guarda una URL de backend nueva sin re-vincular el dispositivo.
+     *
+     * Antes de persistir, valida el formato y —salvo que [forzar] sea `true`— prueba la
+     * conexión pidiendo un token con el `refreshToken` ya guardado contra la URL nueva: no es
+     * un simple *ping*, confirma que del otro lado hay un backend que reconoce a este
+     * dispositivo. Si no responde, no se bloquea el guardado: se corta acá y se le pide al
+     * operario que confirme explícitamente ([forzar]), porque puede estar configurando la URL
+     * por adelantado (por ejemplo, antes de que el técnico llegue al vivero con la PC nueva).
+     */
+    private fun guardarUrl(url: String, forzar: Boolean) {
+        ajustesError = null
+        if (!forzar) ajustesAviso = null
+
+        when (val validacion = ValidadorUrl.validar(url)) {
+            is ValidadorUrl.Resultado.Invalida -> {
+                // El aviso de "no responde" hablaba de otra URL: dejarlo junto al error
+                // mostraría dos diagnósticos contradictorios a la vez.
+                ajustesAviso = null
+                ajustesError = validacion.motivo
+                return
+            }
+            is ValidadorUrl.Resultado.Valida -> {
+                val normalizada = validacion.normalizada
+                ajustesOcupado = true
+                lifecycleScope.launch {
+                    if (!forzar) {
+                        val credencial = almacen.leer()
+                        val responde = credencial != null && runCatching {
+                            ContratoClient(normalizada, proveedor = null).token(credencial.refreshToken)
+                        }.isSuccess
+                        if (!responde) {
+                            ajustesOcupado = false
+                            ajustesAviso = "No se pudo contactar a $normalizada. Si estás " +
+                                "configurando la URL por adelantado, podés guardar igual."
+                            return@launch
+                        }
+                    }
+                    almacen.actualizarUrl(normalizada)
+                    urlActual = normalizada
+                    // El servicio ya tiene un cliente HTTP y un canal SSE abiertos contra la
+                    // URL vieja: hay que rehacerlos. Ver el porqué en DispositivoService.
+                    // Si la Activity se desató del servicio justo en este instante (caso
+                    // extremo), el próximo arranque igual toma la URL nueva desde disco.
+                    servicio?.reiniciarConexion() ?: arrancarServicio()
+                    ajustesOcupado = false
+                    ajustesAviso = null
+                    mostrarAjustes = false
+                }
+            }
         }
     }
 

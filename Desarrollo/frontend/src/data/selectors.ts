@@ -24,7 +24,7 @@ export function selectSectorDetail(data: NurseryData, sectorId: string): SectorD
   if (!zona) return null;
   // Find the latest diagnosis for this sector that has an image
   const latestDiag = data.diagnoses.find(d => d.sectorId === sectorId && d.imagenUrl);
-  return buildSectorDetail(sector, zona.lectura, latestDiag?.imagenUrl);
+  return buildSectorDetail(sector, zona.lectura, latestDiag?.imagenUrl ?? undefined);
 }
 
 /**

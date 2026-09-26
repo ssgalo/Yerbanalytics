@@ -97,7 +97,7 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
           {isOffline && diag.estado !== 'Sin diagnóstico' && (
             <div className={styles.warningBox}>
               <Icon
-                name="warning"
+                name="alert"
                 size={17}
                 stroke="#856404"
                 strokeWidth={2.2}
