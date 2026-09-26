@@ -52,7 +52,6 @@ public final class RuleContextTestFactory {
                 "ok", Instant.now(), false, null, bloqueo);
     }
 
-    /** ConfiguracionOperativaEntity con valores de prueba sensatos. */
     public static ConfiguracionOperativaEntity defaultConfig() {
         return new ConfiguracionOperativaEntity(
                 1,
@@ -62,6 +61,8 @@ public final class RuleContextTestFactory {
                 70.0,   // mediasombraAperturaMaxPct
                 5,      // seguimientoLatenciaMin
                 5.0,    // seguimientoDeltaMin
+                240,    // intervaloSensadoMinutos
+                5,      // intervaloEvaluacionMinutos
                 "test",
                 System.currentTimeMillis()
         );

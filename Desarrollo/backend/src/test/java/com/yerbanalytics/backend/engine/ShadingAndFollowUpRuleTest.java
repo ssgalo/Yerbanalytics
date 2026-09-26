@@ -64,7 +64,7 @@ class ShadingAndFollowUpRuleTest {
     @DisplayName("ShadingRule: pico UV sobre umbral → MOVER_MEDIASOMBRA protector")
     void picoUV_moverMediasombraProtector() {
         ShadingRule rule = new ShadingRule(rustificacionRepository, 7.0, "");
-        WeatherForecast forecast = new WeatherForecast(10.0, 9.5, Instant.now()); // UV > 7
+        WeatherForecast forecast = new WeatherForecast(10.0, 9.5, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of()); // UV > 7
         RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
 
         List<RuleAction> acciones = rule.evaluate(ctx);

@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.rules;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import org.springframework.stereotype.Component;
 
@@ -26,10 +27,10 @@ import java.util.List;
  * {@code DosisLimiteRule} (máximo 24 h) y la integración real del modelo IA.
  */
 @Component
-public class InsumoRule implements Rule {
+public class SupplyRule implements Rule {
 
     private static final int PRIORITY = 11;
-    private static final String NAME = "InsumoRule";
+    private static final String NAME = "SupplyRule";
     private static final double CONF_UMBRAL = 85.0;
 
     @Override
@@ -40,6 +41,16 @@ public class InsumoRule implements Rule {
     @Override
     public String name() {
         return NAME;
+    }
+
+    @Override
+    public String label() {
+        return "🧪 Dosificación de insumo";
+    }
+
+    @Override
+    public RuleBranch branch() {
+        return RuleBranch.INSUMO;
     }
 
     @Override

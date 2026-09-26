@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.rules;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
@@ -51,6 +52,16 @@ public class DailyDoseLimitRule implements Rule {
     @Override
     public String name() {
         return NAME;
+    }
+
+    @Override
+    public String label() {
+        return "🛑 Límite de dosis diaria";
+    }
+
+    @Override
+    public RuleBranch branch() {
+        return RuleBranch.INSUMO;
     }
 
     @Override

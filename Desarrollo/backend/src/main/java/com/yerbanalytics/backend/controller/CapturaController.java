@@ -96,7 +96,19 @@ public class CapturaController {
 
     @GetMapping("/api/capturas/pendientes-diagnostico")
     public ResponseEntity<List<CapturaPendiente>> pendientesDiagnostico() {
-        List<CapturaPendiente> pendientes = service.capturassinDiagnostico().stream()
+        List<CapturaPendiente> pendientes = service.capturasSinDiagnostico().stream()
+                .map(c -> new CapturaPendiente(c.getId(), c.getRutaArchivo().replace('\\', '/')))
+                .toList();
+        return ResponseEntity.ok(pendientes);
+    }
+
+    /**
+     * Lista de capturas pendientes asumiendo un tiempo de quietud (fin de ciclo).
+     */
+    @GetMapping("/api/capturas/pendientes-inactivas")
+    public ResponseEntity<List<CapturaPendiente>> pendientesInactivas(
+            @RequestParam(defaultValue = "1") int minutosQuietos) {
+        List<CapturaPendiente> pendientes = service.capturasInactivas(minutosQuietos).stream()
                 .map(c -> new CapturaPendiente(c.getId(), c.getRutaArchivo().replace('\\', '/')))
                 .toList();
         return ResponseEntity.ok(pendientes);

@@ -1,9 +1,11 @@
-/* Vista principal: Historial y trazabilidad (HU-11 / HU-12) */
+/* Vista principal: Historial y trazabilidad + Inspector de Decisiones (HU-11 / HU-12) */
 import { useMemo, useState } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useHistory } from '@/hooks/useHistory';
+import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
 import { HistorialFilters, type HistorialFilterState } from './components/HistorialFilters';
 import { HistorialTimeline } from './components/HistorialTimeline';
+import type { ActionRecord } from '@/types/domain';
 import styles from './HistorialPage.module.css';
 
 const INITIAL: HistorialFilterState = {
@@ -17,7 +19,9 @@ const INITIAL: HistorialFilterState = {
 
 export function HistorialPage() {
   const { records, loading, error } = useHistory();
+  const { schema, loading: schemaLoading } = useRuleEngineSchema();
   const [filters, setFilters] = useState<HistorialFilterState>(INITIAL);
+
 
   const patch = (p: Partial<HistorialFilterState>) => setFilters((f) => ({ ...f, ...p }));
 
@@ -59,9 +63,16 @@ export function HistorialPage() {
   }
 
   return (
-    <div>
+    <div className={styles.root}>
       <HistorialFilters value={filters} zonaOpts={zonaOpts} count={filtered.length} onChange={patch} />
-      <HistorialTimeline records={filtered} />
+
+      <div className={styles.singleColumn}>
+        <HistorialTimeline
+          records={filtered}
+          schema={schema}
+          schemaLoading={schemaLoading}
+        />
+      </div>
     </div>
   );
 }

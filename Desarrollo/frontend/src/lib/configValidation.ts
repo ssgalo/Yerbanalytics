@@ -41,14 +41,16 @@ export function umbralError(u: MetricThreshold): string | null {
 /** Errores de los límites operativos. */
 export function operativaErrors(op: ConfigOperativa): string[] {
   const out: string[] = [];
-  const positive = (v: number, nombre: string) => {
-    if (!(v > 0)) out.push(`El valor de ${nombre} debe ser mayor a 0.`);
+  const positive = (v: number | null | undefined, nombre: string) => {
+    if (!(Number(v) > 0)) out.push(`El valor de ${nombre} debe ser mayor a 0.`);
   };
   positive(op.riegoTiempoMaxSeg, 'el tiempo máximo de apertura de riego');
   positive(op.riegoVolMaxDiarioMl, 'el volumen máximo diario de riego');
   positive(op.insumoDosisMax24hMl, 'la dosis máxima de insumo por 24 h');
   positive(op.seguimientoLatenciaMin, 'la latencia de seguimiento');
   positive(op.seguimientoDeltaMin, 'el delta mínimo de recuperación');
+  positive(op.intervaloSensadoMinutos ?? 0, 'el intervalo de sensado');
+  positive(op.intervaloEvaluacionMinutos ?? 0, 'el intervalo de evaluación');
   if (op.mediasombraAperturaMaxPct <= 0 || op.mediasombraAperturaMaxPct > 100) {
     out.push('La apertura máxima de mediasombra debe estar entre 0 y 100 %.');
   }

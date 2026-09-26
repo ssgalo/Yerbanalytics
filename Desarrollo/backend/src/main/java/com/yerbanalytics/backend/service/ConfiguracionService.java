@@ -99,6 +99,8 @@ public class ConfiguracionService {
         return new ConfiguracionOperativa(
                 e.getRiegoTiempoMaxSeg(), e.getRiegoVolMaxDiarioMl(), e.getInsumoDosisMax24hMl(),
                 e.getMediasombraAperturaMaxPct(), e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
+                e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : 240,
+                e.getIntervaloEvaluacionMinutos() != null ? e.getIntervaloEvaluacionMinutos() : 5,
                 e.getUpdatedBy(), e.getUpdatedTs());
     }
 
@@ -140,6 +142,8 @@ public class ConfiguracionService {
         oe.setMediasombraAperturaMaxPct(op.mediasombraAperturaMaxPct());
         oe.setSeguimientoLatenciaMin(op.seguimientoLatenciaMin());
         oe.setSeguimientoDeltaMin(op.seguimientoDeltaMin());
+        oe.setIntervaloSensadoMinutos(op.intervaloSensadoMinutos());
+        oe.setIntervaloEvaluacionMinutos(op.intervaloEvaluacionMinutos());
         oe.setUpdatedBy(usuario != null && !usuario.isBlank() ? usuario : "Ingeniero Agrónomo");
         oe.setUpdatedTs(System.currentTimeMillis());
         operativaRepository.save(oe);
@@ -213,6 +217,8 @@ public class ConfiguracionService {
         requirePositive(op.insumoDosisMax24hMl(), "la dosis máxima de insumo por 24 h");
         requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
         requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
+        requirePositive(op.intervaloSensadoMinutos(), "el intervalo de sensado");
+        requirePositive(op.intervaloEvaluacionMinutos(), "el intervalo de evaluación");
         if (op.mediasombraAperturaMaxPct() <= 0 || op.mediasombraAperturaMaxPct() > 100) {
             throw new InvalidConfigurationException(
                     "La apertura máxima de mediasombra debe estar entre 0 y 100 %.");
@@ -349,6 +355,8 @@ public class ConfiguracionService {
         e.setMediasombraAperturaMaxPct(100);
         e.setSeguimientoLatenciaMin(2);
         e.setSeguimientoDeltaMin(5);
+        e.setIntervaloSensadoMinutos(240);
+        e.setIntervaloEvaluacionMinutos(5);
         return e;
     }
 

@@ -19,6 +19,8 @@ const DEFAULT_MACRO_ZONES = 6;
 const LOW_BATTERY_ZONE = 2;
 
 let timer: NodeJS.Timeout | null = null;
+let configWatcher: NodeJS.Timeout | null = null;
+let currentIntervalMs: number = config.autoEmissionIntervalMs;
 
 const around = (base: number, span: number) => base + Math.random() * span;
 
@@ -27,6 +29,25 @@ async function currentMacroZones(): Promise<number> {
   const topology = await fetchFromBackend<{ macroZonas?: number }>('/api/topologia');
   const count = topology?.macroZonas ?? 0;
   return count > 0 ? count : DEFAULT_MACRO_ZONES;
+}
+
+/** Updates the emission interval based on backend configuration. */
+async function checkConfig() {
+  if (!isActive()) return;
+  try {
+    const cfg = await fetchFromBackend<any>('/api/configuracion');
+    if (cfg?.operativa?.intervaloSensadoMinutos) {
+      const newIntervalMs = cfg.operativa.intervaloSensadoMinutos * 60_000;
+      if (newIntervalMs !== currentIntervalMs) {
+        console.log(`[simulator] auto emission interval changed from ${currentIntervalMs} to ${newIntervalMs} ms`);
+        currentIntervalMs = newIntervalMs;
+        if (timer) clearInterval(timer);
+        timer = setInterval(() => void emitRound(), currentIntervalMs);
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 /** Values in CONTRACT units, as a real node would publish them (ce in µS/cm, uv in %). */
@@ -72,18 +93,23 @@ export function isActive(): boolean {
 }
 
 export function intervalMs(): number {
-  return config.autoEmissionIntervalMs;
+  return currentIntervalMs;
 }
 
 /** Turns automatic emission on or off. Idempotent. */
 export function setActive(on: boolean): void {
   if (on && !timer) {
     void emitRound(); // First round without waiting: the effect is visible right away.
-    timer = setInterval(() => void emitRound(), config.autoEmissionIntervalMs);
-    console.log(`[simulator] auto emission on (every ${config.autoEmissionIntervalMs} ms)`);
+    timer = setInterval(() => void emitRound(), currentIntervalMs);
+    configWatcher = setInterval(() => void checkConfig(), 5_000); // Check config every 5s for near-instant update
+    console.log(`[simulator] auto emission on (every ${currentIntervalMs} ms)`);
   } else if (!on && timer) {
     clearInterval(timer);
     timer = null;
+    if (configWatcher) {
+      clearInterval(configWatcher);
+      configWatcher = null;
+    }
     console.log('[simulator] auto emission off');
   }
 }

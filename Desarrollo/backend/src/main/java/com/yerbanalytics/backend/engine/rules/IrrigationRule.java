@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.rules;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
@@ -33,18 +34,18 @@ import java.util.List;
  * para que el usuario sepa que el sistema evaluó la condición y no la encontró necesaria.
  */
 @Component
-public class RiegoRule implements Rule {
+public class IrrigationRule implements Rule {
 
     private static final int PRIORITY = 10;
-    private static final String NAME = "RiegoRule";
+    private static final String NAME = "IrrigationRule";
     private static final double DEFAULT_HUM_UMBRAL = 40.0;
     private static final long MS_EN_24H = 24L * 60 * 60 * 1000;
 
     private final ConfiguracionService configuracionService;
     private final HistorialRepository historialRepository;
 
-    public RiegoRule(ConfiguracionService configuracionService,
-                     HistorialRepository historialRepository) {
+    public IrrigationRule(ConfiguracionService configuracionService,
+                          HistorialRepository historialRepository) {
         this.configuracionService = configuracionService;
         this.historialRepository = historialRepository;
     }
@@ -57,6 +58,16 @@ public class RiegoRule implements Rule {
     @Override
     public String name() {
         return NAME;
+    }
+
+    @Override
+    public String label() {
+        return "💦 Riego";
+    }
+
+    @Override
+    public RuleBranch branch() {
+        return RuleBranch.RIEGO;
     }
 
     @Override

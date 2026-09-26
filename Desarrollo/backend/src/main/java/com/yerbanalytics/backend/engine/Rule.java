@@ -18,8 +18,28 @@ public interface Rule {
      */
     int priority();
 
-    /** Nombre legible de la regla, usado en logs y en el Registro de Inacción. */
+    /** Nombre técnico de la regla, usado en logs y en el Registro de Inacción. */
     String name();
+
+    /**
+     * Etiqueta legible para el usuario final. Se usa en el Inspector de Decisiones
+     * (visualización del DAG) y en cualquier UI orientada al operador del vivero.
+     *
+     * <p>Por defecto retorna {@link #name()} para mantener retrocompatibilidad.
+     * Cada regla DEBE sobreescribir este método con una descripción comprensible,
+     * sin tecnicismos: el usuario es un agrónomo u operador, no un desarrollador.
+     */
+    default String label() {
+        return name();
+    }
+
+    /**
+     * Rama o subsistema al que pertenece esta regla.
+     * Permite ejecución independiente en forma de DAG.
+     */
+    default RuleBranch branch() {
+        return RuleBranch.GLOBAL;
+    }
 
     /**
      * Evalúa la regla contra el snapshot inmutable del sector.

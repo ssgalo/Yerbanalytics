@@ -34,7 +34,7 @@ from dotenv import load_dotenv
 # Cargar .env antes de cualquier importación que lea variables de entorno.
 load_dotenv()
 
-from api import obtener_pendientes, registrar_diagnostico  # noqa: E402
+from api import obtener_pendientes, registrar_diagnostico, obtener_configuracion  # noqa: E402
 from model import InferenceModel  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -127,12 +127,12 @@ def procesar_ciclo(model: InferenceModel, capturas_dir: Path) -> None:
 
 
 def main() -> None:
-    intervalo = _polling_interval()
+    fallback_intervalo = _polling_interval()
     capturas_dir = _capturas_dir()
 
     logger.info("=== Servicio de Inferencia Yerbanalytics ===")
     logger.info("  CAPTURAS_DIR          : %s", capturas_dir)
-    logger.info("  POLLING_INTERVAL      : %d s (%.1f h)", intervalo, intervalo / 3600)
+    logger.info("  POLLING_INTERVAL (FB) : %d s (%.1f h)", fallback_intervalo, fallback_intervalo / 3600)
     logger.info("  BACKEND_URL           : %s", os.environ.get("BACKEND_URL", "http://localhost:8080"))
 
     # Cargar el modelo una única vez al arranque.
@@ -142,13 +142,16 @@ def main() -> None:
         logger.critical("No se pudo inicializar el modelo: %s", exc)
         sys.exit(1)
 
-    logger.info("Modelo listo. Iniciando ciclo de polling cada %d segundos.", intervalo)
+    # Ya no dependemos de un intervalo configurable de inferencia.
+    # El backend dicta cuándo hay capturas listas (tiempo de quietud).
+    # Despertamos frecuentemente para revisar.
+    intervalo_polling = 10
+
+    logger.info("Modelo listo. Iniciando ciclo de polling cada %d s.", intervalo_polling)
 
     while True:
-        logger.info("--- Inicio de ciclo de inferencia ---")
         procesar_ciclo(model, capturas_dir)
-        logger.info("--- Fin de ciclo. Próximo ciclo en %d s. ---", intervalo)
-        time.sleep(intervalo)
+        time.sleep(intervalo_polling)
 
 
 if __name__ == "__main__":

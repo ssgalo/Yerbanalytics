@@ -10,6 +10,7 @@ import { UmbralesForm } from './components/UmbralesForm';
 import { LimitesActuadoresForm } from './components/LimitesActuadoresForm';
 import { RustificacionPlanForm } from './components/RustificacionPlanForm';
 import { SeguimientoForm } from './components/SeguimientoForm';
+import { IntervalosForm } from './components/IntervalosForm';
 import styles from './ConfiguracionPage.module.css';
 
 type Feedback = { kind: 'ok' | 'err'; msg: string } | null;
@@ -121,6 +122,14 @@ export function ConfiguracionPage() {
           <span className={styles.sectionHint}>Latencia y mejora mínima para evaluar efectividad</span>
         </div>
         <SeguimientoForm value={draft.operativa} onChange={patchOperativa} />
+      </Card>
+
+      <Card className={styles.section}>
+        <div className={styles.sectionHead}>
+          <span className={styles.sectionTitle}>Frecuencia Operativa</span>
+          <span className={styles.sectionHint}>Intervalos de sensado (IoT) y ejecución de inferencia (IA)</span>
+        </div>
+        <IntervalosForm value={draft.operativa} onChange={patchOperativa} />
       </Card>
 
       <div className={styles.actions}>

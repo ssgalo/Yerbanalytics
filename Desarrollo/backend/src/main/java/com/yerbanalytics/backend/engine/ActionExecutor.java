@@ -107,14 +107,14 @@ public class ActionExecutor {
                 case NOOP_INFO -> {
                     log.debug("Sector {}: NOOP_INFO — {}", ctx.sector().getId(), action.motivo());
                     // Registro de Inacción: el usuario puede ver por qué el motor no actuó.
-                    historialService.registrarInaccion(ctx.sector(), action.ruleName(), action.motivo());
+                    historialService.registrarInaccion(ctx.sector(), action.type(), action.ruleName(), action.motivo());
                 }
 
                 case ABORT_RIEGO, ABORT_INSUMO, ABORT_ALL, POSTPONE_RIEGO -> {
                     // El corte ya fue aplicado por el RuleOrchestrator.
                     // Se persiste como Registro de Inacción para trazabilidad.
                     log.info("Sector {}: {} — {}", ctx.sector().getId(), action.type(), action.motivo());
-                    historialService.registrarInaccion(ctx.sector(), action.ruleName(), action.motivo());
+                    historialService.registrarInaccion(ctx.sector(), action.type(), action.ruleName(), action.motivo());
                 }
 
                 default -> log.warn("Sector {}: acción desconocida '{}'", ctx.sector().getId(), action.type());

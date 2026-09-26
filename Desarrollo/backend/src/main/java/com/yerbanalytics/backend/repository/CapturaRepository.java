@@ -23,4 +23,8 @@ public interface CapturaRepository extends JpaRepository<CapturaEntity, String> 
     @Query("SELECT c FROM CapturaEntity c WHERE NOT EXISTS " +
            "(SELECT 1 FROM DiagnosticoEntity d WHERE d.capturaId = c.id)")
     List<CapturaEntity> findSinDiagnostico();
+
+    @Query("SELECT MAX(c.recibidaEn) FROM CapturaEntity c WHERE NOT EXISTS " +
+           "(SELECT 1 FROM DiagnosticoEntity d WHERE d.capturaId = c.id)")
+    Long findMaxRecibidaEnSinDiagnostico();
 }
