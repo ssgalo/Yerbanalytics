@@ -5,8 +5,13 @@ services:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
+      # Sólo MQTT sobre TCP. El 9001 (MQTT sobre WebSockets) no se publica:
+      # existe para que un navegador pueda hablar MQTT, y acá nadie lo hace.
+      # Las órdenes de captura van por SSE — la decisión y su porqué están en
+      # CapturaService.java. Además el listener de WebSockets ni siquiera está
+      # configurado (no hay mosquitto.conf), así que el mapeo publicaba un
+      # puerto sin nada detrás, y chocaba con otros servicios de la máquina.
       - "1883:1883"
-      - "9001:9001"
     volumes:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
@@ -35,12 +40,28 @@ services:
       BACKEND_URL: http://host.docker.internal:8000
       # Directorio de capturas montado como volumen compartido.
       CAPTURAS_DIR: /capturas
-      # Intervalo de polling en segundos (default 4 horas = 14400).
-      POLLING_INTERVAL_SECONDS: 14400
+      # Intervalo de polling en segundos. El default de 4 horas es el ritmo de
+      # operación real; para una demo o una prueba hay que bajarlo, y eso se
+      # hace por entorno, no editando este archivo:
+      #     POLLING_INTERVAL_SECONDS=20 docker compose up -d servicio-inferencia
+      POLLING_INTERVAL_SECONDS: ${POLLING_INTERVAL_SECONDS:-14400}
       # Ruta al .pt dentro del contenedor (montado en volumes más abajo).
       MODEL_PATH: /best.pt
-      # Orden de clases del modelo entrenado — AJUSTAR al entrenamiento real.
-      MODEL_CLASSES: "Sano,Clorosis,Estrés solar,Daño biótico,No concluyente,Ácaro,Plaga foliar,Daño fúngico"
+      # Orden de clases del modelo entrenado. NO es la taxonomía del backend:
+      # es la lista de ESTADOS_VALIDOS reordenada para que la posición N de esta
+      # lista corresponda a la clase N del modelo. model.py mapea por índice, no
+      # por nombre, así que un orden equivocado produce diagnósticos plausibles
+      # y completamente errados, sin ningún error que lo delate.
+      #
+      # Fuente de verdad: el propio checkpoint.
+      #     docker compose run --rm --entrypoint python servicio-inferencia \
+      #       -c "from ultralytics import YOLO; print(YOLO('/best.pt').names)"
+      #
+      # best.pt (YOLOv8s, detect, 5 clases) declara:
+      #   0 clorosis · 1 colapso_hongos · 2 estres_solar · 3 plaga_foliar · 4 sano
+      #
+      # Este modelo NO predice Daño biótico, No concluyente ni Ácaro: no los vio.
+      MODEL_CLASSES: "Clorosis,Daño fúngico,Estrés solar,Plaga foliar,Sano"
     volumes:
       # Volumen compartido de imágenes con el backend.
       - ./Desarrollo/backend/capturas:/capturas
