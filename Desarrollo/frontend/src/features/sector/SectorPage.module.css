@@ -76,6 +76,23 @@
   color: var(--muted);
 }
 
+/* Enlace al Inspector del motor de reglas, a la derecha del encabezado */
+.motorLink {
+  margin-left: auto;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--brand);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.motorLink:hover {
+  border-color: var(--brand);
+}
+
 /* Diagnóstico e historial a la izquierda; actuadores y seguimiento a la derecha.
    `align-items: start` evita que las columnas se igualen en alto estirando cajas. */
 .layout {

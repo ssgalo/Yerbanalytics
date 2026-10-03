@@ -166,19 +166,19 @@ comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx,
 
 ## 8. Frontend: Inspector (PR 6)
 
-- [ ] 8.1 Test de `trazaANodos(schema, traza)`: mapea cada estado de la traza a pasó / bloqueó /
+- [x] 8.1 Test de `trazaANodos(schema, traza)`: mapea cada estado de la traza a pasó / bloqueó /
       pospuso / accionó / omitida / no alcanzada, y el terminal de cada rama a "accionó" o "no
       accionó". Función pura, sin regex sobre textos.
-- [ ] 8.2 Test: `ReglaNode` (nodo personalizado de React Flow) muestra hasta dos comparaciones
+- [x] 8.2 Test: `ReglaNode` (nodo personalizado de React Flow) muestra hasta dos comparaciones
       "recibido op umbral" con su resultado, candado si no es configurable y "sin dato" para
       `SIN_DATO`. Estilos con CSS Modules y tokens.
-- [ ] 8.3 Test: `RuleGraph` con prop `traza` usa `trazaANodos`; sin `traza` se comporta igual que
+- [x] 8.3 Test: `RuleGraph` con prop `traza` usa `trazaANodos`; sin `traza` se comporta igual que
       hoy (los tests del Historial no cambian).
-- [ ] 8.4 Test: `InspectorTab` con selector zona → sector, origen y "Actualizar"; respeta
+- [x] 8.4 Test: `InspectorTab` con selector zona → sector, origen y "Actualizar"; respeta
       `?sector=`; sin traza muestra "sin evaluaciones desde el último arranque".
-- [ ] 8.5 Test: clic en un nodo abre el panel con todas las comparaciones, acciones y motivo, y
+- [x] 8.5 Test: clic en un nodo abre el panel con todas las comparaciones, acciones y motivo, y
       "Editar parámetro" navega a Parámetros con esa regla abierta.
-- [ ] 8.6 Detalle de sector: enlace "Ver última evaluación del motor" → `/reglas?tab=inspector&sector=…`.
+- [x] 8.6 Detalle de sector: enlace "Ver última evaluación del motor" → `/reglas?tab=inspector&sector=…`.
 
 ## 9. Cierre
 

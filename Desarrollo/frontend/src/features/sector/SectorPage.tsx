@@ -10,7 +10,7 @@
    media vista vacía.
    ============================================================ */
 import { useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useSectorDetail } from '@/hooks/useSectorDetail';
 import { useHistory } from '@/hooks/useHistory';
 import { usePageTitle } from '@/hooks/PageMeta';
@@ -94,6 +94,10 @@ export function SectorPage() {
           {sector.statusLabel}
         </Badge>
         <span className={styles.reason}>{sector.reason}</span>
+        {/* Cómo decidió el motor para este sector: recibido vs. umbral de cada regla */}
+        <Link className={styles.motorLink} to={`/reglas?tab=inspector&sector=${encodeURIComponent(sector.id)}`}>
+          Ver última evaluación del motor
+        </Link>
       </div>
 
       {/* Diagnóstico e historial a la izquierda; actuadores y seguimiento a la derecha */}

@@ -98,6 +98,9 @@ function aplicar(a: number, op: OperadorComparacion, b: number): boolean {
   }
 }
 
+/** Como el `%.0f` de los motivos del backend: sin decimales de más. */
+const r0 = (v: number | null) => (v === null ? '—' : String(Math.round(v)));
+
 const accion = (tipo: string, motivo: string): AccionTraza => ({ tipo, motivo });
 const noop = (motivo: string) => [accion('NOOP_INFO', motivo)];
 
@@ -122,8 +125,8 @@ const EVALUADORES: Record<string, Evaluador> = {
     const lluvia = ev.comparar('Probabilidad de lluvia', e.lluviaPct, 'GE', 'riego.lluvia-probabilidad');
     if (e.lluviaPct === null) return noop('Pronóstico climático no disponible — el motor evalúa solo con sensores.');
     return lluvia
-      ? [accion('POSTPONE_RIEGO', `Lluvia inminente probable (${e.lluviaPct}% ≥ umbral ${ev.numero('riego.lluvia-probabilidad')}%). Riego autónomo pospuesto.`)]
-      : noop(`Probabilidad de lluvia ${e.lluviaPct}% — no se pospone el riego.`);
+      ? [accion('POSTPONE_RIEGO', `Lluvia inminente probable (${r0(e.lluviaPct)}% ≥ umbral ${ev.numero('riego.lluvia-probabilidad')}%). Riego autónomo pospuesto.`)]
+      : noop(`Probabilidad de lluvia ${r0(e.lluviaPct)}% — no se pospone el riego.`);
   },
 
   DailyVolumeLimitRule: (ev, e) =>
@@ -140,11 +143,11 @@ const EVALUADORES: Record<string, Evaluador> = {
     const bajo = ev.comparar('Humedad de sustrato', e.humSus, 'LT', 'riego.umbral-humedad');
     const umbral = ev.numero('riego.umbral-humedad');
     if (e.humSus === null) return noop('Sin lectura de humedad de sustrato — no se puede evaluar riego.');
-    if (!bajo) return noop(`Humedad de sustrato ${e.humSus}% dentro del rango aceptable (umbral: ${umbral}%). No se riega.`);
+    if (!bajo) return noop(`Humedad de sustrato ${r0(e.humSus)}% dentro del rango aceptable (umbral: ${umbral}%). No se riega.`);
     if (ev.comparar('Riegos en las últimas 24 h', e.riegos24h, 'GE', 'riego.max-riegos-24h-sector')) {
-      return [accion('ABORT_RIEGO', `Humedad ${e.humSus}% bajo el umbral (${umbral}%), pero el sector ya recibió ${e.riegos24h} riego(s) en las últimas 24 h. Riego autónomo bloqueado por límite operativo.`)];
+      return [accion('ABORT_RIEGO', `Humedad ${r0(e.humSus)}% bajo el umbral (${umbral}%), pero el sector ya recibió ${e.riegos24h} riego(s) en las últimas 24 h. Riego autónomo bloqueado por límite operativo.`)];
     }
-    return [accion('ACTIVAR_VALVULA', `Humedad de sustrato ${e.humSus}% bajo el umbral mínimo de ${umbral}%. [tiempo-max-seg=${ev.numero('riego.tiempo-max-apertura')}]`)];
+    return [accion('ACTIVAR_VALVULA', `Humedad de sustrato ${r0(e.humSus)}% bajo el umbral mínimo de ${umbral}%. [tiempo-max-seg=${ev.numero('riego.tiempo-max-apertura')}]`)];
   },
 
   SupplyRule: (ev, e) => {
@@ -152,7 +155,7 @@ const EVALUADORES: Record<string, Evaluador> = {
       return noop('El sector no está en estado crítico — no se dosifica.');
     }
     return ev.comparar('Confianza del diagnóstico', e.confianza, 'GE', 'diagnostico.confianza-minima')
-      ? [accion('ACTIVAR_BOMBA', `Sector crítico con diagnóstico confiable (${e.confianza}%). Se dosifica el insumo.`)]
+      ? [accion('ACTIVAR_BOMBA', `Sector crítico con diagnóstico confiable (${r0(e.confianza)}%). Se dosifica el insumo.`)]
       : noop('Diagnóstico no concluyente — no se dosifica.');
   },
 

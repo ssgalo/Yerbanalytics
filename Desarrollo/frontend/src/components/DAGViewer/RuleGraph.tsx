@@ -20,7 +20,9 @@ import {
   type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { ActionRecord, DagSchema } from '@/types/domain';
+import type { ActionRecord, DagSchema, TrazaEvaluacion } from '@/types/domain';
+import { computeLayout } from './layoutDag';
+import { TrazaGraph } from './TrazaGraph';
 import styles from './RuleGraph.module.css';
 
 // -----------------------------------------------------------------------
@@ -146,72 +148,16 @@ function isPostpone(record: ActionRecord): boolean {
          record.decision?.toLowerCase().includes('lluvia inminente') === true;
 }
 
-/** Calcula el layout de posición X,Y para cada nodo soportando ramas horizontales. */
-function computeLayout(schema: DagSchema): Record<string, { x: number; y: number }> {
-  const positions: Record<string, { x: number; y: number }> = {};
-  const ROW_HEIGHT = 90;
-
-  // Calculamos anchos dinámicos para centrar ramas que sobrevivieron al filtro
-  const branches = ['RIEGO', 'INSUMO', 'MEDIASOMBRA', 'SEGUIMIENTO'].filter(b => 
-    schema.nodes.some(n => n.branch === b)
-  );
-  
-  const COLUMN_WIDTH = 300;
-  const startX = branches.length > 0 ? (branches.length * COLUMN_WIDTH) / 2 : 150;
-  
-  const BRANCH_X: Record<string, number> = { GLOBAL: startX };
-  branches.forEach((b, i) => {
-    BRANCH_X[b] = 50 + (i * COLUMN_WIDTH);
-  });
-
-  const globalNodes = schema.nodes.filter((n) => n.branch === 'GLOBAL' && n.type === 'default');
-  let currentY = 0;
-
-  if (schema.nodes.some(n => n.id === 'start')) {
-    positions['start'] = { x: startX, y: currentY };
-    currentY += ROW_HEIGHT;
-  }
-
-  globalNodes.forEach((node) => {
-    positions[node.id] = { x: startX, y: currentY };
-    currentY += ROW_HEIGHT;
-  });
-
-  if (schema.nodes.some(n => n.id === 'abort-GLOBAL')) {
-    positions['abort-GLOBAL'] = { x: startX + 180, y: ROW_HEIGHT };
-  }
-
-  branches.forEach((branch) => {
-    const branchNodes = schema.nodes.filter((n) => n.branch === branch && n.type === 'default');
-    const baseX = BRANCH_X[branch];
-    let branchY = currentY; 
-
-    branchNodes.forEach((node) => {
-      positions[node.id] = { x: baseX, y: branchY };
-      branchY += ROW_HEIGHT;
-    });
-
-    if (schema.nodes.some(n => n.id === `abort-${branch}`)) {
-      positions[`abort-${branch}`] = { x: baseX + 180, y: currentY };
-    }
-    if (schema.nodes.some(n => n.id === `success-${branch}`)) {
-      positions[`success-${branch}`] = { x: baseX, y: branchY };
-    }
-  });
-
-  return positions;
-}
-
 // -----------------------------------------------------------------------
 // Componente principal
 // -----------------------------------------------------------------------
 
-interface RuleGraphProps {
+interface RuleGraphInnerProps {
   schema: DagSchema;
   activeEvents: ActionRecord[];
 }
 
-function RuleGraphInner({ schema, activeEvents }: RuleGraphProps) {
+function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
   const filteredSchema = useMemo(() => {
     // Excluir nodos abort-* (terminales de bloqueo de rama) — solo aportan ruido visual.
     // La información de bloqueo ya está representada en el nodo que generó el bloqueo
@@ -420,10 +366,31 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphProps) {
   );
 }
 
-export function RuleGraph(props: RuleGraphProps) {
+interface RuleGraphProps {
+  schema: DagSchema;
+  /** Modo Historial: eventos de un ciclo pasado. El estado de cada nodo se infiere de sus textos. */
+  activeEvents?: ActionRecord[];
+  /**
+   * Modo Inspector: la última evaluación del motor. Con traza el estado de cada nodo sale de los
+   * datos estructurados de la evaluación (no de un regex) y los nodos muestran recibido vs. umbral.
+   */
+  traza?: TrazaEvaluacion | null;
+  /** Regla elegida en el modo traza. */
+  seleccionada?: string | null;
+  onSeleccionar?: (ruleId: string | null) => void;
+}
+
+export function RuleGraph({ schema, activeEvents = [], traza, seleccionada, onSeleccionar }: RuleGraphProps) {
+  if (traza) {
+    return (
+      <ReactFlowProvider>
+        <TrazaGraph schema={schema} traza={traza} seleccionada={seleccionada ?? null} onSeleccionar={onSeleccionar} />
+      </ReactFlowProvider>
+    );
+  }
   return (
     <ReactFlowProvider>
-      <RuleGraphInner {...props} />
+      <RuleGraphInner schema={schema} activeEvents={activeEvents} />
     </ReactFlowProvider>
   );
 }

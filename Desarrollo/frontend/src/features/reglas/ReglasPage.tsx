@@ -10,6 +10,7 @@ import { useSearchParams } from 'react-router-dom';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
 import { ParametrosTab } from './ParametrosTab';
+import { InspectorTab } from './inspector/InspectorTab';
 import styles from './Reglas.module.css';
 
 type Pestania = 'parametros' | 'inspector';
@@ -20,6 +21,15 @@ export function ReglasPage() {
   const { catalogo, loading, error, saving, save } = useCatalogoReglas();
 
   usePageTitle('Motor de reglas', 'Umbrales de cada regla y última evaluación por sector');
+
+  /** "Editar parámetro" desde el Inspector: a Parámetros, con esa regla abierta. */
+  const editarRegla = (ruleId: string) => setParams({ regla: ruleId });
+
+  const cambiarSector = (id: string) => {
+    const next = new URLSearchParams(params);
+    next.set('sector', id);
+    setParams(next, { replace: true });
+  };
 
   const elegir = (t: Pestania) => {
     const next = new URLSearchParams(params);
@@ -75,7 +85,13 @@ export function ReglasPage() {
         </>
       )}
 
-      {tab === 'inspector' && <div className={styles.state}>Inspector</div>}
+      {tab === 'inspector' && (
+        <InspectorTab
+          sectorInicial={params.get('sector')}
+          onEditarRegla={editarRegla}
+          onSectorChange={cambiarSector}
+        />
+      )}
     </div>
   );
 }

@@ -32,6 +32,10 @@
   --off: #a9b2ab;
   --off-soft: #eef0ec;
 
+  /* información / acción ejecutada (el azul del DAG del motor) */
+  --info: #3b82f6;
+  --info-soft: #e3edfd;
+
   /* acentos */
   --orange: #ec6a1e;
   --orange-soft: #fbe7d7;

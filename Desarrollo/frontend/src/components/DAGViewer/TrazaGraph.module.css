@@ -1,0 +1,52 @@
+/* Lienzo del DAG en modo traza: mismo fondo oscuro que el del Historial, colores desde tokens */
+
+.canvas {
+  position: relative;
+  width: 100%;
+  background: var(--g900);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.leyenda {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--g700);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--g900) 88%, transparent);
+  color: var(--cdim);
+  font-size: 11px;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.punto {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pasa {
+  background: var(--ok);
+}
+.bloquea {
+  background: var(--crit);
+}
+.pospone {
+  background: var(--warn);
+}
+.acciona {
+  background: var(--info);
+}
+.apagado {
+  background: var(--off);
+}
