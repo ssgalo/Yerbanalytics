@@ -168,6 +168,25 @@ public class HistorialService {
      */
     @Transactional
     public void registrarConfiguracion(String usuario) {
+        registrarConfiguracion(
+                "Recalibración de parámetros agronómicos por " + usuario + ".",
+                "Se validaron los nuevos umbrales y límites contra el rango fisiológico.",
+                "Configuración actualizada: umbrales, límites operativos y plan de rustificación.");
+    }
+
+    /**
+     * Variante con detalle: asienta qué se cambió (p. ej. las claves de los parámetros de reglas
+     * modificados), para que el historial no diga sólo "se configuró algo".
+     */
+    @Transactional
+    public void registrarConfiguracion(String usuario, String detalle) {
+        registrarConfiguracion(
+                "Recalibración de parámetros de reglas por " + usuario + ".",
+                "Se validaron tipo, rango y restricciones cruzadas de los nuevos valores.",
+                detalle);
+    }
+
+    private void registrarConfiguracion(String lectura, String decision, String accion) {
         HistorialEventoEntity e = new HistorialEventoEntity();
         e.setId(UUID.randomUUID().toString());
         e.setSectorId("—");
@@ -175,9 +194,9 @@ public class HistorialService {
         e.setZonaName("Sistema");
         e.setTipo("Configuración");
         e.setTs(System.currentTimeMillis());
-        e.setLectura("Recalibración de parámetros agronómicos por " + usuario + ".");
-        e.setDecision("Se validaron los nuevos umbrales y límites contra el rango fisiológico.");
-        e.setAccion("Configuración actualizada: umbrales, límites operativos y plan de rustificación.");
+        e.setLectura(lectura);
+        e.setDecision(decision);
+        e.setAccion(accion);
         e.setRes("Efectiva");
         e.setSev("—");
         e.setEvoShow(false);

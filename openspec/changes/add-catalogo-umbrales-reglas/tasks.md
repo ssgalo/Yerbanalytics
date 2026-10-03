@@ -10,26 +10,29 @@ Paquetes nuevos: `be/engine/parametros/` y `be/engine/traza/` (`be/` =
 
 ## 0. Decisiones previas
 
-- [ ] 0.1 Confirmar con el usuario DA-1 … DA-6 de `design.md` (los defaults ya están aplicados en
-      las tareas de abajo).
-- [ ] 0.2 Confirmar la estrategia de entrega (ver *Review Workload Forecast*).
+- [x] 0.1 Confirmar con el usuario DA-1 … DA-6 de `design.md`. **Confirmadas con el default
+      recomendado** (DA-1 desacoplar el umbral de riego con fábrica 42; DA-2 migrar las tres reglas
+      de riego actuales; DA-3 DAG con traza en el Inspector de `/reglas`; DA-4 última traza por
+      sector y origen en memoria; DA-5 un solo `diagnostico.confianza-minima`; DA-6 no tocar el
+      Registro de Inacción).
+- [x] 0.2 Confirmar la estrategia de entrega (ver *Review Workload Forecast*).
 
 ## 1. Catálogo: tipos y definiciones (PR 1)
 
-- [ ] 1.1 Test: `VentanaHoraria.parse("06:00-18:00")` y `contiene()` en 05:59 / 06:00 / 17:59 /
+- [x] 1.1 Test: `VentanaHoraria.parse("06:00-18:00")` y `contiene()` en 05:59 / 06:00 / 17:59 /
       18:00; ventana que cruza la medianoche (`18:00-06:00` contiene 02:00); formatos inválidos
       (`25:00-18:00`, `06:00`, vacío). Implementar `ValorParametro` (sellada: `Numero`, `Hora`,
       `VentanaHoraria`) y su formato canónico.
-- [ ] 1.2 Test: `TipoParametro.parsear(texto, def)` acepta y rechaza según tipo, rango y decimales
+- [x] 1.2 Test: `TipoParametro.parsear(texto, def)` acepta y rechaza según tipo, rango y decimales
       (`ENTERO` con 10,5 → error; `NUMERO` 0,2 con 2 decimales → ok). Implementar.
-- [ ] 1.3 Test: `CatalogoParametros` falla al construirse con clave duplicada, con fábrica fuera de
+- [x] 1.3 Test: `CatalogoParametros` falla al construirse con clave duplicada, con fábrica fuera de
       rango y con una regla que declara una clave inexistente. Implementar `DefinicionParametro` y
       `CatalogoParametros`.
-- [ ] 1.4 Test de cobertura de riego: una familia **de test** `ParametrosRiegoV2Fixture` con las 15
+- [x] 1.4 Test de cobertura de riego: una familia **de test** `ParametrosRiegoV2Fixture` con las 15
       entradas de `design.md` D2 se registra sin errores, y sus restricciones cruzadas
       (`crítico < umbral < objetivo`, `bloqueo ≤ alerta`) rechazan los conjuntos inválidos.
       Implementar `RestriccionCruzada`.
-- [ ] 1.5 Crear las familias reales con los valores de **hoy** (ver D7):
+- [x] 1.5 Crear las familias reales con los valores de **hoy** (ver D7):
       `ParametrosSeguridad` (`antiguedad-max-lectura` 30 s), `ParametrosRiego` (`umbral-humedad` 42 %,
       `tiempo-max-apertura` 120 s, `max-riegos-24h` 2, `max-riegos-24h-sector` 1,
       `lluvia-probabilidad` 60 %), `ParametrosInsumo` (`max-dosis-24h` 1),
@@ -39,18 +42,18 @@ Paquetes nuevos: `be/engine/parametros/` y `be/engine/traza/` (`be/` =
 
 ## 2. Catálogo: persistencia, servicio y API (PR 1)
 
-- [ ] 2.1 Test (`@DataJpaTest`): `ParametroReglaEntity` guarda y lee un override por clave.
+- [x] 2.1 Test (`@DataJpaTest`): `ParametroReglaEntity` guarda y lee un override por clave.
       Implementar entidad + `ParametroReglaRepository`.
-- [ ] 2.2 Test: `CatalogoParametrosService.vigentes()` devuelve fábrica sin overrides, override si
+- [x] 2.2 Test: `CatalogoParametrosService.vigentes()` devuelve fábrica sin overrides, override si
       existe, y el mismo objeto en dos llamadas seguidas (cache). Implementar.
-- [ ] 2.3 Test: `guardar(cambios, usuario)` es todo o nada (un cambio inválido en el lote → nada
+- [x] 2.3 Test: `guardar(cambios, usuario)` es todo o nada (un cambio inválido en el lote → nada
       persistido), `valor = null` borra el override, invalida el cache, setea `updatedBy`/`updatedTs`
       y llama a `HistorialService.registrarConfiguracion` con las claves cambiadas. Implementar
       (agregar el overload de `registrarConfiguracion` con detalle).
-- [ ] 2.4 Test (`@WebMvcTest`): `GET /api/rules/parametros` devuelve cada clave una vez con
+- [x] 2.4 Test (`@WebMvcTest`): `GET /api/rules/parametros` devuelve cada clave una vez con
       `usadoPor`; `PUT` válido → 200 con el catálogo; `PUT` inválido → 400 con
       `errores[{clave, mensaje}]`. Implementar `ReglasParametrosController` y DTOs.
-- [ ] 2.5 Test: `GET /api/rules/schema` incluye `parametros` en cada nodo de regla y `[]` en los
+- [x] 2.5 Test: `GET /api/rules/schema` incluye `parametros` en cada nodo de regla y `[]` en los
       especiales. Agregar el campo a `RuleNodeDto` y al controller.
 
 ## 3. Traza de evaluación (PR 2)

@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+
 import java.util.List;
 
 /**
@@ -39,6 +41,15 @@ public interface Rule {
      */
     default RuleBranch branch() {
         return RuleBranch.GLOBAL;
+    }
+
+    /**
+     * Parámetros del catálogo que esta regla usa para decidir. El catálogo valida al arrancar
+     * que todos existan, y de acá se arman la vista "por regla" y el campo {@code usadoPor}.
+     * Por defecto ninguno (reglas sin umbrales).
+     */
+    default List<DefinicionParametro> parametros() {
+        return List.of();
     }
 
     /**
