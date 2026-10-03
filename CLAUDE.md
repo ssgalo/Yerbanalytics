@@ -27,7 +27,7 @@ Yerbanalytics/
 │   ├── simulador/     Simulador de hardware — proyecto propio y borrable (ver §6.2)
 │   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
 │   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
-│   ├── embebido/      Firmware ESP32 (nodo testigo y actuadores); fuente del contrato MQTT
+│   ├── embebido/      Firmware ESP32 (nodo testigo y actuadores); fuente del contrato MQTT. `prototipo_hardware/` = sketches del hardware real, incl. el riel por MQTT (§6.1)
 │   └── Modelo_IA/     Modelo de visión: datasets, notebooks, resultados (ver §5)
 ├── Documentacion/     Documentos de negocio, alcance, arquitectura, entregas
 ├── docs-motor-reglas-e-integracion/  Reglas agronómicas v2, su comparación con el motor, circuito de sensado, guía del ESP32 (ver §6)
@@ -133,9 +133,10 @@ npm run dev          # http://localhost:5173
   Sparkline, Icon.
 - **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown.
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
-  diagnostics, reglas, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
+  diagnostics, reglas, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
   *Parámetros* (edita el catálogo de umbrales) e *Inspector* (el grafo de reglas con la última
-  evaluación de un sector).
+  evaluación de un sector). **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
+  se ve u oculta con un interruptor en Configuración.
 - **Routing**: react-router (`src/router.tsx`).
 
 ### Convenciones de estilo
@@ -202,6 +203,8 @@ cd Desarrollo/backend
   Cada zona trae `lectura` (las 10 métricas evaluadas) y `nodo` (batería/señal del testigo).
 - `GET/PUT /api/rules/parametros`, `GET /api/rules/evaluaciones/{sectorId}`, `GET /api/rules/schema`
   → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
+- `POST /api/pasadas`, `GET /api/pasadas/actual`, `POST /api/pasadas/actual/cancelar` → pasada del
+  riel; `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
 - `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa una carga manual
   hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de origen y sin
   ningún estado global que lo condicione (ver §6.1).
@@ -213,9 +216,10 @@ cd Desarrollo/backend
 - **`spring.jpa.open-in-view=false`.** No revertir sin leer el porqué en el README del
   backend: con el stream SSE de órdenes, cada dispositivo conectado retendría una conexión
   JDBC permanente.
-- **El backend consume la telemetría por MQTT y sólo publica comandos a los actuadores.** No
+- **El backend consume la telemetría por MQTT y publica comandos a los actuadores y al riel.** No
   publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
-  (§6.2). No escucha el ACK de los comandos.
+  (§6.2). Escucha además los eventos del riel (`nursery/rail/event`); no escucha el ACK de los
+  actuadores.
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
@@ -247,6 +251,11 @@ tocar el backend*— y **quedó ejercido**: la app nativa entró sin modificar u
 ni subir la versión del contrato. Dos clientes independientes contra la misma superficie es la
 evidencia de que el contrato sirve; dar de baja la PWA es una decisión posterior, no una deuda.
 
+**Quién pide las fotos.** Además del pedido manual, la **pasada del riel** (`POST /api/pasadas`,
+botón de Demo Expo) mueve el riel por MQTT (`vivero_esp32_red`), emite las órdenes de captura de dos
+sectores y vuelve a home. Probada con hardware el 03/10/2026; límites conocidos (final de carrera de
+home, fuente del motor) en el README del sketch.
+
 Invariantes a respetar al tocar esta área:
 
 - **`/api/camara/v1/**` es superficie versionada.** La fuente de verdad es
@@ -259,8 +268,8 @@ Invariantes a respetar al tocar esta área:
 - **Los JPEG van al filesystem, no a `bytea`.**
 - **La tabla `diagnostico` no tiene columna de origen** y `captura_id` es `NOT NULL`: un
   diagnóstico manual y uno del modelo son la misma fila porque son la misma operación.
-- **El simulador no tiene ni un endpoint propio**: usa el de emisión de órdenes (el del futuro
-  planificador) y el de alta de diagnósticos (el de la futura inferencia).
+- **El simulador no tiene ni un endpoint propio**: usa el de emisión de órdenes (el que también usa
+  el planificador de pasadas) y el de alta de diagnósticos (el de la futura inferencia).
 - **HTTPS no es opcional para la PWA**, y sí lo es para la app nativa. La restricción es del
   navegador, no del sistema: `getUserMedia` exige origen seguro y una página HTTPS no puede
   llamar a un endpoint HTTP. Por eso el backend abre un conector adicional en el 8443 y deja el
@@ -295,11 +304,12 @@ Invariantes a respetar al tocar esta área:
   llamara directo, el backend tendría que permitir su origen por CORS — y eso sería un rastro.
 - **Su estado vive en `simulador/data/`**, nunca en la base del vivero.
 - **No tiene superficie de API propia en el sistema**: topología, órdenes de captura,
-  dispositivos y diagnósticos son endpoints públicos, los mismos que usarán el planificador de
+  dispositivos y diagnósticos son endpoints públicos, los mismos que usan el planificador de
   pasadas y el servicio de inferencia. **No toca `/api/camara/v1/**`**, que es el contrato del
   dispositivo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
+  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.
 
@@ -336,4 +346,5 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Curación de datasets | `Desarrollo/Modelo_IA/informe-curacion-datasets.md` |
 | Negocio / alcance | `Documentacion/` |
 | Reglas agronómicas y su estado en el motor | `docs-motor-reglas-e-integracion/` (`reglas_v2.md`, `diferencias-motor-reglas-vs-reglas-v2.md`) |
+| Pasada del riel (backend) y firmware del riel | `Desarrollo/backend/README.md` ("Planificador de pasadas"), `Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/README.md`, `openspec/changes/add-pasada-riel/` |
 | Del sensor al motor / conectar el ESP32 | `docs-motor-reglas-e-integracion/circuito-sensado-a-motor.md`, `conectar-esp32.md` |

@@ -10,7 +10,7 @@ Versión recibida el 03/10/2026.
 | Sketch | Qué prueba |
 |---|---|
 | `vivero_esp32/` | Riel de la cámara (NEMA 17 + DRV8825, con homing y dos finales de carrera), mediasombra (motor DC por L298N canal A, con dos finales de carrera) y bomba de riego (L298N canal B, PWM) |
-| `vivero_esp32_red/` | Lo mismo que `vivero_esp32` (que no se toca) **más WiFi y MQTT para el riel**: recibe `IR_A`/`HOME` en `nursery/rail/command` y responde en `nursery/rail/event`. Bomba y mediasombra siguen sólo por serie. Instalar, configurar, flashear y probar: [`vivero_esp32_red/README.md`](vivero_esp32_red/README.md) |
+| `vivero_esp32_red/` | Lo mismo que `vivero_esp32` (que no se toca) **más WiFi y MQTT para el riel**: recibe `IR_A`/`HOME` en `nursery/rail/command` y responde en `nursery/rail/event`. Bomba y mediasombra siguen sólo por serie. Compilado, flasheado y probado con el riel real (03/10/2026). Instalar, configurar, flashear y probar: [`vivero_esp32_red/README.md`](vivero_esp32_red/README.md) |
 | `test_caudalimetro/` | Lectura del caudalímetro |
 | `test_hcsr04/` | Sensor ultrasónico HC-SR04 |
 

@@ -236,6 +236,7 @@ embebido/
   nodo_sensor/    nodo_sensor.ino      setup() red + sensado
   nodo_actuador/  nodo_actuador.ino    setup() red + actuación
   nodo_combinado/ nodo_combinado.ino   setup() red + sensado + actuación (prototipo)
+  prototipo_hardware/       sketches de Arduino IDE del hardware real; `vivero_esp32_red` mueve el riel por MQTT (`nursery/rail/*`, sección "Riel" de `comun/contrato.h`). Ver su README
 ```
 
 ---

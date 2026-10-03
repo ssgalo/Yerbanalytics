@@ -256,14 +256,14 @@ cd Desarrollo/contratos/camara/v1/conformidad && npm test
 
 ### API de plataforma — fuera del contrato
 
-La consumen el dashboard y —en el futuro— el planificador de pasadas del riel y el servicio
-de inferencia. Un dispositivo de captura no debe usarlas.
+La consumen el dashboard, el planificador de pasadas del riel (`POST /api/pasadas`, más abajo) y
+el servicio de inferencia. Un dispositivo de captura no debe usarlas.
 
 | Método | Ruta | Quién la usa |
 |---|---|---|
 | `POST` | `/api/camara/vinculacion` | Backoffice: emite el código de un solo uso |
 | `GET` | `/api/camara/dispositivos` | Estado técnico de la flota de cámaras |
-| `POST` | `/api/capturas/ordenes` | Emisor de órdenes (mañana, el planificador de pasadas) |
+| `POST` | `/api/capturas/ordenes` | Emisor de órdenes (hoy, el simulador y el planificador de pasadas) |
 | `GET` | `/api/capturas/ordenes/{id}` | Seguimiento de una orden |
 | `GET` | `/api/capturas/{capturaId}/imagen` | El dashboard, para mostrar la foto |
 | `POST` | `/api/diagnosticos` | **Alta de diagnóstico** |
@@ -390,6 +390,9 @@ La forma de `Pasada` y sus pasos está en `openspec/changes/add-pasada-riel/desi
   aborta el movimiento en curso).
 - **El estado vive en memoria.** Un reinicio a mitad pierde la pasada (`GET` → `204`); las órdenes,
   capturas y diagnósticos, que son el registro real, ya se persisten. Se puede iniciar otra enseguida.
+- **Limitación.** Un `LLEGO` del firmware no prueba que el carro se movió: éste no puede saber si el
+  motor tiene alimentación. Y con el final de carrera de home en falso, `HOME` termina al instante
+  (`pasos: 0`). Detalle en el README del sketch `vivero_esp32_red`.
 - **Diagnóstico.** `GET /api/pasadas/actual` lo completa por captura aunque la pasada ya haya
   terminado: llega ~1 min después de la última foto, cuando el servicio de inferencia barre.
 

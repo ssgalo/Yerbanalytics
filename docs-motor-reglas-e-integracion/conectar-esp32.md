@@ -1,9 +1,9 @@
 # Conectar el ESP32 real al backend
 
-Pasos para reemplazar el simulador por el nodo físico. Sale de leer el código; **todavía no se
-probó con hardware**, y el firmware modificado para el riego (`act_valvula.cpp`) **no se compiló**:
-no hay toolchain (`pio`, `platformio`, `arduino-cli`) en la PC de desarrollo. Compilar y probar
-es el primer paso pendiente.
+Pasos para reemplazar el simulador por el nodo físico. Sale de leer el código. **El nodo modular
+(sensado y actuadores) todavía no se probó con hardware**, y el firmware modificado para el riego
+(`act_valvula.cpp`) no se compiló: el primer paso pendiente es compilarlo y probarlo. Lo que sí se
+probó con hardware real (03/10/2026) es el **riel de la cámara**, con otro sketch (ver abajo).
 
 ## La idea en tres líneas
 
@@ -58,12 +58,17 @@ es el primer paso pendiente.
    - Actuador: publicar un comando a mano y mirar el ACK (ejemplos en
      `Desarrollo/embebido/README.md`).
 
-## El riel de la cámara (otro sketch)
+## El riel de la cámara (otro sketch, ya probado)
 
-Lo de arriba es para el nodo modular (sensado y actuadores). El **riel** lo maneja otro firmware,
+Lo de arriba es para el nodo modular. El **riel** lo maneja otro firmware,
 `Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/`, con su propio `config.h` y los tópicos
 `nursery/rail/command` y `nursery/rail/event`. La red y el broker son los mismos (pasos 1, 2 y 4).
-Librerías, configuración, flasheo, prueba con `mosquitto_pub` y problemas típicos: su
+
+Ese sketch se compiló y flasheó con `arduino-cli` (ahora instalado en esa PC) y se probó con el ESP32,
+el riel y el backend: una pasada completa disparada desde la sección Demo Expo del dashboard recorre
+los dos sectores y trae los diagnósticos. Quedan dos problemas de hardware (final de carrera de home
+y fuente del motor sin detección) y un gotcha del puerto serie en Linux. Librerías, configuración,
+flasheo, prueba con `mosquitto_pub` y esos problemas: su
 [README](../Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/README.md).
 
 ## Lo que va a fallar aunque la red ande

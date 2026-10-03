@@ -2,7 +2,7 @@
 
 Cómo viaja una lectura desde el nodo testigo hasta que el motor de reglas decide y actúa, y por
 dónde entra el diagnóstico de la cámara.
-Todo sale de leer el código (firmware, backend, simulador, servicio de inferencia); no se ejecutó nada.
+Todo sale de leer el código (firmware, backend, simulador, servicio de inferencia). Lo verificado en ejecución, y lo que no, está en `diferencias-motor-reglas-vs-reglas-v2.md` §7.
 El interior del motor está en `diferencias-motor-reglas-vs-reglas-v2.md`.
 
 Ejemplo que recorre los diagramas: **"MZ-2 se está secando"**.
@@ -74,15 +74,17 @@ al contexto. De dónde sale está en el diagrama 2.
 
 El riego es la excepción del paso 7: el Action Executor lo **encola** y lo abre el despacho (7b),
 de a 10 válvulas por macro-zona, en orden de numeración de sector. Antes de abrir cada una revalida
-con los datos de ese momento (nodo y humedad frescos, humedad bajo el bloqueo por saturación,
-sin bloqueo manual y, para el riego común, dentro de la ventana 06:00-18:00). La bomba y la
-mediasombra siguen saliendo directo desde el paso 7.
+con los datos de ese momento: humedad bajo el bloqueo por saturación, sin bloqueo manual y, para el
+riego común, dentro de la ventana 06:00-18:00, fuera de la pausa tras una aplicación, sin lluvia
+prevista y sin haber regado ya en el ciclo (para R-02, fuera de su tope de 12 h). Si el nodo no tiene
+lectura vigente **pausa** la ronda y la retoma al volver; cada solicitud vence a los dos ciclos de
+lectura. La bomba y la mediasombra siguen saliendo directo desde el paso 7.
 
 ## 1.b Captura y diagnóstico (la cámara)
 
 ```mermaid
 flowchart TD
-    PIDE["Quien pide la foto<br/>Hoy: a mano, desde el simulador<br/>PENDIENTE: planificador de pasadas y riel"]
+    PIDE["Quien pide la foto<br/>Pasada del riel: boton de Demo Expo<br/>o pedido manual desde el simulador"]
     CA["A. ORDEN DE CAPTURA<br/>POST /api/capturas/ordenes<br/>sector + posicion de riel"]
     CB["B. TELEFONO (PWA iPhone o app Android)<br/>Recibe la orden por SSE<br/>Saca la foto y la sube por REST"]
     FS[("Filesystem<br/>JPEG de cada captura")]
@@ -90,8 +92,10 @@ flowchart TD
     CD["D. ALTA DE DIAGNOSTICO<br/>POST /api/diagnosticos<br/>estado, confianza y severidad"]
     DB[("PostgreSQL")]
     MOTOR["Paso 5 del diagrama 1<br/>El motor lee el diagnostico del sector<br/>en su proxima evaluacion"]
+    PAS["PASADA DEL RIEL (backend)<br/>POST /api/pasadas<br/>IR_A 1, foto, IR_A 2, foto, HOME"]
+    RIEL["ESP32 del riel<br/>mueve el carro y avisa que llego"]
 
-    PIDE --> CA
+    PIDE -- "pedido manual" --> CA
     CA -- "orden por SSE" --> CB
     CB -- "sube el JPEG" --> FS
     FS --> CC
@@ -100,10 +104,19 @@ flowchart TD
     CB -- "INSERT captura" --> DB
     CD -- "INSERT diagnostico<br/>UPDATE sector" --> DB
     DB -- "diagnostico IA del sector" --> MOTOR
+    PIDE -- "pasada" --> PAS
+    PAS -- "emite la orden de cada foto" --> CA
+    PAS -- "MQTT nursery/rail/command" --> RIEL
+    RIEL -. "MQTT nursery/rail/event" .-> PAS
 
     style MOTOR fill:#efe3f7,stroke:#7b3fa0,stroke-width:2px
     linkStyle 8 stroke:#7b3fa0,stroke-width:3px
 ```
+
+La pasada va de punta a punta: el riel se mueve a la posición, el backend emite la orden de captura de ese
+sector y, cuando la foto llega, pasa a la siguiente; ~1 min después de la última el servicio de inferencia
+carga los diagnósticos. Probada con hardware real el 03/10/2026; límites de hardware conocidos en el
+README de `vivero_esp32_red`.
 
 Cargar un diagnóstico no dispara el motor: queda en el sector y las reglas lo leen en la
 siguiente evaluación (con la próxima lectura o en el barrido del watchdog).
@@ -126,6 +139,8 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 | Nodo → backend | `nursery/zone/{zona}/telemetry` | Nodo testigo o simulador | Backend |
 | Backend → nodo | `nursery/zone/{zona}/sector/{sector}/command` | Backend (el riego, el despacho; bomba y mediasombra, el Action Executor) | Nodo actuador del sector |
 | Nodo → backend | `nursery/zone/{zona}/sector/{sector}/ack` | Nodo actuador | **Nadie** (el backend no se suscribe) |
+| Backend → riel | `nursery/rail/command` | Backend (la pasada: `IR_A` 1 o 2, `HOME`) | ESP32 del riel (`vivero_esp32_red`) |
+| Riel → backend | `nursery/rail/event` | ESP32 del riel (`ACEPTADO`, `LLEGO`, `ERROR`) | Backend (`RielEventoReceiver`) |
 
 **Telemetría** (lo que manda el nodo testigo de MZ-2):
 
@@ -168,16 +183,17 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 | El backend procesa una lectura | Al instante, por cada mensaje (no hace polling) | `MqttTelemetryReceiver.processMessage` |
 | El motor corre por telemetría | Con cada mensaje, sobre todos los sectores de esa zona | `NurseryService.updateTelemetry`, `NurseryService.java:541-590` |
 | El motor corre por watchdog | 5 min (`intervaloEvaluacionMinutos`), sobre todo el vivero; no riega ni toca la cola | `NurseryWatchdog.java:83-104` |
-| El despacho de riego abre válvulas | 10 s: cierra lo vencido y abre los sectores que entren en el cupo (10 por zona) | `yerbanalytics.riego.despacho-intervalo-ms`, `application.properties:103`; `DespachoRiego.java:216-217` |
-| Se da un riego por terminado | A `ts + duración + 5 s`; el ESP32 cierra solo, el backend no manda orden de cierre | `DespachoRiego.java:81,324` |
+| El despacho de riego abre válvulas | 10 s: cierra lo vencido y abre los sectores que entren en el cupo (10 por zona) | `yerbanalytics.riego.despacho-intervalo-ms`, `application.properties:103`; `DespachoRiego.java:254-255` |
+| Se da un riego por terminado | A `ts + duración + 5 s`; el ESP32 cierra solo, el backend no manda orden de cierre | `DespachoRiego.java:104,436` |
 | Ciclo de lectura del riego | Franjas de `intervaloSensadoMinutos` (240 min, acotado a 60-360) desde las 02:00: 02, 06, 10, 14, 18, 22 h. Un riego común por sector y ciclo | `CicloLectura.java:35-55` |
 | Tope del déficit crítico (R-02) | 1 riego cada 12 h por sector (`riego.exceptuado-bloqueo`) | `DeficitCriticoRule.java:84-97` |
-| Una zona pasa a "sin señal" | Si la última lectura **o** la última humedad de sustrato tienen más de 90 s (editable) | Parámetro `seguridad.antiguedad-max-lectura` (`ParametrosSeguridad.java:13-16`, `StaleSensorRule.java:63-92`) |
+| Una zona pasa a "sin señal" | Si la última lectura **o** la última humedad de sustrato tienen más de 90 s (editable) | Parámetro `seguridad.antiguedad-max-lectura` (`ParametrosSeguridad.java:13-16`, `StaleSensorRule.java:64-93`) |
 | Se mide la efectividad de una acción | Revisión cada 30 s; compara 2 min después de actuar (un riego, desde que se abre la válvula) | `HistorialService.java:265-290` |
-| Pronóstico del clima | Caché de 15 min; un fallo se recuerda 60 s. La telemetría nunca espera: usa lo cacheado (hasta 4 TTL) y refresca aparte | `weather.cache-ttl-ms`, `weather.failure-cache-ttl-ms`, `application.properties:120,130`; `WeatherService.java:132-142` |
+| Pronóstico del clima | Caché de 15 min; un fallo se recuerda 60 s. La telemetría nunca espera: usa lo cacheado (hasta 4 TTL) y refresca aparte; se pide también al arrancar, con timeouts de 3 s y 5 s | `weather.cache-ttl-ms`, `weather.failure-cache-ttl-ms`, `application.properties:120,130`; `WeatherService.java:146-156` |
 | El dashboard se refresca | 5 s | `frontend/src/hooks/NurseryContext.tsx:30` |
-| Se pide una foto | Sólo cuando alguien emite la orden; no hay pasada automática | `CapturaController.java:70` |
-| Una orden sin imagen se reintenta | A los 60 s, hasta 3 intentos | `capturas.timeout-orden-seg`, `capturas.max-intentos`, `application.properties:140,142` |
+| Se pide una foto | Sólo cuando alguien emite la orden o dispara una pasada del riel; no hay pasada automática | `CapturaController.java:70`, `PasadaRielController.java:32` |
+| La pasada espera al riel | Sin evento a los 5 s republica el comando; al doble, `RIEL_SIN_RESPUESTA`. Movimiento 120 s, foto 240 s | `yerbanalytics.pasada.*`, `application.properties:189-195` |
+| Una orden sin imagen se reintenta | A los 60 s, hasta 3 intentos | `capturas.timeout-orden-seg`, `capturas.max-intentos`, `application.properties:145,147` |
 | El servicio de inferencia busca capturas | Cada 10 s; el backend se las entrega tras 1 min sin capturas nuevas | `servicio-inferencia/src/main.py:148`, `src/api.py:48` |
 
 ---
@@ -314,20 +330,21 @@ Lo resuelto va tachado; lo que sigue abierto, con su cita.
    el umbral de 90 s la zona pasa casi todo el tiempo "sin señal": el riego queda bloqueado
    (`StaleSensorRule`). Para probar el riego con el simulador hay que acortar ese intervalo. Ese
    parámetro no llega al firmware: el nodo real sigue en 30 s.
-4. **El ACK del actuador no lo escucha nadie.** El backend da la válvula por abierta cuando el
-   cliente MQTT aceptó el comando (`DespachoRiego.java:312-330`), no cuando el nodo confirmó. Ya no
+4. **El ACK del actuador no lo escucha nadie** (el backend sí escucha `nursery/rail/event`, pero eso es el riel, no los actuadores). El backend da la válvula por abierta cuando el
+   cliente MQTT aceptó el comando (`DespachoRiego.java:424-442`), no cuando el nodo confirmó. Ya no
    queda una válvula "enganchada" en "Regando": ese estado es `ts + duración + 5 s`
-   (`DespachoRiego.java:177-184`) y se reconstruye del historial tras un reinicio. Sigue abierto
+   (`DespachoRiego.java:214-221`) y se reconstruye del historial tras un reinicio. Sigue abierto
    que una orden perdida figure como riego hecho.
-5. **El comando de la bomba sale sin mililitros** (`ActionExecutor.java:118`) y el firmware lo
+5. **El comando de la bomba sale sin mililitros** (`ActionExecutor.java:130`) y el firmware lo
    rechaza con `dosis_invalida` (`embebido/actuacion/act_bomba.cpp:24-27`). La bomba además
    conserva el enganche "Dosificando": tras la primera dosificación de un sector no se publican
-   más comandos de bomba ni se registran más eventos "Insumo" (`ActionExecutor.java:114-119`), y
+   más comandos de bomba ni se registran más eventos "Insumo" (`ActionExecutor.java:126-131`), y
    la pausa de R-06 depende de esos eventos.
 6. **No hay validación de rangos en la ingesta** (`NurseryService.java:488-507`) ni
    usuario/contraseña en el broker.
-7. **Nadie pide las fotos solo.** No hay planificador de pasadas ni riel: las órdenes de captura
-   se emiten a mano desde el simulador. La spec v2 supone una pasada diaria a las 09:00.
+7. **Las fotos no se piden solas.** Hay pasada del riel a demanda (Demo Expo o `POST /api/pasadas`), pero
+   ningún planificador la dispara: la spec v2 supone una pasada diaria a las 09:00. Además, con el
+   final de carrera de home del riel en falso, entre pasadas hay que devolver el carro a home a mano.
 8. **La telemetría puede pisar el diagnóstico de la cámara.** En cada lectura, si el estado del
    sector es `ok` el backend escribe "Sano" 98 %, y si pasa a un estado no saludable sin
    diagnóstico previo le asigna uno fijo con 92 % de confianza (`NurseryService.java:548-566`).
@@ -339,10 +356,11 @@ Lo resuelto va tachado; lo que sigue abierto, con su cita.
     tope de 12 h. Una sonda que *deja de reportar* sí se detecta (la humedad vieja bloquea el
     riego). Antes de operar con plantines reales hay que resolverlo (E-01 + S-06 o un volumen
     máximo menor), según el diseño del cambio de riego.
-11. **R-03 no retira una ronda ya encolada.** Si el pronóstico anuncia lluvia después de que se
-    decidió una ronda, el despacho la completa. Pasa también en el primer mensaje tras arrancar,
-    sin pronóstico cacheado (`WeatherService.java:132-142`).
+11. **R-03 sin pronóstico no pospone.** Si falta el pronóstico (API caída o primer mensaje tras arrancar)
+    R-01 riega (O-01, a propósito). El pronóstico se pide al arrancar y el despacho vuelve a mirar la
+    lluvia antes de abrir cada válvula, así que una ronda encolada antes de que llegue el aviso de lluvia
+    ya no se completa (`riego/DespachoRiego.java:487-493`, `WeatherService.java:146-156`).
 12. **El cupo de 10 válvulas se llena por número de sector**, no por urgencia ni por humedad, y
     la cola vive en memoria: un reinicio la pierde y la siguiente telemetría vuelve a decidir.
-13. **El firmware nuevo no se compiló** en esta máquina y nada se probó con hardware: ver
-    `conectar-esp32.md`.
+13. **El firmware del nodo modular no se compiló** y nada de él se probó con hardware; el sketch del riel
+    (`vivero_esp32_red`) sí se compiló, flasheó y probó: ver `conectar-esp32.md`.
