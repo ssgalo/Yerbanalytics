@@ -12,7 +12,7 @@ diferencias que el simulador no deja ver y que dejarían la zona **siempre "sin 
    `seguridad.antiguedad-max-lectura` valía 30 s: un mensaje demorado ya la marcaba caída.
 3. **`NODO_SECTOR_ID` de ejemplo** (`S-001`) no existe: los sectores reales son `MZ-1-001`, y el
    backend publica los comandos a ese id.
-4. **Broker.** Mosquitto 2 sin `mosquitto.conf` arranca en modo "local only": el ESP32 no conecta.
+4. **Broker.** No había `mosquitto.conf`: que el broker aceptara conexiones de la LAN dependía del default de la imagen de Docker (al probarlo, las aceptaba). Se versiona la configuración para que quede explícita.
 
 ## What
 

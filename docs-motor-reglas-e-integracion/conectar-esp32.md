@@ -32,12 +32,11 @@ probó con hardware**.
 
    Si la zona no existe, el backend descarta el mensaje sin avisar.
 
-4. **Abrir el broker a la red.**
-   - Firewall de la PC: permitir el 1883 entrante.
-   - Mosquitto 2 sin configuración acepta sólo conexiones locales. El compose ya monta
-     `Desarrollo/mosquitto/mosquitto.conf` (`listener 1883`, `allow_anonymous true`, sin
-     autenticación: sólo para una LAN de confianza). Si el contenedor ya estaba corriendo,
-     recrearlo para que tome el archivo: `docker compose up -d --force-recreate mosquitto`.
+4. **Broker abierto a la red.** Ya está resuelto en esta PC (verificado el 03/10/2026):
+   - El compose monta `Desarrollo/mosquitto/mosquitto.conf` (`listener 1883`,
+     `allow_anonymous true`; sin autenticación, sólo para una LAN de confianza) y el broker
+     responde por la IP de la red.
+   - El firewall (`ufw`) está deshabilitado. En otra PC, permitir el 1883 entrante.
 
 5. **Levantar todo.** `docker compose up -d mosquitto yerbanalytics-db`, después el backend
    (`./mvnw spring-boot:run`) y el dashboard. **El simulador apagado**, para que no publique

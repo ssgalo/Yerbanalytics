@@ -12,7 +12,7 @@
 
 ## 3. Broker
 - [x] 3.1 `Desarrollo/mosquitto/mosquitto.conf` y montaje en `docker-compose.yml`
-- [ ] 3.2 Recrear el contenedor (`docker compose up -d --force-recreate mosquitto`) — lo hace quien orquesta
+- [x] 3.2 Recrear el contenedor y verificar que el broker responde por la IP de la LAN (CONNACK desde `192.168.1.64`)
 
 ## 4. Documentación
 - [x] 4.1 `conectar-esp32.md` y `circuito-sensado-a-motor.md` §5

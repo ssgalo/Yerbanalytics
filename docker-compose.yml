@@ -13,7 +13,7 @@ services:
       # puerto sin nada detrás, y chocaba con otros servicios de la máquina.
       - "1883:1883"
     volumes:
-      # Sin este archivo Mosquitto 2 sólo acepta conexiones locales y el ESP32 no entra.
+      # Deja explícito que el broker escucha en la LAN sin autenticación (lo necesita el ESP32).
       - ./Desarrollo/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
