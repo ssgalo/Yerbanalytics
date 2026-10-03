@@ -8,6 +8,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.Timeout;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -157,5 +163,46 @@ class OpenMeteoWeatherClientTest {
         server.expect(requestTo(containsString("/forecast"))).andRespond(withServerError());
 
         assertThat(client.fetch()).isNull();
+    }
+
+    // ------------------------------------------------------------------ timeouts HTTP
+
+    @Test
+    @Timeout(15)
+    @DisplayName("si la API no responde, la lectura vence por timeout y fetch() devuelve null (no cuelga el hilo de refresco)")
+    void unaApiQueNoRespondeVencePorTimeoutDeLectura() throws Exception {
+        HttpServer colgado = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        colgado.createContext("/", exchange -> {
+            try {
+                Thread.sleep(12_000);                    // acepta la conexión y no contesta
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        colgado.start();
+        try {
+            OpenMeteoWeatherClient lento = new OpenMeteoWeatherClient(RestClient.builder(),
+                    "http://127.0.0.1:" + colgado.getAddress().getPort(), -27.36, -55.90, RELOJ, 500, 700);
+
+            long desde = System.nanoTime();
+            WeatherForecast resultado = lento.fetch();
+            long ms = (System.nanoTime() - desde) / 1_000_000;
+
+            assertThat(resultado).isNull();
+            assertThat(ms).as("vence a los ~700 ms de lectura, no espera a la API").isLessThan(5_000);
+        } finally {
+            colgado.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("la fábrica de pedidos lleva los timeouts de conexión y de lectura configurados")
+    void laFabricaLlevaLosTimeouts() {
+        SimpleClientHttpRequestFactory f = OpenMeteoWeatherClient.fabricaConTimeouts(3_000, 5_000);
+
+        assertThat(ReflectionTestUtils.getField(f, "connectTimeout")).isEqualTo(3_000);
+        assertThat(ReflectionTestUtils.getField(f, "readTimeout")).isEqualTo(5_000);
     }
 }

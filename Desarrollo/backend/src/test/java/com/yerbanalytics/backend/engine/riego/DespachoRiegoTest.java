@@ -1138,4 +1138,36 @@ class DespachoRiegoTest {
         assertThat(sectoresPublicados()).containsExactly("MZ-2-002");
         assertThat(cola.contiene("MZ-2-001")).as("sin saber si ya regó ni si hay pausa: espera").isTrue();
     }
+
+    // ------------------------------------------------------------------ una zona que falla no corta a las demás
+
+    @Test
+    void unaExcepcionEnUnaZonaNoCortaElDespachoDeLasDemas() {
+        pedir("MZ-1", 1, 600);
+        pedir("MZ-2", 1, 600);
+        pedir("MZ-3", 1, 600);
+        when(sectorRepository.findById("MZ-1-001")).thenThrow(new IllegalStateException("la base explotó en MZ-1"));
+
+        despacho.tick();                                         // MZ-1 va primero (orden por id) y explota
+
+        verify(publisher, times(1)).publicar(eq("MZ-2"), any(), any(), any(), any());
+        verify(publisher, times(1)).publicar(eq("MZ-3"), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-1-001")).as("la solicitud de la zona que falló no se pierde").isTrue();
+    }
+
+    @Test
+    void laZonaQueFallaSeReintentaEnElTickSiguiente() {
+        pedir("MZ-1", 1, 600);
+        when(sectorRepository.findById("MZ-1-001"))
+                .thenThrow(new IllegalStateException("la base explotó"))
+                .thenAnswer(i -> Optional.of(sector("MZ-1-001")));
+
+        despacho.tick();
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+
+        reloj.avanzar(Duration.ofSeconds(10));
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(eq("MZ-1"), eq("MZ-1-001"), any(), any(), any());
+    }
 }

@@ -69,10 +69,11 @@ columnas. También copia el `ideal_min` de `humSus` como override de `riego.umbr
 difiere y no hay uno: antes el riego usaba ese umbral y ahora usa el del catálogo. Es idempotente y
 trae, comentado, el bloque inverso (`ADD COLUMN … DEFAULT …`) para un rollback del código.
 
-> **Ojo:** el script compara ese `ideal_min` contra **42**, la fábrica de aquel momento; la fábrica
-> actual de `riego.umbral-humedad` es **45** (ver más abajo). Una base con `ideal_min = 42` no recibe
-> override y su umbral de riego pasa de 42 a 45. Si querés conservar 42, cargalo después por
-> `PUT /api/rules/parametros`.
+> **Ojo:** el script compara ese `ideal_min` contra la fábrica **actual** de `riego.umbral-humedad`,
+> **45** (era 42; ver más abajo). Una base con `ideal_min = 42` (el default del seed) SÍ recibe el
+> override 42, así que su umbral de riego se conserva; sólo una base con `ideal_min = 45` queda sin
+> override (coincide con la fábrica). Una base ya migrada con la comparación vieja (contra 42) no
+> recibió override y pasó de 42 a 45: cargá 42 por `PUT /api/rules/parametros` si querés conservarlo.
 >
 > `riego.tiempo-max-apertura` (uno de los dos parámetros que mueve este script) ya no existe en el
 > catálogo: lo limpia el script siguiente.
@@ -187,17 +188,22 @@ abren la válvula. Un servicio de despacho (`engine/riego/DespachoRiego`) corre 
 `yerbanalytics.riego.despacho-intervalo-ms` (10 000 ms), abre hasta `riego.sectores-simultaneos` (10)
 válvulas por macro-zona en orden de numeración de sector y publica `valve ON` con
 `durationSec = ceil(volumen / caudal × 3600)`, con tope de 1200 s. Antes de abrir cada válvula
-**revalida con los datos de ese momento**: lectura y humedad de la zona vigentes, humedad bajo el
-bloqueo por saturación, sin bloqueo manual y, para el riego común, hora dentro de la ventana. Lo
-que no pasa se descarta de la cola y deja una alerta WARNING.
+**revalida con los datos de ese momento**, con los mismos parámetros que las reglas: sin bloqueo
+manual, humedad bajo el bloqueo por saturación y, para el riego común (R-01), hora dentro de la
+ventana, sin aplicación de insumo reciente (R-06), sin lluvia prevista (R-03, pronóstico cacheado) y
+sin riego en este ciclo; para R-02, el tope de horas. Lo que no pasa se descarta de la cola y deja una
+alerta WARNING. Si la **lectura o la humedad no están vigentes** el despacho **pausa** (no abre nada y
+conserva la ronda) en vez de descartarla, y la retoma cuando vuelve el nodo; para que no queden
+solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura contando el de su pedido.
 
 - Un sector recibe a lo sumo **un riego común por ciclo de lectura** (franjas de
   `intervaloSensadoMinutos`, acotado a 60-360 min, ancladas a las 02:00).
 - El déficit crítico (R-02) riega a cualquier hora con el volumen máximo, con un tope de 1 riego cada
   12 h por sector.
 - Una ronda encolada **se completa** aunque la humedad se recupere: sólo la retira una cancelación de
-  seguridad (saturación, bloqueo manual, sensor sin datos; ventana cerrada o pausa por aplicación,
-  para el riego común). La lluvia pronosticada después de decidir **no** la retira.
+  seguridad (saturación, bloqueo manual; ventana cerrada o pausa por aplicación, para el riego común) o
+  la revalidación del despacho (lluvia pronosticada después de decidir, ya regó en el ciclo). El sensor
+  sin datos no la retira: la **pausa**.
 - La cola y lo que está regando están en memoria. Un reinicio pierde lo pendiente y reconstruye lo
   abierto del historial; la siguiente telemetría vuelve a decidir.
 - El estado de la válvula del dashboard (`Regando` / `En cola` / `Cerrada`) lo deriva el despacho; el
@@ -209,6 +215,9 @@ que no pasa se descarta de la cola y deja una alerta WARNING.
 > lo lee. Una sonda que deja de reportar sí se detecta (la humedad vieja bloquea el riego). Es seguro
 > con el simulador; para campo, antes hay que implementar E-01 + S-06 o bajar
 > `riego.volumen-max-evento` y vigilar el historial.
+
+El pronóstico (Open-Meteo) se pide con timeouts HTTP (`yerbanalytics.weather.connect-timeout-ms`,
+3 s, y `read-timeout-ms`, 5 s) y se precalienta al arrancar; un refresco colgado se reemplaza a los 60 s.
 
 Otros límites conocidos: R-06 depende de los eventos "Insumo" y la bomba conserva el enganche
 `Dosificando`; el cupo se llena por número de sector, no por urgencia. El detalle de qué cubre y qué

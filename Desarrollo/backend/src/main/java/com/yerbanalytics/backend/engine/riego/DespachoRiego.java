@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -270,8 +271,16 @@ public class DespachoRiego implements ConsumidorParametros {
         Set<String> zonasBloqueadas = bloqueos.stream().map(ManualLockEntity::getZonaId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
 
-        for (String zonaId : zonas) {
-            despacharZona(zonaId, ahora, cupo, minutosDeCiclo, zonasBloqueadas.contains(zonaId), sectoresBloqueados);
+        // En orden de id (determinista) y aislando cada zona: una excepción en una (la base, un dato raro) no puede
+        // cortar el despacho de las demás, que siguen con el agua que les toca. La solicitud de la zona que falló
+        // sigue en la cola y se reintenta en el próximo tick.
+        for (String zonaId : new TreeSet<>(zonas)) {
+            try {
+                despacharZona(zonaId, ahora, cupo, minutosDeCiclo, zonasBloqueadas.contains(zonaId), sectoresBloqueados);
+            } catch (RuntimeException e) {
+                log.error("Zona {}: falló el despacho de riego en este tick; las demás zonas siguen y esta se reintenta.",
+                        zonaId, e);
+            }
         }
     }
 

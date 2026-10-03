@@ -766,3 +766,26 @@ marca no rompía nada); ahora cada regla lo prueba y `RiegoIntegracionTest` lo p
 - Sin ACK: "publicado" es entregado al cliente MQTT.
 - La bomba conserva el enganche "Dosificando" (R-06 depende de eventos "Insumo", rama de insumos fuera de alcance).
 - La tarjeta "Clima y riesgo" del panel usa otro criterio que el motor para la lluvia (probabilidad de la hora actual).
+
+### Endurecimiento de pronóstico, estado en memoria y migración (C12–C14)
+
+**C12 · Timeouts del pronóstico.** `OpenMeteoWeatherClient` no configuraba timeouts HTTP: con la API sin responder el hilo
+de refresco quedaba colgado para siempre, `refrescando` no se liberaba y el pronóstico pasaba a `null` en silencio. Ahora
+la fábrica de pedidos lleva `yerbanalytics.weather.connect-timeout-ms` (3 s) y `read-timeout-ms` (5 s). Además un refresco
+fallido siempre libera el flag (`finally`) y uno colgado se reemplaza pasados `WeatherService.REFRESCO_MAX` (60 s): el
+refresco usa un hilo por consulta (no uno solo) y el flag es una referencia por identidad para que el hilo viejo, si
+vuelve, no pise al nuevo.
+
+**C13 · Las marcas en memoria del executor se aplican tras el commit.** `ActionExecutor` marcaba "inacción registrada" y
+"alerta del ciclo enviada" antes del commit de la transacción de `updateTelemetry` / del barrido: con un rollback la
+memoria quedaba diciendo "registrado" y esas filas no se volvían a escribir. Con una transacción activa las marcas
+quedan en un estado pendiente por transacción (que también deduplica las 100 evaluaciones de la zona dentro de ella) y se
+aplican en `afterCommit`; en un rollback se descartan; sin transacción se aplican de inmediato. **Sin corregir:** las
+solicitudes ya encoladas en la `ColaRiego` dentro de una transacción que revierte siguen en la cola (la cola no participa
+de la transacción): el despacho las revalida con los datos guardados, vencen, y la telemetría siguiente las vuelve a decidir.
+
+**C14 · Migración del umbral de riego.** `migracion-catalogo-parametros.sql` copiaba el `ideal_min` de `humSus` como override
+sólo "si difiere de 42"; con la fábrica nueva en 45, una base con 42 (el default del seed) no recibía override y pasaba de
+42 a 45 sin aviso. Ahora compara contra la fábrica actual (45). Menores: `DailyDoseLimitRule` usa `ctx.now()` (el reloj
+inyectado) y cita el umbral real (`insumo.max-dosis-24h`, en dosis) en lugar del campo viejo en ml; `DespachoRiego.tick()`
+aísla cada zona con un `try/catch` y las recorre en orden de id.

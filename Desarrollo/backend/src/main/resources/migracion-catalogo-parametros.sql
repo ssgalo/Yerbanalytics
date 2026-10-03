@@ -20,8 +20,12 @@
 --    · `umbral_metrica.ideal_min` de `humSus` → parámetro `riego.umbral-humedad` (%)
 --    Antes `IrrigationRule` regaba por debajo del `ideal_min` de la humedad de
 --    sustrato (editable en la configuración agronómica); ahora lo hace por
---    `riego.umbral-humedad` (fábrica 42, rango 35-60). Si en la base ese
---    `ideal_min` es distinto de 42, sin copiarlo el riego cambiaría en silencio.
+--    `riego.umbral-humedad` (rango 35-60). La fábrica de ese parámetro era 42 y
+--    HOY es 45 (cambio implement-reglas-riego): se compara contra la fábrica
+--    ACTUAL (45). Si en la base ese `ideal_min` es distinto de 45 —incluido el
+--    42 que traía el seed—, sin copiarlo el riego cambiaría en silencio de 42
+--    (o del valor editado) a 45; con el override se conserva el valor que la
+--    base ya tenía.
 --    El `ideal_min` sigue existiendo como umbral de estado (colorea el mapa); lo
 --    que se copia es su valor, una sola vez, a un override.
 --
@@ -85,7 +89,7 @@ BEGIN
 END
 $$;
 
--- Umbral de riego: copiar el `ideal_min` de humSus si difiere de la fábrica (42) y todavía
+-- Umbral de riego: copiar el `ideal_min` de humSus si difiere de la fábrica ACTUAL (45; era 42) y todavía
 -- no hay un override. Idempotente: con el override ya creado (por esto o por la API) no hace nada.
 DO $$
 DECLARE
@@ -97,7 +101,7 @@ BEGIN
         RETURN;
     END IF;
     acotado := LEAST(GREATEST(ROUND(original::numeric), 35), 60);
-    IF acotado <> 42
+    IF acotado <> 45   -- fábrica actual de riego.umbral-humedad (ParametrosRiego.UMBRAL_HUMEDAD)
        AND NOT EXISTS (SELECT 1 FROM parametro_regla WHERE clave = 'riego.umbral-humedad') THEN
         IF acotado <> original::numeric THEN
             RAISE NOTICE 'riego.umbral-humedad: ideal_min de humSus = % se acotó a % (rango 35-60, sin decimales).',

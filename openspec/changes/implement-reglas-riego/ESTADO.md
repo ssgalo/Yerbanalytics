@@ -13,5 +13,7 @@
 - Correcciones C8-C11 (pausa en vez de descarte, vencimiento de solicitudes, revalidación de R-06/R-03/ciclo/tope en el
   despacho, R-04 antes de la guarda de ciclo) — hechas (commit `fix(backend): pausar la ronda de riego en vez de descartarla
   y revalidar las precondiciones de R-01`); detalle en `design.md`.
+- Correcciones C12-C14 (timeouts del pronóstico, estado en memoria tras el commit, migración del umbral, dosis diaria, zona aislada
+  en el despacho) — hechas (commit `fix(backend): timeouts del pronóstico, estado en memoria tras el commit y migración del umbral`).
 - Sin verificar: arranque real de Spring con el despacho contra el broker; `@Scheduled(scheduler="despachoScheduler")` en vivo;
   el despacho revalidando contra la base real (los tests usan repositorios falsos).

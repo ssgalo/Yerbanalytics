@@ -121,4 +121,34 @@ class DailyDoseLimitRuleTest {
     void abortInsumoEsBloqueante() {
         assertThat(ActionType.ABORT_INSUMO.isBlocking()).isTrue();
     }
+
+    @Test
+    @DisplayName("el motivo cita el máximo REAL del catálogo en dosis, no el campo viejo en ml de la configuración operativa")
+    void elMotivoCitaElUmbralDelCatalogo() {
+        when(historialRepository.countByTipoAndSectorAndPeriod(
+                eq("MZ-1-010"), eq("Insumo"), anyLong())).thenReturn(3L);
+        // defaultConfig() trae insumoDosisMax24hMl = 50: no debe aparecer en el texto.
+        RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
+
+        List<RuleAction> acciones = rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosInsumo.MAX_DOSIS_24H, "3")));
+        List<RuleAction> deFabrica = rule.evaluate(ctx, ev(rule));
+
+        assertThat(acciones.get(0).type()).isEqualTo(ActionType.ABORT_INSUMO);
+        assertThat(acciones.get(0).motivo()).contains("máx. configurado: 3 dosis").doesNotContain("ml").doesNotContain("50");
+        assertThat(deFabrica.get(0).motivo()).contains("máx. configurado: 1 dosis").doesNotContain(" ml");
+    }
+
+    @Test
+    @DisplayName("la ventana de 24 h se cuenta desde la hora del contexto (el reloj del vivero), no desde System.currentTimeMillis()")
+    void laVentanaSeCuentaDesdeLaHoraDelContexto() {
+        java.time.Instant ahora = java.time.Instant.parse("2020-01-01T12:00:00Z");   // lejos del reloj real
+        when(historialRepository.countByTipoAndSectorAndPeriod(eq("MZ-1-010"), eq("Insumo"), anyLong())).thenReturn(0L);
+        RuleContext ctx = new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
+                "ok", ahora, null, false);
+
+        evaluar(rule, ctx);
+
+        org.mockito.Mockito.verify(historialRepository).countByTipoAndSectorAndPeriod(
+                "MZ-1-010", "Insumo", ahora.toEpochMilli() - 24L * 3_600_000L);
+    }
 }

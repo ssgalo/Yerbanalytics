@@ -82,7 +82,8 @@ public class DailyDoseLimitRule implements Rule {
                     "Sin configuración operativa disponible — límite de dosis no verificado."));
         }
 
-        long since = System.currentTimeMillis() - MS_PER_24H;
+        // La hora del contexto (el reloj inyectado del vivero), no la del sistema: así la regla es testeable y coherente.
+        long since = ctx.now().toEpochMilli() - MS_PER_24H;
         long dosesIn24h = historialRepository.countByTipoAndSectorAndPeriod(
                 ctx.sector().getId(), "Insumo", since);
 
@@ -90,9 +91,9 @@ public class DailyDoseLimitRule implements Rule {
                 ParametrosInsumo.MAX_DOSIS_24H)) {
             String reason = String.format(
                     "El sector %s ya recibió %d dosificación(es) de insumo en las últimas 24 h. " +
-                    "Límite diario alcanzado (máx. configurado: %.0f ml). " +
+                    "Límite diario alcanzado (máx. configurado: %.0f dosis). " +
                     "Dosificación autónoma bloqueada.",
-                    ctx.sector().getId(), dosesIn24h, config.getInsumoDosisMax24hMl());
+                    ctx.sector().getId(), dosesIn24h, ev.numero(ParametrosInsumo.MAX_DOSIS_24H));
             return List.of(RuleAction.of(ActionType.ABORT_INSUMO, NAME, reason));
         }
 

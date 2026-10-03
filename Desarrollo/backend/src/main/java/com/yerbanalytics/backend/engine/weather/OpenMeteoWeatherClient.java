@@ -2,7 +2,9 @@ package com.yerbanalytics.backend.engine.weather;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -61,17 +63,51 @@ public class OpenMeteoWeatherClient implements WeatherClient {
     private final double lon;
     private final Clock reloj;
 
+    @Autowired
     public OpenMeteoWeatherClient(
             RestClient.Builder restClientBuilder,
             @Value("${yerbanalytics.weather.lat:-25.29}") double lat,
             @Value("${yerbanalytics.weather.lon:-57.64}") double lon,
-            Clock reloj) {
+            Clock reloj,
+            @Value("${yerbanalytics.weather.connect-timeout-ms:3000}") int connectTimeoutMs,
+            @Value("${yerbanalytics.weather.read-timeout-ms:5000}") int readTimeoutMs) {
+        this(restClientBuilder, BASE_URL, lat, lon, reloj, connectTimeoutMs, readTimeoutMs);
+    }
+
+    /** Con URL y timeouts explícitos (los tests apuntan a un servidor local que se cuelga). */
+    OpenMeteoWeatherClient(RestClient.Builder restClientBuilder, String baseUrl, double lat, double lon, Clock reloj,
+                           int connectTimeoutMs, int readTimeoutMs) {
+        this.restClient = restClientBuilder
+                .requestFactory(fabricaConTimeouts(connectTimeoutMs, readTimeoutMs))
+                .baseUrl(baseUrl)
+                .build();
+        this.lat = lat;
+        this.lon = lon;
+        this.reloj = reloj;
+    }
+
+    /**
+     * Sin builder con fábrica propia: para los tests que enlazan un {@code MockRestServiceServer} al builder (el
+     * servidor falso trae su fábrica y no hay red que esperar).
+     */
+    OpenMeteoWeatherClient(RestClient.Builder restClientBuilder, double lat, double lon, Clock reloj) {
         this.restClient = restClientBuilder
                 .baseUrl(BASE_URL)
                 .build();
         this.lat = lat;
         this.lon = lon;
         this.reloj = reloj;
+    }
+
+    /**
+     * Fábrica de pedidos con timeouts de conexión y de lectura. Sin ellos el cliente HTTP espera para siempre: el
+     * hilo de refresco se cuelga, el pronóstico no se renueva y R-03 pasa a "sin dato" en silencio.
+     */
+    static SimpleClientHttpRequestFactory fabricaConTimeouts(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory fabrica = new SimpleClientHttpRequestFactory();
+        fabrica.setConnectTimeout(connectTimeoutMs);
+        fabrica.setReadTimeout(readTimeoutMs);
+        return fabrica;
     }
 
     /**

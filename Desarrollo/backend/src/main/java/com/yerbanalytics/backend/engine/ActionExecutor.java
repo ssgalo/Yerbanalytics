@@ -8,8 +8,11 @@ import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,15 @@ import java.util.regex.Pattern;
  * ese sector en esa evaluación, así el DAG del Historial (que pinta los nodos con las filas del sector en ese minuto)
  * sigue teniendo todas las reglas. El barrido tampoco repite lo que ya registró la telemetría. Es estado en memoria:
  * tras un reinicio se registra una vez más y {@link #reiniciarEstado()} lo limpia al regenerar la topología.
+ *
+ * <p><b>Ese estado se marca recién tras el commit.</b> {@code updateTelemetry} y el barrido evalúan dentro de una
+ * transacción: si se marcara "inacción registrada" o "alerta del ciclo enviada" antes y la transacción revirtiera, la
+ * memoria diría "registrado" para filas que no existen y no se volverían a escribir. Con una transacción activa las
+ * marcas quedan pendientes (una por transacción, también para deduplicar los 100 sectores de la zona dentro de ella) y
+ * se aplican en {@code afterCommit}; en un rollback se descartan. Sin transacción se aplican de inmediato. Lo que NO
+ * se revierte con la transacción son las solicitudes ya encoladas en la {@link ColaRiego}: una lectura que no se guardó
+ * puede dejar una ronda encolada, pero el despacho la revalida con los datos guardados (y vence), y la próxima
+ * telemetría la vuelve a decidir; deshacerlas exigiría que la cola participe de la transacción.
  *
  * <p>El tópico de comando tiene la forma {@code nursery/zone/{zonaId}/sector/{sectorId}/command},
  * alineado con el contrato definido en {@code embebido/comun/contrato.h}.
@@ -189,18 +201,79 @@ public class ActionExecutor {
         String sectorId = ctx.sector().getId();
         boolean telemetria = origen == OrigenEvaluacion.TELEMETRIA;
         Map<String, Map<String, String>> propio = telemetria ? inaccionTelemetria : inaccionBarrido;
-        if (actual.equals(propio.get(sectorId))) {
+        Pendiente pendiente = pendiente();
+        Map<String, String> previa = ultimaInaccion(telemetria, sectorId, pendiente);
+        if (actual.equals(previa)) {
             return;
         }
         // El barrido no repite lo que la telemetría ya dejó asentado.
-        if (!telemetria && actual.equals(inaccionTelemetria.get(sectorId))) {
-            propio.put(sectorId, actual);
+        if (!telemetria && actual.equals(ultimaInaccion(true, sectorId, pendiente))) {
+            marcarInaccion(false, sectorId, actual, pendiente);
             return;
         }
         for (RuleAction a : inacciones) {
             historialService.registrarInaccion(ctx.sector(), a.type(), a.ruleName(), a.motivo());
         }
-        propio.put(sectorId, actual);
+        marcarInaccion(telemetria, sectorId, actual, pendiente);
+    }
+
+    private Map<String, String> ultimaInaccion(boolean telemetria, String sectorId, Pendiente pendiente) {
+        if (pendiente != null) {
+            Map<String, String> enVuelo = (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).get(sectorId);
+            if (enVuelo != null) {
+                return enVuelo;
+            }
+        }
+        return (telemetria ? inaccionTelemetria : inaccionBarrido).get(sectorId);
+    }
+
+    /** Marca la decisión como registrada: ya, o recién tras el commit si hay una transacción en curso. */
+    private void marcarInaccion(boolean telemetria, String sectorId, Map<String, String> actual, Pendiente pendiente) {
+        if (pendiente != null) {
+            (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).put(sectorId, actual);
+        } else {
+            (telemetria ? inaccionTelemetria : inaccionBarrido).put(sectorId, actual);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Estado pendiente de la transacción en curso
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lo que se marcó como "ya escrito" durante una transacción que todavía no terminó. Se aplica al estado real en
+     * {@code afterCommit} y se descarta en un rollback. Una instancia por transacción, atada al hilo.
+     */
+    private final class Pendiente implements TransactionSynchronization {
+        final Map<String, Instant> alertas = new HashMap<>();
+        final Map<String, Map<String, String>> inaccionTelemetria = new HashMap<>();
+        final Map<String, Map<String, String>> inaccionBarrido = new HashMap<>();
+
+        @Override
+        public void afterCommit() {
+            alertasPorCiclo.putAll(alertas);
+            ActionExecutor.this.inaccionTelemetria.putAll(inaccionTelemetria);
+            ActionExecutor.this.inaccionBarrido.putAll(inaccionBarrido);
+        }
+
+        @Override
+        public void afterCompletion(int status) {
+            TransactionSynchronizationManager.unbindResourceIfPossible(ActionExecutor.this);
+        }
+    }
+
+    /** El estado pendiente de la transacción en curso, o {@code null} si no hay una (las marcas se aplican de inmediato). */
+    private Pendiente pendiente() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return null;
+        }
+        Pendiente p = (Pendiente) TransactionSynchronizationManager.getResource(this);
+        if (p == null) {
+            p = new Pendiente();
+            TransactionSynchronizationManager.bindResource(this, p);
+            TransactionSynchronizationManager.registerSynchronization(p);
+        }
+        return p;
     }
 
     // -------------------------------------------------------------------------
@@ -276,21 +349,24 @@ public class ActionExecutor {
         Instant ciclo = ctx.riego().inicioCiclo() != null ? ctx.riego().inicioCiclo()
                 : CicloLectura.inicio(ctx.now(), intervaloSensado(ctx));
         String clave = ctx.zona().getId() + "|" + action.ruleName();
-        Instant previo = alertasPorCiclo.put(clave, ciclo);
+        Pendiente pendiente = pendiente();
+        Instant previo = pendiente != null && pendiente.alertas.containsKey(clave)
+                ? pendiente.alertas.get(clave) : alertasPorCiclo.get(clave);
         if (ciclo.equals(previo)) {
-            return;   // ya se avisó en este ciclo
+            return;   // ya se avisó en este ciclo (o en esta misma transacción, todavía sin confirmar)
         }
         try {
             historialService.registrarAlerta(ctx.zona().getId(), ctx.zona().getName(), action.ruleName(),
                     detalle, ctx.now().toEpochMilli());
         } catch (RuntimeException e) {
-            // Que no quede marcada como avisada: la próxima evaluación del ciclo lo reintenta.
-            if (previo == null) {
-                alertasPorCiclo.remove(clave, ciclo);
-            } else {
-                alertasPorCiclo.put(clave, previo);
-            }
+            // Sin marca: la próxima evaluación del ciclo lo reintenta.
             log.error("Zona {}: no se pudo registrar la alerta de {}.", ctx.zona().getId(), action.ruleName(), e);
+            return;
+        }
+        if (pendiente != null) {
+            pendiente.alertas.put(clave, ciclo);   // recién tras el commit pasa a alertasPorCiclo
+        } else {
+            alertasPorCiclo.put(clave, ciclo);
         }
     }
 

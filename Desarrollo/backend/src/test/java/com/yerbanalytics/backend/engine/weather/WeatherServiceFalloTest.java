@@ -181,4 +181,60 @@ class WeatherServiceFalloTest {
 
         assertThat(servicio.getForecastSinEspera()).isNull();
     }
+
+    // ------------------------------------------------------------------ un refresco fallido o colgado no traba los siguientes
+
+    @Test
+    @DisplayName("un refresco que lanza excepción libera 'refrescando': pasado el TTL del fallo se vuelve a intentar")
+    void unRefrescoQueLanzaLiberaElRefresco() {
+        AtomicInteger intentos = new AtomicInteger();
+        WeatherClient lanza = () -> {
+            intentos.incrementAndGet();
+            throw new IllegalStateException("la API explotó");
+        };
+        WeatherService s = new WeatherService(lanza, TTL, 3, 0, TTL_FALLO, reloj, pendientes::add);
+
+        assertThat(s.getForecastSinEspera()).isNull();
+        correrPendientes();                                       // el refresco lanza: no tira el hilo ni deja el flag
+        assertThat(intentos.get()).isEqualTo(1);
+
+        reloj.avanzar(Duration.ofSeconds(61));
+        s.getForecastSinEspera();
+        assertThat(pendientes).as("el refresco anterior se liberó: este se lanza").hasSize(1);
+    }
+
+    @Test
+    @DisplayName("un refresco colgado (cliente que no vuelve) no traba los siguientes: pasado el plazo se lanza otro")
+    void unRefrescoColgadoSeReemplazaPasadoElPlazo() throws Exception {
+        java.util.concurrent.CountDownLatch colgado = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch segundoIntento = new java.util.concurrent.CountDownLatch(2);
+        WeatherClient cuelga = () -> {
+            segundoIntento.countDown();
+            try {
+                colgado.await();                                  // nunca vuelve (hasta el final del test)
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        };
+        java.util.concurrent.ExecutorService hilos = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "test-refresco");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            WeatherService s = new WeatherService(cuelga, TTL, 1, 0, 0, reloj, hilos);
+
+            s.getForecastSinEspera();                             // lanza el refresco y se cuelga
+            s.getForecastSinEspera();                             // dentro del plazo: no lanza otro
+            reloj.avanzar(WeatherService.REFRESCO_MAX.plusSeconds(1));
+            s.getForecastSinEspera();                             // pasado el plazo: toma el relevo
+
+            assertThat(segundoIntento.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("se lanzó un segundo refresco aunque el primero sigue colgado").isTrue();
+        } finally {
+            colgado.countDown();
+            hilos.shutdownNow();
+        }
+    }
 }

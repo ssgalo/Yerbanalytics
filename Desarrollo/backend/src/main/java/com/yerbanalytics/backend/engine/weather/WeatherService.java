@@ -9,10 +9,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -56,6 +56,13 @@ public class WeatherService {
 
     /** Un pronóstico vencido se sigue usando (mientras se refresca aparte) hasta esta cantidad de TTL. */
     static final int FACTOR_USABLE_VENCIDO = 4;
+    /**
+     * Cuánto se espera a un refresco en vuelo antes de darlo por colgado y lanzar otro. Con los timeouts HTTP del
+     * cliente un refresco normal dura a lo sumo unos 25 s (3 intentos de hasta 3 s de conexión y 5 s de lectura, más el
+     * backoff); pasado este plazo se asume que el hilo quedó trabado (p. ej. un cliente sin timeout) y deja de bloquear
+     * a los siguientes.
+     */
+    static final Duration REFRESCO_MAX = Duration.ofSeconds(60);
     private static final long SIN_FALLO = Long.MIN_VALUE;
 
     private final WeatherClient client;
@@ -71,7 +78,11 @@ public class WeatherService {
     private final AtomicReference<WeatherForecast> cache = new AtomicReference<>(null);
     /** Cuándo (epoch ms) falló por última vez una consulta completa; {@link #SIN_FALLO} si no hay fallo vigente. */
     private final AtomicLong ultimoFalloMs = new AtomicLong(SIN_FALLO);
-    private final AtomicBoolean refrescando = new AtomicBoolean(false);
+    /** El refresco en vuelo (identidad, no valor), o {@code null}. Un refresco colgado se reemplaza pasado {@link #REFRESCO_MAX}. */
+    private final AtomicReference<Refresco> refrescando = new AtomicReference<>();
+
+    private record Refresco(long desdeMs) {
+    }
 
     @Autowired
     public WeatherService(
@@ -96,7 +107,8 @@ public class WeatherService {
     }
 
     private static Executor hiloDeRefresco() {
-        return Executors.newSingleThreadExecutor(r -> {
+        // Un hilo por refresco (no uno solo): si un cliente se cuelga, el relevo no queda esperando detrás de él.
+        return Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "weather-refresh");
             t.setDaemon(true);
             return t;
@@ -154,8 +166,17 @@ public class WeatherService {
     }
 
     private void refrescarAparte() {
-        if (!refrescando.compareAndSet(false, true)) {
+        Refresco previo = refrescando.get();
+        long ahora = reloj.millis();
+        if (previo != null && ahora - previo.desdeMs() < REFRESCO_MAX.toMillis()) {
             return;   // ya hay una consulta en vuelo
+        }
+        Refresco propio = new Refresco(ahora);
+        if (!refrescando.compareAndSet(previo, propio)) {
+            return;   // otro hilo lo lanzó justo antes
+        }
+        if (previo != null) {
+            log.warn("WeatherService: el refresco anterior lleva más de {} s sin volver; se lanza otro.", REFRESCO_MAX.toSeconds());
         }
         try {
             refrescador.execute(() -> {
@@ -165,11 +186,11 @@ public class WeatherService {
                     ultimoFalloMs.set(reloj.millis());
                     log.warn("WeatherService: falló el refresco del pronóstico ({}).", e.toString());
                 } finally {
-                    refrescando.set(false);
+                    refrescando.compareAndSet(propio, null);   // no pisa a un refresco más nuevo que tomó el relevo
                 }
             });
         } catch (RuntimeException e) {
-            refrescando.set(false);
+            refrescando.compareAndSet(propio, null);
             log.warn("WeatherService: no se pudo lanzar el refresco del pronóstico ({}).", e.toString());
         }
     }
