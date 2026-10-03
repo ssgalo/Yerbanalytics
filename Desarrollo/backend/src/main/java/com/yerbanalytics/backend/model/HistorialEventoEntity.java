@@ -12,7 +12,13 @@ import lombok.Setter;
  * ninguna operación de edición/borrado: la inalterabilidad es por construcción.
  */
 @Entity
-@Table(name = "historial_evento")
+@Table(name = "historial_evento", indexes = {
+        // El contexto de riego (cada mensaje del nodo): WHERE zona_id = ? AND tipo IN ('Riego','Insumo') AND ts >= ?
+        // → igualdad, lista y rango, en ese orden. Mismo nombre que migracion-reglas-riego.sql.
+        @Index(name = "idx_historial_evento_zona_tipo_ts", columnList = "zona_id, tipo, ts"),
+        // Riegos abiertos tras un reinicio (tipo = 'Riego' AND ts >= ?) y KPI por tipo y día.
+        @Index(name = "idx_historial_evento_tipo_ts", columnList = "tipo, ts")
+})
 @Getter
 @Setter
 @NoArgsConstructor

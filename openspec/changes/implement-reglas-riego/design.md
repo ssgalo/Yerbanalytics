@@ -639,6 +639,25 @@ ciclo puede volver a regar el sector con R-02 (es lo que dice la spec: sólo su 
 + 5 s el ciclo ya no veía ese riego. El despacho guarda en memoria el último riego (y el último de R-02) por
 sector; `NurseryService` toma el más reciente entre eso y el historial para la guarda de ciclo y el tope de R-02.
 
+**C5 · El pronóstico no traba el hilo de la telemetría.** `updateTelemetry` pedía el pronóstico una vez POR SECTOR
+(100 por mensaje) y, con la API caída, `WeatherService` hacía 3 reintentos con `Thread.sleep` (1 + 2 s) sin cachear
+el fallo: ~100 × varios segundos por mensaje sobre el hilo del broker MQTT, justo sin internet (O-01) y bloqueando a
+R-02. Ahora: (a) una consulta por evaluación de zona (y una por barrido); (b) el fallo se cachea
+`yerbanalytics.weather.failure-cache-ttl-ms` (60 s); (c) `getForecastSinEspera()` — la que usa la telemetría — nunca
+espera: devuelve el cacheado (vencido hasta 4 TTL, mejor uno de hace 20 min que ninguno) y refresca en un hilo
+aparte, una consulta a la vez; sin nada usable evalúa sin pronóstico (la traza lo muestra `SIN_DATO`). `getForecast()`
+(watchdog y snapshot) conserva los reintentos pero respeta el fallo cacheado. Se descartó un `@Scheduled` de
+refresco (otro reloj que configurar) y un intento síncrono único en el hilo MQTT (el cliente HTTP no tiene timeout).
+Riesgo residual: el primer mensaje tras arrancar no tiene pronóstico y R-03 queda sin dato; como R-03 no cancela lo
+ya encolado (C1), ese mensaje puede encolar una ronda que la lluvia habría pospuesto.
+
+**C6 · Índices de `historial_evento`.** `ultimosPorSector` filtra por `zona_id`, `tipo IN ('Riego','Insumo')` y `ts`
+(ya restringida a los tipos del riego; excluye las filas "Info") y corre en cada mensaje del nodo, pero el índice sólo
+estaba en el script manual. Se declaran en la entidad (`@Table(indexes)`; `ddl-auto=update` los crea) `(zona_id, tipo,
+ts)` —igualdad, lista y rango, el orden que el planificador necesita— y `(tipo, ts)` para `riegosDesde` (reconstrucción
+tras un reinicio) y los KPI. El script manual conserva el mismo nombre. Sin verificar contra el plan de ejecución real
+de la base (sólo contra el orden de columnas).
+
 **Sin corregir (documentado):**
 - R-06 depende de eventos "Insumo" y la bomba conserva el enganche "Dosificando" (rama de insumos, fuera de alcance).
 - "Publicado" = entregado al cliente MQTT, sin ACK: el despacho da la válvula por abierta cuando el cliente la

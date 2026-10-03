@@ -41,8 +41,12 @@ DELETE FROM parametro_regla
 
 -- 2. Índice para el contexto de riego (último riego / última aplicación por zona, cada 30 s con el nodo real).
 --    Opcional: sin él la consulta funciona, sólo más lenta con un historial grande.
+--    Con `ddl-auto=update` los dos índices los crea Hibernate al arrancar (están declarados en la entidad); esto sólo
+--    permite crearlos antes, o por separado, sin esperar al despliegue.
 CREATE INDEX IF NOT EXISTS idx_historial_evento_zona_tipo_ts
     ON historial_evento (zona_id, tipo, ts);
+CREATE INDEX IF NOT EXISTS idx_historial_evento_tipo_ts
+    ON historial_evento (tipo, ts);
 
 -- 3. Baja de `configuracion_operativa.riego_vol_max_diario_ml` (DA-10). Era un límite diario que sólo leía
 --    el texto de la regla vieja y que ya no existe (los límites diarios se eliminaron). Ojo: la columna es
@@ -88,4 +92,5 @@ COMMIT;
 --    ALTER TABLE configuracion_operativa ADD COLUMN IF NOT EXISTS riego_vol_max_diario_ml DOUBLE PRECISION NOT NULL DEFAULT 2000;
 --    UPDATE sector SET actuador_valve = 'Cerrada' WHERE actuador_valve <> 'Cerrada';
 --    DROP INDEX IF EXISTS idx_historial_evento_zona_tipo_ts;
+--    DROP INDEX IF EXISTS idx_historial_evento_tipo_ts;
 --    COMMIT;

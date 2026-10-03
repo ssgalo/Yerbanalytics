@@ -18,6 +18,21 @@ como hasta ahora.
 - **WHEN** el JVM corre en UTC y son las 13:30 UTC
 - **THEN** la hora actual del pronóstico es la marca de las 10:00 locales
 
+### Requirement: El pronóstico no traba la evaluación
+
+El fallo de la consulta SHALL cachearse `yerbanalytics.weather.failure-cache-ttl-ms` (60 s por defecto): durante
+ese lapso no se reintenta ni se espera. La evaluación por telemetría SHALL pedir el pronóstico UNA vez por
+evaluación de zona (no una por sector) y SHALL NOT esperar ni dormir: usa el cacheado (aunque haya vencido, hasta
+4 TTL) y refresca en un hilo aparte, una consulta a la vez; sin nada usable evalúa sin pronóstico.
+
+#### Scenario: Sin internet
+- **WHEN** la API climática no responde y el nodo publica cada 30 s
+- **THEN** a lo sumo una secuencia de reintentos por minuto, ninguna en el hilo de la telemetría, y R-02 se evalúa sin demora
+
+#### Scenario: Pronóstico vencido
+- **WHEN** el pronóstico cacheado tiene 16 min (TTL de 15)
+- **THEN** la evaluación lo usa y se refresca aparte
+
 ### Requirement: Postergación de riego por lluvia inminente
 
 La postergación del riego por lluvia SHALL ser la regla R-03 (`PosponerPorLluviaRule`, ver

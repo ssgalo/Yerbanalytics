@@ -10,6 +10,7 @@ import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
+import com.yerbanalytics.backend.engine.RiegoCtx;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.riego.CicloLectura;
@@ -17,6 +18,7 @@ import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
+import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -43,6 +45,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +64,7 @@ class NurseryServiceRiegoTest {
     private ActionExecutor actionExecutor;
     private HistorialRepository historialRepository;
     private DespachoRiego despacho;
+    private WeatherService weatherService;
     private ZonaRepository zonaRepository;
     private NurseryService service;
     private ZonaEntity zona;
@@ -71,6 +75,7 @@ class NurseryServiceRiegoTest {
         SectorRepository sectorRepository = mock(SectorRepository.class);
         actionExecutor = mock(ActionExecutor.class);
         historialRepository = mock(HistorialRepository.class);
+        weatherService = mock(WeatherService.class);
         despacho = mock(DespachoRiego.class);
         when(despacho.finRiegoEnCurso(any())).thenReturn(null);   // Mockito devolvería 0L para un Long
         when(despacho.ultimoRiegoMs(any())).thenReturn(null);
@@ -106,7 +111,7 @@ class NurseryServiceRiegoTest {
 
         service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 mock(HistorialService.class), configuracion, mock(HardwareService.class),
-                mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, mock(WeatherService.class),
+                mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
                 mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, parametros,
                 historialRepository, despacho, RELOJ, 20);
     }
@@ -129,6 +134,19 @@ class NurseryServiceRiegoTest {
         ArgumentCaptor<RuleContext> ctx = ArgumentCaptor.forClass(RuleContext.class);
         verify(actionExecutor, times(3)).execute(any(), ctx.capture(), eq(OrigenEvaluacion.TELEMETRIA));
         return ctx.getAllValues();
+    }
+
+    @Test
+    @DisplayName("el pronóstico se pide UNA vez por evaluación de zona y sin espera, no una vez por sector")
+    void unPronosticoPorZonaYSinEspera() {
+        WeatherForecast pronostico = RiegoCtx.pronostico(AHORA, new double[]{90, 90}, new double[]{3, 3});
+        when(weatherService.getForecastSinEspera()).thenReturn(pronostico);
+
+        telemetria();
+
+        verify(weatherService, times(1)).getForecastSinEspera();
+        verify(weatherService, never()).getForecast();
+        assertThat(contextosEvaluados()).hasSize(3).allSatisfy(ctx -> assertThat(ctx.forecast()).isSameAs(pronostico));
     }
 
     @Test

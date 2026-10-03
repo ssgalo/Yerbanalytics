@@ -534,6 +534,9 @@ public class NurseryService {
         Instant ahora = reloj.instant();
         Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
         Map<String, ContextoRiego> riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
+        // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker MQTT
+        // y sostiene a R-02. Sin pronóstico cacheado se evalúa sin él (la traza lo muestra como sin dato).
+        WeatherForecast forecast = weatherService.getForecastSinEspera();
 
         for (SectorEntity s : sectors) {
             String oldStatus = s.getStatus();
@@ -579,7 +582,7 @@ public class NurseryService {
 
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
-            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, riegoPorSector.get(s.getId()));
+            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()));
             // La traza queda en memoria (última por sector y origen); no toca la base.
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
@@ -597,14 +600,13 @@ public class NurseryService {
      *
      * <p>Puebla todos los campos del snapshot:
      * <ul>
-         *   <li>{@code forecast} — obtenido de {@link WeatherService} (puede ser null en modo degradado).</li>
+         *   <li>{@code forecast} — el de la zona, pedido UNA vez a {@link WeatherService} (null en modo degradado).</li>
      *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
      * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus,
-                                         Instant ahora, ContextoRiego riego) {
+                                         Instant ahora, WeatherForecast forecast, ContextoRiego riego) {
         ZonaEntity zona = s.getZona();
-        WeatherForecast forecast = weatherService.getForecast();
 
         boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
                 || (zona != null && !manualLockRepository.findByZonaIdAndActiveTrue(zona.getId()).isEmpty());

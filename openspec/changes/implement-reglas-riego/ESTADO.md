@@ -6,5 +6,6 @@
 - Correcciones de la revisión de la conmutación (ver `design.md`, "Correcciones de la revisión de la conmutación"):
   C1 la ronda se completa (cancelación explícita), C2 el despacho revalida al abrir, C3 R-02 sin guarda de ciclo,
   C4 último riego en memoria — hechas (commit `fix(backend): completar la ronda de riego y revalidar al despachar`).
+  C5 el pronóstico no traba el hilo MQTT, C6 índices de `historial_evento` — hechas (commit `fix(backend): que el motor no se trabe sin pronóstico ni con el historial grande`).
 - Sin verificar: arranque real de Spring con el despacho contra el broker; `@Scheduled(scheduler="despachoScheduler")` en vivo;
   el despacho revalidando contra la base real (los tests usan repositorios falsos).
