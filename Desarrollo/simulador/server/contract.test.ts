@@ -23,3 +23,16 @@ test('other actuators and malformed commands never warn', () => {
   assert.equal(valveDurationWarning({ actuador: 'valve' }), null);
   assert.equal(valveDurationWarning({ actuador: 'valve', parametros: { durationSec: '9999' } }), null);
 });
+
+test('the rail topics and vocabulary mirror contrato.h', async () => {
+  const c = await import('./contract.ts');
+  assert.equal(c.RAIL_COMMAND_TOPIC, 'nursery/rail/command');
+  assert.equal(c.RAIL_EVENT_TOPIC, 'nursery/rail/event');
+  assert.equal(c.RAIL_ACTUATOR, 'rail');
+  assert.deepEqual([...c.RAIL_ACTIONS], ['IR_A', 'HOME']);
+  assert.deepEqual([...c.RAIL_STATUSES], ['ACEPTADO', 'LLEGO', 'ERROR']);
+  assert.deepEqual(
+    [...c.RAIL_ERROR_CODES],
+    ['COMANDO_INVALIDO', 'HOME_NO_ENCONTRADO', 'FIN_DE_CARRERA', 'REEMPLAZADO'],
+  );
+});
