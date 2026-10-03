@@ -1,4 +1,5 @@
 /* Una fila de parámetro dentro de una regla (o de la vista por parámetro). */
+import { unidadSegunValor } from '@/lib/plural';
 import { formatearValor } from '@/lib/parametrosValidation';
 import type { ParametroRegla } from '@/types/domain';
 import { ParametroField } from './ParametroField';
@@ -16,6 +17,8 @@ interface ParametroRowProps {
   nombresReglas: Record<string, string>;
   /** Regla bajo la que se muestra; sus "otras reglas" excluyen a ésta. En la vista por parámetro es undefined. */
   reglaActual?: string;
+  /** Hay un guardado en vuelo: no se edita hasta que vuelva la respuesta. */
+  disabled?: boolean;
   onChange: (texto: string) => void;
   onRestablecer: () => void;
 }
@@ -34,6 +37,7 @@ export function ParametroRow({
   errorServidor,
   nombresReglas,
   reglaActual,
+  disabled,
   onChange,
   onRestablecer,
 }: ParametroRowProps) {
@@ -73,7 +77,7 @@ export function ParametroRow({
         <div className={styles.meta}>
           {p.min !== null && p.max !== null && (
             <span>
-              Rango {p.min}–{p.max} {p.unidad}
+              Rango {p.min}–{p.max} {unidadSegunValor(p.unidad, p.max ?? 0)}
             </span>
           )}
           <span>Fábrica {formatearValor(p, p.fabrica)}</span>
@@ -93,9 +97,9 @@ export function ParametroRow({
       </div>
 
       <div className={styles.filaCampo}>
-        <ParametroField parametro={p} valor={valor} invalid={error !== null} onChange={onChange} />
+        <ParametroField parametro={p} valor={valor} invalid={error !== null} disabled={disabled} onChange={onChange} />
         {(p.modificado || editado) && (
-          <button type="button" className={styles.btnLink} onClick={onRestablecer}>
+          <button type="button" className={styles.btnLink} disabled={disabled} onClick={onRestablecer}>
             Restablecer fábrica
           </button>
         )}

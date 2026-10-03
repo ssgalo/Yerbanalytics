@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ParametrosTab } from './ParametrosTab';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import type { CambioParametro, CatalogoReglas } from '@/types/domain';
+import type { Borrador } from './borrador';
 import { catalogoConCompartido, catalogoDeFabrica, conValor } from './__fixtures__/catalogos';
 
 afterEach(cleanup);
@@ -11,12 +13,43 @@ afterEach(cleanup);
 const COMPARTIDO = 'riego.max-riegos-24h';
 const ETIQUETA_COMPARTIDO = 'Máximo de riegos en 24 h (límite de volumen)';
 
+/** El dueño del borrador (en la app, `ReglasPage`): acá un host mínimo con el estado y el guardado. */
+function Host({
+  catalogo,
+  onGuardar,
+  ...extra
+}: {
+  catalogo: CatalogoReglas;
+  onGuardar: (c: CambioParametro[]) => Promise<unknown>;
+} & Partial<React.ComponentProps<typeof ParametrosTab>>) {
+  const [borrador, setBorrador] = useState<Borrador>(new Map());
+  const [saving, setSaving] = useState(false);
+  const guardar = async (c: CambioParametro[]) => {
+    setSaving(true);
+    try {
+      return await onGuardar(c);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <ParametrosTab
+      catalogo={catalogo}
+      saving={saving}
+      onGuardar={guardar}
+      borrador={borrador}
+      onBorradorChange={setBorrador}
+      {...extra}
+    />
+  );
+}
+
 function montar(
   catalogo: CatalogoReglas,
-  extra: Partial<React.ComponentProps<typeof ParametrosTab>> = {},
+  extra: Partial<React.ComponentProps<typeof Host>> = {},
 ) {
   const onGuardar = vi.fn<(c: CambioParametro[]) => Promise<void>>().mockResolvedValue(undefined);
-  render(<ParametrosTab catalogo={catalogo} saving={false} onGuardar={onGuardar} {...extra} />);
+  render(<Host catalogo={catalogo} onGuardar={onGuardar} {...extra} />);
   return { onGuardar };
 }
 
@@ -244,5 +277,75 @@ describe('ParametrosTab · regla inicial', () => {
   it('abre la regla que llega por parámetro (desde "Editar parámetro" del Inspector)', () => {
     montar(catalogoDeFabrica(), { reglaInicial: 'IrrigationRule' });
     expect(screen.getByLabelText(/Umbral de riego/)).toBeTruthy();
+  });
+});
+
+describe('ParametrosTab · guardado en vuelo (#2)', () => {
+  it('deshabilita los campos y los botones mientras el PUT está en vuelo', async () => {
+    let resolver: () => void = () => undefined;
+    const onGuardar = vi.fn().mockReturnValue(new Promise<void>((r) => (resolver = r)));
+    montar(catalogoDeFabrica(), { onGuardar });
+    abrir(/💦 Riego/);
+    fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
+
+    fireEvent.click(guardar());
+
+    await waitFor(() => expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).disabled).toBe(true));
+    expect((screen.getByRole('button', { name: /Descartar/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /Restablecer fábrica/ }) as HTMLButtonElement).disabled).toBe(true);
+
+    resolver();
+    await waitFor(() => expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).disabled).toBe(false));
+  });
+});
+
+describe('ParametrosTab · errores ocultos por los filtros (#5)', () => {
+  it('avisa cuántos errores quedaron ocultos y "Ver los que tienen error" limpia los filtros', () => {
+    montar(catalogoDeFabrica());
+    abrir(/💦 Riego/);
+    fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '99' } });
+    expect(screen.queryByText(/oculto/)).toBeNull();
+
+    fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'lluvia' } });
+
+    expect(screen.getByText(/Corregí los valores marcados/)).toBeTruthy();
+    expect(screen.getByText(/1 parámetro con error queda oculto por los filtros/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver los que tienen error' }));
+
+    expect((screen.getByPlaceholderText(/Buscar/) as HTMLInputElement).value).toBe('');
+    const campo = screen.getByLabelText(/Umbral de riego/) as HTMLInputElement;
+    expect(campo.className).toMatch(/inputError/);
+    expect(screen.queryByText(/oculto/)).toBeNull();
+  });
+
+  it('también cuenta los errores del servidor y la rama filtrada', async () => {
+    const onGuardar = vi
+      .fn()
+      .mockRejectedValue(new ParametrosInvalidosError([{ clave: 'riego.umbral-humedad', mensaje: 'Inválido.' }]));
+    montar(catalogoDeFabrica(), { onGuardar });
+    abrir(/💦 Riego/);
+    fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
+    fireEvent.click(guardar());
+    await screen.findByText('Inválido.');
+
+    fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
+
+    expect(screen.getByText(/1 parámetro con error queda oculto por los filtros/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver los que tienen error' }));
+    expect((screen.getByLabelText('Rama') as HTMLSelectElement).value).toBe('TODAS');
+    expect(screen.getByText('Inválido.')).toBeTruthy();
+  });
+
+  it('en plural: "N parámetros con error quedan ocultos"', () => {
+    montar(catalogoDeFabrica());
+    abrir(/💦 Riego/);
+    fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '99' } });
+    abrir(/Límite de volumen/);
+    fireEvent.change(screen.getByLabelText(ETIQUETA_COMPARTIDO), { target: { value: '0' } });
+
+    fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
+
+    expect(screen.getByText(/2 parámetros con error quedan ocultos por los filtros/)).toBeTruthy();
   });
 });

@@ -6,10 +6,15 @@ import { NurseryProvider } from '@/hooks/NurseryContext';
 import { routes } from '@/router';
 import { getRepository } from '@/data';
 
-beforeEach(() => vi.stubEnv('VITE_DATA_SOURCE', 'mock'));
+beforeEach(() => {
+  vi.stubEnv('VITE_DATA_SOURCE', 'mock');
+  // El DAG del Inspector mide su lienzo con ResizeObserver, que jsdom no trae.
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 /** La app completa (shell + rutas) en memoria, como la monta `App`. */
@@ -37,9 +42,9 @@ describe('Ruta /reglas (7.1)', () => {
   it('monta ReglasPage con las pestañas Parámetros e Inspector', async () => {
     montarEn('/reglas');
 
-    expect(await screen.findByRole('tab', { name: 'Parámetros' })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: /^Parámetros/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Inspector' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Parámetros' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: /^Parámetros/ }).getAttribute('aria-selected')).toBe('true');
     // La pestaña Parámetros carga el catálogo del repositorio (mock): las 9 reglas
     expect(await screen.findByText('💦 Riego')).toBeTruthy();
     expect(screen.getByText('🔒 Bloqueo manual')).toBeTruthy();
@@ -81,5 +86,37 @@ describe('Ruta /reglas (7.1)', () => {
       expect(c.parametros.find((p) => p.clave === 'riego.umbral-humedad')!.valor).toBe('40');
     });
     await getRepository().saveParametros([{ clave: 'riego.umbral-humedad', valor: null }]);
+  });
+});
+
+describe('Borrador de Parámetros entre pestañas (#1)', () => {
+  it('editar, ir al Inspector y volver conserva el borrador', async () => {
+    montarEn('/reglas?regla=IrrigationRule');
+    fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
+    await screen.findByLabelText('Macro-zona');
+    fireEvent.click(screen.getByRole('tab', { name: /^Parámetros/ }));
+
+    expect(screen.getByText('1 cambio sin guardar')).toBeTruthy();
+    // La regla vuelve abierta (la URL conserva ?regla=) y el valor editado sigue ahí
+    expect((await screen.findByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('40');
+  });
+
+  it('el aviso de cambios sin guardar se ve desde la pestaña Inspector', async () => {
+    montarEn('/reglas?regla=IrrigationRule');
+    fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
+
+    const marca = await screen.findByTitle('1 cambio sin guardar');
+    expect(marca.textContent).toBe('1');
+    expect(screen.getByRole('tab', { name: /^Parámetros/ }).contains(marca)).toBe(true);
+  });
+
+  it('sin cambios no hay marca en la pestaña', async () => {
+    montarEn('/reglas');
+    await screen.findByText('💦 Riego');
+    expect(screen.queryByTitle(/sin guardar/)).toBeNull();
   });
 });

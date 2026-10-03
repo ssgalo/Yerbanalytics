@@ -58,6 +58,18 @@ export function cambiosDelBorrador(catalogo: CatalogoReglas, borrador: Borrador)
   return cambios;
 }
 
+/**
+ * El borrador que queda tras guardar lo `enviado`: se borran sólo las claves enviadas cuyo valor
+ * no cambió desde el envío. Lo editado mientras el PUT estaba en vuelo se conserva.
+ */
+export function sinEnviados(actual: Borrador, enviado: Borrador): Borrador {
+  const out = new Map(actual);
+  for (const [clave, valor] of enviado) {
+    if (actual.has(clave) && actual.get(clave) === valor) out.delete(clave);
+  }
+  return out;
+}
+
 /** Errores de cliente por clave (tipo, rango, decimales). Restablecer nunca es inválido. */
 export function erroresDelBorrador(catalogo: CatalogoReglas, borrador: Borrador): Map<string, string> {
   const errores = new Map<string, string>();

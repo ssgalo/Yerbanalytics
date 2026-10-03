@@ -214,11 +214,11 @@
   font-weight: 800;
 }
 
-.estadoChip[data-estado='paso'] { background: var(--ok-soft); color: #2e7a4f; }
+.estadoChip[data-estado='paso'] { background: var(--ok-soft); color: var(--ok-ink); }
 .estadoChip[data-estado='bloqueo'],
-.estadoChip[data-estado='error'] { background: var(--crit-soft); color: #a8331c; }
-.estadoChip[data-estado='pospuso'] { background: var(--warn-soft); color: #a66a12; }
-.estadoChip[data-estado='accion'] { background: var(--info-soft); color: #1f4fa8; }
+.estadoChip[data-estado='error'] { background: var(--crit-soft); color: var(--crit-ink); }
+.estadoChip[data-estado='pospuso'] { background: var(--warn-soft); color: var(--warn-ink); }
+.estadoChip[data-estado='accion'] { background: var(--info-soft); color: var(--info-ink); }
 
 .panelNota {
   margin: 0;
@@ -315,7 +315,7 @@
   margin-top: 4px;
   border: none;
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
   border-radius: 10px;
   padding: 10px 14px;
   font-family: var(--font-body);
@@ -331,6 +331,8 @@
 @media (max-width: 1100px) {
   .cuerpo {
     flex-direction: column;
+    /* Con `flex-start` el lienzo (flex: 1) colapsaba a ancho 0 en columna: el DAG no se veía. */
+    align-items: stretch;
   }
   .panel {
     width: 100%;

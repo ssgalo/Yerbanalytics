@@ -29,6 +29,14 @@ const ventana: ParametroRegla = {
 };
 
 describe('ParametroField', () => {
+  it('con valor 1 muestra la unidad en singular ("1 riego", no "1 riegos")', () => {
+    const riegos: ParametroRegla = { ...base, unidad: 'riegos', tipo: 'ENTERO', decimales: 0 };
+    const { rerender } = render(<ParametroField parametro={riegos} valor="1" invalid={false} onChange={vi.fn()} />);
+    expect(screen.getByText('riego')).toBeTruthy();
+    rerender(<ParametroField parametro={riegos} valor="4" invalid={false} onChange={vi.fn()} />);
+    expect(screen.getByText('riegos')).toBeTruthy();
+  });
+
   it('NUMERO usa el NumberField con la unidad y entrega el valor como texto', () => {
     const onChange = vi.fn();
     render(<ParametroField parametro={base} valor="42" invalid={false} onChange={onChange} />);

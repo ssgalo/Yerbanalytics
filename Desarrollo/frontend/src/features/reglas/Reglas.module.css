@@ -48,6 +48,20 @@
   color: var(--cream);
 }
 
+.tabBadge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--warn);
+  color: var(--g900);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
 .intro {
   font-family: var(--font-body);
   font-size: 13px;

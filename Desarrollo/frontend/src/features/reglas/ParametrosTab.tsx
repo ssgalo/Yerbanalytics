@@ -5,15 +5,20 @@
    a la vista. Vista "por parámetro": cada umbral una sola vez, útil para auditar que no haya
    duplicados. Las dos comparten UN borrador indexado por clave, así que un parámetro
    compartido se edita una vez y se guarda una vez.
+
+   El borrador NO vive acá: lo posee `ReglasPage`, porque esta pestaña se desmonta al ir al
+   Inspector y las ediciones sin guardar no pueden perderse en el viaje.
    ============================================================ */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { contar } from '@/lib/plural';
 import type { CambioParametro, CatalogoReglas, ParametroRegla, RamaRegla } from '@/types/domain';
 import {
   cambiosDelBorrador,
   editar,
   erroresDelBorrador,
   restablecer,
+  sinEnviados,
   valorMostrado,
   type Borrador,
 } from './borrador';
@@ -37,16 +42,25 @@ interface ParametrosTabProps {
   saving: boolean;
   /** Guarda los cambios. Rechaza (con `ParametrosInvalidosError` si el servidor los rechaza). */
   onGuardar: (cambios: CambioParametro[]) => Promise<unknown>;
+  /** Ediciones sin guardar, indexadas por clave. Las posee el padre para que sobrevivan al cambio de pestaña. */
+  borrador: Borrador;
+  onBorradorChange: Dispatch<SetStateAction<Borrador>>;
   /** Regla que arranca abierta (viene de "Editar parámetro" en el Inspector). */
   reglaInicial?: string | null;
 }
 
 type Vista = 'regla' | 'parametro';
 
-export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: ParametrosTabProps) {
+export function ParametrosTab({
+  catalogo,
+  saving,
+  onGuardar,
+  borrador,
+  onBorradorChange: setBorrador,
+  reglaInicial,
+}: ParametrosTabProps) {
   const [filtros, setFiltros] = useState<Filtros>(SIN_FILTROS);
   const [vista, setVista] = useState<Vista>('regla');
-  const [borrador, setBorrador] = useState<Borrador>(new Map());
   const [abiertas, setAbiertas] = useState<Set<string>>(new Set(reglaInicial ? [reglaInicial] : []));
   const [erroresServidor, setErroresServidor] = useState<Map<string, string>>(new Map());
   const [erroresGenerales, setErroresGenerales] = useState<string[]>([]);
@@ -109,9 +123,11 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
   const onGuardarClick = async () => {
     setErroresServidor(new Map());
     setErroresGenerales([]);
+    // Lo que se envía es esta foto del borrador: al volver se limpia sólo eso, sin pisar lo editado después.
+    const enviado = borrador;
     try {
       await onGuardar(cambios);
-      setBorrador(new Map());
+      setBorrador((actual) => sinEnviados(actual, enviado));
     } catch (e) {
       if (e instanceof ParametrosInvalidosError) {
         const porClave = new Map<string, string>();
@@ -132,6 +148,26 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
         setErroresGenerales([e instanceof Error ? e.message : String(e)]);
       }
     }
+  };
+
+  // Errores (de cliente o de servidor) en parámetros que los filtros actuales no muestran.
+  const clavesConError = useMemo(
+    () => new Set([...erroresCliente.keys(), ...erroresServidor.keys()]),
+    [erroresCliente, erroresServidor],
+  );
+  const clavesVisibles = useMemo(() => {
+    if (vista === 'parametro') return new Set(parametros.map((p) => p.clave));
+    return new Set(reglas.flatMap((r) => r.parametros));
+  }, [vista, parametros, reglas]);
+  const ocultosConError = [...clavesConError].filter((c) => !clavesVisibles.has(c)).length;
+
+  const verConError = () => {
+    setFiltros(SIN_FILTROS);
+    setAbiertas((s) => {
+      const n = new Set(s);
+      for (const r of catalogo.reglas) if (r.parametros.some((c) => clavesConError.has(c))) n.add(r.id);
+      return n;
+    });
   };
 
   const hayErroresCliente = erroresCliente.size > 0;
@@ -205,7 +241,7 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
             <section key={g.rama} className={styles.grupo}>
               <div className={styles.grupoCabecera}>
                 <h2 className={styles.grupoTitulo}>
-                  {NOMBRE_RAMA[g.rama]} · {g.reglas.length} {g.reglas.length === 1 ? 'regla' : 'reglas'}
+                  {NOMBRE_RAMA[g.rama]} · {contar(g.reglas.length, 'regla', 'reglas')}
                 </h2>
                 <span className={styles.grupoDesc}>{DESCRIPCION_RAMA[g.rama]}</span>
               </div>
@@ -219,6 +255,7 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
                   erroresCliente={erroresCliente}
                   erroresServidor={erroresServidor}
                   abierta={abiertas.has(r.id)}
+                  disabled={saving}
                   onToggle={() => alternar(r.id)}
                   onEditar={onEditar}
                   onRestablecer={onRestablecer}
@@ -233,7 +270,7 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
         <section className={styles.grupo}>
           <div className={styles.grupoCabecera}>
             <h2 className={styles.grupoTitulo}>
-              {parametros.length} {parametros.length === 1 ? 'parámetro' : 'parámetros'}
+              {contar(parametros.length, 'parámetro', 'parámetros')}
             </h2>
             <span className={styles.grupoDesc}>Cada umbral una sola vez, con las reglas que lo usan</span>
           </div>
@@ -247,6 +284,7 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
                 errorCliente={erroresCliente.get(p.clave) ?? null}
                 errorServidor={erroresServidor.get(p.clave) ?? null}
                 nombresReglas={nombresReglas}
+                disabled={saving}
                 onChange={(texto) => onEditar(p, texto)}
                 onRestablecer={() => onRestablecer(p)}
               />
@@ -256,18 +294,29 @@ export function ParametrosTab({ catalogo, saving, onGuardar, reglaInicial }: Par
       )}
 
       <div className={styles.acciones}>
-        <span className={hayErroresCliente ? styles.avisoErr : styles.aviso}>
+        <span className={hayErroresCliente || ocultosConError > 0 ? styles.avisoErr : styles.aviso}>
           {hayErroresCliente
             ? 'Corregí los valores marcados para poder guardar.'
             : cambios.length === 0
               ? 'Sin cambios pendientes.'
-              : `${cambios.length} ${cambios.length === 1 ? 'cambio' : 'cambios'} sin guardar`}
+              : `${contar(cambios.length, 'cambio', 'cambios')} sin guardar`}
+          {ocultosConError > 0 && (
+            <>
+              {' '}
+              {ocultosConError === 1
+                ? '1 parámetro con error queda oculto por los filtros.'
+                : `${ocultosConError} parámetros con error quedan ocultos por los filtros.`}{' '}
+              <button type="button" className={styles.btnLink} onClick={verConError}>
+                Ver los que tienen error
+              </button>
+            </>
+          )}
         </span>
         <span className={styles.spacer} />
         <button
           type="button"
           className={styles.btnSecondary}
-          disabled={borrador.size === 0 && erroresServidor.size === 0}
+          disabled={saving || (borrador.size === 0 && erroresServidor.size === 0)}
           onClick={onDescartar}
         >
           Descartar

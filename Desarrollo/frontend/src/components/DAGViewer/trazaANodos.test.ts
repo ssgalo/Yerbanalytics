@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clasificarRegla, trazaANodos } from './trazaANodos';
+import { clasificarRegla, colorArista, trazaANodos } from './trazaANodos';
 import { evaluarMotor, type EntradaMotor } from '@/data/mock/trazaReglas';
 import { buildRuleSchema } from '@/data/mock/reglasMock';
 import fixture from '@/data/mock/catalogoReglas.fixture.json';
@@ -106,7 +106,21 @@ describe('trazaANodos', () => {
     expect(e['ManualLockRule']).toBe('bloqueo');
     expect(e['StaleSensorRule']).toBe('noAlcanzada');
     expect(e['IrrigationRule']).toBe('noAlcanzada');
-    expect(e['success-RIEGO']).toBe('noAccion');
+    // Ninguna regla de la rama llegó a evaluarse: el terminal no dice "no se regó", dice que no se alcanzó.
+    expect(e['success-RIEGO']).toBe('noAlcanzada');
+    expect(e['success-INSUMO']).toBe('noAlcanzada');
+  });
+
+  it('lectura vieja: el terminal de la rama de riego queda omitido, no "no accionó"', () => {
+    const e = estados({ antiguedadSeg: 300 });
+
+    expect(e['success-RIEGO']).toBe('omitida');
+  });
+
+  it('una rama evaluada que no accionó sigue siendo "no accionó"', () => {
+    expect(estados({})['success-RIEGO']).toBe('noAccion');
+    // lluvia: la primera regla de la rama corrió y pospuso; el resto se omitió, pero la rama se evaluó
+    expect(estados({ humSus: 38, lluviaPct: 80 })['success-RIEGO']).toBe('noAccion');
   });
 
   it('un nodo que no figura en la traza queda sin evaluar (no se inventa estado)', () => {
@@ -122,5 +136,29 @@ describe('trazaANodos', () => {
   it('cubre todos los nodos del esquema', () => {
     const e = estados({});
     for (const n of schema.nodes) expect(e).toHaveProperty([n.id]);
+  });
+});
+
+describe('colorArista', () => {
+  const APAGADO = { color: 'var(--off)', activa: false };
+
+  it('se apaga si el ORIGEN no se evaluó, aunque el destino sea un terminal', () => {
+    expect(colorArista('noAlcanzada', 'noAccion')).toEqual(APAGADO);
+    expect(colorArista('omitida', 'noAccion')).toEqual(APAGADO);
+    expect(colorArista('sinTraza', 'noAccion')).toEqual(APAGADO);
+    expect(colorArista('noAlcanzada', 'noAlcanzada')).toEqual(APAGADO);
+  });
+
+  it('se apaga si el destino no se evaluó', () => {
+    expect(colorArista('paso', 'omitida')).toEqual(APAGADO);
+    expect(colorArista('paso', 'noAlcanzada')).toEqual(APAGADO);
+  });
+
+  it('entre nodos evaluados queda activa: verde, azul si la acción viene de una regla que accionó, ámbar si pospuso', () => {
+    expect(colorArista('paso', 'paso')).toEqual({ color: 'var(--ok)', activa: true });
+    expect(colorArista('paso', 'noAccion')).toEqual({ color: 'var(--ok)', activa: true });
+    expect(colorArista('paso', 'accion')).toEqual({ color: 'var(--ok)', activa: true });
+    expect(colorArista('accion', 'accion')).toEqual({ color: 'var(--info)', activa: true });
+    expect(colorArista('pospuso', 'noAccion')).toEqual({ color: 'var(--warn)', activa: true });
   });
 });

@@ -4,6 +4,7 @@ import {
   editar,
   erroresDelBorrador,
   restablecer,
+  sinEnviados,
   valorMostrado,
   type Borrador,
 } from './borrador';
@@ -94,5 +95,33 @@ describe('erroresDelBorrador', () => {
     const p = c.parametros.find((x) => x.clave === UMBRAL)!;
     expect(erroresDelBorrador(c, editar(vacio, p, '40')).size).toBe(0);
     expect(erroresDelBorrador(c, restablecer(vacio, p)).size).toBe(0);
+  });
+});
+
+describe('sinEnviados', () => {
+  const c = catalogoDeFabrica();
+  const umbral = c.parametros.find((x) => x.clave === UMBRAL)!;
+  const otro = c.parametros.find((x) => x.clave === 'insumo.max-dosis-24h')!;
+
+  it('quita las claves enviadas cuyo valor no cambió desde el envío', () => {
+    const enviado = editar(vacio, umbral, '40');
+    expect(sinEnviados(enviado, enviado).size).toBe(0);
+  });
+
+  it('conserva lo editado mientras el PUT estaba en vuelo (clave nueva o valor distinto)', () => {
+    const enviado = editar(vacio, umbral, '40');
+    const actual = editar(editar(enviado, umbral, '45'), otro, '2');
+
+    const resto = sinEnviados(actual, enviado);
+
+    expect([...resto.entries()]).toEqual([
+      [UMBRAL, '45'],
+      [otro.clave, '2'],
+    ]);
+  });
+
+  it('un restablecer enviado (null) también se limpia si no cambió', () => {
+    const enviado: Borrador = new Map([[UMBRAL, null]]);
+    expect(sinEnviados(enviado, enviado).size).toBe(0);
   });
 });

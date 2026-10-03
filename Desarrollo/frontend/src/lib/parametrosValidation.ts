@@ -9,6 +9,7 @@
    Los mensajes espejan los del backend para que el mock falle igual que el sistema real.
    ============================================================ */
 import type { ParametroRegla } from '@/types/domain';
+import { unidadSegunValor } from './plural';
 
 type DefinicionValidable = Pick<ParametroRegla, 'tipo' | 'min' | 'max' | 'decimales' | 'unidad'>;
 
@@ -17,10 +18,11 @@ const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const fmt = (n: number) => String(n);
 
 function rangoMensaje(def: DefinicionValidable, min: number | null, max: number | null): string {
-  const u = def.unidad ? ` ${def.unidad}` : '';
-  if (min !== null && max !== null) return `Debe estar entre ${fmt(min)} y ${fmt(max)}${u}.`;
-  if (min !== null) return `Debe ser como mínimo ${fmt(min)}${u}.`;
-  return `Debe ser como máximo ${fmt(max as number)}${u}.`;
+  // La unidad concuerda con el último número de la frase ("entre 0 y 1 riego", "entre 2 y 10 riegos").
+  const unidadDe = (n: number) => (def.unidad ? ` ${unidadSegunValor(def.unidad, n)}` : '');
+  if (min !== null && max !== null) return `Debe estar entre ${fmt(min)} y ${fmt(max)}${unidadDe(max)}.`;
+  if (min !== null) return `Debe ser como mínimo ${fmt(min)}${unidadDe(min)}.`;
+  return `Debe ser como máximo ${fmt(max as number)}${unidadDe(max as number)}.`;
 }
 
 function decimalesDe(texto: string): number {
@@ -63,5 +65,5 @@ export function parametroError(def: DefinicionValidable, valor: string): string 
 export function formatearValor(def: Pick<ParametroRegla, 'tipo' | 'unidad'>, valor: string): string {
   if (def.tipo === 'VENTANA_HORARIA') return valor.replace('-', '–');
   if (def.tipo === 'HORA') return valor;
-  return def.unidad ? `${valor} ${def.unidad}` : valor;
+  return def.unidad ? `${valor} ${unidadSegunValor(def.unidad, valor)}` : valor;
 }

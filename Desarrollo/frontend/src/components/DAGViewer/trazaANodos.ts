@@ -52,13 +52,29 @@ export function trazaANodos(schema: DagSchema, traza: TrazaEvaluacion): Record<s
     } else if (nodo.id.startsWith('success-')) {
       // El terminal de la rama dice si ALGUNA de sus reglas actuó.
       const rama = nodo.id.slice('success-'.length);
-      const actuo = traza.reglas.some(
-        (r) => r.rama === rama && porRegla.get(r.ruleId) === 'accion',
-      );
-      estados[nodo.id] = actuo ? 'accion' : 'noAccion';
+      const deLaRama = traza.reglas.filter((r) => r.rama === rama).map((r) => porRegla.get(r.ruleId));
+      const actuo = deLaRama.includes('accion');
+      // Si ninguna regla de la rama llegó a evaluarse, el terminal no puede decir "no accionó":
+      // no se alcanzó (cortó un ABORT_ALL antes) o se omitió (la bloqueó una regla global).
+      if (actuo) estados[nodo.id] = 'accion';
+      else if (deLaRama.length > 0 && deLaRama.every((e) => e === 'noAlcanzada')) estados[nodo.id] = 'noAlcanzada';
+      else if (deLaRama.length > 0 && deLaRama.every((e) => e === 'noAlcanzada' || e === 'omitida'))
+        estados[nodo.id] = 'omitida';
+      else estados[nodo.id] = 'noAccion';
     } else {
       estados[nodo.id] = porRegla.get(nodo.id) ?? 'sinTraza';
     }
   }
   return estados;
+}
+
+const SIN_EVALUAR = new Set<EstadoNodo>(['omitida', 'noAlcanzada', 'sinTraza']);
+
+/** Color de la arista: apagada si el origen o el destino no llegaron a evaluarse; si no, sigue al origen. */
+export function colorArista(origen: EstadoNodo, destino: EstadoNodo): { color: string; activa: boolean } {
+  if (SIN_EVALUAR.has(origen) || SIN_EVALUAR.has(destino)) return { color: 'var(--off)', activa: false };
+  if (destino === 'accion' && origen !== 'inicio' && origen !== 'paso')
+    return { color: 'var(--info)', activa: true };
+  if (origen === 'pospuso') return { color: 'var(--warn)', activa: true };
+  return { color: 'var(--ok)', activa: true };
 }

@@ -32,7 +32,13 @@ export function useTrazaEvaluacion(
   const cargar = useCallback(
     (silencioso: boolean) => {
       const mio = ++pedido.current;
-      if (!silencioso) setLoading(true);
+      if (!silencioso) {
+        // Un pedido nuevo (otro sector u origen, o "Actualizar") no hereda ni la traza ni el error
+        // del anterior: el error quedaría rotulado con el sector nuevo.
+        setTraza(null);
+        setError(null);
+        setLoading(true);
+      }
       getRepository()
         .getTrazaEvaluacion(sectorId, origen)
         .then((t) => {

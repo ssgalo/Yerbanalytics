@@ -53,6 +53,12 @@ describe('formatoComparacion', () => {
     expect(formatoComparacion(cmp({ recibido: 55, resultado: 'NO_CUMPLE' })).marca).toBe('✗');
   });
 
+  it('con valor 1 la unidad va en singular: "1 riego" y "3 riegos"', () => {
+    const f = formatoComparacion(cmp({ recibido: 1, umbral: 3, unidad: 'riegos' }));
+    expect(f.recibido).toBe('1 riego');
+    expect(f.umbral).toBe('3 riegos');
+  });
+
   it('SIN_DATO se lee "sin dato" y no inventa valor', () => {
     const f = formatoComparacion(cmp({ recibido: null, resultado: 'SIN_DATO' }));
     expect(f.recibido).toBe('sin dato');

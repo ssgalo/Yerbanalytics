@@ -76,6 +76,55 @@ describe('useTrazaEvaluacion', () => {
     expect(get).toHaveBeenCalledTimes(2);
   });
 
+  it('al cambiar de sector limpia la traza anterior de inmediato, sin esperar la respuesta', async () => {
+    const pendiente = new Promise<TrazaEvaluacion>(() => undefined);
+    repoCon(vi.fn().mockImplementation((id: string) => (id === 'MZ-1-001' ? Promise.resolve(traza(id)) : pendiente)));
+    const { result, rerender } = renderHook(({ id }) => useTrazaEvaluacion(id, 'TELEMETRIA', false), {
+      initialProps: { id: 'MZ-1-001' },
+    });
+    await waitFor(() => expect(result.current.traza?.sectorId).toBe('MZ-1-001'));
+
+    rerender({ id: 'MZ-2-005' });
+
+    expect(result.current.traza).toBeNull();
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('al cambiar de origen limpia la traza del origen anterior', async () => {
+    const pendiente = new Promise<TrazaEvaluacion>(() => undefined);
+    repoCon(vi.fn().mockImplementation((_id: string, o: string) => (o === 'TELEMETRIA' ? Promise.resolve(traza('MZ-1-001')) : pendiente)));
+    const { result, rerender } = renderHook(
+      ({ o }: { o: 'TELEMETRIA' | 'BARRIDO' }) => useTrazaEvaluacion('MZ-1-001', o, false),
+      { initialProps: { o: 'TELEMETRIA' } },
+    );
+    await waitFor(() => expect(result.current.traza).not.toBeNull());
+
+    rerender({ o: 'BARRIDO' });
+
+    expect(result.current.traza).toBeNull();
+  });
+
+  it('al cambiar de sector limpia el error anterior: no queda pegado al sector nuevo', async () => {
+    const pendiente = new Promise<TrazaEvaluacion>(() => undefined);
+    repoCon(
+      vi.fn().mockImplementation((id: string) => (id === 'NOPE' ? Promise.reject(new Error('Error 404')) : pendiente)),
+    );
+    const { result, rerender } = renderHook(({ id }) => useTrazaEvaluacion(id, 'TELEMETRIA', false), {
+      initialProps: { id: 'NOPE' },
+    });
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    rerender({ id: 'MZ-2-005' });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('acepta una traza sin macro-zona (zonaId null)', async () => {
+    repoCon(vi.fn().mockResolvedValue({ ...traza('MZ-1-001'), zonaId: null }));
+    const { result } = renderHook(() => useTrazaEvaluacion('MZ-1-001', 'TELEMETRIA', false));
+    await waitFor(() => expect(result.current.traza?.zonaId).toBeNull());
+  });
+
   it('descarta la respuesta de un sector viejo si ya se eligió otro', async () => {
     let soltarViejo: (t: TrazaEvaluacion) => void = () => undefined;
     const viejo = new Promise<TrazaEvaluacion>((res) => (soltarViejo = res));

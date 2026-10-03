@@ -79,7 +79,7 @@
   margin-top: 7px;
   padding: 5px 8px 6px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--cream) 6%, transparent);
 }
 
 .compEtiqueta {

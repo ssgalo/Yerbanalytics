@@ -2,6 +2,7 @@
    Lectura humana de una traza: cómo se escribe "recibido vs. umbral" y qué pasó de un vistazo.
    Funciones puras; el DAG y el panel sólo las muestran.
    ============================================================ */
+import { unidadSegunValor } from '@/lib/plural';
 import type {
   Comparacion,
   DagSchema,
@@ -23,7 +24,7 @@ function valorTexto(v: Comparacion['recibido'], unidad: string): string {
   if (typeof v === 'boolean') return v ? 'sí' : 'no';
   if (typeof v === 'string') return v;
   const n = String(Number(v.toFixed(2)));
-  return unidad ? `${n} ${unidad}` : n;
+  return unidad ? `${n} ${unidadSegunValor(unidad, Number(n))}` : n;
 }
 
 const MARCAS: Record<ResultadoComparacion, string> = { CUMPLE: '✓', NO_CUMPLE: '✗', SIN_DATO: '?' };

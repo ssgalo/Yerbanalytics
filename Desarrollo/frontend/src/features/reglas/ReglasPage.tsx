@@ -6,9 +6,12 @@
    La pestaña vive en la URL (`?tab=`), así que se puede enlazar: el detalle de sector manda
    a `?tab=inspector&sector=…` y el Inspector a `?regla=…` para editar un umbral.
    ============================================================ */
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { contar } from '@/lib/plural';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
+import { cambiosDelBorrador, type Borrador } from './borrador';
 import { ParametrosTab } from './ParametrosTab';
 import { InspectorTab } from './inspector/InspectorTab';
 import styles from './Reglas.module.css';
@@ -19,6 +22,13 @@ export function ReglasPage() {
   const [params, setParams] = useSearchParams();
   const tab: Pestania = params.get('tab') === 'inspector' ? 'inspector' : 'parametros';
   const { catalogo, loading, error, saving, save } = useCatalogoReglas();
+
+  // El borrador de Parámetros vive acá, no en la pestaña: ésta se desmonta al ir al Inspector.
+  const [borrador, setBorrador] = useState<Borrador>(new Map());
+  const pendientes = useMemo(
+    () => (catalogo ? cambiosDelBorrador(catalogo, borrador).length : 0),
+    [catalogo, borrador],
+  );
 
   usePageTitle('Motor de reglas', 'Umbrales de cada regla y última evaluación por sector');
 
@@ -49,6 +59,11 @@ export function ReglasPage() {
           onClick={() => elegir('parametros')}
         >
           Parámetros
+          {pendientes > 0 && (
+            <span className={styles.tabBadge} title={`${contar(pendientes, 'cambio', 'cambios')} sin guardar`}>
+              {pendientes}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -79,6 +94,8 @@ export function ReglasPage() {
               catalogo={catalogo}
               saving={saving}
               onGuardar={save}
+              borrador={borrador}
+              onBorradorChange={setBorrador}
               reglaInicial={params.get('regla')}
             />
           )}

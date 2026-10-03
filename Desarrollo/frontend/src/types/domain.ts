@@ -619,7 +619,8 @@ export interface TrazaRegla {
 /** Última evaluación del motor para un sector y origen. Vive en memoria en el backend. */
 export interface TrazaEvaluacion {
   sectorId: string;
-  zonaId: string;
+  /** null si el backend no pudo resolver la macro-zona del sector. */
+  zonaId: string | null;
   origen: OrigenEvaluacion;
   /** ISO-8601. */
   ts: string;

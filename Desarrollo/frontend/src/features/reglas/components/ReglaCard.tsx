@@ -15,6 +15,7 @@ interface ReglaCardProps {
   erroresCliente: ReadonlyMap<string, string>;
   erroresServidor: ReadonlyMap<string, string>;
   abierta: boolean;
+  disabled?: boolean;
   onToggle: () => void;
   onEditar: (p: ParametroRegla, texto: string) => void;
   onRestablecer: (p: ParametroRegla) => void;
@@ -28,6 +29,7 @@ export function ReglaCard({
   erroresCliente,
   erroresServidor,
   abierta,
+  disabled,
   onToggle,
   onEditar,
   onRestablecer,
@@ -94,6 +96,7 @@ export function ReglaCard({
                 errorServidor={erroresServidor.get(p.clave) ?? null}
                 nombresReglas={nombresReglas}
                 reglaActual={regla.id}
+                disabled={disabled}
                 onChange={(texto) => onEditar(p, texto)}
                 onRestablecer={() => onRestablecer(p)}
               />

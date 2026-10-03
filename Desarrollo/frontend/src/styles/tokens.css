@@ -36,6 +36,15 @@
   --info: #3b82f6;
   --info-soft: #e3edfd;
 
+  /* texto sobre los fondos *-soft: la variante oscura de cada estado, con contraste de lectura */
+  --ok-ink: #2e7a4f;
+  --warn-ink: #8a5a10;
+  --crit-ink: #8f2b18;
+  --info-ink: #1f4fa8;
+
+  /* texto sobre un fondo de marca / acción primaria */
+  --on-brand: #ffffff;
+
   /* acentos */
   --orange: #ec6a1e;
   --orange-soft: #fbe7d7;

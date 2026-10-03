@@ -11,6 +11,8 @@ interface UseCatalogoReglasResult {
   loading: boolean;
   error: Error | null;
   saving: boolean;
+  /** Vuelve a pedir el catálogo (p. ej. tras un error de carga). */
+  reload: () => void;
   /**
    * Guarda los cambios, todo o nada. Resuelve con el catálogo actualizado o rechaza (con
    * `ParametrosInvalidosError` si el servidor rechazó valores).
@@ -23,6 +25,7 @@ export function useCatalogoReglas(): UseCatalogoReglasResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [saving, setSaving] = useState(false);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -45,6 +48,12 @@ export function useCatalogoReglas(): UseCatalogoReglasResult {
     return () => {
       active = false;
     };
+  }, [version]);
+
+  const reload = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    setVersion((v) => v + 1);
   }, []);
 
   const save = useCallback(async (cambios: CambioParametro[]): Promise<CatalogoReglas> => {
@@ -58,5 +67,5 @@ export function useCatalogoReglas(): UseCatalogoReglasResult {
     }
   }, []);
 
-  return { catalogo, loading, error, saving, save };
+  return { catalogo, loading, error, saving, save, reload };
 }

@@ -21,7 +21,7 @@ import '@xyflow/react/dist/style.css';
 import type { DagSchema, TrazaEvaluacion } from '@/types/domain';
 import { computeLayout } from './layoutDag';
 import { ReglaNode, type ReglaNodeData } from './ReglaNode';
-import { trazaANodos, type EstadoNodo } from './trazaANodos';
+import { colorArista, trazaANodos, type EstadoNodo } from './trazaANodos';
 import styles from './TrazaGraph.module.css';
 
 const nodeTypes = { regla: ReglaNode };
@@ -77,6 +77,15 @@ function estiloEspecial(estado: EstadoNodo): CSSProperties {
       color: 'var(--cdim)',
     };
   }
+  if (estado === 'omitida' || estado === 'noAlcanzada') {
+    return {
+      ...BASE_ESPECIAL,
+      background: 'var(--g900)',
+      border: '1.5px dashed var(--off)',
+      color: 'var(--cdim)',
+      opacity: 0.6,
+    };
+  }
   // inicio
   return {
     ...BASE_ESPECIAL,
@@ -85,16 +94,6 @@ function estiloEspecial(estado: EstadoNodo): CSSProperties {
     color: 'var(--cream)',
     borderRadius: 22,
   };
-}
-
-/** Color de la arista: sigue el estado de la regla de origen mientras el destino haya corrido. */
-function colorArista(origen: EstadoNodo, destino: EstadoNodo): { color: string; activa: boolean } {
-  const apagado = destino === 'omitida' || destino === 'noAlcanzada' || destino === 'sinTraza';
-  if (apagado) return { color: 'var(--off)', activa: false };
-  if (destino === 'accion' && origen !== 'inicio' && origen !== 'paso')
-    return { color: 'var(--info)', activa: true };
-  if (origen === 'pospuso') return { color: 'var(--warn)', activa: true };
-  return { color: 'var(--ok)', activa: true };
 }
 
 export function TrazaGraph({ schema, traza, seleccionada, onSeleccionar }: TrazaGraphProps) {
@@ -157,7 +156,11 @@ export function TrazaGraph({ schema, traza, seleccionada, onSeleccionar }: Traza
         const etiqueta =
           n.id === 'start'
             ? n.label
-            : (TERMINAL[rama]?.[estado === 'accion' ? 'accion' : 'noAccion'] ?? n.label);
+            : estado === 'omitida'
+              ? 'Rama omitida'
+              : estado === 'noAlcanzada'
+                ? 'Rama no alcanzada'
+                : (TERMINAL[rama]?.[estado === 'accion' ? 'accion' : 'noAccion'] ?? n.label);
         return {
           ...comunes,
           type: n.id === 'start' ? 'input' : 'output',
