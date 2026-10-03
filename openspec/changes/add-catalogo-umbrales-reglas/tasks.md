@@ -182,10 +182,13 @@ comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx,
 
 ## 9. Cierre
 
-- [ ] 9.1 Verificación manual con backend + simulador: publicar humedad 38 % en una zona y ver en el
+- [~] 9.1 Verificación manual con backend + simulador: publicar humedad 38 % en una zona y ver en el
       Inspector `IrrigationRule` "38 % < 42 % ✓"; subir el umbral a 35 desde Parámetros y ver
       "38 % < 35 % ✗" en la siguiente telemetría.
-- [ ] 9.2 Verificación en `npm run dev:demo`: sección completa sin backend.
+      *Parcial (03/10/2026)*: se verificó la API del catálogo en ejecución (valor válido, fuera de rango, restricción cruzada,
+      lote vacío, restablecer, auditoría) y el frontend en modo `http` con datos reales. **No** se registró la lectura
+      del Inspector ("38 % < 42 % ✓") con el cambio de umbral.
+- [ ] 9.2 Verificación en `npm run dev:demo`: sección completa sin backend. *No verificado en ejecución.*
 - [x] 9.3 `CLAUDE.md`: mencionar la sección "Motor de reglas" (§4) y el catálogo como única fuente de
       umbrales de reglas (§6, convenciones internas).
 

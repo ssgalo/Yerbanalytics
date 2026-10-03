@@ -223,13 +223,19 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
 
 ## 15. Verificación manual con simulador
 
-- [ ] 15.1 Backend + simulador, en horario de ventana: publicar `humSus` 40 en MZ-1 → el log del
+- [~] 15.1 Backend + simulador, en horario de ventana: publicar `humSus` 40 en MZ-1 → el log del
       simulador muestra 10 comandos `valve ON` con `durationSec` 600 (5 L); el mapa muestra 10 "Regando" y
       90 "En cola"; con `riego.caudal-emisor` 120 L/h las tandas duran 150 s y la MZ termina en ~26 min.
-- [ ] 15.2 `humSus` 30 → `durationSec` 720 (o 180 con 120 L/h) y un evento "Alerta" CRITICAL.
+      *Verificado el 03/10/2026 sólo en parte*: `humSus` 40 → comando de 600 s y riego de 5 L. La base tenía un
+      único sector (que además ya había regado), así que **no** se vieron las tandas de 10, la cola ni el caudal de 120 L/h.
+- [~] 15.2 `humSus` 30 → `durationSec` 720 (o 180 con 120 L/h) y un evento "Alerta" CRITICAL.
+      *Verificado (03/10/2026)*: 30 → 6 L con alerta crítica, frenada por riego en curso y por su tope de 12 h. No se vio la variante de 180 s con 120 L/h.
 - [ ] 15.3 `humSus` 82 → nada en cola y un "Alerta" WARNING. Correr la ventana a una franja que no
       incluya la hora actual y publicar 40 → R-05 corta (Inspector); publicar 30 → R-02 riega igual.
-- [ ] 15.4 Publicar de nuevo 40 en el mismo ciclo → ningún comando (Inspector: regla de ciclo).
+      *No verificado en ejecución* (R-05 y R-02 fuera de ventana; el caso de 82 % tampoco).
+- [x] 15.4 Publicar de nuevo 40 en el mismo ciclo → ningún comando (Inspector: regla de ciclo). *Verificado (03/10/2026): un riego por ciclo; no se miró el Inspector.*
+
+> La segunda ronda de correcciones del riego (`d8e3fb1`, `df9a6db`, `bbb06ef`: pausa de la ronda, revalidación, orden de la rama) es posterior a esta verificación y **no se probó en ejecución**.
 
 ## Review Workload Forecast
 
