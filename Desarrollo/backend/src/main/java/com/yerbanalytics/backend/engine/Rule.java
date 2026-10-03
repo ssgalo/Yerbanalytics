@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 
 import java.util.List;
 
@@ -59,4 +60,16 @@ public interface Rule {
      * @return lista de acciones a ejecutar; nunca null, puede ser vacía
      */
     List<RuleAction> evaluate(RuleContext ctx);
+
+    /**
+     * Evalúa la regla leyendo sus parámetros y comparando a través de la {@link Evaluacion}, que
+     * registra cada comparación en la traza. Es lo que invoca el orquestador.
+     *
+     * <p>Firma puente de la migración al catálogo: por defecto delega en {@link #evaluate(RuleContext)},
+     * así una regla sin migrar sigue funcionando (con traza sin comparaciones). Cada regla migrada
+     * sobreescribe esta; la última tanda borra la firma vieja.
+     */
+    default List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
+        return evaluate(ctx);
+    }
 }

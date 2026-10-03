@@ -58,25 +58,25 @@ Paquetes nuevos: `be/engine/parametros/` y `be/engine/traza/` (`be/` =
 
 ## 3. Traza de evaluación (PR 2)
 
-- [ ] 3.1 Test: `Evaluacion.comparar(...)` devuelve el booleano correcto para `LT/LE/GT/GE/EQ`,
+- [x] 3.1 Test: `Evaluacion.comparar(...)` devuelve el booleano correcto para `LT/LE/GT/GE/EQ`,
       registra `CUMPLE/NO_CUMPLE`, registra `SIN_DATO` con recibido `null`, y guarda el **valor**
       del umbral (no la referencia). Implementar `Evaluacion`, `Comparacion`, `Operador`.
-- [ ] 3.2 Test: `Evaluacion.numero(p)` con un `p` no declarado lanza `ParametroNoDeclaradoException`
+- [x] 3.2 Test: `Evaluacion.numero(p)` con un `p` no declarado lanza `ParametroNoDeclaradoException`
       nombrando regla y clave. Implementar.
-- [ ] 3.3 Test: `compararFijo(...)` registra `configurable = false` y sin clave. Implementar.
-- [ ] 3.4 Test del orquestador con reglas falsas: rama RIEGO bloqueada → las siguientes de RIEGO
+- [x] 3.3 Test: `compararFijo(...)` registra `configurable = false` y sin clave. Implementar.
+- [x] 3.4 Test del orquestador con reglas falsas: rama RIEGO bloqueada → las siguientes de RIEGO
       quedan `OMITIDA_RAMA_BLOQUEADA` con `bloqueadaPor`; `ABORT_ALL` → resto `NO_ALCANZADA`;
       las acciones devueltas son idénticas a las de hoy para las mismas reglas. Agregar a `Rule`
       `parametros()` y la firma puente `evaluate(ctx, ev)` (D3); `RuleOrchestrator.evaluate(ctx,
       origen)` arma una `Evaluacion` por regla con un único `vigentes()` por sector y devuelve
       `ResultadoEvaluacion(acciones, traza)`.
-- [ ] 3.5 Test: `TrazaEvaluacionStore` guarda la última por sector **y por origen**, la de
+- [x] 3.5 Test: `TrazaEvaluacionStore` guarda la última por sector **y por origen**, la de
       telemetría no se pisa con la de barrido, y soporta escrituras concurrentes (dos hilos,
       1 000 escrituras, sin excepciones y con la última de cada origen). Implementar.
-- [ ] 3.6 Test: `NurseryService.updateTelemetry` guarda trazas `TELEMETRIA` y
+- [x] 3.6 Test: `NurseryService.updateTelemetry` guarda trazas `TELEMETRIA` y
       `NurseryWatchdog.evaluarTodos` guarda `BARRIDO`; la cantidad de llamadas a `HistorialService`
       no cambia respecto de hoy. Adaptar los dos llamadores.
-- [ ] 3.7 Test (`@WebMvcTest`): `GET /api/rules/evaluaciones/{id}` → 200 / 204 (sin evaluar) / 404
+- [x] 3.7 Test (`@WebMvcTest`): `GET /api/rules/evaluaciones/{id}` → 200 / 204 (sin evaluar) / 404
       (sector inexistente); `?origen=` filtra; sin `origen` devuelve la más reciente. Implementar.
 
 ## 4. Migración de las reglas existentes (PR 3)

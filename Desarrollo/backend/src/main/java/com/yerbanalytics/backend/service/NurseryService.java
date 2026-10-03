@@ -4,7 +4,10 @@ import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
@@ -42,6 +45,7 @@ public class NurseryService {
     private final WeatherService weatherService;
     private final ManualLockRepository manualLockRepository;
     private final DiagnosticoService diagnosticoService;
+    private final TrazaEvaluacionStore trazaStore;
     private final long staleThresholdMs;
     private final int bateriaMinPct;
 
@@ -57,6 +61,7 @@ public class NurseryService {
                           WeatherService weatherService,
                           ManualLockRepository manualLockRepository,
                           DiagnosticoService diagnosticoService,
+                          TrazaEvaluacionStore trazaStore,
                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -70,6 +75,7 @@ public class NurseryService {
         this.weatherService = weatherService;
         this.manualLockRepository = manualLockRepository;
         this.diagnosticoService = diagnosticoService;
+        this.trazaStore = trazaStore;
         this.staleThresholdMs = staleThresholdMs;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -507,7 +513,10 @@ public class NurseryService {
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
             RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus);
-            actionExecutor.execute(ruleOrchestrator.evaluate(ctx), ctx);
+            // La traza queda en memoria (última por sector y origen); no toca la base.
+            ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
+            trazaStore.guardar(resultado.traza());
+            actionExecutor.execute(resultado.acciones(), ctx);
         }
         sectorRepository.saveAll(sectors);
 

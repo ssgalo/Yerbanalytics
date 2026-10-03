@@ -2,7 +2,10 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
@@ -54,6 +57,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
     private final ConfiguracionService configuracionService;
     private final WeatherService weatherService;
     private final ManualLockRepository manualLockRepository;
+    private final TrazaEvaluacionStore trazaStore;
     private final long staleThresholdMs;
 
     public NurseryWatchdog(ZonaRepository zonaRepository,
@@ -63,6 +67,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                            ConfiguracionService configuracionService,
                            WeatherService weatherService,
                            ManualLockRepository manualLockRepository,
+                           TrazaEvaluacionStore trazaStore,
                            @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
@@ -71,6 +76,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
         this.configuracionService = configuracionService;
         this.weatherService = weatherService;
         this.manualLockRepository = manualLockRepository;
+        this.trazaStore = trazaStore;
         this.staleThresholdMs = staleThresholdMs;
     }
 
@@ -152,7 +158,9 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                         bloqueoActivo
                 );
 
-                actionExecutor.execute(ruleOrchestrator.evaluate(ctx), ctx);
+                ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.BARRIDO);
+                trazaStore.guardar(resultado.traza());
+                actionExecutor.execute(resultado.acciones(), ctx);
                 totalSectores++;
             }
         }
