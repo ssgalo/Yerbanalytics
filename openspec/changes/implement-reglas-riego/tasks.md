@@ -124,24 +124,24 @@ probadas sin registrarlas.
 
 Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la traza.
 
-- [ ] 9.1 `CicloLecturaRiegoRule`: riego del sector a las 10:12 y evaluación 13:59 → `ABORT_RIEGO`;
+- [x] 9.1 `CicloLecturaRiegoRule`: riego del sector a las 10:12 y evaluación 13:59 → `ABORT_RIEGO`;
       a las 14:00:10 → `NOOP_INFO`; riego en curso (de un ciclo anterior) → `ABORT_RIEGO`;
       `ContextoRiego.vacio()` → `NOOP_INFO`.
-- [ ] 9.2 `SustratoSaturadoRule` (R-04): 74 → `NOOP_INFO`; 75 → `ABORT_RIEGO` sin `ALERTA`;
+- [x] 9.2 `SustratoSaturadoRule` (R-04): 74 → `NOOP_INFO`; 75 → `ABORT_RIEGO` sin `ALERTA`;
       80 → `ABORT_RIEGO` + `ALERTA` WARNING; override bloqueo 70 → 72 bloquea.
-- [ ] 9.3 `DeficitCriticoRule` (R-02): 34 → `ACTIVAR_VALVULA` (6 L, 720 s) + `ALERTA` CRITICAL;
+- [x] 9.3 `DeficitCriticoRule` (R-02): 34 → `ACTIVAR_VALVULA` (6 L, 720 s) + `ALERTA` CRITICAL;
       35 → `NOOP_INFO`; último R-02 hace 11 h 59 min → `ABORT_RIEGO` (tope); hace 12 h → riega;
       sin humedad → `SIN_DATO` y `NOOP_INFO`.
-- [ ] 9.4 `FueraDeVentanaRiegoRule` (R-05): con h 40, los cinco bordes de la spec; con h 34 o h 50
+- [x] 9.4 `FueraDeVentanaRiegoRule` (R-05): con h 40, los cinco bordes de la spec; con h 34 o h 50
       → `NOOP_INFO` "no aplica"; la comparación de hora usa `EN` con la ventana vigente.
-- [ ] 9.5 `PausaTrasAplicacionRule` (R-06): aplicación hace 5 h 59 min 59 s → `ABORT_RIEGO`;
+- [x] 9.5 `PausaTrasAplicacionRule` (R-06): aplicación hace 5 h 59 min 59 s → `ABORT_RIEGO`;
       hace 6 h → `NOOP_INFO`; sin aplicaciones → `NOOP_INFO`; h 34 → "no aplica".
-- [ ] 9.6 `PosponerPorLluviaRule` (R-03): (70 %, 5 mm) → `POSTPONE_RIEGO` + `ALERTA` INFO;
+- [x] 9.6 `PosponerPorLluviaRule` (R-03): (70 %, 5 mm) → `POSTPONE_RIEGO` + `ALERTA` INFO;
       (95 %, 4,9 mm) y (69 %, 20 mm) → `NOOP_INFO`; sin pronóstico → dos `SIN_DATO` y `NOOP_INFO`;
       h 60 o h 34 → "no aplica" sin alerta; `lluvia-ventana` 2 ignora lluvia de la hora +3.
-- [ ] 9.7 `RiegoPorDeficitRule` (R-01): 44 → `ACTIVAR_VALVULA` (4,2 L, 504 s) con motivo legible;
+- [x] 9.7 `RiegoPorDeficitRule` (R-01): 44 → `ACTIVAR_VALVULA` (4,2 L, 504 s) con motivo legible;
       45 → `NOOP_INFO`; 34 → `NOOP_INFO` "lo cubre R-02"; override umbral 50 y h 48 → riega.
-- [ ] 9.8 Test de orquestación con las siete reglas nuevas + `ManualLockRule` + `StaleSensorRule`
+- [x] 9.8 Test de orquestación con las siete reglas nuevas + `ManualLockRule` + `StaleSensorRule`
       (orquestador real, sin Spring): h 34 a las 23:30 con lluvia y aplicación reciente → una sola
       `ACTIVAR_VALVULA` (de R-02) y la traza muestra R-05/R-06/R-03 "no aplica"; h 40 con lluvia
       → `POSTPONE_RIEGO` y R-01 `OMITIDA_RAMA_BLOQUEADA`; h 40 a las 19:00 → R-05 corta; bloqueo
