@@ -57,6 +57,10 @@ class CatalogoParametrosServiceTest {
     /** Estado de la "tabla" parametro_regla que simulan los stubs del repositorio. */
     private final Map<String, ParametroReglaEntity> tabla = new ConcurrentHashMap<>();
 
+    /** Fábrica del umbral de riego: 42 hasta la conmutación del bloque 10, 45 después. */
+    private static final String F_UMBRAL = ParametrosRiego.UMBRAL_HUMEDAD.fabrica();
+    private static final double F_UMBRAL_NUM = Double.parseDouble(F_UMBRAL);
+
     private CatalogoParametros catalogo;
     private CatalogoParametrosService service;
 
@@ -74,11 +78,11 @@ class CatalogoParametrosServiceTest {
     @BeforeEach
     void setUp() {
         catalogo = new CatalogoParametros(
-                new ArrayList<DefinicionParametro>(Arrays.asList(ParametrosRiegoV2Fixture.values())),
-                ParametrosRiegoV2Fixture.RESTRICCIONES,
+                CatalogoParametros.definicionesReales(),
+                CatalogoParametros.restriccionesReales(),
                 List.of(regla("IrrigationRule", 10, RuleBranch.RIEGO,
-                                ParametrosRiegoV2Fixture.UMBRAL_HUMEDAD, ParametrosRiegoV2Fixture.LITROS_POR_PUNTO),
-                        regla("WeatherOverrideRule", 5, RuleBranch.RIEGO, ParametrosRiegoV2Fixture.UMBRAL_HUMEDAD),
+                                ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.LITROS_POR_PUNTO),
+                        regla("WeatherOverrideRule", 5, RuleBranch.RIEGO, ParametrosRiego.UMBRAL_HUMEDAD),
                         regla("ManualLockRule", 1, RuleBranch.GLOBAL)));
 
         lenient().when(repository.findAll()).thenAnswer(i -> new ArrayList<>(tabla.values()));
@@ -104,7 +108,7 @@ class CatalogoParametrosServiceTest {
 
     @Test
     void vigentes_sinOverridesDevuelveFabrica() {
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(45.0);
+        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
         assertThat(service.vigentes().ventana("riego.ventana-normal").canonico()).isEqualTo("06:00-18:00");
     }
 
@@ -133,7 +137,7 @@ class CatalogoParametrosServiceTest {
 
         ParametrosVigentes v = service.vigentes();
 
-        assertThat(v.numero("riego.umbral-humedad")).isEqualTo(45.0);
+        assertThat(v.numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
         assertThat(v.numero("riego.humedad-objetivo")).isEqualTo(70.0);
     }
 
@@ -219,14 +223,14 @@ class CatalogoParametrosServiceTest {
 
         assertThat(tabla).doesNotContainKey("riego.umbral-humedad");
         verify(repository).deleteById("riego.umbral-humedad");
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(45.0);
+        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
     }
 
     @Test
     void guardar_unValorIgualAFabricaEquivaleARestablecer() {
         override("riego.umbral-humedad", "50");
 
-        service.guardar(List.of(cambio("riego.umbral-humedad", "45")), "Ana");
+        service.guardar(List.of(cambio("riego.umbral-humedad", F_UMBRAL)), "Ana");
 
         assertThat(tabla).doesNotContainKey("riego.umbral-humedad");
     }
@@ -238,7 +242,7 @@ class CatalogoParametrosServiceTest {
         service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
         ParametrosVigentes despues = service.vigentes();
 
-        assertThat(antes.numero("riego.umbral-humedad")).isEqualTo(45.0);
+        assertThat(antes.numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
         assertThat(despues).isNotSameAs(antes);
         assertThat(despues.numero("riego.umbral-humedad")).isEqualTo(50.0);
     }
@@ -270,8 +274,9 @@ class CatalogoParametrosServiceTest {
 
     @Test
     void guardar_loteVacioONuloDevuelveElCatalogoSinTocarNada() {
-        assertThat(service.guardar(List.of(), "Ana").parametros()).hasSize(15);
-        assertThat(service.guardar(null, "Ana").parametros()).hasSize(15);
+        int total = catalogo.definiciones().size();
+        assertThat(service.guardar(List.of(), "Ana").parametros()).hasSize(total);
+        assertThat(service.guardar(null, "Ana").parametros()).hasSize(total);
         verifyNoInteractions(historialService);
     }
 
@@ -283,10 +288,10 @@ class CatalogoParametrosServiceTest {
 
         CatalogoReglasDto dto = service.catalogo();
 
-        assertThat(dto.parametros()).extracting(ParametroDto::clave).doesNotHaveDuplicates().hasSize(15);
+        assertThat(dto.parametros()).extracting(ParametroDto::clave).doesNotHaveDuplicates().hasSize(catalogo.definiciones().size());
         ParametroDto umbral = dto.parametros().stream().filter(p -> p.clave().equals("riego.umbral-humedad")).findFirst().orElseThrow();
         assertThat(umbral.usadoPor()).containsExactly("WeatherOverrideRule", "IrrigationRule");
-        assertThat(umbral.fabrica()).isEqualTo("45");
+        assertThat(umbral.fabrica()).isEqualTo(F_UMBRAL);
         assertThat(umbral.valor()).isEqualTo("50");
         assertThat(umbral.familia()).isEqualTo("RIEGO");
         assertThat(umbral.tipo()).isEqualTo("NUMERO");

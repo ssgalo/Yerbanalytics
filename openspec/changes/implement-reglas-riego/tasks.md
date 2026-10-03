@@ -63,39 +63,41 @@ probadas sin registrarlas.
 
 ## 5. Pronóstico con milímetros (D6)
 
-- [ ] 5.1 Test (`MockRestServiceServer` o cliente falso): `OpenMeteoWeatherClient` pide
+- [x] 5.1 Test (`MockRestServiceServer` o cliente falso): `OpenMeteoWeatherClient` pide
       `precipitation` y `timezone=America/Argentina/Buenos_Aires`, y con un `Clock` fijo en
       13:30 UTC toma como hora actual la marca `T10:00`.
-- [ ] 5.2 Test de `WeatherForecast.lluviaProxima(10:20, 4)`: marcas 11–14 → (máx. 70 %, 5 mm);
+- [x] 5.2 Test de `WeatherForecast.lluviaProxima(10:20, 4)`: marcas 11–14 → (máx. 70 %, 5 mm);
       excluye 10:00 y 15:00; con menos horas disponibles devuelve `horasCubiertas` < 4.
-- [ ] 5.3 Test: el constructor viejo de `WeatherForecast` deja `horas` vacía y el widget del
+- [x] 5.3 Test: el constructor viejo de `WeatherForecast` deja `horas` vacía y el widget del
       dashboard sigue igual (`NurseryService.buildWeatherFromForecast`). Implementar.
 
 ## 6. Catálogo: parámetros de riego v2 (D8)
 
-- [ ] 6.1 Test (`ParametrosRealesTest`): el catálogo real tiene las 15 claves de la tabla D8 con sus
+- [x] 6.1 Test (`ParametrosRealesTest`): el catálogo real tiene las 15 claves de la tabla D8 con sus
       tipos, unidades, fábricas, rangos y decimales, **además** de las tres que salen (se van en el
       bloque 10). Mover las definiciones de `ParametrosRiegoV2Fixture` a `ParametrosRiego` con
       etiqueta, descripción y `refSpec` (`reglas_v2 §5 R-0x / §11 Riego`). Fábricas nuevas:
-      `umbral-humedad` 45, `lluvia-probabilidad` 70.
-- [ ] 6.2 Test: `CatalogoParametros` real rechaza (al guardar, vía servicio) `crítico ≥ umbral`,
+      `umbral-humedad` 45, `lluvia-probabilidad` 70 — **desvío**: esas dos se cambian en el bloque
+      10.5 (conmutación), porque hasta entonces `IrrigationRule` y `WeatherOverrideRule` las leen y
+      el comportamiento no debe cambiar; en 6.1 quedan en 42 y 60.
+- [x] 6.2 Test: `CatalogoParametros` real rechaza (al guardar, vía servicio) `crítico ≥ umbral`,
       `umbral ≥ objetivo`, `bloqueo > alerta` y `volumen-max / caudal × 3600 > 1200`; los valores de
       fábrica cumplen las cuatro. Llevar las restricciones a `restriccionesReales()`.
-- [ ] 6.3 Test: un `ConsumidorParametros` que no es `Rule` (falso, `"DespachoRiego"`) aparece en
+- [x] 6.3 Test: un `ConsumidorParametros` que no es `Rule` (falso, `"DespachoRiego"`) aparece en
       `usadoPor` y no en `reglas()`; uno que declara una clave inexistente impide construir el
       catálogo. `Rule` extiende `ConsumidorParametros`. Implementar.
-- [ ] 6.4 Borrar `ParametrosRiegoV2Fixture` y apuntar `CatalogoParametrosTest` /
+- [x] 6.4 Borrar `ParametrosRiegoV2Fixture` y apuntar `CatalogoParametrosTest` /
       `CatalogoParametrosServiceTest` a las definiciones reales.
 
 ## 7. Piezas puras: cálculo de riego y ciclo de lectura (D3, D5)
 
-- [ ] 7.1 Test de `CalculoRiego`: h 44,9 → 4,02 L / 483 s; h 44 → 4,2 L / 504 s (no 505);
-      `litros-por-punto` 0,3 y h 40 → 6 L / 720 s; R-02 con caudal 60 → 6 L / 360 s; caudal 10 y
-      volumen 6 → 1200 s exactos sin recorte; volumen 10 y caudal 20 → 1200 s, `recortado = true`.
-- [ ] 7.2 Test de `CicloLectura.inicio(ahora, minutos)`: con 240 → 01:59 da 22:00 del día anterior,
+- [x] 7.1 Test de `CalculoRiego`: h 44,9 → 4,02 L / 483 s; h 44 → 4,2 L / 504 s (no 505);
+      `litros-por-punto` 0,3 y h 40 → 6 L / 720 s; R-02 con caudal 60 → 6 L / 360 s; volumen 10 y caudal
+      30 (o 6 L a 18 L/h) → 1200 s exactos sin recorte; volumen 10 y caudal 20 → 1200 s, `recortado = true`.
+- [x] 7.2 Test de `CicloLectura.inicio(ahora, minutos)`: con 240 → 01:59 da 22:00 del día anterior,
       02:00 da 02:00, 13:59:59 da 10:00, 14:00 da 14:00; con 300 → 23:00 da 22:00 (último ciclo del
       día, corto); `minutos` 5 se acota a 60 y 600 a 360.
-- [ ] 7.3 Test: `ConfiguracionService` rechaza `intervaloSensadoMinutos` fuera de 60–360 con 400
+- [x] 7.3 Test: `ConfiguracionService` rechaza `intervaloSensadoMinutos` fuera de 60–360 con 400
       (`ConfiguracionService.java:223`). Implementar.
 
 ## 8. Cola y despacho (D4) — sin conectar a las reglas
@@ -158,7 +160,8 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
       MZ-2 con `humSus` 40 → tras un tick, 10 comandos `valve ON` con `durationSec` 600 (5 L) y 90
       sectores "En cola"; segunda telemetría a las 10:06 → ningún comando nuevo para los 10 ya
       regados; avanzar el reloj 605 s → tick abre los 10 siguientes.
-- [ ] 10.5 Registrar las siete reglas (`@Component`). Borrar `IrrigationRule`,
+- [ ] 10.5 Registrar las siete reglas (`@Component`). Pasar las fábricas de `riego.umbral-humedad`
+      a 45 y `riego.lluvia-probabilidad` a 70 (ver desvío de 6.1; ajustar `ParametrosRealesTest`). Borrar `IrrigationRule`,
       `WeatherOverrideRule`, `DailyVolumeLimitRule`, sus tests, y las claves
       `riego.tiempo-max-apertura`, `riego.max-riegos-24h`, `riego.max-riegos-24h-sector`
       (actualizar `ParametrosRealesTest`). Borrar `TIEMPO_MAX_PATTERN`/`parseTiempoMax` y el enganche

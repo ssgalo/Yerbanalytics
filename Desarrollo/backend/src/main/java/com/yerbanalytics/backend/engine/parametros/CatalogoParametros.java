@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.parametros;
 
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.riego.CalculoRiego;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +31,7 @@ public class CatalogoParametros {
     private static final Pattern CLAVE = Pattern.compile("[a-z]+\\.[a-z0-9]+(-[a-z0-9]+)*");
 
     /** Definiciones reales, una enum por familia. Sumar una familia nueva es agregarla acá. */
-    private static List<DefinicionParametro> definicionesReales() {
+    static List<DefinicionParametro> definicionesReales() {
         List<DefinicionParametro> todas = new ArrayList<>();
         for (DefinicionParametro[] familia : new DefinicionParametro[][]{
                 ParametrosSeguridad.values(),
@@ -50,20 +51,40 @@ public class CatalogoParametros {
     private final Map<String, ValorParametro> fabricas;
     private final Map<String, List<String>> usadoPor;
 
-    /** Constructor de Spring: definiciones reales y todas las reglas registradas. */
+    /**
+     * Constructor de Spring: definiciones reales y todo lo que lee parámetros (las reglas registradas
+     * y quien ejecuta sin ser regla, como el despacho de riego).
+     */
     @Autowired
-    public CatalogoParametros(List<Rule> reglas) {
-        this(definicionesReales(), restriccionesReales(), reglas);
+    public CatalogoParametros(List<ConsumidorParametros> consumidores) {
+        this(definicionesReales(), restriccionesReales(), consumidores);
     }
 
-    /** Restricciones cruzadas de las familias reales: hoy ninguna (se suman con las reglas v2). */
-    private static List<RestriccionCruzada> restriccionesReales() {
-        return List.of();
+    /** Restricciones cruzadas de las familias reales (riego: {@code reglas_v2} §11 y límite de la válvula). */
+    static List<RestriccionCruzada> restriccionesReales() {
+        return List.of(
+                new RestriccionCruzada(
+                        List.of("riego.umbral-critico", "riego.umbral-humedad"),
+                        v -> v.numero("riego.umbral-critico") < v.numero("riego.umbral-humedad"),
+                        "El umbral crítico debe ser menor que el umbral de riego."),
+                new RestriccionCruzada(
+                        List.of("riego.umbral-humedad", "riego.humedad-objetivo"),
+                        v -> v.numero("riego.umbral-humedad") < v.numero("riego.humedad-objetivo"),
+                        "El umbral de riego debe ser menor que la humedad objetivo."),
+                new RestriccionCruzada(
+                        List.of("riego.saturacion-bloqueo", "riego.saturacion-alerta"),
+                        v -> v.numero("riego.saturacion-bloqueo") <= v.numero("riego.saturacion-alerta"),
+                        "El bloqueo por saturación no puede superar la alerta de saturación."),
+                new RestriccionCruzada(
+                        List.of("riego.volumen-max-evento", "riego.caudal-emisor"),
+                        v -> CalculoRiego.cabeEnLaValvula(v.numero("riego.volumen-max-evento"),
+                                v.numero("riego.caudal-emisor")),
+                        "Con ese caudal, el volumen máximo no se alcanza a regar dentro del límite de la válvula."));
     }
 
     public CatalogoParametros(List<DefinicionParametro> definiciones,
                               List<RestriccionCruzada> restricciones,
-                              List<Rule> reglas) {
+                              List<? extends ConsumidorParametros> consumidores) {
         Map<String, DefinicionParametro> mapa = new LinkedHashMap<>();
         Map<String, ValorParametro> fab = new LinkedHashMap<>();
         for (DefinicionParametro d : definiciones) {
@@ -105,15 +126,19 @@ public class CatalogoParametros {
         }
 
         // Por prioridad (estable): así reglas() y usadoPor() salen en el orden en que corre el motor.
-        List<Rule> ordenadas = reglas.stream().sorted(Comparator.comparingInt(Rule::priority)).toList();
+        // Los consumidores que no son reglas (el despacho de riego) van después, en el orden dado.
+        List<Rule> ordenadas = consumidores.stream().filter(Rule.class::isInstance).map(Rule.class::cast)
+                .sorted(Comparator.comparingInt(Rule::priority)).toList();
+        List<ConsumidorParametros> lectores = new ArrayList<>(ordenadas);
+        consumidores.stream().filter(c -> !(c instanceof Rule)).forEach(lectores::add);
         Map<String, List<String>> usos = new LinkedHashMap<>();
-        for (Rule regla : ordenadas) {
-            for (DefinicionParametro p : regla.parametros()) {
+        for (ConsumidorParametros lector : lectores) {
+            for (DefinicionParametro p : lector.parametros()) {
                 if (!mapa.containsKey(p.clave())) {
-                    throw new IllegalStateException("La regla '" + regla.name()
+                    throw new IllegalStateException("'" + lector.name()
                             + "' declara un parámetro inexistente en el catálogo: '" + p.clave() + "'.");
                 }
-                usos.computeIfAbsent(p.clave(), k -> new ArrayList<>()).add(regla.name());
+                usos.computeIfAbsent(p.clave(), k -> new ArrayList<>()).add(lector.name());
             }
         }
 
@@ -146,7 +171,7 @@ public class CatalogoParametros {
         return ParametrosVigentes.de(fabricas);
     }
 
-    /** Nombres de las reglas que declaran el parámetro, por prioridad. Vacía si ninguna. */
+    /** Nombres de quienes declaran el parámetro: primero las reglas por prioridad, después los demás. Vacía si nadie. */
     public List<String> usadoPor(String clave) {
         return usadoPor.getOrDefault(clave, List.of());
     }

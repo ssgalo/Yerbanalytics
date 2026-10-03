@@ -13,6 +13,7 @@ import com.yerbanalytics.backend.model.UmbralMetricaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
 import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
+import com.yerbanalytics.backend.engine.riego.CicloLectura;
 import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import static com.yerbanalytics.backend.constant.NurseryConstants.SPECS;
 
@@ -220,7 +221,11 @@ public class ConfiguracionService {
         requirePositive(op.insumoDosisMax24hMl(), "la dosis máxima de insumo por 24 h");
         requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
         requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
-        requirePositive(op.intervaloSensadoMinutos(), "el intervalo de sensado");
+        if (op.intervaloSensadoMinutos() < CicloLectura.MINUTOS_MIN || op.intervaloSensadoMinutos() > CicloLectura.MINUTOS_MAX) {
+            // Es también el ciclo de lectura del riego (un riego por sector y ciclo): 1 a 6 h.
+            throw new InvalidConfigurationException("El intervalo de sensado debe estar entre "
+                    + CicloLectura.MINUTOS_MIN + " y " + CicloLectura.MINUTOS_MAX + " minutos (1 a 6 h).");
+        }
         requirePositive(op.intervaloEvaluacionMinutos(), "el intervalo de evaluación");
     }
 

@@ -8,8 +8,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,13 +134,10 @@ class CatalogoParametrosTest {
                 .hasMessageContaining("fábrica");
     }
 
-    // ------------------------------------------------------------------ 1.4
+    // ------------------------------------------------------------------ 1.4 (catálogo real de riego v2)
 
     private static CatalogoParametros catalogoRiegoV2() {
-        return new CatalogoParametros(
-                new ArrayList<DefinicionParametro>(Arrays.asList(ParametrosRiegoV2Fixture.values())),
-                ParametrosRiegoV2Fixture.RESTRICCIONES,
-                List.of());
+        return new CatalogoParametros(List.of());
     }
 
     private static ParametrosVigentes conCambios(CatalogoParametros cat, Map<String, String> cambios) {
@@ -153,10 +148,10 @@ class CatalogoParametrosTest {
     }
 
     @Test
-    void familiaRiegoV2_registraLas15EntradasSinErrores() {
+    void catalogoRealDeRiego_registraLosParametrosV2SinErrores() {
         CatalogoParametros cat = catalogoRiegoV2();
 
-        assertThat(cat.definiciones()).hasSize(15);
+        assertThat(cat.definicion("riego.sectores-simultaneos")).isPresent();
         assertThat(cat.fabricas().ventana("riego.ventana-normal").contiene(LocalTime.of(18, 30))).isFalse();
         assertThat(cat.fabricas().numero("riego.litros-por-punto")).isEqualTo(0.2);
         assertThat(cat.fabricas().numero("riego.sectores-simultaneos")).isEqualTo(10.0);

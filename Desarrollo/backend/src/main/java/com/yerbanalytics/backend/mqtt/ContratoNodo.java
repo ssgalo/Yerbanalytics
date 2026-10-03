@@ -42,6 +42,13 @@ public final class ContratoNodo {
     /** Deriva tolerada hacia el futuro del reloj del nodo. */
     private static final long TOLERANCIA_FUTURO_MS = 5 * 60_000L;
 
+    /**
+     * Duración máxima, en segundos, que el backend puede pedir en {@code durationSec} de un comando
+     * {@code valve ON}. Espeja {@code CONTRATO_VALVULA_DURACION_MAX_SEG} de {@code contrato.h}: cubre
+     * todo el rango del volumen máximo de riego (3–10 L) al caudal nominal (10 L / 30 L/h = 1200 s).
+     */
+    public static final int DURACION_VALVULA_MAX_SEG = 1200;
+
     private ContratoNodo() {
     }
 
