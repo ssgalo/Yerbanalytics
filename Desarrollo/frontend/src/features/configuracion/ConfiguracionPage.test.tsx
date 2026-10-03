@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom';
 import { ConfiguracionPage } from './ConfiguracionPage';
 import { PageMetaProvider } from '@/hooks/PageMeta';
+import { DemoExpoProvider } from '@/hooks/DemoExpoContext';
 import { getRepository } from '@/data';
 
 beforeEach(() => vi.stubEnv('VITE_DATA_SOURCE', 'mock'));
@@ -17,7 +18,9 @@ const montar = () =>
   render(
     <MemoryRouter>
       <PageMetaProvider>
-        <ConfiguracionPage />
+        <DemoExpoProvider>
+          <ConfiguracionPage />
+        </DemoExpoProvider>
       </PageMetaProvider>
     </MemoryRouter>,
   );
@@ -29,6 +32,18 @@ describe('ConfiguracionPage', () => {
     await screen.findByText('Umbrales de métricas');
     expect(screen.queryByLabelText(/Tiempo máx\. de apertura de riego/)).toBeNull();
     expect(screen.getByRole('link', { name: /Motor de reglas/ })).toBeTruthy();
+  });
+
+  it('tiene el interruptor de Demo Expo y usarlo no ensucia el borrador del formulario', async () => {
+    montar();
+    await waitFor(() => expect(screen.queryByText(/Cargando la apertura máxima/)).toBeNull());
+    const sw = (await screen.findByRole('switch', { name: /Mostrar Demo Expo/ })) as HTMLInputElement;
+    await waitFor(() => expect(sw.disabled).toBe(false));
+
+    fireEvent.click(sw);
+
+    await waitFor(() => expect(sw.checked).toBe(true));
+    expect((screen.getByRole('button', { name: /Guardar cambios/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   /** Ensucia el borrador con un cambio válido ajeno a la rustificación. */

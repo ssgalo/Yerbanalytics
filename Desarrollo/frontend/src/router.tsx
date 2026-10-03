@@ -9,6 +9,7 @@ import { ConfiguracionPage } from '@/features/configuracion/ConfiguracionPage';
 import { HardwarePage } from '@/features/hardware/HardwarePage';
 import { TopologiaPage } from '@/features/topologia/TopologiaPage';
 import { ReglasPage } from '@/features/reglas/ReglasPage';
+import { DemoExpoPage } from '@/features/demo-expo/DemoExpoPage';
 
 /** Definición de rutas; aparte del router del navegador para poder montarla en tests. */
 export const routes: RouteObject[] = [
@@ -25,6 +26,7 @@ export const routes: RouteObject[] = [
       { path: 'reglas', element: <ReglasPage /> },
       { path: 'hardware', element: <HardwarePage /> },
       { path: 'topologia', element: <TopologiaPage /> },
+      { path: 'demo-expo', element: <DemoExpoPage /> },
     ],
   },
 ];

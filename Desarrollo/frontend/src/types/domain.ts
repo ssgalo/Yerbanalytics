@@ -639,3 +639,49 @@ export interface TrazaEvaluacion {
   parametrosHash: string;
   reglas: TrazaRegla[];
 }
+
+/* ---------- Pasada del riel (Demo Expo) ---------- */
+
+export type EstadoPasada = 'EN_CURSO' | 'COMPLETADA' | 'FALLIDA' | 'CANCELADA';
+export type TipoPaso = 'MOVER' | 'CAPTURAR' | 'HOME';
+export type EstadoPaso = 'PENDIENTE' | 'EN_CURSO' | 'OK' | 'ERROR' | 'OMITIDO';
+
+/** Diagnóstico de IA de la captura de un paso. `conf` ya es un porcentaje 0–100. */
+export interface DiagnosticoPaso {
+  estado: string;
+  conf: number;
+  sev: string;
+  creadoEn: number;
+}
+
+export interface PasoPasada {
+  n: number;
+  tipo: TipoPaso;
+  posicion: number;
+  sectorId: string | null;
+  estado: EstadoPaso;
+  codigoError: string | null;
+  /** Texto legible que arma el backend (el front sólo lo muestra). */
+  detalle: string | null;
+  commandId: string | null;
+  ordenId: string | null;
+  /** `estado` de la orden de captura tal cual: PENDIENTE, ENTREGADA, RECIBIDA, ERROR… */
+  estadoOrden: string | null;
+  capturaId: string | null;
+  imagenUrl: string | null;
+  diagnostico: DiagnosticoPaso | null;
+  /** ms epoch */
+  iniciadoEn: number | null;
+  terminadoEn: number | null;
+}
+
+export interface Pasada {
+  id: string;
+  estado: EstadoPasada;
+  /** ms epoch */
+  iniciadaEn: number;
+  finalizadaEn: number | null;
+  cancelacionSolicitada: boolean;
+  error: string | null;
+  pasos: PasoPasada[];
+}

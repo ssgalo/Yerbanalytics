@@ -363,6 +363,42 @@ nuevas y no tocan ninguna existente: `ddl-auto=update` las crea sola. El DDL que
 documentado en [`migracion-captura-imagenes.sql`](src/main/resources/migracion-captura-imagenes.sql)
 para entornos sin permisos de DDL.
 
+## Planificador de pasadas del riel
+
+Una **pasada** mueve el riel de la cámara, pide la foto de dos sectores y vuelve a home:
+`IR_A 1` → foto del 1.er sector de la macro-zona de menor número → `IR_A 2` → foto del 2.º → `HOME`.
+Una sola a la vez. Es capacidad del sistema (el backend no tiene modos): funciona siempre.
+
+| Método y ruta | Respuesta |
+|---|---|
+| `POST /api/pasadas` | `202` + `Pasada` · `409 {"error"}` (ya hay una en curso, menos de 2 sectores, ningún dispositivo de captura conectado) |
+| `GET /api/pasadas/actual` | `200` + `Pasada` (la en curso o la última) · `204` si no hubo ninguna desde el arranque |
+| `POST /api/pasadas/actual/cancelar` | `200` + `Pasada` · `409` si no hay una en curso |
+
+La forma de `Pasada` y sus pasos está en `openspec/changes/add-pasada-riel/design.md` §2.6.
+
+- **MQTT.** Publica el comando en `nursery/rail/command` (QoS 1) y escucha `nursery/rail/event` con
+  un adaptador propio, aparte del de telemetría (que queda idéntico). Contrato: `mqtt/ContratoRiel.java`,
+  espejo de la sección "Riel" de `Desarrollo/embebido/comun/contrato.h`. Cada paso lleva un
+  `commandId` y sólo cuentan los eventos que lo citan.
+- **Tiempos** (`yerbanalytics.pasada.*`): sin ningún evento a los `timeout-aceptacion-seg` (5) se
+  republica el *mismo* comando; al doble, `RIEL_SIN_RESPUESTA`. Un movimiento tiene
+  `timeout-movimiento-seg` (120) y una foto `timeout-captura-seg` (240). `tick-ms` (1000) es la
+  cadencia del orquestador, que corre en su propio carril (`pasadaScheduler`).
+- **Fallas.** Una foto fallida no corta la pasada (termina `FALLIDA`); un movimiento fallido omite
+  lo pendiente y manda a home; si falla HOME no se reintenta. Cancelar manda `HOME` (el firmware
+  aborta el movimiento en curso).
+- **El estado vive en memoria.** Un reinicio a mitad pierde la pasada (`GET` → `204`); las órdenes,
+  capturas y diagnósticos, que son el registro real, ya se persisten. Se puede iniciar otra enseguida.
+- **Diagnóstico.** `GET /api/pasadas/actual` lo completa por captura aunque la pasada ya haya
+  terminado: llega ~1 min después de la última foto, cuando el servicio de inferencia barre.
+
+### Interruptor "Demo Expo"
+
+`GET`/`PUT /api/configuracion/demo-expo` (`{"visible": true|false}`; `400` si falta `visible`) decide si
+el dashboard muestra la pestaña. Se guarda en `preferencia_dashboard` (fila única), que crea
+Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de pasada no dependen de él.
+
 ## Integración con el frontend
 
 | `VITE_DATA_SOURCE` | Origen de datos |

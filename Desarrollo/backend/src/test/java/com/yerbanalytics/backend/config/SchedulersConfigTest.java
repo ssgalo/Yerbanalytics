@@ -65,4 +65,15 @@ class SchedulersConfigTest {
                     metodo + " debe correr en el carril de captura, no en el del motor");
         }
     }
+
+    @Test
+    void elTickDeLaPasadaPideSuPropioCarril() throws NoSuchMethodException {
+        Scheduled anotacion = com.yerbanalytics.backend.service.PasadaRielService.class.getMethod("tick")
+                .getAnnotation(Scheduled.class);
+
+        assertNotNull(anotacion, "tick debe seguir siendo una tarea programada");
+        assertEquals("pasadaScheduler", anotacion.scheduler(),
+                "el tick de la pasada no puede esperar detrás del barrido del motor ni de la captura");
+        assertNotSame(taskScheduler, config.pasadaScheduler());
+    }
 }

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useNurseryData } from '@/hooks/NurseryContext';
+import { useDemoExpo } from '@/hooks/DemoExpoContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import styles from './Sidebar.module.css';
 
@@ -20,6 +21,9 @@ const PRINCIPAL: NavItem[] = [
   { to: '/', icon: 'dashboard', label: 'Panel general', end: true },
   { to: '/diagnosticos', icon: 'diagnostics', label: 'Diagnósticos de IA', showCount: true },
 ];
+
+/* Sólo se agrega si el interruptor de Configuración la enciende; va pegada a Diagnósticos de IA. */
+const DEMO_EXPO: NavItem = { to: '/demo-expo', icon: 'camera', label: 'Demo Expo' };
 
 const GESTION: NavItem[] = [
   { to: '/historial', icon: 'history', label: 'Historial' },
@@ -45,6 +49,8 @@ function NavItemLink({ item, count }: { item: NavItem; count: number }) {
 
 export function Sidebar() {
   const { stats } = useNurseryData();
+  const { visible: demoExpoVisible } = useDemoExpo();
+  const principal = demoExpoVisible ? [...PRINCIPAL, DEMO_EXPO] : PRINCIPAL;
 
   return (
     <aside className={styles.sidebar}>
@@ -60,7 +66,7 @@ export function Sidebar() {
 
       <div className={styles.section}>Principal</div>
       <nav className={styles.nav}>
-        {PRINCIPAL.map((item) => (
+        {principal.map((item) => (
           <NavItemLink key={item.to} item={item} count={stats.diagCount} />
         ))}
       </nav>

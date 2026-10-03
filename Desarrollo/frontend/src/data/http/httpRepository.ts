@@ -5,6 +5,7 @@
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { PasadaRechazadaError } from '@/data/pasadaError';
 import type {
   ActionRecord,
   CambioParametro,
@@ -18,6 +19,7 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  Pasada,
   TopologiaVivero,
   TrazaEvaluacion,
 } from '@/types/domain';
@@ -221,5 +223,62 @@ export class HttpRepository implements DataRepository {
       throw new Error(`Error ${res.status} al obtener la evaluación del sector ${sectorId}`);
     }
     return (await res.json()) as TrazaEvaluacion;
+  }
+
+  /** Absolutiza la miniatura de cada paso, igual que las de los diagnósticos. */
+  private resolverPasada(p: Pasada): Pasada {
+    return { ...p, pasos: p.pasos.map((paso) => this.absolutizarImagen(paso)) };
+  }
+
+  /** POST sin body de las pasadas: un 409 trae { error } y es un rechazo esperable, no una falla. */
+  private async postPasada(url: string, accion: string): Promise<Pasada> {
+    const res = await fetch(url, { method: 'POST' });
+    if (res.status === 409) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new PasadaRechazadaError(body?.error ?? `No se pudo ${accion} la pasada.`);
+    }
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al ${accion} la pasada`);
+    }
+    return this.resolverPasada((await res.json()) as Pasada);
+  }
+
+  async iniciarPasada(): Promise<Pasada> {
+    return this.postPasada(`${this.baseUrl}/pasadas`, 'iniciar');
+  }
+
+  async getPasadaActual(): Promise<Pasada | null> {
+    const res = await fetch(`${this.baseUrl}/pasadas/actual?t=${Date.now()}`);
+    // 204: todavía no hubo ninguna pasada desde el arranque del backend.
+    if (res.status === 204) return null;
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener la pasada del riel`);
+    }
+    return this.resolverPasada((await res.json()) as Pasada);
+  }
+
+  async cancelarPasada(): Promise<Pasada> {
+    return this.postPasada(`${this.baseUrl}/pasadas/actual/cancelar`, 'cancelar');
+  }
+
+  async getDemoExpo(): Promise<boolean> {
+    const res = await fetch(`${this.baseUrl}/configuracion/demo-expo?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener la preferencia de Demo Expo`);
+    }
+    return ((await res.json()) as { visible: boolean }).visible === true;
+  }
+
+  async setDemoExpo(visible: boolean): Promise<boolean> {
+    const res = await fetch(`${this.baseUrl}/configuracion/demo-expo`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visible }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al guardar la preferencia de Demo Expo`);
+    }
+    return ((await res.json()) as { visible: boolean }).visible === true;
   }
 }

@@ -6,7 +6,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
- * Tres carriles de tareas programadas, a propósito separados.
+ * Cuatro carriles de tareas programadas, a propósito separados.
  *
  * <p>El default de Spring Boot es <strong>un solo hilo</strong> para todos los {@code @Scheduled}
  * de la aplicación, y acá conviven dos familias de tareas con exigencias incompatibles:
@@ -73,6 +73,21 @@ public class SchedulersConfig {
         ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
         s.setPoolSize(2);
         s.setThreadNamePrefix("captura-sched-");
+        s.setWaitForTasksToCompleteOnShutdown(true);
+        s.setAwaitTerminationSeconds(10);
+        return s;
+    }
+
+    /**
+     * Carril del orquestador de la pasada del riel: un hilo, un tick por segundo. Aparte del motor
+     * para que el movimiento y las fotos no esperen detrás del barrido de 600 sectores, y de la
+     * captura para no competir con el latido del SSE.
+     */
+    @Bean
+    public TaskScheduler pasadaScheduler() {
+        ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
+        s.setPoolSize(1);
+        s.setThreadNamePrefix("pasada-sched-");
         s.setWaitForTasksToCompleteOnShutdown(true);
         s.setAwaitTerminationSeconds(10);
         return s;

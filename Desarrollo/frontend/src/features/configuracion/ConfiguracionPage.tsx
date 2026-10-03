@@ -12,6 +12,7 @@ import { LimitesActuadoresForm } from './components/LimitesActuadoresForm';
 import { RustificacionPlanForm } from './components/RustificacionPlanForm';
 import { SeguimientoForm } from './components/SeguimientoForm';
 import { IntervalosForm } from './components/IntervalosForm';
+import { DemoExpoSwitch } from './components/DemoExpoSwitch';
 import styles from './ConfiguracionPage.module.css';
 
 type Feedback = { kind: 'ok' | 'err'; msg: string } | null;
@@ -146,6 +147,14 @@ export function ConfiguracionPage() {
           <span className={styles.sectionHint}>Intervalos de sensado (IoT) y ejecución de inferencia (IA)</span>
         </div>
         <IntervalosForm value={draft.operativa} onChange={patchOperativa} />
+      </Card>
+
+      <Card className={styles.section}>
+        <div className={styles.sectionHead}>
+          <span className={styles.sectionTitle}>Demo Expo</span>
+          <span className={styles.sectionHint}>Preferencia de visualización · se guarda al instante</span>
+        </div>
+        <DemoExpoSwitch />
       </Card>
 
       <div className={styles.actions}>

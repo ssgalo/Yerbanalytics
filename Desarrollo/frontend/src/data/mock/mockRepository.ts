@@ -4,6 +4,7 @@
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { PasadaRechazadaError } from '@/data/pasadaError';
 import type {
   ActionRecord,
   CambioParametro,
@@ -16,6 +17,7 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  Pasada,
   TopologiaVivero,
   TrazaEvaluacion,
 } from '@/types/domain';
@@ -25,6 +27,7 @@ import { buildNursery, type TopologiaGrid } from './generators';
 import { buildHistory } from './history';
 import { buildRuleSchema, catalogoVigente, validarCambios, type OverrideParametro } from './reglasMock';
 import { evaluarMotor } from './trazaReglas';
+import { simularPasada } from './pasadaMock';
 import {
   altaDispositivo,
   buildFleet,
@@ -55,6 +58,12 @@ export class MockRepository implements DataRepository {
   private disposicionOverride: DisposicionTopologia | null = null;
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
+
+  /** Visibilidad de la pestaña "Demo Expo"; apagada por defecto, igual que el backend. */
+  private demoExpo = false;
+  /** Inicio de la última pasada simulada y, si se canceló, cuándo; null = no hubo ninguna. */
+  private pasadaInicioMs: number | null = null;
+  private pasadaCanceladaMs: number | null = null;
 
   constructor(private readonly seed: number) {}
 
@@ -291,5 +300,43 @@ export class MockRepository implements DataRepository {
       ultimaAplicacionMs: ultimo(delSector('Insumo')),
       riegoEnCursoHastaMs: regando ? ref + 300_000 : null,
     });
+  }
+
+  async getDemoExpo(): Promise<boolean> {
+    return this.demoExpo;
+  }
+
+  async setDemoExpo(visible: boolean): Promise<boolean> {
+    this.demoExpo = visible;
+    return this.demoExpo;
+  }
+
+  /** La pasada simulada tal como estaría ahora; null si nunca se inició. */
+  private pasadaAhora(): Pasada | null {
+    if (this.pasadaInicioMs === null) return null;
+    return simularPasada(this.pasadaInicioMs, Date.now(), this.pasadaCanceladaMs);
+  }
+
+  async iniciarPasada(): Promise<Pasada> {
+    if (this.pasadaAhora()?.estado === 'EN_CURSO') {
+      throw new PasadaRechazadaError('Ya hay una pasada en curso.');
+    }
+    this.pasadaInicioMs = Date.now();
+    this.pasadaCanceladaMs = null;
+    return this.pasadaAhora() as Pasada;
+  }
+
+  async getPasadaActual(): Promise<Pasada | null> {
+    return this.pasadaAhora();
+  }
+
+  async cancelarPasada(): Promise<Pasada> {
+    const actual = this.pasadaAhora();
+    if (!actual || actual.estado !== 'EN_CURSO') {
+      throw new PasadaRechazadaError('No hay una pasada en curso.');
+    }
+    // Cancelar dos veces no reinicia el regreso a home.
+    this.pasadaCanceladaMs ??= Date.now();
+    return this.pasadaAhora() as Pasada;
   }
 }
