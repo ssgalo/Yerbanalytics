@@ -146,19 +146,19 @@ comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx,
 
 ## 7. Frontend: pestaña Parámetros (PR 5)
 
-- [ ] 7.1 Test: `/reglas` aparece en el `Sidebar` y monta `ReglasPage` con pestañas Parámetros /
+- [x] 7.1 Test: `/reglas` aparece en el `Sidebar` y monta `ReglasPage` con pestañas Parámetros /
       Inspector. Ruta y página.
-- [ ] 7.2 Test: las reglas se agrupan por rama en orden de prioridad, colapsadas, con resumen
+- [x] 7.2 Test: las reglas se agrupan por rama en orden de prioridad, colapsadas, con resumen
       "N parámetros · M modificados"; una regla sin parámetros dice "Sin parámetros configurables".
       `ReglaCard`.
-- [ ] 7.3 Test: un parámetro compartido muestra el chip con las otras reglas; editarlo bajo una
+- [x] 7.3 Test: un parámetro compartido muestra el chip con las otras reglas; editarlo bajo una
       regla cambia el valor mostrado bajo la otra; guardar envía **un** cambio para esa clave.
       Borrador indexado por clave (`useCatalogoReglas`).
-- [ ] 7.4 Test: campo por tipo (`NumberField` reutilizado, `HoraField`, `VentanaField`); valor
+- [x] 7.4 Test: campo por tipo (`NumberField` reutilizado, `HoraField`, `VentanaField`); valor
       inválido marca el campo y deshabilita Guardar; "Restablecer" envía `valor: null`.
-- [ ] 7.5 Test: búsqueda, filtro por rama, "sólo modificados" y "Ver por parámetro" (cada clave una
+- [x] 7.5 Test: búsqueda, filtro por rama, "sólo modificados" y "Ver por parámetro" (cada clave una
       vez con `usadoPor`).
-- [ ] 7.6 Test: un 400 del servidor muestra cada error junto a su parámetro y conserva el borrador.
+- [x] 7.6 Test: un 400 del servidor muestra cada error junto a su parámetro y conserva el borrador.
 - [x] 7.7 Configuración: test de que `LimitesActuadoresForm` ya no muestra los dos campos, muestra
       el enlace a "Motor de reglas" y rotula volumen diario y dosis máx. como "no intervienen en
       decisiones del motor"; `RustificacionPlanForm` valida contra `mediasombra.apertura-maxima`

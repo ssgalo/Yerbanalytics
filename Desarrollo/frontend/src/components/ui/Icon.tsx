@@ -30,9 +30,19 @@ export type IconName =
   | 'camera'
   | 'calendar'
   | 'chevron-down'
-  | 'map-pin';
+  | 'map-pin'
+  | 'rules';
 
 const PATHS: Record<IconName, JSX.Element> = {
+  // Motor de reglas: un nodo que se bifurca (el DAG de decisión).
+  rules: (
+    <>
+      <circle cx="6" cy="5" r="2.2" />
+      <circle cx="18" cy="12" r="2.2" />
+      <circle cx="6" cy="19" r="2.2" />
+      <path d="M6 7.2v9.6M6 12h9.8" />
+    </>
+  ),
   leaf: (
     <>
       <path d="M12 21c0-6 0-10 0-13" />

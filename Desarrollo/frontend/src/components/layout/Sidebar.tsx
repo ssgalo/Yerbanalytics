@@ -24,6 +24,7 @@ const PRINCIPAL: NavItem[] = [
 const GESTION: NavItem[] = [
   { to: '/historial', icon: 'history', label: 'Historial' },
   { to: '/configuracion', icon: 'config', label: 'Configuración' },
+  { to: '/reglas', icon: 'rules', label: 'Motor de reglas' },
   { to: '/hardware', icon: 'hardware', label: 'Hardware' },
   { to: '/topologia', icon: 'cube', label: 'Topología' },
 ];
