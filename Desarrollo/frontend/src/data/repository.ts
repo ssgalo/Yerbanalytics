@@ -2,20 +2,26 @@
    Contrato de acceso a datos. La UI solo conoce esta interface;
    nunca sabe si detrás hay un mock o un backend real.
 
-   Cubre el dominio del dashboard y nada más. El backend expone además endpoints de captura
-   —órdenes, dispositivos de cámara, alta de diagnósticos— que NO se declaran acá: son
-   superficie pública de la plataforma, para el planificador de pasadas del riel y el servicio
-   de inferencia, y ninguna vista del dashboard los consume.
+   Cubre el dominio del dashboard y nada más. Las pasadas del riel (Demo Expo) SÍ son
+   superficie del dashboard. Las demás piezas de captura —órdenes, dispositivos de cámara, alta
+   de diagnósticos— NO se declaran acá: son superficie pública de la plataforma, para el
+   planificador de pasadas y el servicio de inferencia, y ninguna vista las consume.
    ============================================================ */
 import type {
   ActionRecord,
+  CambioParametro,
+  CatalogoReglas,
   Configuracion,
+  DagSchema,
   DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  OrigenEvaluacion,
+  Pasada,
   TopologiaVivero,
+  TrazaEvaluacion,
 } from '@/types/domain';
 
 export interface DataRepository {
@@ -39,4 +45,28 @@ export interface DataRepository {
   generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero>;
   /** Actualiza la disposición visual por fila sin regenerar la grilla (HU-18 CA-01). */
   guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero>;
+  /** Catálogo de umbrales del motor de reglas, agrupado por regla (cada parámetro una vez). */
+  getCatalogoReglas(): Promise<CatalogoReglas>;
+  /**
+   * Aplica cambios al catálogo, todo o nada, y devuelve el catálogo actualizado. `valor: null`
+   * restablece el valor de fábrica. Si algo es inválido rechaza con `ParametrosInvalidosError`.
+   */
+  saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas>;
+  /** Esquema base del DAG del motor (topología estática, con los parámetros de cada regla). */
+  getRuleSchema(): Promise<DagSchema>;
+  /**
+   * Última evaluación del motor para un sector. Sin `origen`, la más reciente de las dos.
+   * `null` si todavía no se evaluó desde el arranque.
+   */
+  getTrazaEvaluacion(sectorId: string, origen?: OrigenEvaluacion): Promise<TrazaEvaluacion | null>;
+  /** ¿Se muestra la pestaña "Demo Expo" en el menú? Sólo oculta la pestaña, no las pasadas. */
+  getDemoExpo(): Promise<boolean>;
+  /** Guarda la visibilidad de la pestaña y devuelve el valor guardado. */
+  setDemoExpo(visible: boolean): Promise<boolean>;
+  /** Rechaza con `PasadaRechazadaError` (mensaje del 409) si no se puede iniciar. */
+  iniciarPasada(): Promise<Pasada>;
+  /** La pasada en curso o la última; `null` si no hubo ninguna desde que arrancó el backend (204). */
+  getPasadaActual(): Promise<Pasada | null>;
+  /** Rechaza con `PasadaRechazadaError` si no hay una pasada en curso. */
+  cancelarPasada(): Promise<Pasada>;
 }

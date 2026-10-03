@@ -27,7 +27,7 @@ export function RecentDiagnostics({ recentDiag }: RecentDiagnosticsProps) {
       <div className={styles.list}>
         {recentDiag.map((d) => (
           <button
-            key={d.sectorId}
+            key={d.id}
             className={styles.item}
             onClick={() => navigate('/sector/' + d.sectorId)}
             type="button"

@@ -1,9 +1,12 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
+import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
 import org.springframework.stereotype.Component;
 
@@ -54,13 +57,14 @@ public class ManualLockRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
-        if (ctx.bloqueoManualActivo()) {
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
+        // Condición fija (no configurable): queda en la traza marcada como tal.
+        if (ev.compararFijo("Bloqueo manual activo", ctx.bloqueoManualActivo(), Operador.EQ, true)) {
             String reason = String.format(
                     "Manual override lock active on sector %s or its zone. " +
                     "All autonomous actuation suspended until the operator deactivates it.",
                     ctx.sector().getId());
-            return List.of(RuleAction.of(ActionType.ABORT_ALL, NAME, reason));
+            return List.of(RuleAction.of(ActionType.ABORT_ALL, NAME, reason, CancelaRiego.TODAS));
         }
 
         return List.of(RuleAction.noopInfo(NAME,

@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DiagnosticoRepository extends JpaRepository<DiagnosticoEntity, String> {
@@ -13,4 +14,7 @@ public interface DiagnosticoRepository extends JpaRepository<DiagnosticoEntity, 
     List<DiagnosticoEntity> findAllByOrderByCreadoEnDesc();
 
     List<DiagnosticoEntity> findBySectorIdOrderByCreadoEnDesc(String sectorId);
+
+    /** El diagnóstico más reciente de una captura: lo usa el seguimiento de la pasada del riel. */
+    Optional<DiagnosticoEntity> findFirstByCapturaIdOrderByCreadoEnDesc(String capturaId);
 }

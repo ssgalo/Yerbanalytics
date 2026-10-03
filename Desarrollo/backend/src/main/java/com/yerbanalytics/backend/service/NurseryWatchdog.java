@@ -2,7 +2,10 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
@@ -15,12 +18,12 @@ import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -54,7 +57,8 @@ public class NurseryWatchdog implements SchedulingConfigurer {
     private final ConfiguracionService configuracionService;
     private final WeatherService weatherService;
     private final ManualLockRepository manualLockRepository;
-    private final long staleThresholdMs;
+    private final TrazaEvaluacionStore trazaStore;
+    private final Clock reloj;
 
     public NurseryWatchdog(ZonaRepository zonaRepository,
                            SectorRepository sectorRepository,
@@ -63,7 +67,8 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                            ConfiguracionService configuracionService,
                            WeatherService weatherService,
                            ManualLockRepository manualLockRepository,
-                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
+                           TrazaEvaluacionStore trazaStore,
+                           Clock reloj) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.ruleOrchestrator = ruleOrchestrator;
@@ -71,7 +76,8 @@ public class NurseryWatchdog implements SchedulingConfigurer {
         this.configuracionService = configuracionService;
         this.weatherService = weatherService;
         this.manualLockRepository = manualLockRepository;
-        this.staleThresholdMs = staleThresholdMs;
+        this.trazaStore = trazaStore;
+        this.reloj = reloj;
     }
 
     @Override
@@ -125,20 +131,17 @@ public class NurseryWatchdog implements SchedulingConfigurer {
 
         // Un único instante para todo el barrido: los 600 sectores se evalúan contra la misma
         // foto del tiempo, en vez de contra un reloj que se corre mientras el ciclo avanza.
-        long ahoraMs = System.currentTimeMillis();
-        Instant ahora = Instant.ofEpochMilli(ahoraMs);
+        Instant ahora = reloj.instant();
         int totalSectores = 0;
 
         for (ZonaEntity zona : zonas) {
-            boolean sensorStale = zona.getLastReadingTime() == null
-                    || (ahoraMs - zona.getLastReadingTime() > staleThresholdMs);
             boolean zonaBloqueada = zonasBloqueadas.contains(zona.getId());
 
             for (SectorEntity sector : zona.getSectors()) {
                 boolean bloqueoActivo = zonaBloqueada || sectoresBloqueados.contains(sector.getId());
 
                 // En el ciclo proactivo usamos las métricas derivadas del último estado conocido.
-                // Si el sensor está stale, las métricas serán nulas y StaleSensorRule actuará.
+                // Si el sensor está stale (StaleSensorRule lo calcula con zona.lastReadingTime), actúa ella.
                 RuleContext ctx = new RuleContext(
                         sector,
                         zona,
@@ -147,12 +150,13 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                         operativa,
                         sector.getStatus(),
                         ahora,
-                        sensorStale,
                         forecast,
                         bloqueoActivo
                 );
 
-                actionExecutor.execute(ruleOrchestrator.evaluate(ctx), ctx);
+                ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.BARRIDO);
+                trazaStore.guardar(resultado.traza());
+                actionExecutor.execute(resultado.acciones(), ctx, OrigenEvaluacion.BARRIDO);
                 totalSectores++;
             }
         }

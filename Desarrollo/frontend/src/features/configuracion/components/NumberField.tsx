@@ -8,13 +8,18 @@ interface NumberFieldProps {
   step?: number;
   min?: number;
   invalid?: boolean;
+  disabled?: boolean;
+  /** Aclaración debajo del campo (p. ej. que no interviene en decisiones del motor). */
+  hint?: string;
+  /** Oculta el rótulo visible cuando otro texto ya nombra el campo (sigue como `aria-label`). */
+  hideLabel?: boolean;
   onChange: (value: number) => void;
 }
 
-export function NumberField({ label, unit, value, step = 1, min = 0, invalid, onChange }: NumberFieldProps) {
+export function NumberField({ label, unit, value, step = 1, min = 0, invalid, disabled, hint, hideLabel, onChange }: NumberFieldProps) {
   return (
     <div className={styles.field}>
-      <label className={styles.label}>{label}</label>
+      {!hideLabel && <label className={styles.label}>{label}</label>}
       <div className={styles.inputWrap}>
         <input
           className={invalid ? `${styles.input} ${styles.inputError}` : styles.input}
@@ -22,6 +27,7 @@ export function NumberField({ label, unit, value, step = 1, min = 0, invalid, on
           step={step}
           min={min}
           value={value}
+          disabled={disabled}
           aria-label={label}
           onChange={(e) => {
             const n = Number(e.target.value);
@@ -30,6 +36,7 @@ export function NumberField({ label, unit, value, step = 1, min = 0, invalid, on
         />
         {unit && <span className={styles.unit}>{unit}</span>}
       </div>
+      {hint && <span className={styles.hint}>{hint}</span>}
     </div>
   );
 }

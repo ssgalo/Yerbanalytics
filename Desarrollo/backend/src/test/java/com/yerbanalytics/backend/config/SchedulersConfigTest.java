@@ -32,12 +32,26 @@ class SchedulersConfigTest {
     private SchedulersConfig config;
 
     @Test
-    void hayDosCarrilesDistintos() {
+    void hayTresCarrilesDistintos() {
         TaskScheduler captura = config.capturaScheduler();
+        TaskScheduler despacho = config.despachoScheduler();
 
         assertNotNull(taskScheduler, "El carril del motor tiene que resolverse por nombre");
         assertNotSame(taskScheduler, captura,
                 "El motor y la captura no pueden compartir scheduler");
+        assertNotSame(taskScheduler, despacho,
+                "El despacho de riego no puede esperar detrás del barrido del motor");
+        assertNotSame(captura, despacho);
+    }
+
+    @Test
+    void elTickDelDespachoDeRiegoPideSuPropioCarril() throws NoSuchMethodException {
+        Scheduled anotacion = com.yerbanalytics.backend.engine.riego.DespachoRiego.class.getMethod("tick")
+                .getAnnotation(Scheduled.class);
+
+        assertNotNull(anotacion, "tick debe seguir siendo una tarea programada");
+        assertEquals("despachoScheduler", anotacion.scheduler(),
+                "las tandas liberan cupo cada 10 s: no pueden compartir hilo con el barrido de 600 sectores");
     }
 
     @Test
@@ -50,5 +64,16 @@ class SchedulersConfigTest {
             assertEquals("capturaScheduler", anotacion.scheduler(),
                     metodo + " debe correr en el carril de captura, no en el del motor");
         }
+    }
+
+    @Test
+    void elTickDeLaPasadaPideSuPropioCarril() throws NoSuchMethodException {
+        Scheduled anotacion = com.yerbanalytics.backend.service.PasadaRielService.class.getMethod("tick")
+                .getAnnotation(Scheduled.class);
+
+        assertNotNull(anotacion, "tick debe seguir siendo una tarea programada");
+        assertEquals("pasadaScheduler", anotacion.scheduler(),
+                "el tick de la pasada no puede esperar detrás del barrido del motor ni de la captura");
+        assertNotSame(taskScheduler, config.pasadaScheduler());
     }
 }

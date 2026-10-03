@@ -13,7 +13,7 @@
    ============================================================ */
 import mqtt, { type MqttClient } from 'mqtt';
 import { config } from './config.ts';
-import { telemetryTopic, type TelemetryPayload } from './contract.ts';
+import { telemetryTopic, valveDurationWarning, type TelemetryPayload } from './contract.ts';
 
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
 const COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/sector/+/command';
@@ -88,6 +88,8 @@ export function connect(): void {
           params +
           ` commandId=${payload.commandId ?? '?'}`,
       );
+      const warning = valveDurationWarning(payload);
+      if (warning) console.warn(`[simulator] WARNING ${warning}`);
     } catch {
       console.log(`[simulator] ← COMMAND topic=${topic} (unparseable payload)`);
     }

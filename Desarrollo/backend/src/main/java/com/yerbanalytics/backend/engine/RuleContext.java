@@ -29,13 +29,6 @@ public record RuleContext(
         // --- Campos incorporados en fases R1/R2/R3 ---
 
         /**
-         * {@code true} si el nodo testigo de la macro-zona no reportó telemetría
-         * dentro del umbral configurado ({@code yerbanalytics.nursery.stale-threshold-ms}).
-         * Evaluado por {@code StaleSensorRule}.
-         */
-        boolean sensorStale,
-
-        /**
          * Pronóstico climático obtenido por {@code WeatherService} (R2/HU-09).
          * Puede ser {@code null} si la API externa no respondió — el motor opera
          * en modo degradado sin cancelar la evaluación.
@@ -46,9 +39,24 @@ public record RuleContext(
          * {@code true} si existe un {@code ManualLockEntity} activo para este sector
          * o su zona (R2/HU-19). Evaluado por {@code ManualLockRule}.
          */
-        boolean bloqueoManualActivo
+        boolean bloqueoManualActivo,
+
+        /**
+         * Pasado reciente del sector que necesitan las reglas de riego (último riego, última
+         * aplicación de insumo, inicio del ciclo de lectura…). {@link ContextoRiego#vacio()} si
+         * el llamador no lo arma (el barrido, que no riega).
+         */
+        ContextoRiego riego
 
 ) {
+    /** Constructor sin contexto de riego: mantiene la firma de antes de las reglas de riego v2. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo,
+                ContextoRiego.vacio());
+    }
+
     /**
      * Devuelve el valor raw de la métrica identificada por {@code key},
      * o {@code null} si no está presente en el contexto.

@@ -12,7 +12,13 @@ import lombok.Setter;
  * ninguna operación de edición/borrado: la inalterabilidad es por construcción.
  */
 @Entity
-@Table(name = "historial_evento")
+@Table(name = "historial_evento", indexes = {
+        // El contexto de riego (cada mensaje del nodo): WHERE zona_id = ? AND tipo IN ('Riego','Insumo') AND ts >= ?
+        // → igualdad, lista y rango, en ese orden. Mismo nombre que migracion-reglas-riego.sql.
+        @Index(name = "idx_historial_evento_zona_tipo_ts", columnList = "zona_id, tipo, ts"),
+        // Riegos abiertos tras un reinicio (tipo = 'Riego' AND ts >= ?) y KPI por tipo y día.
+        @Index(name = "idx_historial_evento_tipo_ts", columnList = "tipo, ts")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,7 +37,7 @@ public class HistorialEventoEntity {
     @Column(name = "zona_name", nullable = false)
     private String zonaName;
 
-    /** Riego | Insumo | Mediasombra */
+    /** Riego | Insumo | Mediasombra | Info | Configuración | Alerta */
     @Column(nullable = false)
     private String tipo;
 
@@ -102,4 +108,22 @@ public class HistorialEventoEntity {
     /** Bloqueo de repetición autónoma ante "Sin efectividad" (HU-12 CA-03). */
     @Column(name = "bloqueo_repeticion", nullable = false)
     private boolean bloqueoRepeticion;
+
+    // --- Riego y alertas del motor (nulos en los eventos que no los usan) ---
+
+    /** Regla que ordenó la acción (p. ej. {@code RiegoPorDeficitRule}). */
+    @Column(name = "regla")
+    private String regla;
+
+    /** Nivel de una alerta: INFO | WARNING | CRITICAL. Nulo si el evento no es una alerta. */
+    @Column(name = "alerta")
+    private String alerta;
+
+    /** Volumen de riego ordenado, en litros. */
+    @Column(name = "volumen_l")
+    private Double volumenL;
+
+    /** Duración de apertura de la válvula ordenada, en segundos. */
+    @Column(name = "duracion_seg")
+    private Integer duracionSeg;
 }

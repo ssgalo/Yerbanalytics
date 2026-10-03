@@ -48,6 +48,65 @@ El script traslada las lecturas, recupera el estado de los nodos desde el regist
 hardware, convierte `ce` a dS/m y re-escala los umbrales de `uv`. Los `DROP COLUMN` quedan
 comentados a propósito: descomentalos recién después de verificar el resultado.
 
+### Migración manual pendiente · catálogo de parámetros de reglas
+
+El tiempo máximo de apertura de riego y la apertura máxima de la mediasombra se mudaron de
+`configuracion_operativa` al **catálogo de parámetros de reglas** (`riego.tiempo-max-apertura` y
+`mediasombra.apertura-maxima`), junto con el resto de los umbrales que comparan las reglas.
+`ddl-auto=update` **nunca baja columnas**: las dos quedan en la tabla como `NOT NULL` sin default y
+el primer `INSERT` de una fila operativa nueva falla. El backend arranca igual (la fila existente
+sólo se lee y los valores de fábrica son los mismos del seed).
+
+Corré `src/main/resources/migracion-catalogo-parametros.sql`:
+
+1. Arrancar la app una vez con el código nuevo → crea la tabla `parametro_regla`.
+2. Detener la app.
+3. Ejecutar el script.
+4. Volver a arrancar.
+
+Copia cada valor a `parametro_regla` **sólo si difiere de fábrica** (120 s y 100 %) y baja las
+columnas. También copia el `ideal_min` de `humSus` como override de `riego.umbral-humedad` si
+difiere y no hay uno: antes el riego usaba ese umbral y ahora usa el del catálogo. Es idempotente y
+trae, comentado, el bloque inverso (`ADD COLUMN … DEFAULT …`) para un rollback del código.
+
+> **Ojo:** el script compara ese `ideal_min` contra la fábrica **actual** de `riego.umbral-humedad`,
+> **45** (era 42; ver más abajo). Una base con `ideal_min = 42` (el default del seed) SÍ recibe el
+> override 42, así que su umbral de riego se conserva; sólo una base con `ideal_min = 45` queda sin
+> override (coincide con la fábrica). Una base ya migrada con la comparación vieja (contra 42) no
+> recibió override y pasó de 42 a 45: cargá 42 por `PUT /api/rules/parametros` si querés conservarlo.
+>
+> `riego.tiempo-max-apertura` (uno de los dos parámetros que mueve este script) ya no existe en el
+> catálogo: lo limpia el script siguiente.
+
+### Migración manual pendiente · reglas de riego R-01…R-06
+
+El riego pasó a las reglas v2 (`reglas_v2` §5) con despacho por tandas. `ddl-auto=update` agrega las
+columnas nuevas (`historial_evento.regla`, `alerta`, `volumen_l`, `duracion_seg` y `zona.hum_sus_ts`,
+todas nulas) y los índices de `historial_evento`, pero **no limpia filas viejas ni baja columnas**.
+El backend arranca igual sin correr nada: un override de una clave que ya no existe se ignora con un
+warn. Correr `src/main/resources/migracion-reglas-riego.sql` deja la base sin esas filas huérfanas:
+
+1. Arrancar la app una vez con el código nuevo → crea las columnas.
+2. Ejecutar el script (la app puede estar levantada: sólo borra filas muertas e índices).
+
+El script **no se aplica solo**. Hace cuatro cosas:
+
+- Borra los overrides de `riego.tiempo-max-apertura`, `riego.max-riegos-24h` y
+  `riego.max-riegos-24h-sector`, claves que ya no existen.
+- Crea (si no existen) los índices `historial_evento(zona_id, tipo, ts)` y `(tipo, ts)`. Hibernate los
+  crea sola al arrancar; el script permite hacerlo antes o por separado.
+- **Baja `configuracion_operativa.riego_vol_max_diario_ml`** (`NOT NULL`): el código nuevo no la
+  completa, así que mientras exista el primer guardado de Configuración sobre una base *sin fila*
+  falla.
+- Trae, comentadas, una consulta que detecta overrides que violan las restricciones nuevas (el
+  backend no falla al arrancar con ellos, pero la pantalla de Reglas los rechaza al editar) y el
+  bloque de rollback.
+
+`riego.umbral-humedad` (42 → 45 %) y `riego.lluvia-probabilidad` (60 → 70 %) cambiaron **de fábrica**:
+sin override, el valor vigente cambia solo al desplegar; con override, se respeta. La columna
+`sector.actuador_valve` quedó como legado: nadie la lee para decidir (el estado de la válvula lo
+deriva el despacho).
+
 ### Migración manual pendiente · baja del estado del simulador
 
 El simulador se extrajo a `Desarrollo/simulador/`, un proyecto independiente, y con él salieron
@@ -74,8 +133,10 @@ Qué cambió, en concreto:
   desapareció junto con todo `/api/simulacion/**`. El simulador publica **directo al broker**,
   en el mismo topic y con el mismo payload que el firmware, así que la lectura entra por la
   ingesta de siempre.
-- **El backend dejó de tener publicador MQTT.** Sólo consume. Existía únicamente para que el
-  backend se publicara telemetría a sí mismo.
+- **El backend dejó de publicar telemetría.** Consume la del nodo y publica **sólo comandos a los
+  actuadores** (`nursery/zone/{zona}/sector/{sector}/command`, `ComandoActuadorPublisher`). El
+  publicador de telemetría existía únicamente para que el backend se publicara lecturas a sí
+  mismo.
 
 ## Arquitectura
 
@@ -90,6 +151,78 @@ El proyecto sigue el patrón multicapa clásico de Spring Boot:
 ## Endpoints
 
 - `GET /api/nursery`: Devuelve el snapshot completo del vivero (`NurseryData`). Hoy usa un generador determinístico con semilla configurable (`yerbanalytics.mock.seed`, default `20260613`).
+
+### Motor de reglas: catálogo de parámetros y traza de evaluación
+
+Los umbrales que comparan las reglas (antigüedad de la lectura, umbrales y volúmenes de riego,
+lluvia, saturación, ventana horaria, UV, confianza mínima del diagnóstico, dosis en 24 h, aperturas de
+mediasombra…) viven en **un catálogo único** (`engine/parametros/`, 21 parámetros), **no** en
+`application.properties` ni en `configuracion_operativa`. Definiciones y valores de fábrica están en
+código; en la base (`parametro_regla`) sólo hay los overrides. Cada regla declara los parámetros que
+usa (`Rule.parametros()`) y sólo puede leer esos. Sumar un umbral nuevo es agregarlo al catálogo, no
+una constante en la regla.
+
+Fuera del catálogo quedan, a propósito, la fecha de siembra (`yerbanalytics.nursery.sowing-date-iso`),
+el intervalo de despacho de riego, los parámetros del cliente de pronóstico (`yerbanalytics.weather.*`)
+y los intervalos de sensado y evaluación (configuración operativa).
+
+- `GET /api/rules/parametros`: catálogo normalizado (`reglas` y `parametros`, cada parámetro una
+  vez con su `usadoPor`).
+- `PUT /api/rules/parametros`: edición en lote, todo o nada (`{"cambios":[{"clave","valor"}]}`;
+  `valor: null` restablece la fábrica). Valida tipo, rango y restricciones cruzadas (crítico < umbral
+  de riego < humedad objetivo; bloqueo ≤ alerta de saturación; el volumen máximo debe caber en los
+  1200 s de la válvula); si algo falla responde `400 {"errores":[{"clave","mensaje"}]}` y no persiste
+  nada. Audita con `X-Usuario`.
+- `GET /api/rules/evaluaciones/{sectorId}?origen=TELEMETRIA|BARRIDO`: última traza de evaluación
+  del sector (qué recibió cada regla contra qué umbral). Vive en memoria: `204` si todavía no se
+  evaluó desde el arranque, `404` si el sector no existe.
+- `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros`.
+
+El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Parámetros* (edición
+del catálogo) e *Inspector* (el grafo coloreado con la última evaluación de un sector).
+
+### Riego: reglas R-01…R-06 y despacho por tandas
+
+El riego sigue `docs-motor-reglas-e-integracion/reglas_v2.md` §5. Las reglas **deciden y encolan**; no
+abren la válvula. Un servicio de despacho (`engine/riego/DespachoRiego`) corre cada
+`yerbanalytics.riego.despacho-intervalo-ms` (10 000 ms), abre hasta `riego.sectores-simultaneos` (10)
+válvulas por macro-zona en orden de numeración de sector y publica `valve ON` con
+`durationSec = ceil(volumen / caudal × 3600)`, con tope de 1200 s. Antes de abrir cada válvula
+**revalida con los datos de ese momento**, con los mismos parámetros que las reglas: sin bloqueo
+manual, humedad bajo el bloqueo por saturación y, para el riego común (R-01), hora dentro de la
+ventana, sin aplicación de insumo reciente (R-06), sin lluvia prevista (R-03, pronóstico cacheado) y
+sin riego en este ciclo; para R-02, el tope de horas. Lo que no pasa se descarta de la cola y deja una
+alerta WARNING. Si la **lectura o la humedad no están vigentes** el despacho **pausa** (no abre nada y
+conserva la ronda) en vez de descartarla, y la retoma cuando vuelve el nodo; para que no queden
+solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura contando el de su pedido.
+
+- Un sector recibe a lo sumo **un riego común por ciclo de lectura** (franjas de
+  `intervaloSensadoMinutos`, acotado a 60-360 min, ancladas a las 02:00).
+- El déficit crítico (R-02) riega a cualquier hora con el volumen máximo, con un tope de 1 riego cada
+  12 h por sector.
+- Una ronda encolada **se completa** aunque la humedad se recupere: sólo la retira una cancelación de
+  seguridad (saturación, bloqueo manual; ventana cerrada o pausa por aplicación, para el riego común) o
+  la revalidación del despacho (lluvia pronosticada después de decidir, ya regó en el ciclo). El sensor
+  sin datos no la retira: la **pausa**.
+- La cola y lo que está regando están en memoria. Un reinicio pierde lo pendiente y reconstruye lo
+  abierto del historial; la siguiente telemetría vuelve a decidir.
+- El estado de la válvula del dashboard (`Regando` / `En cola` / `Cerrada`) lo deriva el despacho; el
+  ESP32 corta solo al cumplir la duración y el backend no escucha el ACK.
+
+> **No operar con plantines reales sin E-01 y S-06.** Un sensor de humedad trabado en un valor seco
+> plausible haría regar en cada ciclo de lectura de la ventana (~20 L por día y por sector con el 40 %
+> fijo). Hoy nada lo detecta: la evaluación de efectividad marca `bloqueoRepeticion` pero ninguna regla
+> lo lee. Una sonda que deja de reportar sí se detecta (la humedad vieja bloquea el riego). Es seguro
+> con el simulador; para campo, antes hay que implementar E-01 + S-06 o bajar
+> `riego.volumen-max-evento` y vigilar el historial.
+
+El pronóstico (Open-Meteo) se pide con timeouts HTTP (`yerbanalytics.weather.connect-timeout-ms`,
+3 s, y `read-timeout-ms`, 5 s) y se precalienta al arrancar; un refresco colgado se reemplaza a los 60 s.
+
+Otros límites conocidos: R-06 depende de los eventos "Insumo" y la bomba conserva el enganche
+`Dosificando`; el cupo se llena por número de sector, no por urgencia. El detalle de qué cubre y qué
+no cada regla frente a la spec está en
+[`diferencias-motor-reglas-vs-reglas-v2.md`](../../docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md).
 
 ## Captura de imágenes cenitales (HU-04 CA-01)
 
@@ -123,14 +256,14 @@ cd Desarrollo/contratos/camara/v1/conformidad && npm test
 
 ### API de plataforma — fuera del contrato
 
-La consumen el dashboard y —en el futuro— el planificador de pasadas del riel y el servicio
-de inferencia. Un dispositivo de captura no debe usarlas.
+La consumen el dashboard, el planificador de pasadas del riel (`POST /api/pasadas`, más abajo) y
+el servicio de inferencia. Un dispositivo de captura no debe usarlas.
 
 | Método | Ruta | Quién la usa |
 |---|---|---|
 | `POST` | `/api/camara/vinculacion` | Backoffice: emite el código de un solo uso |
 | `GET` | `/api/camara/dispositivos` | Estado técnico de la flota de cámaras |
-| `POST` | `/api/capturas/ordenes` | Emisor de órdenes (mañana, el planificador de pasadas) |
+| `POST` | `/api/capturas/ordenes` | Emisor de órdenes (hoy, el simulador y el planificador de pasadas) |
 | `GET` | `/api/capturas/ordenes/{id}` | Seguimiento de una orden |
 | `GET` | `/api/capturas/{capturaId}/imagen` | El dashboard, para mostrar la foto |
 | `POST` | `/api/diagnosticos` | **Alta de diagnóstico** |
@@ -200,12 +333,14 @@ yerbanalytics.https.keystore=../certs/servidor.p12
 yerbanalytics.capturas.dir=./capturas
 yerbanalytics.capturas.timeout-orden-seg=60      # plazo antes de vencer una orden
 yerbanalytics.capturas.max-intentos=3            # antes de mandarla a ERROR
-yerbanalytics.capturas.confianza-minima=85       # umbral de concluyente (HU-04 CA-03)
 yerbanalytics.capturas.jwt-secret=...            # SOBRESCRIBIR EN PRODUCCIÓN
 yerbanalytics.capturas.ancho-max=1920            # la resolución la fija el backend,
 yerbanalytics.capturas.calidad-jpeg=0.85         # no el cliente
 yerbanalytics.cors.origins=...                   # agregar el origen de la app de cámara
 ```
+
+La confianza mínima de un diagnóstico concluyente (HU-04 CA-03) ya no es una propiedad: es el
+parámetro `diagnostico.confianza-minima` del catálogo de reglas, compartido con `SupplyRule`.
 
 `yerbanalytics.cors.origins` importa: el iPhone carga la app desde la IP de la máquina en la
 LAN y por HTTPS, no desde `localhost`. Acepta patrones (`https://192.168.0.*:5190`).
@@ -227,6 +362,45 @@ Las cuatro tablas (`orden_captura`, `captura`, `dispositivo_camara`, `diagnostic
 nuevas y no tocan ninguna existente: `ddl-auto=update` las crea sola. El DDL queda
 documentado en [`migracion-captura-imagenes.sql`](src/main/resources/migracion-captura-imagenes.sql)
 para entornos sin permisos de DDL.
+
+## Planificador de pasadas del riel
+
+Una **pasada** mueve el riel de la cámara, pide la foto de dos sectores y vuelve a home:
+`IR_A 1` → foto del 1.er sector de la macro-zona de menor número → `IR_A 2` → foto del 2.º → `HOME`.
+Una sola a la vez. Es capacidad del sistema (el backend no tiene modos): funciona siempre.
+
+| Método y ruta | Respuesta |
+|---|---|
+| `POST /api/pasadas` | `202` + `Pasada` · `409 {"error"}` (ya hay una en curso, menos de 2 sectores, ningún dispositivo de captura conectado) |
+| `GET /api/pasadas/actual` | `200` + `Pasada` (la en curso o la última) · `204` si no hubo ninguna desde el arranque |
+| `POST /api/pasadas/actual/cancelar` | `200` + `Pasada` · `409` si no hay una en curso |
+
+La forma de `Pasada` y sus pasos está en `openspec/changes/add-pasada-riel/design.md` §2.6.
+
+- **MQTT.** Publica el comando en `nursery/rail/command` (QoS 1) y escucha `nursery/rail/event` con
+  un adaptador propio, aparte del de telemetría (que queda idéntico). Contrato: `mqtt/ContratoRiel.java`,
+  espejo de la sección "Riel" de `Desarrollo/embebido/comun/contrato.h`. Cada paso lleva un
+  `commandId` y sólo cuentan los eventos que lo citan.
+- **Tiempos** (`yerbanalytics.pasada.*`): sin ningún evento a los `timeout-aceptacion-seg` (5) se
+  republica el *mismo* comando; al doble, `RIEL_SIN_RESPUESTA`. Un movimiento tiene
+  `timeout-movimiento-seg` (120) y una foto `timeout-captura-seg` (240). `tick-ms` (1000) es la
+  cadencia del orquestador, que corre en su propio carril (`pasadaScheduler`).
+- **Fallas.** Una foto fallida no corta la pasada (termina `FALLIDA`); un movimiento fallido omite
+  lo pendiente y manda a home; si falla HOME no se reintenta. Cancelar manda `HOME` (el firmware
+  aborta el movimiento en curso).
+- **El estado vive en memoria.** Un reinicio a mitad pierde la pasada (`GET` → `204`); las órdenes,
+  capturas y diagnósticos, que son el registro real, ya se persisten. Se puede iniciar otra enseguida.
+- **Limitación.** Un `LLEGO` del firmware no prueba que el carro se movió: éste no puede saber si el
+  motor tiene alimentación. Y con el final de carrera de home en falso, `HOME` termina al instante
+  (`pasos: 0`). Detalle en el README del sketch `vivero_esp32_red`.
+- **Diagnóstico.** `GET /api/pasadas/actual` lo completa por captura aunque la pasada ya haya
+  terminado: llega ~1 min después de la última foto, cuando el servicio de inferencia barre.
+
+### Interruptor "Demo Expo"
+
+`GET`/`PUT /api/configuracion/demo-expo` (`{"visible": true|false}`; `400` si falta `visible`) decide si
+el dashboard muestra la pestaña. Se guarda en `preferencia_dashboard` (fila única), que crea
+Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de pasada no dependen de él.
 
 ## Integración con el frontend
 

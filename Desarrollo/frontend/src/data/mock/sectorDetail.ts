@@ -48,12 +48,16 @@ export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: s
       active: false,
       path: 'M4 12h16M12 4v3M3 16h18a9 9 0 0 0-18 0Z',
     },
-  ].map((a) => ({
-    ...a,
-    soft: a.active ? '#E7F1EA' : '#F0EFE7',
-    ink: a.active ? '#2E7A4F' : '#6A776E',
-    dot: a.active ? '#3FA06A' : '#A9B2AB',
-  }));
+  ].map((a) => {
+    // "En cola": la válvula espera su turno en la tanda de la macro-zona; no está abierta pero tampoco inactiva.
+    const enCola = a.state === 'En cola';
+    return {
+      ...a,
+      soft: a.active ? '#E7F1EA' : enCola ? '#FBF0DC' : '#F0EFE7',
+      ink: a.active ? '#2E7A4F' : enCola ? '#8A5A10' : '#6A776E',
+      dot: a.active ? '#3FA06A' : enCola ? '#E0972C' : '#A9B2AB',
+    };
+  });
 
   // historial (ahora se maneja desde SectorPage con useHistory)
   const hist: HistoryEntry[] = [];

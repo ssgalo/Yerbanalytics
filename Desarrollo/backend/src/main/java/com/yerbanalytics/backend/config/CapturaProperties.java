@@ -49,9 +49,6 @@ public class CapturaProperties {
     /** Timeout del emisor SSE, en ms. El cliente reconecta solo al vencer. */
     private long sseTimeoutMs = 3_600_000;
 
-    /** Umbral de confianza para considerar un diagnóstico concluyente (HU-04 CA-03). */
-    private double confianzaMinima = 85.0;
-
     // --- Configuración que baja al dispositivo ---
 
     private int anchoMax = 1920;
@@ -97,8 +94,6 @@ public class CapturaProperties {
     public long getSseTimeoutMs() { return sseTimeoutMs; }
     public void setSseTimeoutMs(long sseTimeoutMs) { this.sseTimeoutMs = sseTimeoutMs; }
 
-    public double getConfianzaMinima() { return confianzaMinima; }
-    public void setConfianzaMinima(double confianzaMinima) { this.confianzaMinima = confianzaMinima; }
 
     public int getAnchoMax() { return anchoMax; }
     public void setAnchoMax(int anchoMax) { this.anchoMax = anchoMax; }

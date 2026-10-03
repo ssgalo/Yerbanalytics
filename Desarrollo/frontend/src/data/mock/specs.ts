@@ -215,6 +215,11 @@ export const ACT: Record<string, { tint: string; ink: string; path: string }> = 
     ink: '#8A6A22',
     path: 'M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z',
   },
+  Alerta: {
+    tint: '#FBF0DC',
+    ink: '#8A5A10',
+    path: 'M12 3 2.5 20h19L12 3ZM12 10v4M12 17h.01',
+  },
 };
 
 /** Pares soft/ink por resultado de acción. */
@@ -223,6 +228,7 @@ export const resMap: Record<string, ColorPair> = {
   'En seguimiento': { soft: '#F3ECDD', ink: '#8A6A22' },
   Pospuesta: { soft: '#FBE7D7', ink: '#9A4410' },
   Abortada: { soft: '#FBE6E0', ink: '#A8331C' },
+  Informativo: { soft: '#EEEDE5', ink: '#6A776E' },
 };
 
 /** Plantillas del feed de actividad del sistema. */

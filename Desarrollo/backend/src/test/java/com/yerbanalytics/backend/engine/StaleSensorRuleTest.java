@@ -1,23 +1,33 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.rules.StaleSensorRule;
+import com.yerbanalytics.backend.engine.traza.Comparacion;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
+import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.evaluar;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests unitarios de {@link StaleSensorRule} (tarea 2.2).
- *
- * <p>No requiere Spring — contexto fabricado con {@link RuleContextTestFactory}.
+ * Tests unitarios de {@link StaleSensorRule}. La antigüedad se calcula acá con
+ * {@code zona.lastReadingTime} y {@code ctx.now()} contra el parámetro del catálogo.
  */
 @DisplayName("StaleSensorRule")
 class StaleSensorRuleTest {
+
+    private static final Instant AHORA = Instant.parse("2026-01-01T12:00:00Z");
 
     private StaleSensorRule rule;
     private SectorEntity sector;
@@ -30,12 +40,24 @@ class StaleSensorRuleTest {
         zona = RuleContextTestFactory.zonaBasica("MZ-1");
     }
 
-    @Test
-    @DisplayName("sensor stale → emite ABORT_RIEGO")
-    void cuandoSensorStale_emiteAbortRiego() {
-        RuleContext ctx = RuleContextTestFactory.conSensorStale(sector, zona, true);
+    /** Contexto con la última lectura de la zona {@code segundos} antes de {@code AHORA}; null = nunca. */
+    private RuleContext conLecturaHace(Double segundos) {
+        // La humedad de sustrato llegó junto con la lectura: tan fresca como ella.
+        return conLecturaYHumedadHace(segundos, segundos);
+    }
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+    /** Última lectura de la zona y última humedad de sustrato recibidas hace tantos segundos; null = nunca. */
+    private RuleContext conLecturaYHumedadHace(Double lecturaSeg, Double humedadSeg) {
+        zona.setLastReadingTime(lecturaSeg == null ? null : AHORA.toEpochMilli() - (long) (lecturaSeg * 1000));
+        zona.setHumSusTs(humedadSeg == null ? null : AHORA.toEpochMilli() - (long) (humedadSeg * 1000));
+        return new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
+                "ok", AHORA, null, false);
+    }
+
+    @Test
+    @DisplayName("lectura más vieja que el umbral → ABORT_RIEGO")
+    void cuandoLaLecturaEsVieja_emiteAbortRiego() {
+        List<RuleAction> acciones = evaluar(rule, conLecturaHace(91.0));
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.ABORT_RIEGO);
@@ -44,19 +66,151 @@ class StaleSensorRuleTest {
     }
 
     @Test
-    @DisplayName("sensor fresco → emite NOOP_INFO")
-    void cuandoSensorFresco_emiteNoopInfo() {
-        RuleContext ctx = RuleContextTestFactory.conSensorStale(sector, zona, false);
+    @DisplayName("lectura reciente → NOOP_INFO")
+    void cuandoLaLecturaEsReciente_emiteNoopInfo() {
+        assertThat(evaluar(rule, conLecturaHace(10.0))).extracting(RuleAction::type)
+                .containsExactly(ActionType.NOOP_INFO);
+    }
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+    @Test
+    @DisplayName("exactamente en el umbral todavía es fresca (comparación estricta)")
+    void exactamenteEnElUmbral_esFresca() {
+        assertThat(evaluar(rule, conLecturaHace(90.0))).extracting(RuleAction::type)
+                .containsExactly(ActionType.NOOP_INFO);
+    }
 
-        assertThat(acciones).hasSize(1);
-        assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
+    @Test
+    @DisplayName("sin lectura → SIN_DATO y bloquea igual que antes")
+    void sinLectura_bloqueaYQuedaSinDato() {
+        Evaluacion ev = ev(rule);
+
+        List<RuleAction> acciones = rule.evaluate(conLecturaHace(null), ev);
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(ev.comparaciones()).extracting(Comparacion::resultado)
+                .containsExactly(ResultadoComparacion.SIN_DATO, ResultadoComparacion.SIN_DATO);
+    }
+
+    @Test
+    @DisplayName("sin zona → bloquea (zona desconocida)")
+    void sinZona_bloquea() {
+        RuleContext ctx = new RuleContext(sector, null, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
+                "ok", AHORA, null, false);
+
+        List<RuleAction> acciones = evaluar(rule, ctx);
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).motivo()).contains("desconocida");
+    }
+
+    @Test
+    @DisplayName("la traza registra la antigüedad en segundos contra el parámetro")
+    void laTrazaRegistraLaAntiguedadContraElParametro() {
+        Evaluacion ev = ev(rule);
+
+        rule.evaluate(conLecturaHace(95.0), ev);
+
+        assertThat(rule.parametros()).containsExactly(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
+        Comparacion c = ev.comparaciones().get(0);
+        assertThat(c.recibido()).isEqualTo(95.0);
+        assertThat(c.operador()).isEqualTo(Operador.GT);
+        assertThat(c.umbral()).isEqualTo(90.0);
+        assertThat(c.unidad()).isEqualTo("s");
+        assertThat(c.clave()).isEqualTo("seguridad.antiguedad-max-lectura");
+        assertThat(c.resultado()).isEqualTo(ResultadoComparacion.CUMPLE);
+    }
+
+    @Test
+    @DisplayName("el umbral sale del catálogo")
+    void elUmbralSaleDelCatalogo() {
+        // Con 120 s de tolerancia, una lectura de 95 s (vieja para la fábrica) sigue siendo fresca.
+        List<RuleAction> acciones = rule.evaluate(conLecturaHace(95.0),
+                ev(rule, Map.of(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, "120")));
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
     @DisplayName("ABORT_RIEGO es una acción bloqueante")
     void abortRiegoEsBloqueante() {
         assertThat(ActionType.ABORT_RIEGO.isBlocking()).isTrue();
+    }
+
+    // ------------------------------------------------------------------ 4.2 frescura de la humedad
+
+    @Test
+    @DisplayName("zona fresca pero humedad de sustrato de hace 300 s → ABORT_RIEGO con su comparación")
+    void humedadVieja_conZonaFresca_abortaYLoRegistra() {
+        Evaluacion ev = ev(rule);
+
+        List<RuleAction> acciones = rule.evaluate(conLecturaYHumedadHace(10.0, 300.0), ev);
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).motivo()).contains("humedad de sustrato");
+        assertThat(ev.comparaciones()).hasSize(2);
+        Comparacion c = ev.comparaciones().get(1);
+        assertThat(c.etiqueta()).isEqualTo("Antigüedad de la humedad de sustrato");
+        assertThat(c.clave()).isEqualTo("seguridad.antiguedad-max-lectura");
+        assertThat(c.recibido()).isEqualTo(300.0);
+        assertThat(c.operador()).isEqualTo(Operador.GT);
+        assertThat(c.umbral()).isEqualTo(90.0);
+        assertThat(c.resultado()).isEqualTo(ResultadoComparacion.CUMPLE);
+    }
+
+    @Test
+    @DisplayName("humedad de hace 89 s (y exactamente 90 s) → NOOP_INFO")
+    void humedadFresca_noAborta() {
+        assertThat(evaluar(rule, conLecturaYHumedadHace(10.0, 89.0))).extracting(RuleAction::type)
+                .containsExactly(ActionType.NOOP_INFO);
+        assertThat(evaluar(rule, conLecturaYHumedadHace(10.0, 90.0))).extracting(RuleAction::type)
+                .containsExactly(ActionType.NOOP_INFO);
+    }
+
+    @Test
+    @DisplayName("sin marca de humedad → SIN_DATO y ABORT_RIEGO")
+    void sinHumSusTs_quedaSinDatoYAborta() {
+        Evaluacion ev = ev(rule);
+
+        List<RuleAction> acciones = rule.evaluate(conLecturaYHumedadHace(10.0, null), ev);
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(ev.comparaciones().get(0).resultado()).isEqualTo(ResultadoComparacion.NO_CUMPLE);
+        assertThat(ev.comparaciones().get(1).resultado()).isEqualTo(ResultadoComparacion.SIN_DATO);
+    }
+
+    @Test
+    @DisplayName("zona vieja y humedad fresca → aborta igual, con las dos comparaciones en la traza")
+    void zonaVieja_registraAmbasComparaciones() {
+        Evaluacion ev = ev(rule);
+
+        List<RuleAction> acciones = rule.evaluate(conLecturaYHumedadHace(120.0, 10.0), ev);
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(ev.comparaciones()).extracting(Comparacion::resultado)
+                .containsExactly(ResultadoComparacion.CUMPLE, ResultadoComparacion.NO_CUMPLE);
+    }
+
+    @Test
+    @DisplayName("lectura vieja: el ABORT_RIEGO NO lleva marca de cancelación (el despacho PAUSA, no retira la cola)")
+    void lecturaViejaNoCancelaLaCola() {
+        List<RuleAction> acciones = evaluar(rule, conLecturaHace(120.0));
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isNull();
+    }
+
+    @Test
+    @DisplayName("sin lectura: tampoco cancela la cola")
+    void sinLecturaNoCancelaLaCola() {
+        assertThat(evaluar(rule, conLecturaHace(null)).get(0).detalle()).isNull();
+    }
+
+    @Test
+    @DisplayName("humedad de sustrato congelada: ABORT_RIEGO sin marca de cancelación")
+    void humedadCongeladaNoCancelaLaCola() {
+        List<RuleAction> acciones = evaluar(rule, conLecturaYHumedadHace(10.0, 300.0));
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isNull();
     }
 }

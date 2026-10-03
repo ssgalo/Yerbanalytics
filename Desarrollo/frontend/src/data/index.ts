@@ -7,6 +7,8 @@ import { HttpRepository } from './http/httpRepository';
 import { MockRepository } from './mock/mockRepository';
 
 export type { DataRepository } from './repository';
+export { ParametrosInvalidosError } from './parametrosError';
+export { PasadaRechazadaError } from './pasadaError';
 export { selectSectorDetail, selectSensadoTiles, selectSerieMetrica } from './selectors';
 
 let instancia: DataRepository | null = null;

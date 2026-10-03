@@ -1,8 +1,9 @@
 package com.yerbanalytics.backend.service;
 
-import com.yerbanalytics.backend.config.CapturaProperties;
 import com.yerbanalytics.backend.constant.NurseryConstants;
 import com.yerbanalytics.backend.dto.Diagnostico;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
 import com.yerbanalytics.backend.model.CapturaEntity;
 import com.yerbanalytics.backend.model.DiagnosticoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -44,16 +45,16 @@ public class DiagnosticoService {
     private final DiagnosticoRepository repo;
     private final CapturaRepository capturaRepo;
     private final SectorRepository sectorRepo;
-    private final CapturaProperties props;
+    private final CatalogoParametrosService parametros;
 
     public DiagnosticoService(DiagnosticoRepository repo,
                               CapturaRepository capturaRepo,
                               SectorRepository sectorRepo,
-                              CapturaProperties props) {
+                              CatalogoParametrosService parametros) {
         this.repo = repo;
         this.capturaRepo = capturaRepo;
         this.sectorRepo = sectorRepo;
-        this.props = props;
+        this.parametros = parametros;
     }
 
     /**
@@ -131,7 +132,7 @@ public class DiagnosticoService {
 
     /** Umbral de confianza mínima para considerar el diagnóstico concluyente (HU-04 CA-03). */
     public boolean esConcluyente(double conf) {
-        return conf >= props.getConfianzaMinima();
+        return conf >= parametros.vigentes().numero(ParametrosDiagnostico.CONFIANZA_MINIMA);
     }
 
     private Diagnostico aDto(DiagnosticoEntity e) {

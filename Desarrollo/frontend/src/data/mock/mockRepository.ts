@@ -3,20 +3,31 @@
    y lo cachea. Implementa el mismo contrato que el backend real.
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
+import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { PasadaRechazadaError } from '@/data/pasadaError';
 import type {
   ActionRecord,
+  CambioParametro,
+  CatalogoReglas,
   Configuracion,
+  DagSchema,
   DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  OrigenEvaluacion,
+  Pasada,
   TopologiaVivero,
+  TrazaEvaluacion,
 } from '@/types/domain';
 import { validateConfig } from '@/lib/configValidation';
 import { buildConfig } from './config';
 import { buildNursery, type TopologiaGrid } from './generators';
 import { buildHistory } from './history';
+import { buildRuleSchema, catalogoVigente, validarCambios, type OverrideParametro } from './reglasMock';
+import { evaluarMotor } from './trazaReglas';
+import { simularPasada } from './pasadaMock';
 import {
   altaDispositivo,
   buildFleet,
@@ -45,6 +56,14 @@ export class MockRepository implements DataRepository {
   private topologiaOverride: TopologiaGrid | null = null;
   /** Disposición visual elegida por el Administrador; null = defaults (HU-18 CA-01). */
   private disposicionOverride: DisposicionTopologia | null = null;
+  /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
+  private readonly parametrosEditados = new Map<string, OverrideParametro>();
+
+  /** Visibilidad de la pestaña "Demo Expo"; apagada por defecto, igual que el backend. */
+  private demoExpo = false;
+  /** Inicio de la última pasada simulada y, si se canceló, cuándo; null = no hubo ninguna. */
+  private pasadaInicioMs: number | null = null;
+  private pasadaCanceladaMs: number | null = null;
 
   constructor(private readonly seed: number) {}
 
@@ -75,7 +94,13 @@ export class MockRepository implements DataRepository {
 
   async saveConfig(config: Configuracion): Promise<Configuracion> {
     // Mismo comportamiento que el backend: rechaza configuraciones inválidas (HU-15 CA-03).
-    const errors = validateConfig(config);
+    // El tope de apertura del plan de rustificación es un parámetro del catálogo del motor.
+    const aperturaMax = Number(
+      catalogoVigente(this.parametrosEditados).parametros.find(
+        (p) => p.clave === 'mediasombra.apertura-maxima',
+      )?.valor ?? 100,
+    );
+    const errors = validateConfig(config, aperturaMax);
     if (errors.length > 0) {
       throw new Error(errors[0]);
     }
@@ -189,5 +214,129 @@ export class MockRepository implements DataRepository {
     this.cache = null;
 
     return topologiaSummary(t.macroZonas, t.sectoresPorMacroZona, this.disposicionOverride);
+  }
+
+  async getCatalogoReglas(): Promise<CatalogoReglas> {
+    return catalogoVigente(this.parametrosEditados);
+  }
+
+  async saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas> {
+    // Mismo comportamiento que el backend: todo o nada, con la misma validación que la UI.
+    const errores = validarCambios(cambios);
+    if (errores.length > 0) throw new ParametrosInvalidosError(errores);
+
+    const ahora = Date.now();
+    for (const c of cambios) {
+      if (c.valor === null) {
+        this.parametrosEditados.delete(c.clave);
+      } else {
+        this.parametrosEditados.set(c.clave, {
+          valor: c.valor,
+          updatedBy: 'Ingeniero Agrónomo',
+          updatedTs: ahora,
+        });
+      }
+    }
+    return catalogoVigente(this.parametrosEditados);
+  }
+
+  async getRuleSchema(): Promise<DagSchema> {
+    return buildRuleSchema();
+  }
+
+  async getTrazaEvaluacion(
+    sectorId: string,
+    origen: OrigenEvaluacion = 'TELEMETRIA',
+  ): Promise<TrazaEvaluacion | null> {
+    const nursery = await this.getNursery();
+    const sector = nursery.byId[sectorId];
+    if (!sector) throw new Error(`Error 404: el sector ${sectorId} no existe`);
+
+    const zonaIdx = Math.max(
+      0,
+      nursery.zonas.findIndex((z) => z.id === sector.zona),
+    );
+    const zona = nursery.zonas[zonaIdx];
+    const lecturaTs = zona.lectura.ts;
+    const ref = lecturaTs ?? Date.now();
+
+    // El pronóstico del mock es una grilla de franjas: cada macro-zona toma una distinta, así
+    // la demo muestra tanto riego normal como riego pospuesto por lluvia.
+    const slot = nursery.weather.forecast[zonaIdx % nursery.weather.forecast.length];
+
+    const historial = await this.getHistory();
+    const delSector = (tipo: string) =>
+      historial.filter((h) => h.sectorId === sectorId && h.tipo === tipo && h.ts <= ref);
+    const ultimo = (eventos: { ts: number }[]) => eventos.reduce<number | null>((m, h) => (m === null || h.ts > m ? h.ts : m), null);
+    const dosis24h = delSector('Insumo').filter((h) => h.ts > ref - 86_400_000).length;
+
+    // El despacho riega de a tandas: los sectores que el mapa muestra "Regando" ya tienen su riego
+    // despachado (y abierto) en este ciclo; los "En cola" todavía no. Así la demo muestra el corte
+    // "ya regó en este ciclo" en unos y el riego por déficit en otros.
+    const regando = sector.actuadores.valve === 'Regando';
+    const ultimoRiegoMs = regando ? ref - 60_000 : ultimo(delSector('Riego'));
+
+    // La telemetría dispara la evaluación al llegar (lectura fresca y con métricas); el barrido
+    // corre 5 min después y no trae métricas, igual que `NurseryWatchdog`.
+    const telemetria = origen === 'TELEMETRIA';
+    const ts = lecturaTs === null ? ref : ref + (telemetria ? 0 : 300_000);
+
+    return evaluarMotor(await this.getCatalogoReglas(), {
+      sectorId,
+      zonaId: sector.zona,
+      origen,
+      ts: new Date(ts).toISOString(),
+      antiguedadSeg: lecturaTs === null ? null : telemetria ? 1 : 300,
+      bloqueoManual: false,
+      humSus: telemetria ? (zona.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null) : null,
+      lluviaPct: slot?.rain ?? null,
+      uvIndex: slot?.uv ?? null,
+      dosis24h,
+      estadoSector: sector.status,
+      confianza: sector.diagnosis.conf,
+      lluviaMm: slot ? Math.round(slot.rain) / 10 : null,
+      ultimoRiegoMs,
+      ultimoRiegoCriticoMs: ultimo(delSector('Riego').filter((h) => h.regla === 'DeficitCriticoRule')),
+      ultimaAplicacionMs: ultimo(delSector('Insumo')),
+      riegoEnCursoHastaMs: regando ? ref + 300_000 : null,
+    });
+  }
+
+  async getDemoExpo(): Promise<boolean> {
+    return this.demoExpo;
+  }
+
+  async setDemoExpo(visible: boolean): Promise<boolean> {
+    this.demoExpo = visible;
+    return this.demoExpo;
+  }
+
+  /** La pasada simulada tal como estaría ahora; null si nunca se inició. */
+  private pasadaAhora(): Pasada | null {
+    if (this.pasadaInicioMs === null) return null;
+    return simularPasada(this.pasadaInicioMs, Date.now(), this.pasadaCanceladaMs);
+  }
+
+  async iniciarPasada(): Promise<Pasada> {
+    if (this.pasadaAhora()?.estado === 'EN_CURSO') {
+      throw new PasadaRechazadaError('Ya hay una pasada en curso.');
+    }
+    this.pasadaInicioMs = Date.now();
+    this.pasadaCanceladaMs = null;
+    return this.pasadaAhora() as Pasada;
+  }
+
+  async getPasadaActual(): Promise<Pasada | null> {
+    return this.pasadaAhora();
+  }
+
+  async cancelarPasada(): Promise<Pasada> {
+    const actual = this.pasadaAhora();
+    if (!actual || actual.estado !== 'EN_CURSO') {
+      throw new PasadaRechazadaError('No hay una pasada en curso.');
+    }
+    // Cancelar dos veces no reinicia el regreso a home.
+    this.pasadaCanceladaMs ??= Date.now();
+    return this.pasadaAhora() as Pasada;
   }
 }

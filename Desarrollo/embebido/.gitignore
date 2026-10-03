@@ -1,5 +1,6 @@
 # Configuración real con credenciales (NO versionar). Usar config.example.h como plantilla.
 comun/config.h
+prototipo_hardware/vivero_esp32_red/config.h
 
 # Artefactos de build de PlatformIO
 .pio/

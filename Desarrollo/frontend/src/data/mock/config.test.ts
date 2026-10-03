@@ -25,7 +25,13 @@ describe('buildConfig (configuración de fábrica)', () => {
   });
 
   it('la configuración de fábrica es válida', () => {
-    expect(validateConfig(buildConfig())).toEqual([]);
+    expect(validateConfig(buildConfig(), 100)).toEqual([]);
+  });
+
+  it('ya no trae los dos límites que se mudaron al catálogo del motor', () => {
+    const op = buildConfig().operativa as unknown as Record<string, unknown>;
+    expect(op).not.toHaveProperty('riegoTiempoMaxSeg');
+    expect(op).not.toHaveProperty('mediasombraAperturaMaxPct');
   });
 });
 
@@ -34,7 +40,7 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
     const cfg = buildConfig();
     cfg.umbrales[0] = { ...cfg.umbrales[0], idealMin: 90, idealMax: 10 };
     expect(umbralError(cfg.umbrales[0])).not.toBeNull();
-    expect(validateConfig(cfg).length).toBeGreaterThan(0);
+    expect(validateConfig(cfg, 100).length).toBeGreaterThan(0);
   });
 
   it('detecta valores fuera del rango fisiológico de fábrica', () => {
@@ -47,14 +53,15 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
 
   it('rechaza límites operativos no positivos', () => {
     const cfg = buildConfig();
-    cfg.operativa = { ...cfg.operativa, riegoVolMaxDiarioMl: 0 };
+    cfg.operativa = { ...cfg.operativa, insumoDosisMax24hMl: 0 };
     expect(operativaErrors(cfg.operativa).length).toBeGreaterThan(0);
   });
 
-  it('rechaza una apertura de mediasombra fuera de [0, 100]', () => {
+  it('el plan de rustificación se valida contra la apertura máxima que le pasan (la del catálogo)', () => {
     const cfg = buildConfig();
-    cfg.operativa = { ...cfg.operativa, mediasombraAperturaMaxPct: 150 };
-    expect(operativaErrors(cfg.operativa).length).toBeGreaterThan(0);
+    expect(validateConfig(cfg, 100)).toEqual([]);
+    // El plan de fábrica llega a 100 %: con un tope de 50 % del catálogo deja de ser válido.
+    expect(validateConfig(cfg, 50).length).toBeGreaterThan(0);
   });
 
   it('detecta etapas de rustificación solapadas', () => {
@@ -77,6 +84,6 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
   it('exige las 5 métricas: una config incompleta es inválida', () => {
     const cfg: Configuracion = buildConfig();
     cfg.umbrales = cfg.umbrales.slice(0, 3);
-    expect(validateConfig(cfg).length).toBeGreaterThan(0);
+    expect(validateConfig(cfg, 100).length).toBeGreaterThan(0);
   });
 });

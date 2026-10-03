@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useConfig } from '@/hooks/useConfig';
+import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
 import { validateConfig } from '@/lib/configValidation';
 import { buildConfig } from '@/data/mock/config';
 import type { ConfigOperativa, Configuracion, MetricThreshold, RustificacionEtapa } from '@/types/domain';
@@ -11,6 +12,7 @@ import { LimitesActuadoresForm } from './components/LimitesActuadoresForm';
 import { RustificacionPlanForm } from './components/RustificacionPlanForm';
 import { SeguimientoForm } from './components/SeguimientoForm';
 import { IntervalosForm } from './components/IntervalosForm';
+import { DemoExpoSwitch } from './components/DemoExpoSwitch';
 import styles from './ConfiguracionPage.module.css';
 
 type Feedback = { kind: 'ok' | 'err'; msg: string } | null;
@@ -24,6 +26,12 @@ function formatTs(ts: number | null): string {
 
 export function ConfiguracionPage() {
   const { config, loading, error, saving, save } = useConfig();
+  // El tope del plan de rustificación es un parámetro del motor de reglas, no de esta página.
+  const { catalogo, loading: catalogoCargando, error: catalogoError, reload: recargarCatalogo } = useCatalogoReglas();
+  // Sin el catálogo no hay tope: no se supone ninguno (100 % daría por válido un plan que el
+  // motor rechazaría) y el plan no se guarda hasta conocerlo.
+  const valorApertura = catalogo?.parametros.find((p) => p.clave === 'mediasombra.apertura-maxima')?.valor;
+  const aperturaMax = valorApertura !== undefined && Number.isFinite(Number(valorApertura)) ? Number(valorApertura) : null;
   const [draft, setDraft] = useState<Configuracion | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -32,7 +40,7 @@ export function ConfiguracionPage() {
     if (config) setDraft(structuredClone(config));
   }, [config]);
 
-  const errors = useMemo(() => (draft ? validateConfig(draft) : []), [draft]);
+  const errors = useMemo(() => (draft ? validateConfig(draft, aperturaMax ?? 100) : []), [draft, aperturaMax]);
   const dirty = useMemo(
     () => (draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false),
     [draft, config],
@@ -78,7 +86,7 @@ export function ConfiguracionPage() {
     setFeedback(null);
   };
 
-  const canSave = dirty && errors.length === 0 && !saving;
+  const canSave = dirty && errors.length === 0 && !saving && aperturaMax !== null;
 
   return (
     <div>
@@ -99,7 +107,7 @@ export function ConfiguracionPage() {
       <Card className={styles.section}>
         <div className={styles.sectionHead}>
           <span className={styles.sectionTitle}>Límites de riego e insumos</span>
-          <span className={styles.sectionHint}>Topes físicos contra inundaciones y sobredosis</span>
+          <span className={styles.sectionHint}>Topes informativos de volumen y dosis</span>
         </div>
         <LimitesActuadoresForm value={draft.operativa} onChange={patchOperativa} />
       </Card>
@@ -109,11 +117,20 @@ export function ConfiguracionPage() {
           <span className={styles.sectionTitle}>Plan de rustificación</span>
           <span className={styles.sectionHint}>Cronograma de exposición gradual de la mediasombra</span>
         </div>
-        <RustificacionPlanForm
-          value={draft.rustificacion}
-          aperturaMax={draft.operativa.mediasombraAperturaMaxPct}
-          onChange={setEtapas}
-        />
+        {aperturaMax !== null ? (
+          <RustificacionPlanForm value={draft.rustificacion} aperturaMax={aperturaMax} onChange={setEtapas} />
+        ) : catalogoCargando && !catalogoError ? (
+          <div className={styles.state}>Cargando la apertura máxima del motor…</div>
+        ) : (
+          <div className={styles.state} style={{ color: 'var(--crit)' }}>
+            No se pudo obtener la apertura máxima de la mediasombra
+            {catalogoError ? ` (${catalogoError.message})` : ''}. Sin ese tope no se puede validar el plan de
+            rustificación ni guardar la configuración.{' '}
+            <button type="button" className={styles.btnSecondary} onClick={recargarCatalogo}>
+              Reintentar
+            </button>
+          </div>
+        )}
       </Card>
 
       <Card className={styles.section}>
@@ -130,6 +147,14 @@ export function ConfiguracionPage() {
           <span className={styles.sectionHint}>Intervalos de sensado (IoT) y ejecución de inferencia (IA)</span>
         </div>
         <IntervalosForm value={draft.operativa} onChange={patchOperativa} />
+      </Card>
+
+      <Card className={styles.section}>
+        <div className={styles.sectionHead}>
+          <span className={styles.sectionTitle}>Demo Expo</span>
+          <span className={styles.sectionHint}>Preferencia de visualización · se guarda al instante</span>
+        </div>
+        <DemoExpoSwitch />
       </Card>
 
       <div className={styles.actions}>

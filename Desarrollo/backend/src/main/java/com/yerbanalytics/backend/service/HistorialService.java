@@ -1,9 +1,12 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
 import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
+import com.yerbanalytics.backend.engine.DetalleAlerta;
+import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
@@ -17,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.ZoneId;
+import java.time.Clock;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -29,12 +32,14 @@ import java.util.*;
 @Service
 public class HistorialService {
 
+    private static final String EMDASH = "—";
+
     private static final ColorPair VERDICT_EFECTIVA = new ColorPair("#E7F1EA", "#2E7A4F");
     private static final ColorPair VERDICT_SEGUIMIENTO = new ColorPair("#F3ECDD", "#8A6A22");
     private static final ColorPair VERDICT_SIN = new ColorPair("#FBE6E0", "#A8331C");
 
     private static final DateTimeFormatter FECHA_FMT =
-            DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
+            DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZonaHorariaVivero.ZONA);
 
     private final HistorialRepository historialRepository;
     private final SectorRepository sectorRepository;
@@ -43,19 +48,23 @@ public class HistorialService {
     private final long latencyMs;
     private final String latencyLabel;
     private final double umbralRecuperacion;
+    /** Reloj del vivero: el mismo que usa el despacho de riego para sellar y comparar los eventos. */
+    private final Clock reloj;
 
     public HistorialService(HistorialRepository historialRepository,
                             SectorRepository sectorRepository,
                             @Lazy ConfiguracionService configuracionService,
                             @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
                             @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
-                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion) {
+                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion,
+                            Clock reloj) {
         this.historialRepository = historialRepository;
         this.sectorRepository = sectorRepository;
         this.configuracionService = configuracionService;
         this.latencyMs = latencyMs;
         this.latencyLabel = latencyLabel;
         this.umbralRecuperacion = umbralRecuperacion;
+        this.reloj = reloj;
     }
 
     // ------------------------------------------------------------------
@@ -71,6 +80,51 @@ public class HistorialService {
         e.setDecision("El motor de reglas ordena abrir la electroválvula del sector.");
         e.setAccion("Microaspersor abierto · riego autónomo en curso.");
         withSeguimiento(e, hum);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra el riego que el despacho acaba de ordenar al nodo: sector, volumen, duración, humedad
+     * de sustrato y regla (HU-06 CA-05), con seguimiento de la humedad. {@code ts} es el instante de la
+     * orden (el del reloj del vivero), no el de la escritura.
+     */
+    public void registrarRiego(SectorEntity s, DetalleRiego detalle, String regla, long ts) {
+        HistorialEventoEntity e = base(s, "Riego", "Efectiva");
+        e.setTs(ts);
+        e.setRegla(regla);
+        e.setVolumenL(detalle.volumenL());
+        e.setDuracionSeg(detalle.duracionSeg());
+        e.setLectura("Humedad de sustrato " + fmt0(detalle.humedad()) + "% (regla " + regla + ").");
+        e.setDecision("El motor de reglas ordena regar " + fmtLitros(detalle.volumenL()) + " L durante "
+                + detalle.duracionSeg() + " s"
+                + (detalle.recortado() ? " (duración recortada al máximo de la válvula)." : "."));
+        e.setAccion("Electroválvula abierta · riego autónomo en curso.");
+        withSeguimiento(e, detalle.humedad());
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra una alerta del motor (INFO | WARNING | CRITICAL). Su alcance es la macro-zona, no un sector:
+     * el evento queda con {@code sectorId = "—"} (igual que los de Configuración) y se filtra por zona.
+     * {@code ts} es el instante de la evaluación (reloj del vivero).
+     */
+    public void registrarAlerta(String zonaId, String zonaName, String regla, DetalleAlerta detalle, long ts) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(zonaId);
+        e.setZonaName(zonaName != null ? zonaName : zonaId);
+        e.setTipo("Alerta");
+        e.setTs(ts);
+        e.setRegla(regla);
+        e.setAlerta(detalle.nivel().name());
+        e.setLectura("Alerta de la macro-zona " + zonaId + " (regla " + regla + ").");
+        e.setDecision(detalle.texto());
+        e.setAccion("Alerta " + detalle.nivel().name() + " registrada para el operador.");
+        e.setRes("Informativo");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
         historialRepository.save(e);
     }
 
@@ -95,7 +149,7 @@ public class HistorialService {
         e.setZonaId(s.getZona().getId());
         e.setZonaName(s.getZona().getName());
         e.setTipo(tipo);
-        e.setTs(System.currentTimeMillis());
+        e.setTs(reloj.millis());
         e.setRes(res);
         e.setSev(s.getDiagnosisSev());
         e.setBloqueoRepeticion(false);
@@ -151,7 +205,7 @@ public class HistorialService {
         e.setZonaId(s.getZona().getId());
         e.setZonaName(s.getZona().getName());
         e.setTipo("Info");
-        e.setTs(System.currentTimeMillis());
+        e.setTs(reloj.millis());
         e.setLectura("Ciclo de evaluación: " + ruleName + ".");
         e.setDecision(motivo);
         e.setAccion(type.isBlocking() ? "Evaluación bloqueada." : "Condición normal — sin actuación.");
@@ -168,16 +222,35 @@ public class HistorialService {
      */
     @Transactional
     public void registrarConfiguracion(String usuario) {
+        registrarConfiguracion(
+                "Recalibración de parámetros agronómicos por " + usuario + ".",
+                "Se validaron los nuevos umbrales y límites contra el rango fisiológico.",
+                "Configuración actualizada: umbrales, límites operativos y plan de rustificación.");
+    }
+
+    /**
+     * Variante con detalle: asienta qué se cambió (p. ej. las claves de los parámetros de reglas
+     * modificados), para que el historial no diga sólo "se configuró algo".
+     */
+    @Transactional
+    public void registrarConfiguracion(String usuario, String detalle) {
+        registrarConfiguracion(
+                "Recalibración de parámetros de reglas por " + usuario + ".",
+                "Se validaron tipo, rango y restricciones cruzadas de los nuevos valores.",
+                detalle);
+    }
+
+    private void registrarConfiguracion(String lectura, String decision, String accion) {
         HistorialEventoEntity e = new HistorialEventoEntity();
         e.setId(UUID.randomUUID().toString());
         e.setSectorId("—");
         e.setZonaId("—");
         e.setZonaName("Sistema");
         e.setTipo("Configuración");
-        e.setTs(System.currentTimeMillis());
-        e.setLectura("Recalibración de parámetros agronómicos por " + usuario + ".");
-        e.setDecision("Se validaron los nuevos umbrales y límites contra el rango fisiológico.");
-        e.setAccion("Configuración actualizada: umbrales, límites operativos y plan de rustificación.");
+        e.setTs(reloj.millis());
+        e.setLectura(lectura);
+        e.setDecision(decision);
+        e.setAccion(accion);
         e.setRes("Efectiva");
         e.setSev("—");
         e.setEvoShow(false);
@@ -192,7 +265,7 @@ public class HistorialService {
     @Scheduled(fixedDelayString = "${yerbanalytics.historial.eval-interval-ms:30000}")
     @Transactional
     public void evaluarSeguimiento() {
-        long now = System.currentTimeMillis();
+        long now = reloj.millis();
         List<HistorialEventoEntity> pendientes = historialRepository.findByEvoShowTrueAndEvoEvaluadoTsIsNull();
         List<HistorialEventoEntity> evaluados = new ArrayList<>();
 
@@ -272,8 +345,8 @@ public class HistorialService {
      */
     @Transactional(readOnly = true)
     public Map<String, Long> countToday() {
-        long startOfDay = java.time.LocalDate.now()
-                .atStartOfDay(java.time.ZoneId.systemDefault())
+        long startOfDay = java.time.LocalDate.now(reloj.withZone(ZonaHorariaVivero.ZONA))
+                .atStartOfDay(ZonaHorariaVivero.ZONA)
                 .toInstant()
                 .toEpochMilli();
         return Map.of(
@@ -334,7 +407,11 @@ public class HistorialService {
                 meta.tint(),
                 meta.ink(),
                 meta.path(),
-                evo
+                evo,
+                e.getRegla(),
+                e.getAlerta(),
+                e.getVolumenL(),
+                e.getDuracionSeg()
         );
     }
 
@@ -348,12 +425,17 @@ public class HistorialService {
         return (v == null || v.isBlank()) ? null : v;
     }
 
+    /** Litros con coma decimal y sin ceros de más: 4,2 · 6 · 4,02. */
+    private static String fmtLitros(double v) {
+        return java.math.BigDecimal.valueOf(v).stripTrailingZeros().toPlainString().replace('.', ',');
+    }
+
     private static String fmt0(double v) {
         return String.format(Locale.US, "%.0f", v);
     }
 
-    private static String formatAgo(long timestamp) {
-        long diffMs = Math.max(0, System.currentTimeMillis() - timestamp);
+    private String formatAgo(long timestamp) {
+        long diffMs = Math.max(0, reloj.millis() - timestamp);
         long diffSec = diffMs / 1000;
         if (diffSec < 60) return "hace " + diffSec + " s";
         long diffMin = diffSec / 60;

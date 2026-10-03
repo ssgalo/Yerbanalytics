@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Glyph, Icon } from '@/components/ui/Icon';
 import { RuleGraph } from '@/components/DAGViewer/RuleGraph';
 import type { ActionRecord, Evolution, DagSchema } from '@/types/domain';
+import { esAlertaDeZona, esSectorReal, etiquetaTipo, presentacionIcono } from '../eventoPresentacion';
+import { EventoMeta } from './EventoMeta';
 import styles from './HistorialTimeline.module.css';
 
 interface HistorialTimelineProps {
@@ -41,6 +43,12 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
 
   const [openDag, setOpenDag] = useState<Record<string, boolean>>({});
   const toggleDag = (id: string) => setOpenDag((o) => ({ ...o, [id]: !o[id] }));
+
+  /** id de regla → nombre legible, para rotular la regla de cada evento. */
+  const nombresReglas = useMemo(
+    () => Object.fromEntries((schema?.nodes ?? []).map((n) => [n.id, n.label])),
+    [schema],
+  );
 
   const groupedCycles = useMemo(() => {
     const cycles: Record<string, CycleGroup> = {};
@@ -90,7 +98,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
       </div>
 
       <div className={styles.feed}>
-        {groupedCycles.map((cycle, cycleIndex) => {
+        {groupedCycles.map((cycle) => {
           const isCycleOpen = !!openCycles[cycle.fecha];
           const zonaList = Object.values(cycle.zonas).sort((a, b) => a.zonaName.localeCompare(b.zonaName));
           
@@ -98,7 +106,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
           let totalDecisionsCycle = 0;
           zonaList.forEach(z => {
             const sectors = Object.values(z.sectors);
-            totalSectorsCycle += sectors.length;
+            totalSectorsCycle += sectors.filter((s) => esSectorReal(s.sectorId)).length;
             totalDecisionsCycle += sectors.reduce((acc, s) => acc + s.actions.length, 0);
           });
 
@@ -113,7 +121,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                 <Icon name="calendar" size={18} stroke="var(--ink)" />
                 <span className={styles.cycleTitle}>Ciclo {cycle.fecha}</span>
                 <span className={styles.cycleCount}>
-                  {totalSectorsCycle} sector{totalSectorsCycle !== 1 ? 'es' : ''} evaluados · {totalDecisionsCycle} decisión{totalDecisionsCycle !== 1 ? 'es' : ''}
+                  {totalSectorsCycle} sector{totalSectorsCycle !== 1 ? 'es' : ''} evaluados · {totalDecisionsCycle} {totalDecisionsCycle !== 1 ? 'decisiones' : 'decisión'}
                 </span>
                 <span className={styles.spacer} />
                 <Icon
@@ -131,6 +139,8 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                     const isZonaOpen = !!openZonas[zonaId];
                     const sectorList = Object.values(zona.sectors).sort((a, b) => a.sectorId.localeCompare(b.sectorId));
                     const totalDecisionsZona = sectorList.reduce((acc, s) => acc + s.actions.length, 0);
+                    // Los eventos de alcance macro-zona ("—": Configuración, alertas) no son un sector evaluado.
+                    const totalSectoresZona = sectorList.filter((s) => esSectorReal(s.sectorId)).length;
 
                     return (
                       <div key={zonaId} className={styles.zonaBlock} style={{ marginBottom: '8px', borderLeft: '2px solid var(--border)', paddingLeft: '12px' }}>
@@ -143,7 +153,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                           <Icon name="map-pin" size={16} stroke="var(--ink)" />
                           <span className={styles.cycleTitle} style={{ fontSize: '13px' }}>{zona.zonaName}</span>
                           <span className={styles.cycleCount}>
-                            {sectorList.length} sector{sectorList.length !== 1 ? 'es' : ''} evaluados · {totalDecisionsZona} decisión{totalDecisionsZona !== 1 ? 'es' : ''}
+                            {totalSectoresZona} sector{totalSectoresZona !== 1 ? 'es' : ''} evaluados · {totalDecisionsZona} {totalDecisionsZona !== 1 ? 'decisiones' : 'decisión'}
                           </span>
                           <span className={styles.spacer} />
                           <Icon
@@ -167,12 +177,14 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                     className={styles.sectorHeader}
                                     onClick={() => toggleSector(secId)}
                                   >
-                                    <span className={styles.sectorName}>{sector.sectorId}</span>
+                                    <span className={styles.sectorName}>
+                                      {sector.actions.every(esAlertaDeZona) ? 'Alertas de la macro-zona' : sector.sectorId}
+                                    </span>
                                     <span className={styles.spacer} />
                                     <div className={styles.badges}>
                                       {sector.actions.map((r) => (
                                         <Badge key={r.id} soft={r.resSoft} ink={r.resInk} style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 6px' }}>
-                                          {r.tipo}: {r.res}
+                                          {etiquetaTipo(r)}: {r.res}
                                         </Badge>
                                       ))}
                                     </div>
@@ -187,6 +199,8 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                   {isSectorOpen && (
                                     <div className={styles.sectorContent}>
                                       {/* Boton para ver el DAG del motor de reglas */}
+                                      {/* Las alertas son de la macro-zona: no hay razonamiento de un sector que mostrar. */}
+                                      {!sector.actions.every(esAlertaDeZona) && (
                                       <button
                                         type="button"
                                         className={styles.dagToggleBtn}
@@ -198,8 +212,9 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                           ? 'Ocultar razonamiento del motor'
                                           : '🧠 Ver razonamiento del motor — cómo se tomó esta decisión'}
                                       </button>
+                                      )}
 
-                                      {openDag[secId] && (
+                                      {openDag[secId] && !sector.actions.every(esAlertaDeZona) && (
                                         <div className={styles.dagContainer}>
                                           <div className={styles.dagHeader}>Pipeline de decisión automática</div>
                                           {schemaLoading ? (
@@ -213,17 +228,20 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                       )}
 
                                       <div className={styles.actionList}>
-                                        {sector.actions.map((r) => (
+                                        {sector.actions.map((r) => {
+                                          const icono = presentacionIcono(r);
+                                          return (
                                           <div key={r.id} className={styles.actionDetail}>
                                             <div className={styles.actionHeader}>
-                                              <span className={styles.iconWrap} style={{ background: r.tint, color: r.ink }}>
-                                                <Glyph path={r.path} stroke="currentColor" size={14} />
+                                              <span className={styles.iconWrap} style={{ background: icono.tint, color: icono.ink }}>
+                                                <Glyph path={icono.path} stroke="currentColor" size={14} />
                                               </span>
-                                              <span style={{ fontWeight: 600 }}>{r.tipo}</span>
+                                              <span style={{ fontWeight: 600 }}>{etiquetaTipo(r)}</span>
                                             </div>
+                                            <EventoMeta registro={r} nombresReglas={nombresReglas} />
                                             <Chain 
                                               label="Lectura / diagnóstico" 
-                                              text={r.lectura.replace(/Ciclo de evaluaci[oó]n:\s*(\w+)\.?/i, (match, ruleName) => {
+                                              text={r.lectura.replace(/Ciclo de evaluaci[oó]n:\s*(\w+)\.?/i, (_match, ruleName) => {
                                                 const node = schema?.nodes.find((n) => n.id === ruleName);
                                                 return `Evaluando: ${node ? node.label : ruleName}`;
                                               })} 
@@ -232,7 +250,8 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                             <Chain label="Acción ejecutada" text={r.accion} />
                                             {r.evo && <EvoBlock evo={r.evo} />}
                                           </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}

@@ -23,6 +23,7 @@ import type {
   Zona,
 } from '@/types/domain';
 import { capturaDemo } from './capturasDemo';
+import catalogo from './catalogoReglas.fixture.json';
 import { ACT, C, LAB, actTpl, pathos, resMap, sevMap, specs, tints, zonaDefs } from './specs';
 import {
   clampDisposicion,
@@ -76,6 +77,47 @@ export function pathFrom(vals: number[], w: number, h: number): { line: string; 
 }
 
 /** Severidad relativa, para combinar el estado de la zona con el del plantín. */
+/** Valor de fábrica de un parámetro del catálogo (el que usa la demo para el estado de las válvulas). */
+const fabricaDe = (clave: string): number => Number(catalogo.parametros.find((p) => p.clave === clave)?.fabrica);
+const UMBRAL_RIEGO_FABRICA = fabricaDe('riego.umbral-humedad');
+const SECTORES_SIMULTANEOS_FABRICA = fabricaDe('riego.sectores-simultaneos');
+const UMBRAL_CRITICO_FABRICA = fabricaDe('riego.umbral-critico');
+const LLUVIA_PROBABILIDAD_FABRICA = fabricaDe('riego.lluvia-probabilidad');
+const LLUVIA_MM_FABRICA = fabricaDe('riego.lluvia-mm');
+
+/** Franjas del pronóstico de la demo. Cada macro-zona toma una distinta (`zona % franjas`). */
+const PRONOSTICO_DEMO: Weather['forecast'] = [
+  { t: '15 h', uv: 7, rain: 10 },
+  { t: '18 h', uv: 3, rain: 60 },
+  { t: '21 h', uv: 0, rain: 80 },
+  { t: 'Mañana', uv: 6, rain: 25 },
+];
+
+/**
+ * Humedad de sustrato forzada por macro-zona para que la demo muestre cada camino del riego
+ * (reglas_v2): MZ-2 déficit común (riega), MZ-3 déficit con lluvia prevista (pospone), MZ-4 déficit
+ * crítico (R-02) y MZ-5 sustrato saturado (R-04). MZ-1 y MZ-6 siguen con su lectura sorteada.
+ */
+const HUMEDAD_DEMO_POR_ZONA: Record<string, number> = { 'MZ-2': 40, 'MZ-3': 41, 'MZ-4': 30, 'MZ-5': 82 };
+
+/** La lluvia prevista para la franja de la zona alcanza para posponer el riego (probabilidad y milímetros). */
+const posponePorLluvia = (zonaIdx: number): boolean => {
+  const rain = PRONOSTICO_DEMO[zonaIdx % PRONOSTICO_DEMO.length].rain;
+  // La demo estima los milímetros como décimas de la probabilidad (80 % → 8 mm).
+  return rain >= LLUVIA_PROBABILIDAD_FABRICA && rain / 10 >= LLUVIA_MM_FABRICA;
+};
+
+/** Reemplaza la humedad de sustrato de la lectura de una zona por la del escenario de la demo, si lo tiene. */
+function conHumedadDemo(zonaId: string, metrics: Metric[]): Metric[] {
+  const v = HUMEDAD_DEMO_POR_ZONA[zonaId];
+  if (v === undefined) return metrics;
+  return metrics.map((m) => {
+    if (m.key !== 'humSus') return m;
+    const ms = metricStatus(v, m.spec);
+    return { ...m, raw: v, value: v.toFixed(m.spec.dec), status: ms, color: C[ms] };
+  });
+}
+
 export const SEVERIDAD: Record<Status, number> = { ok: 0, warning: 1, critical: 2, offline: 3 };
 
 /** El más severo de dos estados. */
@@ -166,6 +208,7 @@ function makeSector(
   piso: Status,
   metrics: Metric[],
   r: () => number,
+  posponeLluvia: boolean,
 ): Sector {
   const id = z.id + '-' + String(i).padStart(3, '0');
 
@@ -216,7 +259,12 @@ function makeSector(
 
   // actuadores — el riego responde a la humedad de sustrato de la zona
   const humSus = metrics.find((m) => m.key === 'humSus')?.raw;
-  const valve = finalStatus !== 'offline' && humSus != null && humSus < 42 ? 'Regando' : 'Cerrada';
+  // Con el umbral de riego de fábrica (45 %) el despacho riega de a tandas de 10 sectores por
+  // macro-zona: los primeros 10 "Regando" y el resto "En cola" hasta que les toque el turno.
+  // R-03 pospone el déficit común (≥ umbral crítico) con lluvia prevista; el déficit crítico (R-02) riega igual.
+  const pospuesto = posponeLluvia && humSus != null && humSus >= UMBRAL_CRITICO_FABRICA;
+  const necesitaRiego = finalStatus !== 'offline' && humSus != null && humSus < UMBRAL_RIEGO_FABRICA && !pospuesto;
+  const valve = !necesitaRiego ? 'Cerrada' : i <= SECTORES_SIMULTANEOS_FABRICA ? 'Regando' : 'En cola';
   const pump =
     finalStatus === 'critical' && diagnosis.conf && diagnosis.conf >= 85
       ? 'Dosificando'
@@ -279,7 +327,7 @@ export function buildNursery(
   /** Antigüedad de la lectura por zona: los diagnósticos la usan como sello temporal. */
   const agoPorZona: Record<string, string> = {};
 
-  const zonas: Zona[] = zonaList.map((z) => {
+  const zonas: Zona[] = zonaList.map((z, zonaIdx) => {
     // Lectura del nodo testigo: una por macro-zona, compartida por sus 100 sectores.
     // Un vivero recién generado por topología todavía no tiene nodos reportando.
     const u = r();
@@ -290,7 +338,7 @@ export function buildNursery(
         : u > 0.75
           ? 'warning'
           : 'ok';
-    const metrics = offlineOnly ? offlineMetrics() : makeLectura(r, sesgo);
+    const metrics = offlineOnly ? offlineMetrics() : conHumedadDemo(z.id, makeLectura(r, sesgo));
     const piso: Status = offlineOnly ? 'offline' : pisoDeZona(metrics);
 
     const ago = offlineOnly ? 'hace —' : 'hace ' + Math.round(rr(r, 4, 28)) + ' min';
@@ -314,7 +362,7 @@ export function buildNursery(
     let alerta = 0;
     let off = 0;
     for (let i = 1; i <= sectoresPorZona; i++) {
-      const s = makeSector(z, i, piso, metrics, r);
+      const s = makeSector(z, i, piso, metrics, r, !offlineOnly && posponePorLluvia(zonaIdx));
       list.push(s);
       sectors.push(s);
       byId[s.id] = s;
@@ -478,13 +526,8 @@ export function buildNursery(
     hum: 78,
     uv: 7,
     uvLabel: 'Alto',
-    rainText: 'Lluvia probable en ~3 h — riego autónomo pospuesto en 2 macro-zonas.',
-    forecast: [
-      { t: '15 h', uv: 7, rain: 10 },
-      { t: '18 h', uv: 3, rain: 60 },
-      { t: '21 h', uv: 0, rain: 80 },
-      { t: 'Mañana', uv: 6, rain: 25 },
-    ],
+    rainText: 'Lluvia probable en ~3 h — riego autónomo pospuesto en 1 macro-zona.',
+    forecast: PRONOSTICO_DEMO,
   };
 
   return {

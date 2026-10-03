@@ -1,5 +1,14 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
+import com.yerbanalytics.backend.engine.traza.AccionTrazada;
+import com.yerbanalytics.backend.engine.traza.EstadoRegla;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacion;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
+import com.yerbanalytics.backend.engine.traza.TrazaRegla;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,7 +26,7 @@ import java.util.List;
  * Spring inyecta la lista en orden de declaración, lo que produciría un corte
  * anticipado en orden arbitrario (bug silencioso).
  *
- * <p>Por cada ciclo de evaluación ({@link #evaluate(RuleContext)}):
+ * <p>Por cada ciclo de evaluación ({@link #evaluate(RuleContext, OrigenEvaluacion)}):
  * <ol>
  *   <li>Itera las reglas en orden de prioridad.</li>
  *   <li>Acumula las acciones devueltas por cada regla.</li>
@@ -31,8 +40,12 @@ public class RuleOrchestrator {
     private static final Logger log = LoggerFactory.getLogger(RuleOrchestrator.class);
 
     private final List<Rule> rules;
+    private final CatalogoParametrosService parametros;
+    private final TrazaEvaluacionStore trazaStore;
 
-    public RuleOrchestrator(List<Rule> rules) {
+    public RuleOrchestrator(List<Rule> rules, CatalogoParametrosService parametros, TrazaEvaluacionStore trazaStore) {
+        this.parametros = parametros;
+        this.trazaStore = trazaStore;
         // Ordenamiento explícito obligatorio — Spring no ordena @Component por prioridad.
         this.rules = rules.stream()
                 .sorted(Comparator.comparingInt(Rule::priority))
@@ -48,35 +61,61 @@ public class RuleOrchestrator {
      * utiliza un modelo de ramas (DAG) donde el bloqueo de un subsistema
      * (ej. RIEGO) no afecta a los demás (ej. MEDIASOMBRA).
      *
-     * @param ctx snapshot inmutable del sector (nunca null)
-     * @return lista de acciones acumuladas; puede estar vacía pero nunca es null
+     * <p>Además de las acciones arma la traza: TODAS las reglas figuran, las que no corrieron con
+     * el motivo ({@code OMITIDA_RAMA_BLOQUEADA} o {@code NO_ALCANZADA}) y la regla que cortó.
+     * Los valores vigentes del catálogo se toman UNA vez, así todo el ciclo ve lo mismo.
+     *
+     * <p>Si una regla lanza, la excepción se propaga tal cual (la actuación no cambia), pero antes
+     * se guarda la traza parcial con esa regla en {@code ERROR}: el inspector no puede seguir
+     * mostrando como "última" una evaluación vieja y sana.
+     *
+     * @param ctx    snapshot inmutable del sector (nunca null)
+     * @param origen qué disparó la evaluación; la traza se guarda por origen
+     * @return acciones acumuladas (puede estar vacía, nunca null) y la traza de la evaluación
      */
-    public List<RuleAction> evaluate(RuleContext ctx) {
+    public ResultadoEvaluacion evaluate(RuleContext ctx, OrigenEvaluacion origen) {
         List<RuleAction> accumulated = new ArrayList<>();
+        List<TrazaRegla> trazas = new ArrayList<>(rules.size());
         String sectorId = ctx.sector().getId();
+        ParametrosVigentes vigentes = parametros.vigentes();
 
-        boolean abortAll = false;
-        boolean abortRiego = false;
-        boolean abortInsumo = false;
+        // Nombre de la regla que cortó cada nivel; null = no cortado.
+        String abortAll = null;
+        String abortRiego = null;
+        String abortInsumo = null;
 
         for (Rule rule : rules) {
-            // Si hay un bloqueo global, no se evalúa nada más.
-            if (abortAll) {
-                break;
-            }
-
             RuleBranch branch = rule.branch();
 
-            // Saltear evaluación si la rama específica ya fue bloqueada por una regla anterior
-            if (branch == RuleBranch.RIEGO && abortRiego) {
-                continue;
-            }
-            if (branch == RuleBranch.INSUMO && abortInsumo) {
+            // Si hay un bloqueo global, no se evalúa nada más.
+            if (abortAll != null) {
+                trazas.add(omitida(rule, EstadoRegla.NO_ALCANZADA, abortAll));
                 continue;
             }
 
-            List<RuleAction> actions = rule.evaluate(ctx);
+            // Saltear evaluación si la rama específica ya fue bloqueada por una regla anterior
+            if (branch == RuleBranch.RIEGO && abortRiego != null) {
+                trazas.add(omitida(rule, EstadoRegla.OMITIDA_RAMA_BLOQUEADA, abortRiego));
+                continue;
+            }
+            if (branch == RuleBranch.INSUMO && abortInsumo != null) {
+                trazas.add(omitida(rule, EstadoRegla.OMITIDA_RAMA_BLOQUEADA, abortInsumo));
+                continue;
+            }
+
+            Evaluacion ev = new Evaluacion(rule, vigentes);
+            List<RuleAction> actions;
+            try {
+                actions = rule.evaluate(ctx, ev);
+            } catch (RuntimeException e) {
+                guardarTrazaParcial(ctx, origen, vigentes, trazas, rule, ev, e);
+                throw e;
+            }
             accumulated.addAll(actions);
+            trazas.add(new TrazaRegla(rule.name(), branch, rule.priority(), EstadoRegla.EVALUADA,
+                    List.copyOf(ev.comparaciones()),
+                    actions.stream().map(a -> new AccionTrazada(a.type(), a.motivo())).toList(),
+                    null));
 
             // Analizar acciones para actualizar el estado de los bloqueos de rama
             for (RuleAction action : actions) {
@@ -84,20 +123,54 @@ public class RuleOrchestrator {
                 if (type == ActionType.ABORT_ALL) {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_ALL — ejecución global detenida.",
                             sectorId, rule.name(), branch);
-                    abortAll = true;
+                    abortAll = abortAll != null ? abortAll : rule.name();
                 } else if (type == ActionType.ABORT_RIEGO || type == ActionType.POSTPONE_RIEGO) {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió {} — rama RIEGO detenida.",
                             sectorId, rule.name(), branch, type);
-                    abortRiego = true;
+                    abortRiego = abortRiego != null ? abortRiego : rule.name();
                 } else if (type == ActionType.ABORT_INSUMO) {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_INSUMO — rama INSUMO detenida.",
                             sectorId, rule.name(), branch);
-                    abortInsumo = true;
+                    abortInsumo = abortInsumo != null ? abortInsumo : rule.name();
                 }
             }
         }
 
-        return accumulated;
+        return new ResultadoEvaluacion(accumulated, armarTraza(ctx, origen, vigentes, trazas));
+    }
+
+    private static TrazaEvaluacion armarTraza(RuleContext ctx, OrigenEvaluacion origen,
+                                              ParametrosVigentes vigentes, List<TrazaRegla> trazas) {
+        return new TrazaEvaluacion(
+                ctx.sector().getId(),
+                ctx.zona() != null ? ctx.zona().getId() : null,
+                origen,
+                ctx.now(),
+                vigentes.huella(),
+                List.copyOf(trazas));
+    }
+
+    /** Traza de una evaluación cortada por una excepción: la regla en ERROR y el resto sin alcanzar. */
+    private void guardarTrazaParcial(RuleContext ctx, OrigenEvaluacion origen, ParametrosVigentes vigentes,
+                                     List<TrazaRegla> hechas, Rule fallida, Evaluacion ev, RuntimeException e) {
+        List<TrazaRegla> trazas = new ArrayList<>(hechas);
+        trazas.add(new TrazaRegla(fallida.name(), fallida.branch(), fallida.priority(), EstadoRegla.ERROR,
+                List.copyOf(ev.comparaciones()), List.of(), null,
+                e.getClass().getSimpleName() + ": " + e.getMessage()));
+        boolean despues = false;
+        for (Rule r : rules) {
+            if (r == fallida) {
+                despues = true;
+            } else if (despues) {
+                trazas.add(omitida(r, EstadoRegla.NO_ALCANZADA, fallida.name()));
+            }
+        }
+        trazaStore.guardar(armarTraza(ctx, origen, vigentes, trazas));
+    }
+
+    private static TrazaRegla omitida(Rule rule, EstadoRegla estado, String bloqueadaPor) {
+        return new TrazaRegla(rule.name(), rule.branch(), rule.priority(), estado,
+                List.of(), List.of(), bloqueadaPor);
     }
 
     /** Expone las reglas ordenadas (útil para tests de ordenamiento). */

@@ -91,6 +91,16 @@ Flags clave:
   (nodo combinado). Solo afecta a los nodos que sensan.
 - **`ENVIAR_METRICAS_EXTENDIDAS`**: `0` → solo las 5 métricas base (100% compatible
   con el backend actual). `1` → agrega pH/N/P/K/etc. **Requiere cambio backend** (ver §7).
+- **`CAUDALIMETRO_INSTALADO`**: `0` (de fábrica, el prototipo no tiene caudalímetro) →
+  la válvula no verifica flujo; `1` → si no hay pulsos en `TIMEOUT_CAUDAL_MS` cierra y
+  reporta `falla_hidraulica`. Con el flag en `1` y sin caudalímetro, todo riego falla a los 10 s.
+
+Límite de la válvula: **`LIMITE_VALVULA_SEG_MAX` = 1200 s**, igual al máximo del contrato
+(`CONTRATO_VALVULA_DURACION_MAX_SEG` en `comun/contrato.h`; espejo en `ContratoNodo.java` y
+en `simulador/server/contract.ts`). El backend calcula la duración de cada riego (volumen ÷
+caudal) y nunca pide más de 1200 s; el límite local sigue siendo la última barrera. Si tu
+`config.h` local es anterior y dice 120, **el firmware no compila** (`static_assert` en
+`actuacion/act_valvula.cpp`): copiá el valor nuevo y el flag de `config.example.h`.
 
 ---
 
@@ -226,6 +236,7 @@ embebido/
   nodo_sensor/    nodo_sensor.ino      setup() red + sensado
   nodo_actuador/  nodo_actuador.ino    setup() red + actuación
   nodo_combinado/ nodo_combinado.ino   setup() red + sensado + actuación (prototipo)
+  prototipo_hardware/       sketches de Arduino IDE del hardware real; `vivero_esp32_red` mueve el riel por MQTT (`nursery/rail/*`, sección "Riel" de `comun/contrato.h`). Ver su README
 ```
 
 ---
@@ -237,7 +248,7 @@ se puede validar la ingesta **antes** de tener el hardware. Para comandos, publi
 manualmente:
 
 ```bash
-mosquitto_pub -h <broker> -t 'nursery/zone/MZ-1/sector/S-001/command' \
+mosquitto_pub -h <broker> -t 'nursery/zone/MZ-1/sector/MZ-1-001/command' \
   -m '{"commandId":"t1","actuador":"valve","accion":"open","parametros":{"durationSec":10}}'
-mosquitto_sub -h <broker> -t 'nursery/zone/MZ-1/sector/S-001/ack'
+mosquitto_sub -h <broker> -t 'nursery/zone/MZ-1/sector/MZ-1-001/ack'
 ```

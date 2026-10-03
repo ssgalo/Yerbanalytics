@@ -1,0 +1,576 @@
+{
+  "reglas": [
+    {
+      "id": "ManualLockRule",
+      "label": "🔒 Bloqueo manual",
+      "rama": "GLOBAL",
+      "prioridad": 0,
+      "parametros": []
+    },
+    {
+      "id": "StaleSensorRule",
+      "label": "📵 Sensor sin datos recientes",
+      "rama": "GLOBAL",
+      "prioridad": 1,
+      "parametros": [
+        "seguridad.antiguedad-max-lectura"
+      ]
+    },
+    {
+      "id": "SustratoSaturadoRule",
+      "label": "💧 Sustrato saturado (R-04)",
+      "rama": "RIEGO",
+      "prioridad": 2,
+      "parametros": [
+        "riego.saturacion-bloqueo",
+        "riego.saturacion-alerta"
+      ]
+    },
+    {
+      "id": "CicloLecturaRiegoRule",
+      "label": "🔁 Un riego por ciclo de lectura",
+      "rama": "RIEGO",
+      "prioridad": 3,
+      "parametros": [
+        "riego.umbral-critico"
+      ]
+    },
+    {
+      "id": "DeficitCriticoRule",
+      "label": "🚨 Déficit hídrico crítico (R-02)",
+      "rama": "RIEGO",
+      "prioridad": 4,
+      "parametros": [
+        "riego.umbral-critico",
+        "riego.volumen-max-evento",
+        "riego.caudal-emisor",
+        "riego.exceptuado-bloqueo"
+      ]
+    },
+    {
+      "id": "DailyDoseLimitRule",
+      "label": "🛑 Límite de dosis diaria",
+      "rama": "INSUMO",
+      "prioridad": 5,
+      "parametros": [
+        "insumo.max-dosis-24h"
+      ]
+    },
+    {
+      "id": "FueraDeVentanaRiegoRule",
+      "label": "🌙 Riego fuera de ventana horaria (R-05)",
+      "rama": "RIEGO",
+      "prioridad": 6,
+      "parametros": [
+        "riego.ventana-normal",
+        "riego.umbral-humedad",
+        "riego.umbral-critico"
+      ]
+    },
+    {
+      "id": "PausaTrasAplicacionRule",
+      "label": "⏸️ Pausa tras una aplicación (R-06)",
+      "rama": "RIEGO",
+      "prioridad": 7,
+      "parametros": [
+        "riego.pausa-tras-aplicacion",
+        "riego.umbral-humedad",
+        "riego.umbral-critico"
+      ]
+    },
+    {
+      "id": "PosponerPorLluviaRule",
+      "label": "🌧️ Posponer por lluvia (R-03)",
+      "rama": "RIEGO",
+      "prioridad": 8,
+      "parametros": [
+        "riego.lluvia-probabilidad",
+        "riego.lluvia-mm",
+        "riego.lluvia-ventana",
+        "riego.umbral-humedad",
+        "riego.umbral-critico"
+      ]
+    },
+    {
+      "id": "RiegoPorDeficitRule",
+      "label": "💦 Riego por déficit hídrico (R-01)",
+      "rama": "RIEGO",
+      "prioridad": 10,
+      "parametros": [
+        "riego.umbral-humedad",
+        "riego.umbral-critico",
+        "riego.humedad-objetivo",
+        "riego.litros-por-punto",
+        "riego.volumen-max-evento",
+        "riego.caudal-emisor"
+      ]
+    },
+    {
+      "id": "SupplyRule",
+      "label": "🧪 Dosificación de insumo",
+      "rama": "INSUMO",
+      "prioridad": 11,
+      "parametros": [
+        "diagnostico.confianza-minima"
+      ]
+    },
+    {
+      "id": "ShadingRule",
+      "label": "⛅ Control de mediasombra",
+      "rama": "MEDIASOMBRA",
+      "prioridad": 12,
+      "parametros": [
+        "mediasombra.uv-umbral",
+        "mediasombra.apertura-proteccion-uv",
+        "mediasombra.apertura-maxima"
+      ]
+    },
+    {
+      "id": "FollowUpRule",
+      "label": "⏱️ Seguimiento post-acción",
+      "rama": "SEGUIMIENTO",
+      "prioridad": 20,
+      "parametros": []
+    }
+  ],
+  "parametros": [
+    {
+      "clave": "seguridad.antiguedad-max-lectura",
+      "etiqueta": "Antigüedad máxima de la lectura",
+      "descripcion": "Si la última lectura de la zona es más vieja que esto, se considera que el sensor dejó de reportar y se bloquea la evaluación. La fábrica son 3 intervalos de publicación del nodo (30 s).",
+      "familia": "SEGURIDAD",
+      "tipo": "ENTERO",
+      "unidad": "s",
+      "valor": "90",
+      "fabrica": "90",
+      "min": 10.0,
+      "max": 600.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: StaleSensorRule",
+      "modificado": false,
+      "usadoPor": [
+        "StaleSensorRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.umbral-humedad",
+      "etiqueta": "Umbral de riego (humedad de sustrato)",
+      "descripcion": "Por debajo de esta humedad de sustrato el sector necesita riego.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "45",
+      "fabrica": "45",
+      "min": 35.0,
+      "max": 60.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-01 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "FueraDeVentanaRiegoRule",
+        "PausaTrasAplicacionRule",
+        "PosponerPorLluviaRule",
+        "RiegoPorDeficitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.lluvia-probabilidad",
+      "etiqueta": "Probabilidad de lluvia que posterga el riego",
+      "descripcion": "Con una probabilidad de lluvia igual o mayor a esta (y los milímetros configurados), se posterga el riego.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "70",
+      "fabrica": "70",
+      "min": 50.0,
+      "max": 95.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-03 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "PosponerPorLluviaRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.umbral-critico",
+      "etiqueta": "Umbral crítico (humedad de sustrato)",
+      "descripcion": "Por debajo de esta humedad el déficit es crítico: se riega con el volumen máximo, a cualquier hora y aunque se prevea lluvia.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "35",
+      "fabrica": "35",
+      "min": 25.0,
+      "max": 40.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-02 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "CicloLecturaRiegoRule",
+        "DeficitCriticoRule",
+        "FueraDeVentanaRiegoRule",
+        "PausaTrasAplicacionRule",
+        "PosponerPorLluviaRule",
+        "RiegoPorDeficitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.humedad-objetivo",
+      "etiqueta": "Humedad objetivo",
+      "descripcion": "Humedad de sustrato a la que apunta el riego por déficit: el volumen es (objetivo − humedad) × litros por punto.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "65",
+      "fabrica": "65",
+      "min": 55.0,
+      "max": 75.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-01 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "RiegoPorDeficitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.litros-por-punto",
+      "etiqueta": "Litros por punto de humedad",
+      "descripcion": "Litros de agua que se aplican por cada punto de humedad que le falta al sustrato para llegar al objetivo.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "L/punto",
+      "valor": "0.2",
+      "fabrica": "0.2",
+      "min": 0.1,
+      "max": 0.5,
+      "decimales": 2,
+      "refSpec": "reglas_v2 §5 R-01 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "RiegoPorDeficitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.volumen-max-evento",
+      "etiqueta": "Volumen máximo por evento de riego",
+      "descripcion": "Tope de agua de un solo riego por sector. Es también el volumen del riego por déficit crítico.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "L",
+      "valor": "6",
+      "fabrica": "6",
+      "min": 3.0,
+      "max": 10.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §5 R-01 y R-02 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "DeficitCriticoRule",
+        "RiegoPorDeficitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.caudal-emisor",
+      "etiqueta": "Caudal del emisor",
+      "descripcion": "Caudal real del microaspersor de un sector. Con él se calcula cuánto tiempo abrir la válvula para entregar el volumen.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "L/h",
+      "valor": "30",
+      "fabrica": "30",
+      "min": 5.0,
+      "max": 120.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §1.2 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "DeficitCriticoRule",
+        "RiegoPorDeficitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.saturacion-bloqueo",
+      "etiqueta": "Saturación que bloquea el riego",
+      "descripcion": "Con esta humedad de sustrato o más, el sustrato está saturado y no se riega.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "75",
+      "fabrica": "75",
+      "min": 65.0,
+      "max": 85.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-04 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "SustratoSaturadoRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.saturacion-alerta",
+      "etiqueta": "Saturación que genera alerta",
+      "descripcion": "Con esta humedad de sustrato o más, además de bloquear el riego se avisa del riesgo de asfixia radicular y hongos.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "80",
+      "fabrica": "80",
+      "min": 65.0,
+      "max": 85.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-04 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "SustratoSaturadoRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.ventana-normal",
+      "etiqueta": "Ventana horaria de riego normal",
+      "descripcion": "Franja del día en que se permite el riego por déficit. Fuera de ella sólo puede regar el déficit crítico. La lectura de la hora de fin todavía entra.",
+      "familia": "RIEGO",
+      "tipo": "VENTANA_HORARIA",
+      "unidad": "",
+      "valor": "06:00-18:00",
+      "fabrica": "06:00-18:00",
+      "min": null,
+      "max": null,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-05 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "FueraDeVentanaRiegoRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.lluvia-mm",
+      "etiqueta": "Lluvia prevista que posterga el riego",
+      "descripcion": "Milímetros de lluvia acumulada prevista en la ventana. Se posterga el riego sólo si se alcanza también la probabilidad configurada.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "mm",
+      "valor": "5",
+      "fabrica": "5",
+      "min": 2.0,
+      "max": 20.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §5 R-03 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "PosponerPorLluviaRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.lluvia-ventana",
+      "etiqueta": "Ventana del pronóstico de lluvia",
+      "descripcion": "Cantidad de horas hacia adelante del pronóstico que se consideran para posponer el riego.",
+      "familia": "RIEGO",
+      "tipo": "ENTERO",
+      "unidad": "h",
+      "valor": "4",
+      "fabrica": "4",
+      "min": 2.0,
+      "max": 12.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-03 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "PosponerPorLluviaRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.pausa-tras-aplicacion",
+      "etiqueta": "Pausa de riego tras una aplicación",
+      "descripcion": "Horas sin regar un sector después de aplicarle fertilizante o fitosanitario, para no lavar el producto.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "h",
+      "valor": "6",
+      "fabrica": "6",
+      "min": 2.0,
+      "max": 24.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §5 R-06 / §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "PausaTrasAplicacionRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.exceptuado-bloqueo",
+      "etiqueta": "Intervalo mínimo entre riegos por déficit crítico",
+      "descripcion": "Horas que deben pasar entre dos riegos por déficit crítico de un mismo sector. Evita regar sin fin con un sensor que marca seco de forma falsa.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "h",
+      "valor": "12",
+      "fabrica": "12",
+      "min": 6.0,
+      "max": 24.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §4 y §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "DeficitCriticoRule",
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.sectores-simultaneos",
+      "etiqueta": "Sectores regando a la vez por macro-zona",
+      "descripcion": "Máximo de electroválvulas abiertas al mismo tiempo en una macro-zona: los demás sectores esperan su turno, en orden.",
+      "familia": "RIEGO",
+      "tipo": "ENTERO",
+      "unidad": "sectores",
+      "valor": "10",
+      "fabrica": "10",
+      "min": 1.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §2 y §11 Riego",
+      "modificado": false,
+      "usadoPor": [
+        "DespachoRiego"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.max-dosis-24h",
+      "etiqueta": "Máximo de dosis en 24 h",
+      "descripcion": "Con esta cantidad de dosificaciones en 24 h el sector alcanzó su límite y no se le aplican más insumos.",
+      "familia": "INSUMO",
+      "tipo": "ENTERO",
+      "unidad": "dosis",
+      "valor": "1",
+      "fabrica": "1",
+      "min": 1.0,
+      "max": 10.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: DailyDoseLimitRule",
+      "modificado": false,
+      "usadoPor": [
+        "DailyDoseLimitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "mediasombra.uv-umbral",
+      "etiqueta": "Índice UV de protección",
+      "descripcion": "Con un índice UV de pronóstico igual o mayor a este, la mediasombra pasa a posición protectora.",
+      "familia": "MEDIASOMBRA",
+      "tipo": "NUMERO",
+      "unidad": "índice",
+      "valor": "7",
+      "fabrica": "7",
+      "min": 1.0,
+      "max": 11.0,
+      "decimales": 1,
+      "refSpec": "motor-reglas: ShadingRule",
+      "modificado": false,
+      "usadoPor": [
+        "ShadingRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "mediasombra.apertura-proteccion-uv",
+      "etiqueta": "Apertura protectora ante pico UV",
+      "descripcion": "Apertura de la mediasombra cuando se supera el índice UV de protección.",
+      "familia": "MEDIASOMBRA",
+      "tipo": "ENTERO",
+      "unidad": "%",
+      "valor": "30",
+      "fabrica": "30",
+      "min": 0.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: ShadingRule",
+      "modificado": false,
+      "usadoPor": [
+        "ShadingRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "mediasombra.apertura-maxima",
+      "etiqueta": "Apertura máxima de la mediasombra",
+      "descripcion": "Tope de apertura que admite el plan de rustificación.",
+      "familia": "MEDIASOMBRA",
+      "tipo": "ENTERO",
+      "unidad": "%",
+      "valor": "100",
+      "fabrica": "100",
+      "min": 10.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: ShadingRule",
+      "modificado": false,
+      "usadoPor": [
+        "ShadingRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "diagnostico.confianza-minima",
+      "etiqueta": "Confianza mínima del diagnóstico",
+      "descripcion": "Un diagnóstico de IA con confianza menor a esta no es concluyente y no dispara dosificación.",
+      "familia": "DIAGNOSTICO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "85",
+      "fabrica": "85",
+      "min": 50.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: SupplyRule; HU-04 CA-03",
+      "modificado": false,
+      "usadoPor": [
+        "SupplyRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    }
+  ]
+}

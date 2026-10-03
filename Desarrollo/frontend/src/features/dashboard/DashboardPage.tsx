@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useNurseryData } from '@/hooks/NurseryContext';
 import { KpiRow } from './components/KpiRow';
-import { ViveroOverview } from './components/ViveroOverview';
+import { PlanoVivero } from './components/PlanoVivero';
+import { EstadoVivero } from './components/EstadoVivero';
+import type { FocoZona } from './components/ZonaBlock';
 import { PriorityCard } from './components/PriorityCard';
 import { WeatherCard } from './components/WeatherCard';
 import { ActivityFeed } from './components/ActivityFeed';
@@ -12,6 +15,9 @@ export function DashboardPage() {
   usePageTitle('Panel general', 'Vivero San Ignacio · Misiones, AR');
 
   const { stats, zonas, priority, weather, actions, recentDiag, layout } = useNurseryData();
+
+  /* Zona a la que se llegó tocando su parcela del plano (el tick re-dispara el destello). */
+  const [foco, setFoco] = useState<FocoZona | null>(null);
 
   return (
     <div style={{ animation: 'ybFade .4s both' }}>
@@ -29,7 +35,13 @@ export function DashboardPage() {
           alignItems: 'start',
         }}
       >
-        <ViveroOverview zonas={zonas} layout={layout} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          <PlanoVivero
+            zonas={zonas}
+            onSelectZona={(zonaId) => setFoco((f) => ({ zonaId, tick: (f?.tick ?? 0) + 1 }))}
+          />
+          <EstadoVivero zonas={zonas} layout={layout} foco={foco} />
+        </div>
 
         {/* Rail derecho: prioridad + clima */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

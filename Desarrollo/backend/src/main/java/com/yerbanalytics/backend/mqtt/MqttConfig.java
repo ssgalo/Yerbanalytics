@@ -67,6 +67,38 @@ public class MqttConfig {
     }
 
     // -------------------------------------------------------------------------
+    // Inbound del riel: eventos del ESP32 que mueve la cámara (nursery/rail/event)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Adaptador <strong>propio</strong> (y no un {@code addTopic} al de telemetría) para que el
+     * camino de la telemetría, el que alimenta al motor de reglas, quede idéntico. Su clientId lleva
+     * sufijo {@code -riel} para no colisionar sesiones en el broker.
+     */
+    @Bean(name = "mqttRielChannel")
+    public MessageChannel mqttRielChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MqttPahoMessageDrivenChannelAdapter rielInboundAdapter(MqttPahoClientFactory factory) {
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                new MqttPahoMessageDrivenChannelAdapter(clientId + "-riel", factory, ContratoRiel.TOPIC_EVENTO);
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        adapter.setOutputChannel(mqttRielChannel());
+        return adapter;
+    }
+
+    @Bean
+    public IntegrationFlow mqttRielFlow() {
+        return IntegrationFlow.from(mqttRielChannel())
+                .handle("rielEventoReceiver", "processMessage")
+                .get();
+    }
+
+    // -------------------------------------------------------------------------
     // Outbound: publicación de comandos hacia los nodos actuadores (Downlink)
     // -------------------------------------------------------------------------
 

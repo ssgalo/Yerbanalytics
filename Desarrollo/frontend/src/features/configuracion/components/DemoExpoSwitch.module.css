@@ -1,0 +1,80 @@
+/* Interruptor "Mostrar Demo Expo" */
+
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+}
+
+/* El checkbox real queda accesible pero invisible; el riel dibuja el estado. */
+.input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.track {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background-color: var(--off);
+  transition: background-color 0.15s;
+}
+
+.thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--card);
+  transition: transform 0.15s;
+}
+
+.input:checked + .track {
+  background-color: var(--brand);
+}
+
+.input:checked + .track .thumb {
+  transform: translateX(20px);
+}
+
+.input:focus-visible + .track {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.input:disabled + .track {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.error {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--crit);
+}

@@ -1,0 +1,163 @@
+/* PlanoVivero — macro-zonas dibujadas como parcelas del vivero */
+
+.card {
+  padding: 20px 22px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Resumen del vivero en una frase; el punto toma el color del peor estado */
+.resumen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.resumenDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--off);
+}
+
+.resumen[data-status='ok'] .resumenDot {
+  background: var(--ok);
+}
+.resumen[data-status='warning'] .resumenDot {
+  background: var(--warn);
+}
+.resumen[data-status='critical'] .resumenDot {
+  background: var(--crit);
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Parcela: borde punteado, textura de terreno y color por peor estado */
+.parcela {
+  flex: 0 0 168px;
+  max-width: 168px;
+  position: relative;
+  text-align: left;
+  cursor: pointer;
+  border: 2px dashed var(--off);
+  border-radius: 14px;
+  padding: 12px 13px 11px;
+  background:
+    repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.025) 0 7px, rgba(0, 0, 0, 0) 7px 14px),
+    var(--bg);
+  font-family: var(--font-body);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.parcela:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -12px rgba(12, 35, 25, 0.4);
+}
+
+.parcela[data-status='ok'] {
+  border-color: var(--ok);
+}
+.parcela[data-status='warning'] {
+  border-color: var(--warn);
+}
+.parcela[data-status='critical'] {
+  border-color: var(--crit);
+}
+.parcela[data-status='offline'] {
+  border-color: var(--off);
+  opacity: 0.82;
+}
+
+.badge {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.sensor {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.resumenZona {
+  display: block;
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--off);
+}
+
+.parcela[data-status='ok'] .resumenZona {
+  color: var(--ok);
+}
+.parcela[data-status='warning'] .resumenZona {
+  color: var(--warn);
+}
+.parcela[data-status='critical'] .resumenZona {
+  color: var(--crit);
+}
+
+@media (max-width: 768px) {
+  .parcela {
+    flex-basis: calc(50% - 6px);
+    max-width: none;
+  }
+}
+
+/* Tira "Cómo leer esta pantalla" */
+.howto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line2);
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.howtoLabel {
+  color: var(--faint);
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+.howto i {
+  font-style: normal;
+  color: var(--faint);
+}
+
+.howtoSub {
+  color: var(--faint);
+}

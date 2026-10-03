@@ -100,6 +100,14 @@ public class ZonaEntity {
     private Long lastReadingTime;
 
     /**
+     * Epoch ms de la última humedad de sustrato recibida. Se escribe sólo cuando el payload trae
+     * {@code humSus}: si la sonda falla el nodo sigue publicando el resto y {@link #lastReadingTime}
+     * se refresca, pero {@link #humSusRaw} queda congelado; esta marca delata la humedad vieja.
+     */
+    @Column(name = "hum_sus_ts")
+    private Long humSusTs;
+
+    /**
      * Valor crudo de una métrica por su clave del contrato, o {@code null} si el nodo nunca
      * la reportó. Evita que cada consumidor repita la cadena de {@code if}s por clave.
      */

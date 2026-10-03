@@ -1,5 +1,9 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+
 import java.util.List;
 
 /**
@@ -10,7 +14,7 @@ import java.util.List;
  * (bloqueante) puede emitir una acción de tipo {@code ABORT_*} para detener la
  * cadena antes de que las reglas ejecutoras sean evaluadas.
  */
-public interface Rule {
+public interface Rule extends ConsumidorParametros {
 
     /**
      * Número de prioridad de esta regla. Menor valor = mayor precedencia.
@@ -19,6 +23,7 @@ public interface Rule {
     int priority();
 
     /** Nombre técnico de la regla, usado en logs y en el Registro de Inacción. */
+    @Override
     String name();
 
     /**
@@ -42,10 +47,23 @@ public interface Rule {
     }
 
     /**
-     * Evalúa la regla contra el snapshot inmutable del sector.
+     * Parámetros del catálogo que esta regla usa para decidir. El catálogo valida al arrancar
+     * que todos existan, y de acá se arman la vista "por regla" y el campo {@code usadoPor}.
+     * Por defecto ninguno (reglas sin umbrales).
+     */
+    @Override
+    default List<DefinicionParametro> parametros() {
+        return List.of();
+    }
+
+    /**
+     * Evalúa la regla contra el snapshot inmutable del sector. Los umbrales se leen y se comparan
+     * a través de la {@link Evaluacion}, que sólo deja leer los {@link #parametros()} declarados y
+     * registra cada comparación en la traza: decidir y registrar son el mismo gesto.
      *
      * @param ctx snapshot del sector en el ciclo de evaluación actual (nunca null)
+     * @param ev  lectura de parámetros y registro de comparaciones de esta regla en este ciclo
      * @return lista de acciones a ejecutar; nunca null, puede ser vacía
      */
-    List<RuleAction> evaluate(RuleContext ctx);
+    List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev);
 }

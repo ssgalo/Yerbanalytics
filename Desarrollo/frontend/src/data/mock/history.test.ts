@@ -25,7 +25,7 @@ describe('buildHistory (historial determinístico)', () => {
       expect(r.lectura).toBeTruthy();
       expect(r.decision).toBeTruthy();
       expect(r.accion).toBeTruthy();
-      expect(['Riego', 'Insumo', 'Mediasombra']).toContain(r.tipo);
+      expect(['Riego', 'Insumo', 'Mediasombra', 'Alerta']).toContain(r.tipo);
     });
   });
 
@@ -44,5 +44,39 @@ describe('buildHistory (historial determinístico)', () => {
       expect(['Efectiva', 'Sin efectividad']).toContain(r.evo!.verdict);
       expect(r.evo!.delta).not.toBe('—');
     });
+  });
+});
+
+describe('buildHistory · riegos y alertas (13.5)', () => {
+  it('los riegos traen regla, volumen y duración coherentes con el caudal de fábrica (30 L/h)', () => {
+    const riegos = buildHistory(SEED).filter((r) => r.tipo === 'Riego' && r.volumenL != null);
+
+    expect(riegos.length).toBeGreaterThan(0);
+    riegos.forEach((r) => {
+      expect(['RiegoPorDeficitRule', 'DeficitCriticoRule']).toContain(r.regla);
+      expect(r.duracionSeg).toBe(Math.ceil((r.volumenL! * 3600) / 30));
+      expect(r.duracionSeg).toBeLessThanOrEqual(1200);
+    });
+  });
+
+  it('hay riegos por déficit crítico, pospuestos por lluvia y alertas de los tres niveles', () => {
+    const recs = buildHistory(SEED);
+
+    expect(recs.some((r) => r.regla === 'DeficitCriticoRule' && r.tipo === 'Riego')).toBe(true);
+    expect(recs.some((r) => r.regla === 'PosponerPorLluviaRule' && r.res === 'Pospuesta')).toBe(true);
+    expect(new Set(recs.filter((r) => r.tipo === 'Alerta').map((r) => r.alerta))).toEqual(
+      new Set(['INFO', 'WARNING', 'CRITICAL']),
+    );
+  });
+
+  it('las alertas son de la macro-zona: sin sector, informativas y sin seguimiento', () => {
+    buildHistory(SEED)
+      .filter((r) => r.tipo === 'Alerta')
+      .forEach((r) => {
+        expect(r.sectorId).toBe('—');
+        expect(r.res).toBe('Informativo');
+        expect(r.evo).toBeNull();
+        expect(r.volumenL).toBeNull();
+      });
   });
 });

@@ -62,6 +62,7 @@ export interface Diagnosis {
 
 /** Estado de los actuadores físicos del sector. */
 export interface Actuadores {
+  /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno en la tanda de la macro-zona) o `Cerrada`. */
   valve: string;
   pump: string;
   shade: number;
@@ -278,7 +279,7 @@ export interface ActionRecord {
   id: string;
   sectorId: string;
   zonaName: string;
-  tipo: string; // 'Riego' | 'Insumo' | 'Mediasombra'
+  tipo: string; // 'Riego' | 'Insumo' | 'Mediasombra' | 'Alerta'
   time: string; // tiempo relativo: 'hace 6 min'
   ts: number; // epoch ms (orden y filtro por fecha)
   fecha: string; // 'dd/MM HH:mm'
@@ -295,7 +296,18 @@ export interface ActionRecord {
   path: string; // path SVG del ícono
   /** Seguimiento post-acción; null si la acción no lo requiere. */
   evo: Evolution | null;
+  /** Regla que ordenó la acción (p. ej. `DeficitCriticoRule`); null/ausente si no aplica. */
+  regla?: string | null;
+  /** Nivel de la alerta; sólo en eventos de tipo `Alerta`. */
+  alerta?: NivelAlerta | null;
+  /** Volumen de riego ordenado (L); sólo en eventos de tipo `Riego`. */
+  volumenL?: number | null;
+  /** Duración de apertura ordenada (s); sólo en eventos de tipo `Riego`. */
+  duracionSeg?: number | null;
 }
+
+/** Nivel de una alerta del motor (eventos `Alerta` del historial). */
+export type NivelAlerta = 'INFO' | 'WARNING' | 'CRITICAL';
 
 /** Presentación del diagnóstico en el detalle. */
 export interface DiagnosisDetail {
@@ -339,12 +351,13 @@ export interface MetricThreshold {
   provisional: boolean;
 }
 
-/** Límites operativos de actuadores y parámetros de seguimiento (HU-15). */
+/**
+ * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego y la
+ * apertura máx. de mediasombra no viven acá: son parámetros del catálogo del motor de reglas
+ * (`riego.volumen-max-evento`, `mediasombra.apertura-maxima`).
+ */
 export interface ConfigOperativa {
-  riegoTiempoMaxSeg: number;
-  riegoVolMaxDiarioMl: number;
   insumoDosisMax24hMl: number;
-  mediasombraAperturaMaxPct: number;
   seguimientoLatenciaMin: number;
   seguimientoDeltaMin: number;
   intervaloSensadoMinutos: number;
@@ -487,6 +500,8 @@ export interface RuleNode {
   priority: number;
   /** Rama del DAG a la que pertenece este nodo (ej. RIEGO, INSUMO). */
   branch: string;
+  /** Claves del catálogo de parámetros que declara la regla; vacía en los nodos especiales. */
+  parametros: string[];
 }
 
 /** Arista dirigida entre dos nodos del DAG. Espejo de `RuleEdgeDto` del backend. */
@@ -506,3 +521,167 @@ export interface DagSchema {
   edges: RuleEdge[];
 }
 
+
+// -----------------------------------------------------------------------
+// Motor de reglas: catálogo de parámetros y traza de evaluación
+// Espejo de los DTO de `/api/rules/parametros` y `/api/rules/evaluaciones`.
+// -----------------------------------------------------------------------
+
+export type TipoParametro = 'NUMERO' | 'ENTERO' | 'HORA' | 'VENTANA_HORARIA';
+
+/** Una rama del motor: agrupa reglas que se bloquean entre sí. */
+export type RamaRegla = 'GLOBAL' | 'RIEGO' | 'INSUMO' | 'MEDIASOMBRA' | 'SEGUIMIENTO';
+
+/**
+ * Un umbral del catálogo. Existe UNA vez aunque lo usen varias reglas (`usadoPor`).
+ * `valor` y `fabrica` son strings canónicos por tipo ("42", "0.2", "06:00", "06:00-18:00").
+ */
+export interface ParametroRegla {
+  clave: string;
+  etiqueta: string;
+  descripcion: string;
+  familia: string;
+  tipo: TipoParametro;
+  unidad: string;
+  valor: string;
+  fabrica: string;
+  /** Nulos en horas y ventanas horarias. */
+  min: number | null;
+  max: number | null;
+  decimales: number;
+  refSpec: string;
+  /** Distinto del valor de fábrica. */
+  modificado: boolean;
+  /** Ids de las reglas que lo declaran. Derivado en el servidor. */
+  usadoPor: string[];
+  updatedBy: string | null;
+  /** Epoch ms de la última edición. */
+  updatedTs: number | null;
+}
+
+/** Una regla del motor con las claves de los parámetros que declara. */
+export interface ReglaCatalogo {
+  id: string;
+  label: string;
+  rama: RamaRegla;
+  prioridad: number;
+  parametros: string[];
+}
+
+/** Catálogo normalizado: los parámetros van una vez y las reglas los referencian por clave. */
+export interface CatalogoReglas {
+  reglas: ReglaCatalogo[];
+  parametros: ParametroRegla[];
+}
+
+/** Cambio de un parámetro. `valor: null` restablece el valor de fábrica. */
+export interface CambioParametro {
+  clave: string;
+  valor: string | null;
+}
+
+/** Error de validación del servidor; `clave` es null si no corresponde a un parámetro. */
+export interface ErrorParametro {
+  clave: string | null;
+  mensaje: string;
+}
+
+export type OrigenEvaluacion = 'TELEMETRIA' | 'BARRIDO';
+
+export type EstadoReglaTraza = 'EVALUADA' | 'OMITIDA_RAMA_BLOQUEADA' | 'NO_ALCANZADA' | 'ERROR';
+
+/** `EN` es pertenencia ("∈"): la hora local dentro de una ventana horaria. */
+export type OperadorComparacion = 'LT' | 'LE' | 'GT' | 'GE' | 'EQ' | 'EN';
+
+export type ResultadoComparacion = 'CUMPLE' | 'NO_CUMPLE' | 'SIN_DATO';
+
+/** Qué recibió una regla contra qué umbral, y si se cumplió. */
+export interface Comparacion {
+  etiqueta: string;
+  /** Clave del parámetro; null en las condiciones fijas (no configurables). */
+  clave: string | null;
+  /** null cuando el dato no estaba (`SIN_DATO`). Las condiciones fijas pueden ser texto o booleano. */
+  recibido: number | string | boolean | null;
+  operador: OperadorComparacion;
+  umbral: number | string | boolean | null;
+  unidad: string;
+  configurable: boolean;
+  resultado: ResultadoComparacion;
+}
+
+export interface AccionTraza {
+  tipo: string;
+  motivo: string;
+}
+
+/** Lo que pasó con una regla en una evaluación. */
+export interface TrazaRegla {
+  ruleId: string;
+  rama: RamaRegla;
+  prioridad: number;
+  estado: EstadoReglaTraza;
+  comparaciones: Comparacion[];
+  acciones: AccionTraza[];
+  /** Regla que cortó la rama (sólo en `OMITIDA_RAMA_BLOQUEADA`). */
+  bloqueadaPor: string | null;
+  /** "Clase: mensaje" cuando la regla lanzó una excepción (`ERROR`). */
+  error: string | null;
+}
+
+/** Última evaluación del motor para un sector y origen. Vive en memoria en el backend. */
+export interface TrazaEvaluacion {
+  sectorId: string;
+  /** null si el backend no pudo resolver la macro-zona del sector. */
+  zonaId: string | null;
+  origen: OrigenEvaluacion;
+  /** ISO-8601. */
+  ts: string;
+  parametrosHash: string;
+  reglas: TrazaRegla[];
+}
+
+/* ---------- Pasada del riel (Demo Expo) ---------- */
+
+export type EstadoPasada = 'EN_CURSO' | 'COMPLETADA' | 'FALLIDA' | 'CANCELADA';
+export type TipoPaso = 'MOVER' | 'CAPTURAR' | 'HOME';
+export type EstadoPaso = 'PENDIENTE' | 'EN_CURSO' | 'OK' | 'ERROR' | 'OMITIDO';
+
+/** Diagnóstico de IA de la captura de un paso. `conf` ya es un porcentaje 0–100. */
+export interface DiagnosticoPaso {
+  estado: string;
+  conf: number;
+  sev: string;
+  creadoEn: number;
+}
+
+export interface PasoPasada {
+  n: number;
+  tipo: TipoPaso;
+  posicion: number;
+  sectorId: string | null;
+  estado: EstadoPaso;
+  codigoError: string | null;
+  /** Texto legible que arma el backend (el front sólo lo muestra). */
+  detalle: string | null;
+  commandId: string | null;
+  ordenId: string | null;
+  /** `estado` de la orden de captura tal cual: PENDIENTE, ENTREGADA, RECIBIDA, ERROR… */
+  estadoOrden: string | null;
+  capturaId: string | null;
+  imagenUrl: string | null;
+  diagnostico: DiagnosticoPaso | null;
+  /** ms epoch */
+  iniciadoEn: number | null;
+  terminadoEn: number | null;
+}
+
+export interface Pasada {
+  id: string;
+  estado: EstadoPasada;
+  /** ms epoch */
+  iniciadaEn: number;
+  finalizadaEn: number | null;
+  cancelacionSolicitada: boolean;
+  error: string | null;
+  pasos: PasoPasada[];
+}

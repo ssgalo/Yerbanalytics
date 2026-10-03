@@ -1,6 +1,9 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.rules.ManualLockRule;
+import com.yerbanalytics.backend.engine.traza.Comparacion;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
 import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -14,6 +17,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.evaluar;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -42,7 +47,7 @@ class ManualLockRuleTest {
     void sinBloqueo_emiteNoopInfo() {
         RuleContext ctx = RuleContextTestFactory.conBloqueo(sector, zona, false);
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
@@ -53,11 +58,37 @@ class ManualLockRuleTest {
     void conBloqueo_emiteAbortAll() {
         RuleContext ctx = RuleContextTestFactory.conBloqueo(sector, zona, true);
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.ABORT_ALL);
         assertThat(acciones.get(0).motivo()).contains("MZ-3-005");
+    }
+
+    @Test
+    @DisplayName("sin parámetros; la traza lleva la condición fija 'bloqueo manual activo'")
+    void trazaConLaCondicionFija() {
+        assertThat(rule.parametros()).isEmpty();
+        Evaluacion ev = ev(rule);
+
+        rule.evaluate(RuleContextTestFactory.conBloqueo(sector, zona, true), ev);
+
+        assertThat(ev.comparaciones()).hasSize(1);
+        Comparacion c = ev.comparaciones().get(0);
+        assertThat(c.etiqueta()).isEqualTo("Bloqueo manual activo");
+        assertThat(c.configurable()).isFalse();
+        assertThat(c.clave()).isNull();
+        assertThat(c.resultado()).isEqualTo(ResultadoComparacion.CUMPLE);
+    }
+
+    @Test
+    @DisplayName("sin bloqueo la condición fija no se cumple")
+    void trazaSinBloqueo() {
+        Evaluacion ev = ev(rule);
+
+        rule.evaluate(RuleContextTestFactory.conBloqueo(sector, zona, false), ev);
+
+        assertThat(ev.comparaciones().get(0).resultado()).isEqualTo(ResultadoComparacion.NO_CUMPLE);
     }
 
     @Test
@@ -70,5 +101,21 @@ class ManualLockRuleTest {
     @DisplayName("prioridad es 0 (la más alta)")
     void prioridad_esLaMasAlta() {
         assertThat(rule.priority()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("el ABORT_ALL lleva la marca CancelaRiego.TODAS: retira de la cola la solicitud de R-01 y de R-02")
+    void emiteLaMarcaDeCancelacionTotal() {
+        List<RuleAction> acciones = evaluar(rule, RuleContextTestFactory.conBloqueo(sector, zona, true));
+
+        assertThat(acciones.get(0).detalle()).isEqualTo(CancelaRiego.TODAS);
+    }
+
+    @Test
+    @DisplayName("sin bloqueo el NOOP_INFO no lleva marca de cancelación")
+    void sinBloqueoNoCancela() {
+        List<RuleAction> acciones = evaluar(rule, RuleContextTestFactory.conBloqueo(sector, zona, false));
+
+        assertThat(acciones.get(0).detalle()).isNull();
     }
 }
