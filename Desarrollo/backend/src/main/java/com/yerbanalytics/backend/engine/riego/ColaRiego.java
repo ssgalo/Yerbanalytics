@@ -1,5 +1,9 @@
 package com.yerbanalytics.backend.engine.riego;
 
+import com.yerbanalytics.backend.engine.DetalleRiego;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -25,15 +29,79 @@ import java.util.Set;
 @Component
 public class ColaRiego {
 
+    private static final Logger log = LoggerFactory.getLogger(ColaRiego.class);
+
     private final Object candado = new Object();
     private final Map<String, Map<String, SolicitudRiego>> porZona = new HashMap<>();
     private final Set<String> sectoresEnCola = new HashSet<>();
 
-    /** Encola o REEMPLAZA la solicitud del sector. */
-    public void solicitar(SolicitudRiego s) {
+    /**
+     * Encola o REEMPLAZA la solicitud del sector. Sólo entra una orden despachable: volumen finito y
+     * positivo, y duración entre 1 s y el máximo del contrato de la válvula. Una orden vacía (0 L / 0 s,
+     * que sale de un déficit que redondea a cero) o fuera del contrato se rechaza, y como la última decisión
+     * manda, cancela también la solicitud anterior del sector.
+     *
+     * @return {@code true} si quedó en la cola; {@code false} si se rechazó
+     */
+    public boolean solicitar(SolicitudRiego s) {
+        if (!esDespachable(s)) {
+            log.warn("Sector {}: solicitud de riego rechazada por no ser despachable ({}).", s.sectorId(), s.detalle());
+            retirar(s.zonaId(), s.sectorId());
+            return false;
+        }
         synchronized (candado) {
             porZona.computeIfAbsent(s.zonaId(), z -> new LinkedHashMap<>()).put(s.sectorId(), s);
             sectoresEnCola.add(s.sectorId());
+        }
+        return true;
+    }
+
+    private static boolean esDespachable(SolicitudRiego s) {
+        DetalleRiego d = s.detalle();
+        return d != null
+                && Double.isFinite(d.volumenL()) && d.volumenL() > 0
+                && d.duracionSeg() >= 1 && d.duracionSeg() <= ContratoNodo.DURACION_VALVULA_MAX_SEG;
+    }
+
+    /** {@code true} si {@code s} (la MISMA instancia, no una igual por valor) sigue siendo la solicitud del sector. */
+    public boolean esVigente(SolicitudRiego s) {
+        synchronized (candado) {
+            Map<String, SolicitudRiego> zona = porZona.get(s.zonaId());
+            return zona != null && zona.get(s.sectorId()) == s;
+        }
+    }
+
+    /**
+     * Reclama {@code s} para despacharla: la saca de la cola sólo si SIGUE siendo la solicitud vigente del
+     * sector (misma instancia). Si la telemetría la retiró (R-04, bloqueo) o la reemplazó mientras el despacho
+     * trabajaba sobre su copia, devuelve {@code false} y no se publica nada; así una cancelación posterior a la
+     * copia no se pierde y una solicitud nueva nunca se borra por error.
+     */
+    public boolean retirarSiCoincide(SolicitudRiego s) {
+        synchronized (candado) {
+            if (!esVigente(s)) {
+                return false;
+            }
+            retirar(s.zonaId(), s.sectorId());
+            return true;
+        }
+    }
+
+    /** Devuelve a la cola una solicitud reclamada que no se pudo despachar, salvo que ya haya otra más nueva. */
+    public void reponerSiAusente(SolicitudRiego s) {
+        synchronized (candado) {
+            Map<String, SolicitudRiego> zona = porZona.computeIfAbsent(s.zonaId(), z -> new LinkedHashMap<>());
+            if (zona.putIfAbsent(s.sectorId(), s) == null) {
+                sectoresEnCola.add(s.sectorId());
+            }
+        }
+    }
+
+    /** Vacía la cola (al regenerar la topología los sectores pendientes pueden no existir más). */
+    public void limpiar() {
+        synchronized (candado) {
+            porZona.clear();
+            sectoresEnCola.clear();
         }
     }
 

@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.dto.NuevaTopologia;
+import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
@@ -22,6 +23,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Regenerar la topología reutiliza ids de sector: las trazas viejas no pueden sobrevivir. */
@@ -30,16 +33,18 @@ class TopologiaServiceTrazaTest {
 
     private TrazaEvaluacionStore store;
     private TopologiaService service;
+    private DespachoRiego despacho;
 
     @BeforeEach
     void setUp() {
         store = new TrazaEvaluacionStore();
+        despacho = mock(DespachoRiego.class);
         ZonaRepository zonas = mock(ZonaRepository.class);
         when(zonas.count()).thenReturn(1L);
         TopologiaLayoutRepository layout = mock(TopologiaLayoutRepository.class);
         when(layout.findById(1)).thenReturn(Optional.empty());
         service = new TopologiaService(zonas, mock(SectorRepository.class), mock(DispositivoRepository.class),
-                mock(HistorialRepository.class), layout, store);
+                mock(HistorialRepository.class), layout, store, despacho);
         store.guardar(new TrazaEvaluacion("MZ-1-001", "MZ-1", OrigenEvaluacion.TELEMETRIA, Instant.EPOCH, "h", List.of()));
     }
 
@@ -72,5 +77,25 @@ class TopologiaServiceTrazaTest {
             s.afterCommit();
         }
         assertThat(store.masReciente("MZ-1-001")).isEmpty();
+    }
+
+    @Test
+    void regenerar_sinTransaccionVaciaTambienLaColaDeRiegoYLoQueEstabaRegando() {
+        service.generar(regenerar());
+
+        verify(despacho).reiniciarEstado();
+    }
+
+    @Test
+    void regenerar_conTransaccionVaciaLaColaDeRiegoDespuesDelCommitYNoAntes() {
+        TransactionSynchronizationManager.initSynchronization();
+
+        service.generar(regenerar());
+        verify(despacho, never()).reiniciarEstado();
+
+        for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
+            s.afterCommit();
+        }
+        verify(despacho).reiniciarEstado();
     }
 }

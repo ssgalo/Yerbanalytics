@@ -83,6 +83,20 @@ class PosponerPorLluviaRuleTest {
     }
 
     @Test
+    @DisplayName("probabilidad alta pero milímetros sin dato → la comparación de mm queda SIN_DATO y no pospone")
+    void milimetrosSinDato() {
+        WeatherForecast f = new WeatherForecast(90, 5, RiegoCtx.instante("10:05"), 22, "x", 70, List.of(), List.of(
+                new WeatherForecast.PronosticoHora(java.time.LocalDateTime.of(RiegoCtx.DIA, java.time.LocalTime.of(11, 0)), 95.0, null)));
+        Evaluacion ev = evV2(rule);
+
+        List<RuleAction> acciones = rule.evaluate(ctx(40.0, f), ev);
+
+        assertThat(tipos(acciones)).containsExactly(ActionType.NOOP_INFO);
+        Comparacion mm = ev.comparaciones().stream().filter(c -> "riego.lluvia-mm".equals(c.clave())).findFirst().orElseThrow();
+        assertThat(mm.resultado()).isEqualTo(ResultadoComparacion.SIN_DATO);
+    }
+
+    @Test
     @DisplayName("h 60 con lluvia fuerte → no aplica, sin alerta")
     void sinDeficit_noAplica() {
         List<RuleAction> acciones = rule.evaluate(ctx(60.0, lluvia(90, 15.0)), evV2(rule));

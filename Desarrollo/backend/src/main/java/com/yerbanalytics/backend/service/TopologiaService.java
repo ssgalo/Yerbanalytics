@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.dto.DisposicionTopologia;
 import com.yerbanalytics.backend.dto.NuevaTopologia;
 import com.yerbanalytics.backend.dto.TopologiaVivero;
+import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
@@ -65,19 +66,22 @@ public class TopologiaService {
     private final HistorialRepository historialRepository;
     private final TopologiaLayoutRepository layoutRepository;
     private final TrazaEvaluacionStore trazaStore;
+    private final DespachoRiego despacho;
 
     public TopologiaService(ZonaRepository zonaRepository,
                             SectorRepository sectorRepository,
                             DispositivoRepository dispositivoRepository,
                             HistorialRepository historialRepository,
                             TopologiaLayoutRepository layoutRepository,
-                            TrazaEvaluacionStore trazaStore) {
+                            TrazaEvaluacionStore trazaStore,
+                            DespachoRiego despacho) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.historialRepository = historialRepository;
         this.layoutRepository = layoutRepository;
         this.trazaStore = trazaStore;
+        this.despacho = despacho;
     }
 
     @Transactional(readOnly = true)
@@ -171,7 +175,7 @@ public class TopologiaService {
             sectorRepository.deleteAllInBatch();
             zonaRepository.deleteAllInBatch();
             zonaRepository.flush();
-            limpiarTrazasAlConfirmar();
+            limpiarEstadoEnMemoriaAlConfirmar();
         }
 
         List<ZonaEntity> zonas = new ArrayList<>();
@@ -207,19 +211,22 @@ public class TopologiaService {
 
     /**
      * Los ids de sector se reutilizan al regenerar: las trazas en memoria del vivero anterior
-     * dejarían de ser ciertas. Se descartan DESPUÉS del commit, así un hilo que evalúe en el
-     * medio no deja una traza del esquema viejo que sobreviva a la limpieza.
+     * dejarían de ser ciertas, y la cola de riego y lo que estaba regando apuntarían a sectores que ya no
+     * existen (o que ahora son otros). Se descartan DESPUÉS del commit, así un hilo que evalúe en el
+     * medio no deja nada del esquema viejo que sobreviva a la limpieza.
      */
-    private void limpiarTrazasAlConfirmar() {
+    private void limpiarEstadoEnMemoriaAlConfirmar() {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
                     trazaStore.limpiar();
+                    despacho.reiniciarEstado();
                 }
             });
         } else {
             trazaStore.limpiar();
+            despacho.reiniciarEstado();
         }
     }
 

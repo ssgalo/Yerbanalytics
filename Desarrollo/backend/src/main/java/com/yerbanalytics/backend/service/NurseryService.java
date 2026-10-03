@@ -112,7 +112,7 @@ public class NurseryService {
             // La lectura es de la zona: un solo nodo testigo la produce y sus 100 sectores
             // la comparten. Si el nodo dejó de reportar, toda la zona queda fuera de servicio.
             boolean isStale = ze.getLastReadingTime() == null
-                    || (System.currentTimeMillis() - ze.getLastReadingTime() > umbralAntiguedadMs());
+                    || (reloj.millis() - ze.getLastReadingTime() > umbralAntiguedadMs());
             List<Metric> zoneMetrics = isStale ? buildOfflineMetricsList() : buildMetricsList(ze);
             String zoneAgo = ze.getLastReadingTime() == null ? "hace —" : formatAgo(ze.getLastReadingTime());
             agoPorZona.put(ze.getId(), zoneAgo);
@@ -700,7 +700,7 @@ public class NurseryService {
     }
 
     private String formatAgo(long timestamp) {
-        long diffMs = System.currentTimeMillis() - timestamp;
+        long diffMs = reloj.millis() - timestamp;
         if (diffMs < 0) diffMs = 0;
         long diffSec = diffMs / 1000;
         if (diffSec < 60) {

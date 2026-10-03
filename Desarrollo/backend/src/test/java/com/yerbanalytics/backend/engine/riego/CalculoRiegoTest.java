@@ -120,4 +120,34 @@ class CalculoRiegoTest {
         assertThat(CalculoRiego.cabeEnLaValvula(10, 29.9)).isFalse();
         assertThat(CalculoRiego.cabeEnLaValvula(6, 30)).isTrue();
     }
+
+    @Test
+    void sinDeficitONegativoElPlanQuedaVacio() {
+        // h ≥ objetivo: nada que regar. Un plan vacío (0 L, 0 s) nunca debe llegar a una válvula.
+        assertThat(CalculoRiego.porDeficit(65, 65, 0.2, 6, 30)).isEqualTo(new CalculoRiego.PlanRiego(0.0, 0, false));
+        assertThat(CalculoRiego.porDeficit(70, 65, 0.2, 6, 30).duracionSeg()).isZero();
+    }
+
+    @Test
+    void unDeficitQueRedondeaACeroLitrosDaPlanVacio() {
+        // (65 − 64,999) × 0,2 = 0,0002 L → 0,00 L: sin volumen no hay tiempo.
+        CalculoRiego.PlanRiego p = CalculoRiego.porDeficit(64.999, 65, 0.2, 6, 30);
+
+        assertThat(p.volumenL()).isZero();
+        assertThat(p.duracionSeg()).isZero();
+    }
+
+    @Test
+    void unVolumenMaximoNegativoDaPlanVacioNoUnaDuracionNegativa() {
+        assertThat(CalculoRiego.volumenMaximo(-3, 30)).isEqualTo(new CalculoRiego.PlanRiego(0.0, 0, false));
+        assertThat(CalculoRiego.porDeficit(40, 65, 0.2, -6, 30).duracionSeg()).isZero();
+    }
+
+    @Test
+    void losValoresNoFinitosSonUnError() {
+        assertThatThrownBy(() -> CalculoRiego.porDeficit(Double.NaN, 65, 0.2, 6, 30)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> CalculoRiego.volumenMaximo(Double.NaN, 30)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> CalculoRiego.volumenMaximo(6, Double.NaN)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> CalculoRiego.volumenMaximo(Double.POSITIVE_INFINITY, 30)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

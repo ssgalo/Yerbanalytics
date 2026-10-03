@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import java.time.Clock;
 import com.yerbanalytics.backend.dto.HistorialEvento;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
@@ -45,7 +46,7 @@ class HistorialServiceDtoTest {
     }
 
     private HistorialService service() {
-        return new HistorialService(historialRepository, sectorRepository, configuracionService, 120000, "2 min", 5);
+        return new HistorialService(historialRepository, sectorRepository, configuracionService, 120000, "2 min", 5, Clock.systemUTC());
     }
 
     @Test

@@ -28,7 +28,7 @@ class HistorialServiceConfiguracionTest {
     @Test
     void asientaUnEventoConfiguracionConElUsuarioYElDetalle() {
         HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                configuracionService, 120000, "2 min", 5);
+                configuracionService, 120000, "2 min", 5, java.time.Clock.systemUTC());
 
         service.registrarConfiguracion("Ana", "Parámetros de reglas modificados: riego.umbral-humedad.");
 

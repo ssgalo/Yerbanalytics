@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
 import com.yerbanalytics.backend.dto.Evolution;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.ZoneId;
+import java.time.Clock;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -35,7 +36,7 @@ public class HistorialService {
     private static final ColorPair VERDICT_SIN = new ColorPair("#FBE6E0", "#A8331C");
 
     private static final DateTimeFormatter FECHA_FMT =
-            DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
+            DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZonaHorariaVivero.ZONA);
 
     private final HistorialRepository historialRepository;
     private final SectorRepository sectorRepository;
@@ -44,19 +45,23 @@ public class HistorialService {
     private final long latencyMs;
     private final String latencyLabel;
     private final double umbralRecuperacion;
+    /** Reloj del vivero: el mismo que usa el despacho de riego para sellar y comparar los eventos. */
+    private final Clock reloj;
 
     public HistorialService(HistorialRepository historialRepository,
                             SectorRepository sectorRepository,
                             @Lazy ConfiguracionService configuracionService,
                             @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
                             @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
-                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion) {
+                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion,
+                            Clock reloj) {
         this.historialRepository = historialRepository;
         this.sectorRepository = sectorRepository;
         this.configuracionService = configuracionService;
         this.latencyMs = latencyMs;
         this.latencyLabel = latencyLabel;
         this.umbralRecuperacion = umbralRecuperacion;
+        this.reloj = reloj;
     }
 
     // ------------------------------------------------------------------
@@ -116,7 +121,7 @@ public class HistorialService {
         e.setZonaId(s.getZona().getId());
         e.setZonaName(s.getZona().getName());
         e.setTipo(tipo);
-        e.setTs(System.currentTimeMillis());
+        e.setTs(reloj.millis());
         e.setRes(res);
         e.setSev(s.getDiagnosisSev());
         e.setBloqueoRepeticion(false);
@@ -172,7 +177,7 @@ public class HistorialService {
         e.setZonaId(s.getZona().getId());
         e.setZonaName(s.getZona().getName());
         e.setTipo("Info");
-        e.setTs(System.currentTimeMillis());
+        e.setTs(reloj.millis());
         e.setLectura("Ciclo de evaluación: " + ruleName + ".");
         e.setDecision(motivo);
         e.setAccion(type.isBlocking() ? "Evaluación bloqueada." : "Condición normal — sin actuación.");
@@ -214,7 +219,7 @@ public class HistorialService {
         e.setZonaId("—");
         e.setZonaName("Sistema");
         e.setTipo("Configuración");
-        e.setTs(System.currentTimeMillis());
+        e.setTs(reloj.millis());
         e.setLectura(lectura);
         e.setDecision(decision);
         e.setAccion(accion);
@@ -232,7 +237,7 @@ public class HistorialService {
     @Scheduled(fixedDelayString = "${yerbanalytics.historial.eval-interval-ms:30000}")
     @Transactional
     public void evaluarSeguimiento() {
-        long now = System.currentTimeMillis();
+        long now = reloj.millis();
         List<HistorialEventoEntity> pendientes = historialRepository.findByEvoShowTrueAndEvoEvaluadoTsIsNull();
         List<HistorialEventoEntity> evaluados = new ArrayList<>();
 
@@ -312,8 +317,8 @@ public class HistorialService {
      */
     @Transactional(readOnly = true)
     public Map<String, Long> countToday() {
-        long startOfDay = java.time.LocalDate.now()
-                .atStartOfDay(java.time.ZoneId.systemDefault())
+        long startOfDay = java.time.LocalDate.now(reloj.withZone(ZonaHorariaVivero.ZONA))
+                .atStartOfDay(ZonaHorariaVivero.ZONA)
                 .toInstant()
                 .toEpochMilli();
         return Map.of(
@@ -401,8 +406,8 @@ public class HistorialService {
         return String.format(Locale.US, "%.0f", v);
     }
 
-    private static String formatAgo(long timestamp) {
-        long diffMs = Math.max(0, System.currentTimeMillis() - timestamp);
+    private String formatAgo(long timestamp) {
+        long diffMs = Math.max(0, reloj.millis() - timestamp);
         long diffSec = diffMs / 1000;
         if (diffSec < 60) return "hace " + diffSec + " s";
         long diffMin = diffSec / 60;

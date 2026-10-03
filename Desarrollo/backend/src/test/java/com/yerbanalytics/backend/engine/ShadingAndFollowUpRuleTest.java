@@ -83,7 +83,7 @@ class ShadingAndFollowUpRuleTest {
     @Test
     @DisplayName("ShadingRule: apertura ya correcta según plan → NOOP_INFO")
     void aperturaYaCorrecta_noopInfo() {
-        String hoy = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String hoy = LocalDate.now(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA).format(DateTimeFormatter.ISO_LOCAL_DATE);
         ShadingRule rule = new ShadingRule(rustificacionRepository, hoy);
         // sector tiene apertura 50%, plan dice 50%
         sector.setActuadorShade(50);
@@ -98,9 +98,25 @@ class ShadingAndFollowUpRuleTest {
     }
 
     @Test
+    @DisplayName("ShadingRule: el día del ciclo sale del reloj del contexto en la zona del vivero, no de la del JVM")
+    void diaDelCiclo_usaLaZonaDelVivero() {
+        // 01:00 UTC del 3/10 son las 22:00 del 2/10 en Buenos Aires: siembra el 1/10 → día 2 del ciclo (no 3).
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "2026-10-01");
+        sector.setActuadorShade(50);
+        when(rustificacionRepository.findAllByOrderByOrdenAsc()).thenReturn(List.of(
+                new RustificacionEtapaEntity(1, 1, 2, 40), new RustificacionEtapaEntity(2, 3, 5, 60)));
+        RuleContext ctx = new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
+                "ok", Instant.parse("2026-10-03T01:00:00Z"), null, false);
+
+        List<RuleAction> acciones = evaluar(rule, ctx);
+
+        assertThat(acciones.get(0).motivo()).contains("[apertura=40]");
+    }
+
+    @Test
     @DisplayName("ShadingRule: apertura diferente al plan → MOVER_MEDIASOMBRA")
     void aperturaDiferenteAlPlan_moverMediasombra() {
-        String hoy = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String hoy = LocalDate.now(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA).format(DateTimeFormatter.ISO_LOCAL_DATE);
         ShadingRule rule = new ShadingRule(rustificacionRepository, hoy);
         sector.setActuadorShade(30); // actual 30%, plan dice 60%
         when(rustificacionRepository.findAllByOrderByOrdenAsc())

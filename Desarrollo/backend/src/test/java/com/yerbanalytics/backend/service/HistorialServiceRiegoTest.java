@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import java.time.Clock;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
@@ -31,7 +32,7 @@ class HistorialServiceRiegoTest {
         when(config.getLatencyMs()).thenReturn(120_000L);
         when(config.getLatencyLabel()).thenReturn("2 min");
         when(config.getUmbralRecuperacion()).thenReturn(5.0);
-        service = new HistorialService(historialRepository, mock(SectorRepository.class), config, 1, "x", 1);
+        service = new HistorialService(historialRepository, mock(SectorRepository.class), config, 1, "x", 1, Clock.systemUTC());
         sector = RuleContextTestFactory.sectorBasico("MZ-2-003");
         sector.setZona(RuleContextTestFactory.zonaBasica("MZ-2"));
         sector.getZona().setName("Macro-zona 2");

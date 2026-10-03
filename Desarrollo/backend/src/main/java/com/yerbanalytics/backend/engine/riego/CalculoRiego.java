@@ -47,6 +47,7 @@ public final class CalculoRiego {
     /** R-01: {@code V = min((objetivo − humedad) × litrosPorPunto, volumenMax)}; sin déficit, 0 L. */
     public static PlanRiego porDeficit(double humedad, double objetivo, double litrosPorPunto,
                                        double volumenMaxL, double caudalLh) {
+        finitos(humedad, objetivo, litrosPorPunto, volumenMaxL);
         BigDecimal deficit = BigDecimal.valueOf(objetivo).subtract(BigDecimal.valueOf(humedad));
         BigDecimal v = deficit.multiply(BigDecimal.valueOf(litrosPorPunto)).max(BigDecimal.ZERO)
                 .min(BigDecimal.valueOf(volumenMaxL));
@@ -55,6 +56,7 @@ public final class CalculoRiego {
 
     /** R-02: {@code V = volumenMax}. */
     public static PlanRiego volumenMaximo(double volumenMaxL, double caudalLh) {
+        finitos(volumenMaxL);
         return plan(BigDecimal.valueOf(volumenMaxL), caudalLh);
     }
 
@@ -68,11 +70,26 @@ public final class CalculoRiego {
                 .compareTo(BigDecimal.valueOf(caudalLh).multiply(DURACION_MAX)) <= 0;
     }
 
+    private static void finitos(double... valores) {
+        for (double v : valores) {
+            if (!Double.isFinite(v)) {
+                throw new IllegalArgumentException("El cálculo de riego recibió un valor no finito: " + v);
+            }
+        }
+    }
+
+    /**
+     * Un volumen que redondea a 0 L (sin déficit, déficit mínimo o volumen máximo no positivo) da el plan
+     * vacío {@code (0 L, 0 s)}: quien lo use NO debe ordenar un riego con él.
+     */
     private static PlanRiego plan(BigDecimal volumen, double caudalLh) {
-        if (!(caudalLh > 0)) {
+        if (!(caudalLh > 0) || Double.isInfinite(caudalLh)) {
             throw new IllegalArgumentException("El caudal del emisor debe ser mayor a 0 L/h: " + caudalLh);
         }
         BigDecimal v = volumen.setScale(2, RoundingMode.HALF_UP);
+        if (v.signum() <= 0) {
+            return new PlanRiego(0.0, 0, false);
+        }
         BigDecimal t = v.multiply(SEGUNDOS_POR_HORA).divide(BigDecimal.valueOf(caudalLh), 0, RoundingMode.CEILING);
         boolean recortado = t.compareTo(DURACION_MAX) > 0;
         return new PlanRiego(v.doubleValue(), recortado ? ContratoNodo.DURACION_VALVULA_MAX_SEG : t.intValueExact(), recortado);

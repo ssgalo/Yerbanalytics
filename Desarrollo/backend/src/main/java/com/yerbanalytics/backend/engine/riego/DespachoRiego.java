@@ -20,7 +20,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.util.List;
@@ -75,6 +76,7 @@ public class DespachoRiego implements ConsumidorParametros {
     private final ManualLockRepository manualLockRepository;
     private final CatalogoParametrosService parametros;
     private final Clock reloj;
+    private final TransactionTemplate transaccion;
 
     private final Map<String, Curso> enCurso = new ConcurrentHashMap<>();
     private volatile boolean reconstruido;
@@ -88,7 +90,8 @@ public class DespachoRiego implements ConsumidorParametros {
                          // Perezoso: el catálogo necesita a este bean (es un consumidor de parámetros)
                          // para armarse, y este necesita el catálogo para leer el valor vigente.
                          @Lazy CatalogoParametrosService parametros,
-                         Clock reloj) {
+                         Clock reloj,
+                         PlatformTransactionManager transacciones) {
         this.cola = cola;
         this.publisher = publisher;
         this.historialService = historialService;
@@ -97,6 +100,7 @@ public class DespachoRiego implements ConsumidorParametros {
         this.manualLockRepository = manualLockRepository;
         this.parametros = parametros;
         this.reloj = reloj;
+        this.transaccion = new TransactionTemplate(transacciones);
     }
 
     @Override
@@ -130,8 +134,25 @@ public class DespachoRiego implements ConsumidorParametros {
         return cola.contiene(sectorId) ? "En cola" : "Cerrada";
     }
 
-    @Scheduled(fixedDelayString = "${yerbanalytics.riego.despacho-intervalo-ms:10000}")
-    @Transactional
+    /**
+     * Olvida lo pendiente y lo que estaba regando (en memoria): se llama al regenerar la topología, cuando
+     * los sectores del vivero anterior ya no existen o sus ids se van a reutilizar.
+     */
+    public synchronized void reiniciarEstado() {
+        cola.limpiar();
+        enCurso.clear();
+    }
+
+    /**
+     * Sin {@code @Transactional}: una transacción abierta durante el tick mantendría una conexión JDBC
+     * mientras se publica por MQTT, y el historial de las válvulas YA abiertas se confirmaría recién al final
+     * (si algo fallara en el medio se perdería, y tras un reinicio el sector podría regarse otra vez). Cada
+     * riego se registra en su propia transacción, apenas después de publicarlo.
+     *
+     * <p>Corre en su propio scheduler ({@code despachoScheduler}): el barrido del watchdog (600 sectores y el
+     * HTTP del pronóstico con reintentos) no puede demorar la liberación de cupo de las tandas.
+     */
+    @Scheduled(scheduler = "despachoScheduler", fixedDelayString = "${yerbanalytics.riego.despacho-intervalo-ms:10000}")
     public synchronized void tick() {
         long ahora = reloj.millis();
         Set<String> zonas = cola.zonas();
@@ -162,21 +183,33 @@ public class DespachoRiego implements ConsumidorParametros {
         for (SolicitudRiego s : cola.pendientes(zonaId)) {
             if (zonaBloqueada || sectoresBloqueados.contains(s.sectorId())) {
                 log.info("Sector {}: riego descartado, hay un bloqueo manual activo.", s.sectorId());
-                cola.retirar(zonaId, s.sectorId());
+                cola.retirarSiCoincide(s);
                 continue;
             }
             if (enCurso.containsKey(s.sectorId())) {
                 log.debug("Sector {}: ya está regando, se descarta la solicitud repetida.", s.sectorId());
-                cola.retirar(zonaId, s.sectorId());
+                cola.retirarSiCoincide(s);
                 continue;
             }
             if (libres <= 0) {
                 continue;   // sigue revisando: lo bloqueado se descarta aunque no haya cupo
             }
-            SectorEntity sector = sectorRepository.findById(s.sectorId()).orElse(null);
-            if (sector == null) {
+            if (sectorRepository.findById(s.sectorId()).isEmpty()) {
                 log.warn("Sector {}: ya no existe, se descarta su solicitud de riego.", s.sectorId());
-                cola.retirar(zonaId, s.sectorId());
+                cola.retirarSiCoincide(s);
+                continue;
+            }
+            // Los bloqueos se leyeron al empezar el tick: un operario pudo bloquear después. Se mira de nuevo,
+            // justo antes de abrir ESTE sector.
+            if (hayBloqueoAhora(zonaId, s.sectorId())) {
+                log.info("Sector {}: riego descartado, hay un bloqueo manual activo.", s.sectorId());
+                cola.retirarSiCoincide(s);
+                continue;
+            }
+            // Reclamo: la saca de la cola sólo si sigue siendo la MISMA solicitud. Si la telemetría la retiró
+            // (R-04, bloqueo) o la reemplazó después de que se copió la cola, no se publica nada.
+            if (!cola.retirarSiCoincide(s)) {
+                log.debug("Sector {}: la solicitud cambió o se canceló mientras se despachaba; no se abre.", s.sectorId());
                 continue;
             }
             DetalleRiego d = s.detalle();
@@ -184,21 +217,38 @@ public class DespachoRiego implements ConsumidorParametros {
                     Map.of("durationSec", d.duracionSeg()));
             if (!r.publicado()) {
                 // Sin broker no se registra el riego y la solicitud sigue: el próximo tick reintenta.
+                cola.reponerSiAusente(s);
                 log.warn("Zona {}: no se pudo abrir {} ({}). Se reintenta en el próximo ciclo.",
                         zonaId, s.sectorId(), r.error());
                 return;
             }
-            // Primero se marca abierto y se saca de la cola; recién después se escribe el historial:
-            // si la base falla, la válvula ya abrió y no puede volver a pedirse.
+            // La válvula ya abrió: se marca en curso ANTES de escribir el historial. Si el registro falla, el
+            // sector sigue "regando" en memoria y no se vuelve a publicar.
             enCurso.put(s.sectorId(), new Curso(zonaId, ahora + d.duracionSeg() * 1000L + MARGEN_MS));
-            cola.retirar(zonaId, s.sectorId());
             libres--;
-            try {
-                historialService.registrarRiego(sector, d, s.regla(), ahora);
-            } catch (RuntimeException e) {
-                log.error("Sector {}: la válvula se abrió pero no se pudo registrar el riego en el historial.",
-                        s.sectorId(), e);
-            }
+            registrar(s, ahora);
+        }
+    }
+
+    private boolean hayBloqueoAhora(String zonaId, String sectorId) {
+        return !manualLockRepository.findBySectorIdAndActiveTrue(sectorId).isEmpty()
+                || !manualLockRepository.findByZonaIdAndActiveTrue(zonaId).isEmpty();
+    }
+
+    /**
+     * Registra el riego recién abierto en su PROPIA transacción, confirmada acá mismo: un fallo no revierte
+     * los riegos de los otros sectores ni aborta el resto del tick.
+     */
+    private void registrar(SolicitudRiego s, long ahora) {
+        try {
+            transaccion.executeWithoutResult(estado -> {
+                SectorEntity sector = sectorRepository.findById(s.sectorId())
+                        .orElseThrow(() -> new IllegalStateException("el sector " + s.sectorId() + " ya no existe"));
+                historialService.registrarRiego(sector, s.detalle(), s.regla(), ahora);
+            });
+        } catch (RuntimeException e) {
+            log.error("Sector {}: la válvula se abrió pero no se pudo registrar el riego en el historial.",
+                    s.sectorId(), e);
         }
     }
 

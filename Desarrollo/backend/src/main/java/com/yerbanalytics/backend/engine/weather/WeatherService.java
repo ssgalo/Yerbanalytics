@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -40,6 +41,7 @@ public class WeatherService {
     private final long cacheTtlMs;
     private final int maxRetries;
     private final long retryBaseMs;
+    private final Clock reloj;
 
     /** Cache thread-safe del último pronóstico válido. */
     private final AtomicReference<WeatherForecast> cache = new AtomicReference<>(null);
@@ -48,11 +50,13 @@ public class WeatherService {
             WeatherClient client,
             @Value("${yerbanalytics.weather.cache-ttl-ms:900000}") long cacheTtlMs,
             @Value("${yerbanalytics.weather.max-retries:3}") int maxRetries,
-            @Value("${yerbanalytics.weather.retry-base-ms:1000}") long retryBaseMs) {
+            @Value("${yerbanalytics.weather.retry-base-ms:1000}") long retryBaseMs,
+            Clock reloj) {
         this.client = client;
         this.cacheTtlMs = cacheTtlMs;
         this.maxRetries = maxRetries;
         this.retryBaseMs = retryBaseMs;
+        this.reloj = reloj;
     }
 
     /**
@@ -64,7 +68,7 @@ public class WeatherService {
      */
     public WeatherForecast getForecast() {
         WeatherForecast cached = cache.get();
-        if (cached != null && cached.isFresh(cacheTtlMs)) {
+        if (cached != null && cached.isFresh(cacheTtlMs, reloj.instant())) {
             log.debug("WeatherService: retornando pronóstico desde cache.");
             return cached;
         }

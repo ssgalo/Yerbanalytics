@@ -93,6 +93,12 @@ public class DeficitCriticoRule implements Rule {
 
         CalculoRiego.PlanRiego plan = CalculoRiego.volumenMaximo(
                 ev.numero(ParametrosRiego.VOLUMEN_MAX_EVENTO), ev.numero(ParametrosRiego.CAUDAL_EMISOR));
+        if (plan.duracionSeg() < 1) {
+            // Defensa: con el rango del catálogo no ocurre, pero nunca se ordena un riego de 0 s.
+            return List.of(RuleAction.noopInfo(NAME, String.format(
+                    "Déficit crítico (%s%%), pero el volumen calculado es 0 L: no se ordena el riego.",
+                    RiegoRuleSupport.num(humedad))));
+        }
         String motivo = String.format(
                 "Déficit hídrico crítico: humedad de sustrato %s%% bajo %s%%. Regar %s con el volumen máximo, a cualquier hora%s.",
                 RiegoRuleSupport.num(humedad), RiegoRuleSupport.num(ev.numero(ParametrosRiego.UMBRAL_CRITICO)),

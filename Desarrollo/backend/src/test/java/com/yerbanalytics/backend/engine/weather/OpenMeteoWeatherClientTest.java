@@ -44,6 +44,11 @@ class OpenMeteoWeatherClientTest {
 
     /** 48 marcas desde las 00:00 locales del 3/10: prob = índice, mm = índice / 10, temp = 20 + índice. */
     private static String respuesta(boolean conPrecipitacion) {
+        return respuesta(conPrecipitacion, java.util.Set.of(), java.util.Set.of());
+    }
+
+    /** Como {@link #respuesta(boolean)} pero con {@code null} en las marcas dadas (índices) de probabilidad y de mm. */
+    private static String respuesta(boolean conPrecipitacion, java.util.Set<Integer> probNull, java.util.Set<Integer> mmNull) {
         List<String> time = new ArrayList<>();
         List<String> prob = new ArrayList<>();
         List<String> mm = new ArrayList<>();
@@ -51,8 +56,8 @@ class OpenMeteoWeatherClientTest {
         LocalDateTime t0 = LocalDateTime.of(2026, 10, 3, 0, 0);
         for (int i = 0; i < 48; i++) {
             time.add("\"" + t0.plusHours(i).toString() + "\"");
-            prob.add(String.valueOf(i));
-            mm.add(String.format(Locale.US, "%.1f", i / 10.0));
+            prob.add(probNull.contains(i) ? "null" : String.valueOf(i));
+            mm.add(mmNull.contains(i) ? "null" : String.format(Locale.US, "%.1f", i / 10.0));
             otros.add(String.valueOf(20 + i));
         }
         String lista = String.join(",", otros);
@@ -114,11 +119,37 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
-    void sinLaListaDeMilimetrosEsModoDegradado() {
+    void sinLaListaDeMilimetrosDegradaSoloLaLluviaYConservaElRestoDelPronostico() {
         server.expect(requestTo(containsString("/forecast")))
                 .andRespond(withSuccess(respuesta(false), MediaType.APPLICATION_JSON));
 
-        assertThat(client.fetch()).isNull();
+        WeatherForecast f = client.fetch();
+
+        // El widget y la mediasombra (UV) siguen funcionando: la hora actual es la marca índice 10.
+        assertThat(f).isNotNull();
+        assertThat(f.uvIndex()).isEqualTo(30.0);
+        assertThat(f.tempC()).isEqualTo(30.0);
+        // Pero la lluvia acumulada no se conoce: no es "0 mm", es sin dato (R-03 queda SIN_DATO).
+        WeatherForecast.LluviaPrevista l = f.lluviaProxima(LocalDateTime.of(2026, 10, 3, 10, 20), 4);
+        assertThat(l.mmTotal()).isNull();
+        assertThat(l.horasCubiertas()).isZero();
+        assertThat(l.probMaxPct()).isEqualTo(14.0);
+    }
+
+    @Test
+    void unaMarcaConMilimetrosNulosNoSeLeeComoCeroYNoCuentaComoCubierta() {
+        // Marcas 11 a 14 de la ventana: la 12 no trae milímetros y la 13 no trae probabilidad.
+        server.expect(requestTo(containsString("/forecast")))
+                .andRespond(withSuccess(respuesta(true, java.util.Set.of(13), java.util.Set.of(12)), MediaType.APPLICATION_JSON));
+
+        WeatherForecast f = client.fetch();
+
+        assertThat(f.horas().get(2).precipitacionMm()).isNull();
+        assertThat(f.horas().get(3).probLluviaPct()).isNull();
+        WeatherForecast.LluviaPrevista l = f.lluviaProxima(LocalDateTime.of(2026, 10, 3, 10, 20), 4);
+        assertThat(l.horasCubiertas()).isEqualTo(2);                       // sólo 11 y 14 traen los dos datos
+        assertThat(l.mmTotal()).isEqualTo(3.8);                            // 1,1 + 1,3 + 1,4: la hora 12 no suma "0"
+        assertThat(l.probMaxPct()).isEqualTo(14.0);
     }
 
     @Test

@@ -30,8 +30,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tarea 7.3: el intervalo de sensado define el ciclo de lectura del riego y se acota a 60–360 min
- * ({@code reglas_v2} §11 "Intervalo de lectura 1–6 h").
+ * El intervalo de sensado define el ciclo de lectura del riego, que SE ACOTA a 60–360 min dentro del cálculo
+ * del ciclo ({@code CicloLectura.acotarMinutos}); el guardado sigue exigiendo sólo un valor positivo. Validar
+ * 60–360 al guardar rompería las bases con un valor viejo fuera de rango y le impediría al simulador emitir
+ * más rápido que cada hora, que es la forma de probar el sistema.
  */
 @DisplayName("ConfiguracionService - intervalo de sensado")
 class ConfiguracionServiceIntervaloTest {
@@ -63,18 +65,17 @@ class ConfiguracionServiceIntervaloTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {59, 5, 0, -1, 361, 600})
-    void rechazaUnIntervaloFueraDeRango(int minutos) {
+    @ValueSource(ints = {0, -1, -240})
+    void rechazaUnIntervaloNoPositivo(int minutos) {
         assertThatThrownBy(() -> service.updateConfiguracion(cfg(minutos), "Ana"))
                 .isInstanceOf(InvalidConfigurationException.class)
-                .hasMessageContaining("60")
-                .hasMessageContaining("360");
+                .hasMessageContaining("intervalo de sensado");
         verify(operativaRepo, never()).save(any());
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {60, 240, 300, 360})
-    void aceptaLosLimitesYLosValoresIntermedios(int minutos) {
+    @ValueSource(ints = {1, 5, 59, 60, 240, 360, 361, 600})
+    void aceptaCualquierIntervaloPositivoSinAcotarloAlGuardar(int minutos) {
         assertThatCode(() -> service.updateConfiguracion(cfg(minutos), "Ana")).doesNotThrowAnyException();
         ArgumentCaptor<ConfiguracionOperativaEntity> guardada = ArgumentCaptor.forClass(ConfiguracionOperativaEntity.class);
         verify(operativaRepo).save(guardada.capture());

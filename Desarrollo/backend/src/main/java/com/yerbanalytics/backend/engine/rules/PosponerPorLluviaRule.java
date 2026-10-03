@@ -70,20 +70,23 @@ public class PosponerPorLluviaRule implements Rule {
         WeatherForecast pronostico = ctx.forecast();
         WeatherForecast.LluviaPrevista lluvia = pronostico == null ? null
                 : pronostico.lluviaProxima(RiegoRuleSupport.fechaHoraLocal(ctx), horas);
-        boolean hayDato = lluvia != null && lluvia.horasCubiertas() > 0;
+        // Una hora sin dato no es una hora seca: si falta la probabilidad o los milímetros, esa comparación
+        // queda SIN_DATO y no se pospone (O-01: sin pronóstico se asume que no llueve).
+        Double probMax = lluvia == null ? null : lluvia.probMaxPct();
+        Double mmTotal = lluvia == null ? null : lluvia.mmTotal();
 
         boolean probable = ev.comparar("Probabilidad máxima de lluvia en las próximas " + horas + " h",
-                hayDato ? lluvia.probMaxPct() : null, Operador.GE, ParametrosRiego.LLUVIA_PROBABILIDAD);
+                probMax, Operador.GE, ParametrosRiego.LLUVIA_PROBABILIDAD);
         boolean abundante = ev.comparar("Lluvia acumulada en las próximas " + horas + " h",
-                hayDato ? lluvia.mmTotal() : null, Operador.GE, ParametrosRiego.LLUVIA_MM);
+                mmTotal, Operador.GE, ParametrosRiego.LLUVIA_MM);
 
-        if (!hayDato) {
+        if (probMax == null || mmTotal == null) {
             return List.of(RuleAction.noopInfo(NAME,
-                    "Pronóstico de lluvia no disponible: se asume que no llueve y el riego sigue su curso."));
+                    "Pronóstico de lluvia incompleto o no disponible: se asume que no llueve y el riego sigue su curso."));
         }
         if (probable && abundante) {
             String detalle = String.format("probabilidad máxima %s%% y %s mm en las próximas %d h",
-                    RiegoRuleSupport.num(lluvia.probMaxPct()), RiegoRuleSupport.num(lluvia.mmTotal()), horas);
+                    RiegoRuleSupport.num(probMax), RiegoRuleSupport.num(mmTotal), horas);
             RuleAction pospone = RuleAction.of(ActionType.POSTPONE_RIEGO, NAME,
                     "Riego pospuesto por lluvia prevista (" + detalle + "). En la próxima lectura se decide de nuevo.");
             RuleAction alerta = RuleAction.of(ActionType.ALERTA, NAME, "Lluvia prevista: " + detalle + ".",
@@ -92,6 +95,6 @@ public class PosponerPorLluviaRule implements Rule {
         }
         return List.of(RuleAction.noopInfo(NAME, String.format(
                 "Lluvia prevista insuficiente para posponer (probabilidad máxima %s%%, %s mm en %d h).",
-                RiegoRuleSupport.num(lluvia.probMaxPct()), RiegoRuleSupport.num(lluvia.mmTotal()), horas)));
+                RiegoRuleSupport.num(probMax), RiegoRuleSupport.num(mmTotal), horas)));
     }
 }

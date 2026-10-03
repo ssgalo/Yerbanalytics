@@ -39,7 +39,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -63,14 +65,19 @@ class DespachoRiegoTest {
     private ManualLockRepository bloqueos;
     private CatalogoParametrosService parametros;
     private DespachoRiego despacho;
+    /** begin / commit / rollback de las transacciones y "publish" de cada comando, en orden. */
+    private List<String> eventos;
 
     @BeforeEach
     void setUp() {
         reloj = new RelojDePrueba(T0);
         cola = new ColaRiego();
+        eventos = Collections.synchronizedList(new ArrayList<>());
         publisher = mock(ComandoActuadorPublisher.class);
-        when(publisher.publicar(any(), any(), any(), any(), any()))
-                .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
+        when(publisher.publicar(any(), any(), any(), any(), any())).thenAnswer(i -> {
+            eventos.add("publish");
+            return new ComandoActuadorPublisher.Resultado(true, "c", null);
+        });
         historial = mock(HistorialService.class);
         historialRepository = mock(HistorialRepository.class);
         when(historialRepository.riegosDesde(anyLong())).thenReturn(List.of());
@@ -85,7 +92,7 @@ class DespachoRiegoTest {
 
     private DespachoRiego nuevoDespacho() {
         return new DespachoRiego(cola, publisher, historial, historialRepository, sectorRepository, bloqueos,
-                parametros, reloj);
+                parametros, reloj, new TxFalso(eventos));
     }
 
     private static String zonaDe(String sectorId) {
@@ -322,6 +329,130 @@ class DespachoRiegoTest {
 
         verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
         assertThat(cola.contiene("MZ-2-001")).isFalse();
+    }
+
+    // ------------------------------------------------------------------ transacción por riego
+
+    @Test
+    void elHistorialDeCadaRiegoSeConfirmaApenasDespuesDePublicarYNuncaConUnaTransaccionAbiertaMientrasSePublica() {
+        pedirZona("MZ-2", 3, 600);
+
+        despacho.tick();
+
+        // Cada sector: publish → begin → commit. Si hubiera una transacción abierta al publicar el siguiente,
+        // aparecería un "begin" antes del segundo "publish" sin su "commit".
+        assertThat(eventos).containsExactly(
+                "publish", "begin", "commit",
+                "publish", "begin", "commit",
+                "publish", "begin", "commit");
+    }
+
+    @Test
+    void siElHistorialFallaTrasPublicarElSectorSigueRegandoNoSeRepublicaYElRestoDelTickSigue() {
+        pedirZona("MZ-2", 4, 600);
+        doThrow(new IllegalStateException("base caída")).when(historial)
+                .registrarRiego(argThat(sec -> sec != null && sec.getId().equals("MZ-2-002")), any(), any(), anyLong());
+
+        despacho.tick();
+
+        // Los cuatro se publicaron: la falla del segundo no abortó el tick.
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-002", "MZ-2-003", "MZ-2-004");
+        // Sólo el registro del 002 se revirtió; los demás quedaron confirmados.
+        assertThat(eventos.stream().filter("commit"::equals).count()).isEqualTo(3);
+        assertThat(eventos.stream().filter("rollback"::equals).count()).isEqualTo(1);
+        // El 002 sigue "Regando" (en memoria) y no sale de nuevo aunque la telemetría lo pida otra vez.
+        assertThat(despacho.estadoValvula("MZ-2-002")).isEqualTo("Regando");
+        reloj.avanzar(Duration.ofSeconds(30));
+        pedir("MZ-2", 2, 600);
+        despacho.tick();
+        verify(publisher, times(4)).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-2-002")).isFalse();
+    }
+
+    @Test
+    void siFallaElHistorialYSeReiniciaElDespachoElSectorNoSeVeEnCursoPeroNoHayDobleRiegoEnVivo() {
+        // Documenta el límite: lo que no llegó al historial no se reconstruye tras un reinicio. Por eso el
+        // registro se confirma de inmediato y por separado, para que esta ventana sea la mínima posible.
+        pedir("MZ-2", 1, 600);
+        doThrow(new IllegalStateException("base caída")).when(historial).registrarRiego(any(), any(), any(), anyLong());
+        despacho.tick();
+
+        assertThat(despacho.estadoValvula("MZ-2-001")).isEqualTo("Regando");
+        assertThat(nuevoDespacho().estadoValvula("MZ-2-001")).isEqualTo("Cerrada");
+    }
+
+    // ------------------------------------------------------------------ carrera cancelación / despacho
+
+    @Test
+    void unaCancelacionDeLaTelemetriaPosteriorALaCopiaDeLaColaFrenaElPublish() {
+        pedirZona("MZ-2", 3, 600);
+        // Entre la copia de pendientes() y el reclamo, el hilo MQTT retira el 002 (p. ej. R-04).
+        when(sectorRepository.findById("MZ-2-002")).thenAnswer(i -> {
+            cola.retirar("MZ-2", "MZ-2-002");
+            return Optional.of(sector("MZ-2-002"));
+        });
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-003");
+        assertThat(cola.contiene("MZ-2-002")).isFalse();
+        assertThat(despacho.estadoValvula("MZ-2-002")).isEqualTo("Cerrada");
+    }
+
+    @Test
+    void unaSolicitudReemplazadaDuranteElTickNoSeBorraNiSePublicaLaVieja() {
+        pedirZona("MZ-2", 3, 600);
+        SolicitudRiego nueva = new SolicitudRiego("MZ-2", "MZ-2-002", 2,
+                new DetalleRiego(7.0, 840, 38.0, false), "RiegoPorDeficitRule", reloj.instant());
+        when(sectorRepository.findById("MZ-2-002")).thenAnswer(i -> {
+            cola.solicitar(nueva);
+            return Optional.of(sector("MZ-2-002"));
+        });
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-003");
+        // La solicitud nueva sigue en la cola, intacta, para el próximo tick.
+        assertThat(cola.pendientes("MZ-2")).containsExactly(nueva);
+    }
+
+    @Test
+    void unBloqueoManualPosteriorALaLecturaDeLosBloqueosDelTickSeRevalidaAntesDeAbrir() {
+        pedirZona("MZ-2", 3, 600);
+        // findByActiveTrue (al empezar el tick) dice que no hay bloqueos; justo antes de abrir el 002 sí.
+        when(bloqueos.findBySectorIdAndActiveTrue("MZ-2-002")).thenReturn(List.of(bloqueoSector("MZ-2-002")));
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-003");
+        assertThat(cola.contiene("MZ-2-002")).isFalse();
+    }
+
+    @Test
+    void unBloqueoDeLaZonaPosteriorALaLecturaTambienSeRevalida() {
+        pedirZona("MZ-2", 2, 600);
+        when(bloqueos.findByZonaIdAndActiveTrue("MZ-2")).thenReturn(List.of(bloqueoZona("MZ-2")));
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.pendientes("MZ-2")).isEmpty();
+    }
+
+    // ------------------------------------------------------------------ topología regenerada
+
+    @Test
+    void reiniciarEstadoVaciaLaColaYLoQueEstabaRegando() {
+        pedirZona("MZ-2", 12, 600);
+        despacho.tick();
+        assertThat(despacho.estadoValvula("MZ-2-001")).isEqualTo("Regando");
+        assertThat(despacho.estadoValvula("MZ-2-011")).isEqualTo("En cola");
+
+        despacho.reiniciarEstado();
+
+        assertThat(despacho.estadoValvula("MZ-2-001")).isEqualTo("Cerrada");
+        assertThat(despacho.estadoValvula("MZ-2-011")).isEqualTo("Cerrada");
+        assertThat(cola.zonas()).isEmpty();
     }
 
     // ------------------------------------------------------------------ 8.5

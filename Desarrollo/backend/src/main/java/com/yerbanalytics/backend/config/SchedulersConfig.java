@@ -6,7 +6,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
- * Dos carriles de tareas programadas, a propósito separados.
+ * Tres carriles de tareas programadas, a propósito separados.
  *
  * <p>El default de Spring Boot es <strong>un solo hilo</strong> para todos los {@code @Scheduled}
  * de la aplicación, y acá conviven dos familias de tareas con exigencias incompatibles:
@@ -44,6 +44,21 @@ public class SchedulersConfig {
         ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
         s.setPoolSize(1);
         s.setThreadNamePrefix("motor-sched-");
+        s.setWaitForTasksToCompleteOnShutdown(true);
+        s.setAwaitTerminationSeconds(10);
+        return s;
+    }
+
+    /**
+     * Carril del despacho de riego: un hilo propio. Las tandas liberan cupo con un tick cada 10 s y el
+     * barrido del motor (600 sectores, más el HTTP del pronóstico con reintentos) puede tardar mucho más:
+     * compartiendo hilo, cada tanda esperaría detrás del barrido y la macro-zona tardaría de más en regarse.
+     */
+    @Bean
+    public TaskScheduler despachoScheduler() {
+        ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
+        s.setPoolSize(1);
+        s.setThreadNamePrefix("despacho-sched-");
         s.setWaitForTasksToCompleteOnShutdown(true);
         s.setAwaitTerminationSeconds(10);
         return s;

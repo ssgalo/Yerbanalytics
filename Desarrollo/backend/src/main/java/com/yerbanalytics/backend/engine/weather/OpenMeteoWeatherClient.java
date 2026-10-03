@@ -115,7 +115,12 @@ public class OpenMeteoWeatherClient implements WeatherClient {
             List<Number> wmoList    = (List<Number>) hourly.get("weathercode");
             List<String> timeList   = (List<String>) hourly.get("time");
 
-            if (precipProb == null || precipMm == null || uvList == null || tempList == null
+            // Los milímetros son opcionales: sin ellos se degrada sólo la lluvia acumulada (R-03 queda sin
+            // dato) y el widget y la mediasombra (UV) siguen con el resto del pronóstico.
+            if (precipMm == null) {
+                log.warn("WeatherClient: la respuesta no trae 'precipitation': la lluvia acumulada queda sin dato.");
+            }
+            if (precipProb == null || uvList == null || tempList == null
                     || humList == null || wmoList == null || precipProb.isEmpty()) {
                 log.warn("WeatherClient: campos de pronóstico ausentes o vacíos.");
                 return null;
@@ -148,7 +153,7 @@ public class OpenMeteoWeatherClient implements WeatherClient {
                 if (idx >= precipProb.size()) break;
                 LocalDateTime marca = parseMarca(timeList, idx);
                 if (marca == null) break;
-                horas.add(new WeatherForecast.PronosticoHora(marca, safeDouble(precipProb, idx), safeDouble(precipMm, idx)));
+                horas.add(new WeatherForecast.PronosticoHora(marca, valorONull(precipProb, idx), valorONull(precipMm, idx)));
             }
 
             log.debug("WeatherClient: temp={}°C cond={} lluvia={}% UV={}", tempC, cond, prob, uv);
@@ -207,6 +212,12 @@ public class OpenMeteoWeatherClient implements WeatherClient {
             }
         }
         return "+" + offset + " h";
+    }
+
+    /** El valor del índice, o {@code null} si la lista o el dato faltan: "sin dato" no es "0" (seco). */
+    private static Double valorONull(List<Number> list, int idx) {
+        if (list == null || idx < 0 || idx >= list.size() || list.get(idx) == null) return null;
+        return list.get(idx).doubleValue();
     }
 
     private double safeDouble(List<Number> list, int idx) {

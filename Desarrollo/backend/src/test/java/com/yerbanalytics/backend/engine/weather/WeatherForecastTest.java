@@ -92,6 +92,38 @@ class WeatherForecastTest {
     }
 
     @Test
+    void unaHoraSinDatoNoCuentaNiSeLeeComoCero() {
+        WeatherForecast f = con(List.of(
+                new PronosticoHora(LocalDateTime.of(2026, 10, 3, 11, 0), null, 2.0),
+                new PronosticoHora(LocalDateTime.of(2026, 10, 3, 12, 0), 60.0, null),
+                new PronosticoHora(LocalDateTime.of(2026, 10, 3, 13, 0), 40.0, 1.0)));
+
+        WeatherForecast.LluviaPrevista l = f.lluviaProxima(DIEZ, 4);
+
+        assertThat(l.horasCubiertas()).isEqualTo(1);
+        assertThat(l.probMaxPct()).isEqualTo(60.0);
+        assertThat(l.mmTotal()).isEqualTo(3.0);
+    }
+
+    @Test
+    void sinNingunDatoDeMilimetrosEnLaVentanaElTotalEsNull() {
+        WeatherForecast f = con(List.of(
+                new PronosticoHora(LocalDateTime.of(2026, 10, 3, 11, 0), 60.0, null)));
+
+        assertThat(f.lluviaProxima(DIEZ, 4).mmTotal()).isNull();
+        assertThat(f.lluviaProxima(DIEZ, 4).horasCubiertas()).isZero();
+    }
+
+    @Test
+    void laFrescuraSeMideContraElRelojInyectado() {
+        Instant t = Instant.parse("2026-10-03T13:00:00Z");
+        WeatherForecast f = new WeatherForecast(10.0, 1.0, t, 20.0, "x", 40.0, List.of());
+
+        assertThat(f.isFresh(900_000, t.plusSeconds(899))).isTrue();
+        assertThat(f.isFresh(900_000, t.plusSeconds(900))).isFalse();
+    }
+
+    @Test
     void elConstructorViejoDejaLasHorasVacias() {
         WeatherForecast viejo = new WeatherForecast(10.0, 9.5, Instant.now(), 20.0, "Soleado", 40.0, List.of());
 

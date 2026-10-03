@@ -491,3 +491,32 @@ Anotados al implementar los bloques 0–8 (los bloques siguientes parten de esto
   ese campo en `ConfiguracionService`.
 - **`tasks.md` 7.1.** El ejemplo "caudal 10 y volumen 6 → 1200 s" era inconsistente (6 L a 10 L/h son
   2160 s y se recortan): se testea 10 L a 30 L/h y 6 L a 18 L/h.
+
+### Correcciones de la revisión de §0–§8 (commit `fix(backend)`)
+
+- **DA-1 (desvío): el guardado del intervalo de sensado NO valida 60–360.** Vuelve a exigir sólo "positivo"
+  (`ConfiguracionService`); el acotamiento a 60–360 vive únicamente en `CicloLectura.acotarMinutos`. Validarlo
+  al guardar rompía las bases con un valor viejo fuera de rango (cualquier guardado de Configuración fallaba),
+  contradecía al validador del frontend y le impedía al simulador emitir más rápido que cada 60 min (deriva su
+  período de ese valor, que es como se prueba el sistema). Con un valor fuera de rango el ciclo usa 60 / 360 y
+  se loguea (una vez por valor).
+- **Despacho (D4).** `tick()` ya no es `@Transactional`: cada riego se registra en su propia transacción
+  (`TransactionTemplate`), confirmada apenas después de publicar, sin transacción ni conexión abierta durante
+  el MQTT. Si el registro falla, el sector queda en curso en memoria (no se republica) y el tick sigue. Cada
+  solicitud se **reclama** con `ColaRiego.retirarSiCoincide` (misma instancia, bajo el candado) antes de
+  publicar; si falla el broker se repone con `reponerSiAusente` (nunca pisa una decisión más nueva); y el
+  bloqueo manual del sector y de la zona se revalida justo antes de abrir. Tiene su propio scheduler
+  (`despachoScheduler`).
+- **Orden despachable.** `ColaRiego.solicitar` devuelve `boolean` y rechaza (cancelando la solicitud anterior
+  del sector) volumen no finito o ≤ 0 y duración fuera de 1…1200 s. `CalculoRiego` devuelve el plan vacío
+  `(0 L, 0 s)` para un volumen que redondea a 0 y lanza `IllegalArgumentException` ante valores no finitos;
+  R-01 y R-02 no emiten `ACTIVAR_VALVULA` con plan vacío.
+- **Pronóstico (D6).** `PronosticoHora` y `LluviaPrevista` usan `Double` anulables: una hora sin probabilidad o
+  sin milímetros ya no se lee como 0 ni cuenta en `horasCubiertas`. R-03 deja `SIN_DATO` la comparación a la
+  que le falta el dato y no pospone. Sin `precipitation` en la respuesta se degrada sólo la lluvia acumulada
+  (el UV de `ShadingRule` y el widget siguen).
+- **Relojes.** `HistorialService` (sellos, vencimiento del seguimiento, "hace N", KPI del día en
+  `America/Argentina/Buenos_Aires`), `WeatherService`/`WeatherForecast.isFresh(maxAge, ahora)`, la frescura del
+  snapshot de `NurseryService` y el día de ciclo de `ShadingRule` usan el `Clock` del vivero y su zona.
+- **Topología regenerada.** Después del commit se vacían también la cola de riego y lo que estaba regando.
+

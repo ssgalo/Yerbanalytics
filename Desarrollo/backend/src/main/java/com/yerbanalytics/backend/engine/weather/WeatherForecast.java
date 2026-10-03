@@ -61,28 +61,39 @@ public record WeatherForecast(
      * las 10:00 ya pasó y la de las 15:00 queda afuera.
      *
      * @return probabilidad horaria máxima, milímetros acumulados (suma, sin redondeo binario) y cuántas
-     *         marcas había disponibles: menos que {@code horas} si el pronóstico no alcanza
+     *         marcas había disponibles con AMBOS datos: menos que {@code horas} si el pronóstico no alcanza.
+     *         Una hora sin dato (la API devolvió {@code null}) no cuenta: si ninguna hora trae probabilidad
+     *         (o milímetros) ese valor es {@code null}, que no es lo mismo que 0 (seco)
      */
     public LluviaPrevista lluviaProxima(LocalDateTime ahora, int horas) {
         LocalDateTime desde = ahora.truncatedTo(ChronoUnit.HOURS);
         LocalDateTime hasta = desde.plusHours(horas);
-        double probMax = 0.0;
-        BigDecimal mm = BigDecimal.ZERO;
+        Double probMax = null;
+        BigDecimal mm = null;
         int cubiertas = 0;
         for (PronosticoHora h : this.horas) {
             if (h.hora().isAfter(desde) && !h.hora().isAfter(hasta)) {
-                probMax = Math.max(probMax, h.probLluviaPct());
-                mm = mm.add(BigDecimal.valueOf(h.precipitacionMm()));
-                cubiertas++;
+                if (h.probLluviaPct() != null) {
+                    probMax = probMax == null ? h.probLluviaPct() : Math.max(probMax, h.probLluviaPct());
+                }
+                if (h.precipitacionMm() != null) {
+                    mm = (mm == null ? BigDecimal.ZERO : mm).add(BigDecimal.valueOf(h.precipitacionMm()));
+                }
+                if (h.probLluviaPct() != null && h.precipitacionMm() != null) {
+                    cubiertas++;
+                }
             }
         }
-        return new LluviaPrevista(probMax, mm.doubleValue(), cubiertas);
+        return new LluviaPrevista(probMax, mm == null ? null : mm.doubleValue(), cubiertas);
     }
 
-    /** @return true si el pronóstico fue emitido hace menos de {@code maxAgeMs} ms. */
-    public boolean isFresh(long maxAgeMs) {
+    /**
+     * @param ahora instante actual según el reloj del vivero (el mismo con que se selló {@link #timestamp})
+     * @return true si el pronóstico fue emitido hace menos de {@code maxAgeMs} ms.
+     */
+    public boolean isFresh(long maxAgeMs, Instant ahora) {
         return timestamp != null
-                && (System.currentTimeMillis() - timestamp.toEpochMilli()) < maxAgeMs;
+                && (ahora.toEpochMilli() - timestamp.toEpochMilli()) < maxAgeMs;
     }
 
     /**
@@ -98,17 +109,17 @@ public record WeatherForecast(
      * Una marca horaria del pronóstico.
      *
      * @param hora           marca en hora local del vivero (fin de la hora que describe)
-     * @param probLluviaPct  probabilidad de precipitación en % (0–100)
-     * @param precipitacionMm precipitación prevista en milímetros
+     * @param probLluviaPct  probabilidad de precipitación en % (0–100); {@code null} si la API no trajo el dato
+     * @param precipitacionMm precipitación prevista en milímetros; {@code null} si la API no trajo el dato
      */
-    public record PronosticoHora(LocalDateTime hora, double probLluviaPct, double precipitacionMm) {}
+    public record PronosticoHora(LocalDateTime hora, Double probLluviaPct, Double precipitacionMm) {}
 
     /**
      * Lluvia prevista en una ventana de horas.
      *
-     * @param probMaxPct    probabilidad horaria máxima en la ventana
-     * @param mmTotal       milímetros acumulados en la ventana
-     * @param horasCubiertas cantidad de marcas horarias disponibles dentro de la ventana
+     * @param probMaxPct    probabilidad horaria máxima en la ventana; {@code null} si ninguna hora trae el dato
+     * @param mmTotal       milímetros acumulados en la ventana; {@code null} si ninguna hora trae el dato
+     * @param horasCubiertas cantidad de marcas horarias con probabilidad Y milímetros dentro de la ventana
      */
-    public record LluviaPrevista(double probMaxPct, double mmTotal, int horasCubiertas) {}
+    public record LluviaPrevista(Double probMaxPct, Double mmTotal, int horasCubiertas) {}
 }
