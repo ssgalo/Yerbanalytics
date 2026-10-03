@@ -421,8 +421,8 @@ Cada una tiene el default aplicado en este diseño.
   20 min. *Default: aceptarlo en el prototipo*; el cierre por timer queda para el cambio de firmware.
 - **DA-13 · Las reglas nuevas emiten `NOOP_INFO` como las existentes** (el DAG del Historial los
   usa). *Default: sí.* Con el nodo real cada 30 s eso es ~13 filas × 100 sectores por mensaje
-  (~3,7 M filas/día por MZ). Ya pasa hoy con 9 reglas: **recomiendo hacer DA-6 de
-  `add-catalogo-umbrales-reglas` antes de dejar un nodo real conectado días**.
+  (~3,7 M filas/día por MZ). **Resuelta en la revisión de la conmutación (C7)**: se registra sólo cuando cambia
+  la decisión del sector.
 
 ## Risks / Trade-offs
 
@@ -657,6 +657,25 @@ estaba en el script manual. Se declaran en la entidad (`@Table(indexes)`; `ddl-a
 ts)` —igualdad, lista y rango, el orden que el planificador necesita— y `(tipo, ts)` para `riegosDesde` (reconstrucción
 tras un reinicio) y los KPI. El script manual conserva el mismo nombre. Sin verificar contra el plan de ejecución real
 de la base (sólo contra el orden de columnas).
+
+**C7 · El Registro de Inacción escribe sólo cuando cambia la decisión (resuelve DA-13).** Cada `NOOP_INFO`/`ABORT_*`/
+`POSTPONE_RIEGO` escribía una fila "Info" por sector, por regla y por evaluación: ~13 filas × 100 sectores = ~1.300 por
+mensaje de una zona, ~3,7 millones por día por zona con el nodo real a 30 s. Ahora el `ActionExecutor` recuerda, por
+sector y por origen (telemetría / barrido), `regla → tipo de acción + clave estable del motivo` (el texto con los
+números reemplazados por `#`: la humedad exacta o los segundos restantes no son otra decisión) y escribe sólo si la
+evaluación difiere de la última registrada. **Si cambia CUALQUIER regla del sector se escribe el conjunto completo de
+sus reglas en esa evaluación**: es lo que necesita el DAG del Historial. Impacto en el frontend (verificado leyendo
+`HistorialTimeline.tsx` y `RuleGraph.tsx`): el Historial agrupa las filas por minuto, zona y sector y `RuleGraph`
+pinta el DAG con las filas de ese sector en ese minuto (la regla sale de "Ciclo de evaluación: X", los nodos de
+prioridad menor a la del evento quedan "pasó"). Con el conjunto completo en cada cambio el DAG de ese evento queda
+igual; un evento "Riego" (que ahora puede caer en un minuto sin filas Info, porque la decisión se tomó antes) se
+pinta con su sola fila: `regla` + prioridad dejan "pasadas" las reglas anteriores. Lo que cambia es sólo cosmético:
+los contadores "N decisiones" del ciclo bajan y el historial muestra los cambios, no cada evaluación. Estado en memoria:
+tras un reinicio se registra una vez más; se limpia al regenerar la topología (`ActionExecutor.reiniciarEstado()`). El
+barrido (sin métricas, decisión distinta) lleva su propio estado y no repite lo que ya dejó la telemetría. Régimen
+estable: **0 filas por mensaje**. Si la escritura falla no se da por registrada y se reintenta. Se descartó dedupe
+por ventana de tiempo (esconde decisiones que sí cambian) y persistir el estado (otra tabla para algo que se
+reconstruye con una evaluación).
 
 **Sin corregir (documentado):**
 - R-06 depende de eventos "Insumo" y la bomba conserva el enganche "Dosificando" (rama de insumos, fuera de alcance).

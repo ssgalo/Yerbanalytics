@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.dto.DisposicionTopologia;
 import com.yerbanalytics.backend.dto.NuevaTopologia;
 import com.yerbanalytics.backend.dto.TopologiaVivero;
+import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -67,6 +68,7 @@ public class TopologiaService {
     private final TopologiaLayoutRepository layoutRepository;
     private final TrazaEvaluacionStore trazaStore;
     private final DespachoRiego despacho;
+    private final ActionExecutor actionExecutor;
 
     public TopologiaService(ZonaRepository zonaRepository,
                             SectorRepository sectorRepository,
@@ -74,7 +76,8 @@ public class TopologiaService {
                             HistorialRepository historialRepository,
                             TopologiaLayoutRepository layoutRepository,
                             TrazaEvaluacionStore trazaStore,
-                            DespachoRiego despacho) {
+                            DespachoRiego despacho,
+                            ActionExecutor actionExecutor) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.dispositivoRepository = dispositivoRepository;
@@ -82,6 +85,7 @@ public class TopologiaService {
         this.layoutRepository = layoutRepository;
         this.trazaStore = trazaStore;
         this.despacho = despacho;
+        this.actionExecutor = actionExecutor;
     }
 
     @Transactional(readOnly = true)
@@ -212,7 +216,8 @@ public class TopologiaService {
     /**
      * Los ids de sector se reutilizan al regenerar: las trazas en memoria del vivero anterior
      * dejarían de ser ciertas, y la cola de riego y lo que estaba regando apuntarían a sectores que ya no
-     * existen (o que ahora son otros). Se descartan DESPUÉS del commit, así un hilo que evalúe en el
+     * existen (o que ahora son otros); lo que el motor recuerda de lo ya registrado en el historial también es de
+     * sectores que ya no son los mismos. Se descartan DESPUÉS del commit, así un hilo que evalúe en el
      * medio no deja nada del esquema viejo que sobreviva a la limpieza.
      */
     private void limpiarEstadoEnMemoriaAlConfirmar() {
@@ -222,11 +227,13 @@ public class TopologiaService {
                 public void afterCommit() {
                     trazaStore.limpiar();
                     despacho.reiniciarEstado();
+                    actionExecutor.reiniciarEstado();
                 }
             });
         } else {
             trazaStore.limpiar();
             despacho.reiniciarEstado();
+            actionExecutor.reiniciarEstado();
         }
     }
 

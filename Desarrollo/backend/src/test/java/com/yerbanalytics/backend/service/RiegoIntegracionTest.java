@@ -358,6 +358,51 @@ class RiegoIntegracionTest {
         assertThat(cola.zonas()).isEmpty();
     }
 
+    // ------------------------------------------------------------------ el registro de inacción sólo cuando cambia
+
+    private int filasDeInaccion() {
+        return org.mockito.Mockito.mockingDetails(historialService).getInvocations().stream()
+                .filter(i -> i.getMethod().getName().equals("registrarInaccion")).mapToInt(i -> 1).sum();
+    }
+
+    @Test
+    @DisplayName("60 mensajes idénticos del nodo (30 min) escriben una sola tanda de filas Info; al cambiar la decisión se registra otra")
+    void inaccionSoloCuandoCambia() {
+        telemetria(40.0);
+        int primeraTanda = filasDeInaccion();
+        assertThat(primeraTanda).as("la primera evaluación registra el conjunto de cada sector").isGreaterThan(SECTORES);
+
+        for (int mensaje = 0; mensaje < 59; mensaje++) {
+            reloj.avanzar(Duration.ofSeconds(30));
+            telemetria(40.0);
+        }
+        assertThat(filasDeInaccion()).as("en régimen estable: cero filas por mensaje").isEqualTo(primeraTanda);
+
+        telemetria(80.0);                                  // saturado: R-04 corta, otras reglas pasan a "no alcanzada"
+        assertThat(filasDeInaccion()).isGreaterThan(primeraTanda);
+    }
+
+    @Test
+    @DisplayName("el barrido del watchdog no escribe filas que la telemetría ya registró ni repite las suyas")
+    void barridoNoDuplicaFilas() {
+        telemetria(40.0);
+        reloj.avanzar(Duration.ofSeconds(30));
+        telemetria(40.0);
+        int base = filasDeInaccion();
+
+        for (int pasada = 0; pasada < 3; pasada++) {
+            watchdog.evaluarTodos();
+        }
+
+        // La primera pasada registra la decisión propia del barrido (otra: sin métricas), las demás nada.
+        int tras1 = filasDeInaccion();
+        reloj.avanzar(Duration.ofSeconds(30));
+        telemetria(40.0);
+        watchdog.evaluarTodos();
+        assertThat(filasDeInaccion()).isEqualTo(tras1);
+        assertThat(tras1).isGreaterThanOrEqualTo(base);
+    }
+
     // ------------------------------------------------------------------ la ronda se completa (cancelación explícita)
 
     /** Avanza {@code segundos} publicando una lectura cada 30 s y despachando, como el nodo real y el scheduler. */

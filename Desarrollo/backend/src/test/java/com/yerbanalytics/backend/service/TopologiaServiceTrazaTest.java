@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.dto.NuevaTopologia;
+import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacion;
@@ -34,17 +35,19 @@ class TopologiaServiceTrazaTest {
     private TrazaEvaluacionStore store;
     private TopologiaService service;
     private DespachoRiego despacho;
+    private ActionExecutor executor;
 
     @BeforeEach
     void setUp() {
         store = new TrazaEvaluacionStore();
         despacho = mock(DespachoRiego.class);
+        executor = mock(ActionExecutor.class);
         ZonaRepository zonas = mock(ZonaRepository.class);
         when(zonas.count()).thenReturn(1L);
         TopologiaLayoutRepository layout = mock(TopologiaLayoutRepository.class);
         when(layout.findById(1)).thenReturn(Optional.empty());
         service = new TopologiaService(zonas, mock(SectorRepository.class), mock(DispositivoRepository.class),
-                mock(HistorialRepository.class), layout, store, despacho);
+                mock(HistorialRepository.class), layout, store, despacho, executor);
         store.guardar(new TrazaEvaluacion("MZ-1-001", "MZ-1", OrigenEvaluacion.TELEMETRIA, Instant.EPOCH, "h", List.of()));
     }
 
@@ -84,6 +87,7 @@ class TopologiaServiceTrazaTest {
         service.generar(regenerar());
 
         verify(despacho).reiniciarEstado();
+        verify(executor).reiniciarEstado();     // y lo que recuerda de lo ya registrado en el historial
     }
 
     @Test
@@ -92,10 +96,12 @@ class TopologiaServiceTrazaTest {
 
         service.generar(regenerar());
         verify(despacho, never()).reiniciarEstado();
+        verify(executor, never()).reiniciarEstado();
 
         for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
             s.afterCommit();
         }
         verify(despacho).reiniciarEstado();
+        verify(executor).reiniciarEstado();
     }
 }

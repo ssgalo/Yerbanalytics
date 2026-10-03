@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,8 +37,18 @@ import java.util.regex.Pattern;
  *   <li>{@code ALERTA}: se persiste como evento "Alerta", una sola vez por macro-zona, regla y ciclo de
  *       lectura (el motor evalúa 100 sectores por mensaje: sin esto serían 100 alertas iguales).</li>
  *   <li>{@code NOOP_INFO} y las bloqueantes ({@code ABORT_*}, {@code POSTPONE_RIEGO}): se persiste el motivo
- *       como Registro de Inacción; el corte ya lo aplicó el {@link RuleOrchestrator}.</li>
+ *       como Registro de Inacción, <b>sólo cuando cambia la decisión del sector</b> (ver abajo); el corte ya lo
+ *       aplicó el {@link RuleOrchestrator}.</li>
  * </ul>
+ *
+ * <p><b>Registro de Inacción sólo ante un cambio.</b> Con el nodo real publicando cada 30 s, una fila "Info" por
+ * sector, por regla y por mensaje eran ~1.300 filas por mensaje de una zona (millones por día) que repetían lo mismo.
+ * Por cada sector (y por origen: telemetría o barrido) se recuerda la última decisión registrada: el tipo de acción y
+ * una clave estable del motivo (el texto sin los números, que cambian en cada lectura) de cada regla. Si la
+ * evaluación coincide no se escribe nada; si cambió la decisión de CUALQUIER regla se escribe el conjunto completo de
+ * ese sector en esa evaluación, así el DAG del Historial (que pinta los nodos con las filas del sector en ese minuto)
+ * sigue teniendo todas las reglas. El barrido tampoco repite lo que ya registró la telemetría. Es estado en memoria:
+ * tras un reinicio se registra una vez más y {@link #reiniciarEstado()} lo limpia al regenerar la topología.
  *
  * <p>El tópico de comando tiene la forma {@code nursery/zone/{zonaId}/sector/{sectorId}/command},
  * alineado con el contrato definido en {@code embebido/comun/contrato.h}.
@@ -62,6 +73,14 @@ public class ActionExecutor {
      */
     private final Map<String, Instant> alertasPorCiclo = new ConcurrentHashMap<>();
 
+    /**
+     * Última decisión de inacción registrada por sector: {@code regla → firma (tipo + clave estable del motivo)}.
+     * Una por origen: la telemetría y el barrido evalúan con datos distintos (el barrido, sin métricas) y no
+     * deben pisarse el estado entre sí.
+     */
+    private final Map<String, Map<String, String>> inaccionTelemetria = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, String>> inaccionBarrido = new ConcurrentHashMap<>();
+
     public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola) {
         this.historialService = historialService;
         this.publisher = publisher;
@@ -81,6 +100,7 @@ public class ActionExecutor {
         if (origen == OrigenEvaluacion.TELEMETRIA) {
             actualizarCola(actions, ctx);
         }
+        registrarInacciones(actions, ctx, origen);
 
         for (RuleAction action : actions) {
             switch (action.type()) {
@@ -108,24 +128,79 @@ public class ActionExecutor {
                     publishCommand(ctx, "shade", "SET", Map.of("targetPct", apertura));
                 }
 
-                case NOOP_INFO -> {
-                    log.debug("Sector {}: NOOP_INFO — {}", ctx.sector().getId(), action.motivo());
-                    // Registro de Inacción: el usuario puede ver por qué el motor no actuó.
-                    historialService.registrarInaccion(ctx.sector(), action.type(), action.ruleName(), action.motivo());
-                }
+                // Registro de Inacción: el usuario puede ver por qué el motor no actuó. Ya se persistió arriba
+                // (sólo si cambió la decisión del sector); acá queda el log.
+                case NOOP_INFO -> log.debug("Sector {}: NOOP_INFO — {}", ctx.sector().getId(), action.motivo());
 
-                case ABORT_RIEGO, ABORT_INSUMO, ABORT_ALL, POSTPONE_RIEGO -> {
-                    // El corte ya fue aplicado por el RuleOrchestrator.
-                    // Se persiste como Registro de Inacción para trazabilidad.
-                    log.info("Sector {}: {} — {}", ctx.sector().getId(), action.type(), action.motivo());
-                    historialService.registrarInaccion(ctx.sector(), action.type(), action.ruleName(), action.motivo());
-                }
+                // El corte ya fue aplicado por el RuleOrchestrator.
+                case ABORT_RIEGO, ABORT_INSUMO, ABORT_ALL, POSTPONE_RIEGO ->
+                    log.debug("Sector {}: {} — {}", ctx.sector().getId(), action.type(), action.motivo());
 
                 case ALERTA -> persistirAlerta(action, ctx);
 
                 default -> log.warn("Sector {}: acción desconocida '{}'", ctx.sector().getId(), action.type());
             }
         }
+    }
+
+    /** Olvida lo que recuerda de lo ya registrado (al regenerar la topología los ids de sector se reutilizan). */
+    public void reiniciarEstado() {
+        inaccionTelemetria.clear();
+        inaccionBarrido.clear();
+        alertasPorCiclo.clear();
+    }
+
+    // -------------------------------------------------------------------------
+    // Registro de Inacción
+    // -------------------------------------------------------------------------
+
+    /** Números (con signo y decimales): lo que cambia en cada lectura y no es una decisión distinta. */
+    private static final Pattern NUMEROS = Pattern.compile("-?\\d+(?:[.,]\\d+)?");
+
+    private static boolean esInaccion(RuleAction a) {
+        return a.type() == ActionType.NOOP_INFO || a.type().isBlocking();
+    }
+
+    /** Tipo de acción y motivo sin números: "humedad 44% bajo 45%" y "humedad 40% bajo 45%" son la misma decisión. */
+    private static String firma(RuleAction a) {
+        String motivo = a.motivo() == null ? "" : NUMEROS.matcher(a.motivo()).replaceAll("#");
+        return a.type() + "|" + motivo;
+    }
+
+    /**
+     * Escribe las filas "Info" del sector sólo si su decisión cambió (cualquier regla): en ese caso, el conjunto
+     * completo de la evaluación. Si la escritura falla se propaga y NO se da por registrada: la próxima evaluación
+     * lo reintenta.
+     */
+    private void registrarInacciones(List<RuleAction> actions, RuleContext ctx, OrigenEvaluacion origen) {
+        List<RuleAction> inacciones = actions.stream().filter(ActionExecutor::esInaccion).toList();
+        if (inacciones.isEmpty()) {
+            return;
+        }
+        // Una regla puede emitir más de una acción de inacción: la clave lleva el orden para no pisarlas.
+        Map<String, String> actual = new LinkedHashMap<>();
+        for (RuleAction a : inacciones) {
+            String clave = a.ruleName();
+            for (int n = 2; actual.containsKey(clave); n++) {
+                clave = a.ruleName() + "#" + n;
+            }
+            actual.put(clave, firma(a));
+        }
+        String sectorId = ctx.sector().getId();
+        boolean telemetria = origen == OrigenEvaluacion.TELEMETRIA;
+        Map<String, Map<String, String>> propio = telemetria ? inaccionTelemetria : inaccionBarrido;
+        if (actual.equals(propio.get(sectorId))) {
+            return;
+        }
+        // El barrido no repite lo que la telemetría ya dejó asentado.
+        if (!telemetria && actual.equals(inaccionTelemetria.get(sectorId))) {
+            propio.put(sectorId, actual);
+            return;
+        }
+        for (RuleAction a : inacciones) {
+            historialService.registrarInaccion(ctx.sector(), a.type(), a.ruleName(), a.motivo());
+        }
+        propio.put(sectorId, actual);
     }
 
     // -------------------------------------------------------------------------
