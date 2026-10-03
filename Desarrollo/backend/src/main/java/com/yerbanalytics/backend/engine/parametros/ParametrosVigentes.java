@@ -10,9 +10,17 @@ import java.util.Map;
 public final class ParametrosVigentes {
 
     private final Map<String, ValorParametro> valores;
+    private final String huella;
 
     private ParametrosVigentes(Map<String, ValorParametro> valores) {
         this.valores = Map.copyOf(valores);
+        // Inmutable: se calcula una vez, no por cada sector evaluado.
+        this.huella = Integer.toHexString(this.valores.hashCode());
+    }
+
+    /** Huella de los valores: dos trazas con la misma huella se evaluaron contra los mismos umbrales. */
+    public String huella() {
+        return huella;
     }
 
     public static ParametrosVigentes de(Map<String, ValorParametro> valores) {

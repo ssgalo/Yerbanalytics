@@ -54,9 +54,10 @@ public final class Evaluacion {
      */
     public boolean comparar(String etiqueta, Double recibido, Operador op, DefinicionParametro umbral) {
         double valorUmbral = numero(umbral);
-        boolean cumple = recibido != null && op.cumple(Double.compare(recibido, valorUmbral));
-        comparaciones.add(new Comparacion(etiqueta, umbral.clave(), recibido, op, valorUmbral,
-                umbral.unidad(), true, resultado(recibido, cumple)));
+        boolean sinDato = recibido == null || recibido.isNaN();
+        boolean cumple = !sinDato && op.cumple(recibido, valorUmbral);
+        comparaciones.add(new Comparacion(etiqueta, umbral.clave(), sinDato ? null : recibido, op, valorUmbral,
+                umbral.unidad(), true, resultado(sinDato, cumple)));
         return cumple;
     }
 
@@ -66,9 +67,10 @@ public final class Evaluacion {
      * Con números admite todos los operadores; con otros tipos sólo {@link Operador#EQ}.
      */
     public boolean compararFijo(String etiqueta, Object recibido, Operador op, Object umbral) {
-        boolean cumple = recibido != null && aplicar(recibido, op, umbral);
-        comparaciones.add(new Comparacion(etiqueta, null, recibido, op, umbral, "", false,
-                resultado(recibido, cumple)));
+        boolean sinDato = recibido == null || (recibido instanceof Double d && d.isNaN());
+        boolean cumple = !sinDato && aplicar(recibido, op, umbral);
+        comparaciones.add(new Comparacion(etiqueta, null, sinDato ? null : recibido, op, umbral, "", false,
+                resultado(sinDato, cumple)));
         return cumple;
     }
 
@@ -84,8 +86,8 @@ public final class Evaluacion {
         return p;
     }
 
-    private static ResultadoComparacion resultado(Object recibido, boolean cumple) {
-        if (recibido == null) {
+    private static ResultadoComparacion resultado(boolean sinDato, boolean cumple) {
+        if (sinDato) {
             return ResultadoComparacion.SIN_DATO;
         }
         return cumple ? ResultadoComparacion.CUMPLE : ResultadoComparacion.NO_CUMPLE;
@@ -93,7 +95,7 @@ public final class Evaluacion {
 
     private static boolean aplicar(Object recibido, Operador op, Object umbral) {
         if (recibido instanceof Number r && umbral instanceof Number u) {
-            return op.cumple(Double.compare(r.doubleValue(), u.doubleValue()));
+            return op.cumple(r.doubleValue(), u.doubleValue());
         }
         if (op != Operador.EQ) {
             throw new IllegalArgumentException("El operador " + op + " sólo aplica a números.");

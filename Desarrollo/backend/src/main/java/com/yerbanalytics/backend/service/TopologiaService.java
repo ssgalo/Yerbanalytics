@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.dto.DisposicionTopologia;
 import com.yerbanalytics.backend.dto.NuevaTopologia;
 import com.yerbanalytics.backend.dto.TopologiaVivero;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -16,6 +17,8 @@ import com.yerbanalytics.backend.exception.TopologyConflictException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,17 +64,20 @@ public class TopologiaService {
     private final DispositivoRepository dispositivoRepository;
     private final HistorialRepository historialRepository;
     private final TopologiaLayoutRepository layoutRepository;
+    private final TrazaEvaluacionStore trazaStore;
 
     public TopologiaService(ZonaRepository zonaRepository,
                             SectorRepository sectorRepository,
                             DispositivoRepository dispositivoRepository,
                             HistorialRepository historialRepository,
-                            TopologiaLayoutRepository layoutRepository) {
+                            TopologiaLayoutRepository layoutRepository,
+                            TrazaEvaluacionStore trazaStore) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.historialRepository = historialRepository;
         this.layoutRepository = layoutRepository;
+        this.trazaStore = trazaStore;
     }
 
     @Transactional(readOnly = true)
@@ -165,6 +171,7 @@ public class TopologiaService {
             sectorRepository.deleteAllInBatch();
             zonaRepository.deleteAllInBatch();
             zonaRepository.flush();
+            limpiarTrazasAlConfirmar();
         }
 
         List<ZonaEntity> zonas = new ArrayList<>();
@@ -196,6 +203,24 @@ public class TopologiaService {
         layoutRepository.save(layout);
 
         return new TopologiaVivero(macroZonas, sectoresPorMacroZona, sectores.size(), true, mzPorFila, secPorFila);
+    }
+
+    /**
+     * Los ids de sector se reutilizan al regenerar: las trazas en memoria del vivero anterior
+     * dejarían de ser ciertas. Se descartan DESPUÉS del commit, así un hilo que evalúe en el
+     * medio no deja una traza del esquema viejo que sobreviva a la limpieza.
+     */
+    private void limpiarTrazasAlConfirmar() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    trazaStore.limpiar();
+                }
+            });
+        } else {
+            trazaStore.limpiar();
+        }
     }
 
     /** Sector en estado offline, replicando los defaults del seed (id `MZ-{z}-{NNN}`). */

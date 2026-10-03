@@ -46,6 +46,39 @@ class EvaluacionTest {
         return new Evaluacion(reglaConUmbral(), vigentes(umbral));
     }
 
+
+    // ------------------------------------------------------------------ NaN y cero con signo
+
+    @ParameterizedTest
+    @CsvSource({"LT", "LE", "GT", "GE", "EQ"})
+    void comparar_unRecibidoNaNEsSinDatoYNuncaCumple(Operador op) {
+        Evaluacion ev = evaluacion(42);
+
+        assertThat(ev.comparar("Humedad de sustrato", Double.NaN, op, UMBRAL)).isFalse();
+        assertThat(ev.comparaciones().get(0).resultado()).isEqualTo(ResultadoComparacion.SIN_DATO);
+    }
+
+    @Test
+    void comparar_menosCeroYCeroSonIguales() {
+        Evaluacion ev = evaluacion(0);
+
+        assertThat(ev.comparar("x", -0.0, Operador.EQ, UMBRAL)).isTrue();
+        assertThat(ev.comparar("x", -0.0, Operador.LT, UMBRAL)).isFalse();
+        assertThat(ev.comparar("x", 0.0, Operador.GT, UMBRAL)).isFalse();
+        assertThat(ev.comparar("x", -0.0, Operador.LE, UMBRAL)).isTrue();
+        assertThat(ev.comparar("x", -0.0, Operador.GE, UMBRAL)).isTrue();
+    }
+
+    @Test
+    void compararFijo_NaNEsSinDatoYMenosCeroIgualACero() {
+        Evaluacion ev = evaluacion(42);
+
+        assertThat(ev.compararFijo("n", Double.NaN, Operador.GT, 0.0)).isFalse();
+        assertThat(ev.comparaciones().get(0).resultado()).isEqualTo(ResultadoComparacion.SIN_DATO);
+        assertThat(ev.compararFijo("z", -0.0, Operador.EQ, 0.0)).isTrue();
+        assertThat(ev.compararFijo("z", -0.0, Operador.LT, 0.0)).isFalse();
+    }
+
     // ------------------------------------------------------------------ 3.1
 
     @ParameterizedTest(name = "{0} {1} {2} -> {3}")

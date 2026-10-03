@@ -107,4 +107,15 @@ class TrazaEvaluacionStoreTest {
             store.guardar(traza("MZ-1-001", origen, i));
         }
     }
+
+    @Test
+    void limpiar_descartaTodasLasTrazasDeTodosLosSectores() {
+        store.guardar(traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 1000));
+        store.guardar(traza("MZ-1-002", OrigenEvaluacion.BARRIDO, 1000));
+
+        store.limpiar();
+
+        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA)).isEmpty();
+        assertThat(store.masReciente("MZ-1-002")).isEmpty();
+    }
 }

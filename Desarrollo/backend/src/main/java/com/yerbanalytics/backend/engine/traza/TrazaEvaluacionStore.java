@@ -64,4 +64,12 @@ public class TrazaEvaluacionStore {
         Ultimas u = porSector.get(sectorId);
         return u == null ? Optional.empty() : Optional.ofNullable(u.masReciente());
     }
+
+    /**
+     * Descarta todo. Se llama al regenerar la topología: los ids de sector ({@code MZ-n-xxx}) se
+     * reutilizan, y una traza vieja se vería como la evaluación de un sector que ya no es el mismo.
+     */
+    public void limpiar() {
+        porSector.clear();
+    }
 }

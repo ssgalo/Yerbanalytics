@@ -18,14 +18,17 @@ public enum Operador {
 
     private final String simbolo;
 
-    /** Aplica el operador al resultado de {@code Double.compare(recibido, umbral)}. */
-    boolean cumple(int comparacion) {
+    /**
+     * Aplica el operador con los operadores primitivos: {@code -0.0 == 0.0} y cualquier
+     * comparación con NaN da {@code false}. ({@code Double.compare} haría lo contrario en ambos casos.)
+     */
+    boolean cumple(double recibido, double umbral) {
         return switch (this) {
-            case LT -> comparacion < 0;
-            case LE -> comparacion <= 0;
-            case GT -> comparacion > 0;
-            case GE -> comparacion >= 0;
-            case EQ -> comparacion == 0;
+            case LT -> recibido < umbral;
+            case LE -> recibido <= umbral;
+            case GT -> recibido > umbral;
+            case GE -> recibido >= umbral;
+            case EQ -> recibido == umbral;
         };
     }
 }

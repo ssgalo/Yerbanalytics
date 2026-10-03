@@ -7,5 +7,7 @@ public enum EstadoRegla {
     /** No se ejecutó porque una regla anterior bloqueó su rama. */
     OMITIDA_RAMA_BLOQUEADA,
     /** No se ejecutó porque una regla anterior emitió {@code ABORT_ALL}. */
-    NO_ALCANZADA
+    NO_ALCANZADA,
+    /** Lanzó una excepción al evaluarse: {@code TrazaRegla.error} dice cuál. Las reglas que seguían quedan {@code NO_ALCANZADA}. */
+    ERROR
 }

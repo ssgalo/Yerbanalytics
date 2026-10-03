@@ -7,6 +7,7 @@ import com.yerbanalytics.backend.engine.traza.EstadoRegla;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacion;
+import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.traza.TrazaRegla;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +41,11 @@ public class RuleOrchestrator {
 
     private final List<Rule> rules;
     private final CatalogoParametrosService parametros;
+    private final TrazaEvaluacionStore trazaStore;
 
-    public RuleOrchestrator(List<Rule> rules, CatalogoParametrosService parametros) {
+    public RuleOrchestrator(List<Rule> rules, CatalogoParametrosService parametros, TrazaEvaluacionStore trazaStore) {
         this.parametros = parametros;
+        this.trazaStore = trazaStore;
         // Ordenamiento explícito obligatorio — Spring no ordena @Component por prioridad.
         this.rules = rules.stream()
                 .sorted(Comparator.comparingInt(Rule::priority))
@@ -61,6 +64,10 @@ public class RuleOrchestrator {
      * <p>Además de las acciones arma la traza: TODAS las reglas figuran, las que no corrieron con
      * el motivo ({@code OMITIDA_RAMA_BLOQUEADA} o {@code NO_ALCANZADA}) y la regla que cortó.
      * Los valores vigentes del catálogo se toman UNA vez, así todo el ciclo ve lo mismo.
+     *
+     * <p>Si una regla lanza, la excepción se propaga tal cual (la actuación no cambia), pero antes
+     * se guarda la traza parcial con esa regla en {@code ERROR}: el inspector no puede seguir
+     * mostrando como "última" una evaluación vieja y sana.
      *
      * @param ctx    snapshot inmutable del sector (nunca null)
      * @param origen qué disparó la evaluación; la traza se guarda por origen
@@ -97,7 +104,13 @@ public class RuleOrchestrator {
             }
 
             Evaluacion ev = new Evaluacion(rule, vigentes);
-            List<RuleAction> actions = rule.evaluate(ctx, ev);
+            List<RuleAction> actions;
+            try {
+                actions = rule.evaluate(ctx, ev);
+            } catch (RuntimeException e) {
+                guardarTrazaParcial(ctx, origen, vigentes, trazas, rule, ev, e);
+                throw e;
+            }
             accumulated.addAll(actions);
             trazas.add(new TrazaRegla(rule.name(), branch, rule.priority(), EstadoRegla.EVALUADA,
                     List.copyOf(ev.comparaciones()),
@@ -110,27 +123,49 @@ public class RuleOrchestrator {
                 if (type == ActionType.ABORT_ALL) {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_ALL — ejecución global detenida.",
                             sectorId, rule.name(), branch);
-                    abortAll = rule.name();
+                    abortAll = abortAll != null ? abortAll : rule.name();
                 } else if (type == ActionType.ABORT_RIEGO || type == ActionType.POSTPONE_RIEGO) {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió {} — rama RIEGO detenida.",
                             sectorId, rule.name(), branch, type);
-                    abortRiego = rule.name();
+                    abortRiego = abortRiego != null ? abortRiego : rule.name();
                 } else if (type == ActionType.ABORT_INSUMO) {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_INSUMO — rama INSUMO detenida.",
                             sectorId, rule.name(), branch);
-                    abortInsumo = rule.name();
+                    abortInsumo = abortInsumo != null ? abortInsumo : rule.name();
                 }
             }
         }
 
-        TrazaEvaluacion traza = new TrazaEvaluacion(
-                sectorId,
+        return new ResultadoEvaluacion(accumulated, armarTraza(ctx, origen, vigentes, trazas));
+    }
+
+    private static TrazaEvaluacion armarTraza(RuleContext ctx, OrigenEvaluacion origen,
+                                              ParametrosVigentes vigentes, List<TrazaRegla> trazas) {
+        return new TrazaEvaluacion(
+                ctx.sector().getId(),
                 ctx.zona() != null ? ctx.zona().getId() : null,
                 origen,
                 ctx.now(),
-                Integer.toHexString(vigentes.valores().hashCode()),
+                vigentes.huella(),
                 List.copyOf(trazas));
-        return new ResultadoEvaluacion(accumulated, traza);
+    }
+
+    /** Traza de una evaluación cortada por una excepción: la regla en ERROR y el resto sin alcanzar. */
+    private void guardarTrazaParcial(RuleContext ctx, OrigenEvaluacion origen, ParametrosVigentes vigentes,
+                                     List<TrazaRegla> hechas, Rule fallida, Evaluacion ev, RuntimeException e) {
+        List<TrazaRegla> trazas = new ArrayList<>(hechas);
+        trazas.add(new TrazaRegla(fallida.name(), fallida.branch(), fallida.priority(), EstadoRegla.ERROR,
+                List.copyOf(ev.comparaciones()), List.of(), null,
+                e.getClass().getSimpleName() + ": " + e.getMessage()));
+        boolean despues = false;
+        for (Rule r : rules) {
+            if (r == fallida) {
+                despues = true;
+            } else if (despues) {
+                trazas.add(omitida(r, EstadoRegla.NO_ALCANZADA, fallida.name()));
+            }
+        }
+        trazaStore.guardar(armarTraza(ctx, origen, vigentes, trazas));
     }
 
     private static TrazaRegla omitida(Rule rule, EstadoRegla estado, String bloqueadaPor) {

@@ -35,7 +35,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,7 +78,7 @@ class TrazaEvaluacionLlamadoresTest {
                 return List.of(RuleAction.noopInfo("ReglaFalsa", "nada que hacer"));
             }
         };
-        orchestrator = new RuleOrchestrator(List.of(regla), parametros);
+        orchestrator = new RuleOrchestrator(List.of(regla), parametros, store);
 
         zona = RuleContextTestFactory.zonaBasica("MZ-1");
         s1 = RuleContextTestFactory.sectorBasico("MZ-1-001");
@@ -109,8 +108,24 @@ class TrazaEvaluacionLlamadoresTest {
         verify(actionExecutor, times(2)).execute(acciones.capture(), any(RuleContext.class));
         assertThat(acciones.getAllValues()).allSatisfy(l -> assertThat(l).extracting(RuleAction::type)
                 .containsExactly(ActionType.NOOP_INFO));
-        // La traza no escribe en el historial: este servicio no lo toca al actualizar telemetría.
-        verifyNoInteractions(historialService);
+    }
+
+    @Test
+    void elStoreYElOrquestadorNoDependenDelHistorialNiDeRepositorios() {
+        // Guardar la traza no puede escribir en la base: ni el store ni el orquestador reciben
+        // un HistorialService ni un repositorio, así que no tienen cómo hacerlo.
+        for (Class<?> c : List.of(TrazaEvaluacionStore.class, RuleOrchestrator.class)) {
+            List<Class<?>> tipos = new java.util.ArrayList<>();
+            for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                tipos.add(f.getType());
+            }
+            for (java.lang.reflect.Constructor<?> k : c.getDeclaredConstructors()) {
+                tipos.addAll(List.of(k.getParameterTypes()));
+            }
+            assertThat(tipos).as(c.getSimpleName())
+                    .doesNotContain(HistorialService.class)
+                    .noneMatch(org.springframework.data.repository.Repository.class::isAssignableFrom);
+        }
     }
 
     @Test
