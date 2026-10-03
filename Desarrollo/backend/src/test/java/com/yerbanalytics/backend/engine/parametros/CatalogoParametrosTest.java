@@ -111,6 +111,30 @@ class CatalogoParametrosTest {
         assertThat(cat.reglas()).containsExactly(a, b, c);
     }
 
+
+    @Test
+    void minMayorQueMax_fallaNombrandoElParametro() {
+        List<DefinicionParametro> defs = List.of(DefinicionDePrueba.numero("riego.umbral", "50", 60.0, 35.0, 0));
+
+        assertThatThrownBy(() -> catalogo(defs))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("riego.umbral")
+                .hasMessageContaining("mínimo");
+    }
+
+    @Test
+    void fabricaQueViolaUnaRestriccionCruzada_fallaAlConstruir() {
+        DefinicionParametro a = DefinicionDePrueba.numero("riego.a", "50", 0.0, 100.0, 0);
+        DefinicionParametro b = DefinicionDePrueba.numero("riego.b", "40", 0.0, 100.0, 0);
+        RestriccionCruzada r = new RestriccionCruzada(List.of("riego.a", "riego.b"),
+                v -> v.numero("riego.a") < v.numero("riego.b"), "A debe ser menor que B.");
+
+        assertThatThrownBy(() -> new CatalogoParametros(List.of(a, b), List.of(r), List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("A debe ser menor que B.")
+                .hasMessageContaining("fábrica");
+    }
+
     // ------------------------------------------------------------------ 1.4
 
     private static CatalogoParametros catalogoRiegoV2() {

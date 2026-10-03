@@ -17,7 +17,8 @@ import java.util.regex.Pattern;
  * reglas que las usan. Es inmutable y <b>falla al construirse</b> (la aplicación no arranca) si:
  * <ul>
  *   <li>hay claves duplicadas, mal formadas o sin el prefijo de su familia;</li>
- *   <li>un valor de fábrica no cumple su propio tipo o rango;</li>
+ *   <li>un valor de fábrica no cumple su propio tipo o rango, o un rango tiene mínimo mayor que máximo;</li>
+ *   <li>los valores de fábrica violan una restricción cruzada;</li>
  *   <li>una restricción cruzada o una regla refiere a una clave que no existe.</li>
  * </ul>
  * No conoce los valores vigentes: eso es {@link CatalogoParametrosService}.
@@ -74,6 +75,10 @@ public class CatalogoParametros {
                 throw new IllegalStateException("Clave inválida '" + clave + "': debe ser '"
                         + d.familia().name().toLowerCase() + ".nombre-en-kebab-case'.");
             }
+            if (d.min() != null && d.max() != null && d.min() > d.max()) {
+                throw new IllegalStateException("Rango inválido en '" + clave + "': el mínimo (" + d.min()
+                        + ") supera al máximo (" + d.max() + ").");
+            }
             try {
                 fab.put(clave, d.tipo().parsear(d.fabrica(), d));
             } catch (ValorParametroInvalidoException e) {
@@ -89,6 +94,13 @@ public class CatalogoParametros {
                     throw new IllegalStateException("La restricción '" + r.mensaje()
                             + "' refiere a un parámetro inexistente: '" + clave + "'.");
                 }
+            }
+        }
+
+        ParametrosVigentes deFabrica = ParametrosVigentes.de(fab);
+        for (RestriccionCruzada r : restricciones) {
+            if (!r.cumple(deFabrica)) {
+                throw new IllegalStateException("Los valores de fábrica violan la restricción: " + r.mensaje());
             }
         }
 

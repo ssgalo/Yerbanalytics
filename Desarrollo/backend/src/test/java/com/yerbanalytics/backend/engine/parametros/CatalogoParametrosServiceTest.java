@@ -14,12 +14,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.http.MediaType;
+import com.yerbanalytics.backend.controller.ReglasParametrosController;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,9 +50,11 @@ class CatalogoParametrosServiceTest {
     private ParametroReglaRepository repository;
     @Mock
     private HistorialService historialService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     /** Estado de la "tabla" parametro_regla que simulan los stubs del repositorio. */
-    private final Map<String, ParametroReglaEntity> tabla = new LinkedHashMap<>();
+    private final Map<String, ParametroReglaEntity> tabla = new ConcurrentHashMap<>();
 
     private CatalogoParametros catalogo;
     private CatalogoParametrosService service;
@@ -75,7 +88,7 @@ class CatalogoParametrosServiceTest {
         });
         lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
 
-        service = new CatalogoParametrosService(catalogo, repository, historialService);
+        service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager);
     }
 
     private void override(String clave, String valor) {
@@ -290,5 +303,127 @@ class CatalogoParametrosServiceTest {
         assertThat(dto.reglas().get(0).parametros()).isEmpty();
         assertThat(dto.reglas().get(2).rama()).isEqualTo("RIEGO");
         assertThat(dto.reglas().get(2).prioridad()).isEqualTo(10);
+    }
+
+    // ------------------------------------------------------------------ revisión del bloque 1
+
+    @Test
+    void cache_unaLecturaQueEmpezoAntesDeUnaInvalidacionNoPublicaSuEstadoViejo() {
+        override("riego.umbral-humedad", "50");
+        AtomicInteger llamadas = new AtomicInteger();
+        // Primera carga: toma la foto vieja y, antes de devolverla, "otro hilo" guarda y invalida.
+        org.mockito.Mockito.when(repository.findAll()).thenAnswer(i -> {
+            List<ParametroReglaEntity> foto = new ArrayList<>(tabla.values());
+            if (llamadas.getAndIncrement() == 0) {
+                override("riego.umbral-humedad", "55");
+                service.invalidar();
+            }
+            return foto;
+        });
+
+        ParametrosVigentes durante = service.vigentes();
+        ParametrosVigentes despues = service.vigentes();
+
+        assertThat(durante.numero("riego.umbral-humedad")).isEqualTo(50.0);
+        assertThat(despues.numero("riego.umbral-humedad")).isEqualTo(55.0);
+    }
+
+    @Test
+    void cache_noSeRepueblaMientrasHayUnaTransaccionActiva() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.vigentes();
+            service.vigentes();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(repository, org.mockito.Mockito.times(2)).findAll();
+    }
+
+    @Test
+    void guardar_alCerrarLaTransaccionInvalidaLoQueOtroHiloRepoblo() {
+        ParametrosVigentes previo;
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
+            // Otro hilo (sin transacción) repuebla el cache entre el guardado y el commit.
+            previo = CompletableFuture.supplyAsync(service::vigentes).join();
+            for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
+                s.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+            }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(service.vigentes()).isNotSameAs(previo);
+    }
+
+    @Test
+    void guardar_unElementoNuloEnElLoteEsUnErrorDeValidacionNoUnNpe() {
+        assertThatThrownBy(() -> service.guardar(Arrays.asList((CambioParametro) null), "Ana"))
+                .isInstanceOf(ParametrosInvalidosException.class);
+    }
+
+    @Test
+    void put_conUnElementoNuloDevuelve400ConElFormatoDeErrores() throws Exception {
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ReglasParametrosController(service)).build();
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/rules/parametros")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"cambios\":[null]}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errores.length()").value(1));
+    }
+
+    @Test
+    void guardar_restablecerBorraUnOverrideCorruptoDeLaBase() {
+        override("riego.umbral-humedad", "abc");
+
+        service.guardar(List.of(cambio("riego.umbral-humedad", null)), "Ana");
+
+        assertThat(tabla).doesNotContainKey("riego.umbral-humedad");
+        verify(repository).deleteById("riego.umbral-humedad");
+    }
+
+    @Test
+    void guardar_unOverrideHuerfanoDeUnaClaveInexistenteSigueIgnorandose() {
+        override("riego.clave-que-ya-no-existe", "1");
+
+        service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
+
+        assertThat(tabla).containsKeys("riego.clave-que-ya-no-existe", "riego.umbral-humedad");
+        verify(repository, never()).deleteById("riego.clave-que-ya-no-existe");
+    }
+
+    @Test
+    void guardar_dosGuardadosConcurrentesSeSerializanYElSegundoValidaContraElResultadoDelPrimero() throws Exception {
+        CountDownLatch primeroAdentro = new CountDownLatch(1);
+        CountDownLatch liberar = new CountDownLatch(1);
+        AtomicInteger lecturas = new AtomicInteger();
+        org.mockito.Mockito.when(repository.findAll()).thenAnswer(i -> {
+            List<ParametroReglaEntity> foto = new ArrayList<>(tabla.values());
+            if (lecturas.incrementAndGet() == 1) {
+                primeroAdentro.countDown();
+                liberar.await(5, TimeUnit.SECONDS);
+            }
+            return foto;
+        });
+
+        // A: umbral 60 + objetivo 75 (válido). B: objetivo 55 solo — válido contra la base vieja
+        // (umbral 45), inválido contra el resultado de A (umbral 60).
+        CompletableFuture<Object> a = CompletableFuture.supplyAsync(() ->
+                service.guardar(List.of(cambio("riego.umbral-humedad", "60"), cambio("riego.humedad-objetivo", "75")), "Ana"));
+        assertThat(primeroAdentro.await(5, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture<Object> b = CompletableFuture.supplyAsync(() ->
+                service.guardar(List.of(cambio("riego.humedad-objetivo", "55")), "Beto"));
+
+        Thread.sleep(300);
+        assertThat(lecturas.get()).as("B no puede leer la base mientras A guarda").isEqualTo(1);
+        liberar.countDown();
+
+        a.get(5, TimeUnit.SECONDS);
+        assertThatThrownBy(() -> b.get(5, TimeUnit.SECONDS))
+                .hasCauseInstanceOf(ParametrosInvalidosException.class);
+        assertThat(tabla.get("riego.humedad-objetivo").getValor()).isEqualTo("75");
     }
 }
