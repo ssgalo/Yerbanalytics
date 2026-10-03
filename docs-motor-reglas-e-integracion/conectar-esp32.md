@@ -58,6 +58,14 @@ es el primer paso pendiente.
    - Actuador: publicar un comando a mano y mirar el ACK (ejemplos en
      `Desarrollo/embebido/README.md`).
 
+## El riel de la cámara (otro sketch)
+
+Lo de arriba es para el nodo modular (sensado y actuadores). El **riel** lo maneja otro firmware,
+`Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/`, con su propio `config.h` y los tópicos
+`nursery/rail/command` y `nursery/rail/event`. La red y el broker son los mismos (pasos 1, 2 y 4).
+Librerías, configuración, flasheo, prueba con `mosquitto_pub` y problemas típicos: su
+[README](../Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/README.md).
+
 ## Lo que va a fallar aunque la red ande
 
 Son diferencias entre el firmware y el backend que el simulador no deja ver. Dos ya se
