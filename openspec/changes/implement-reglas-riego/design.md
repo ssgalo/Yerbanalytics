@@ -677,6 +677,12 @@ estable: **0 filas por mensaje**. Si la escritura falla no se da por registrada 
 por ventana de tiempo (esconde decisiones que sí cambian) y persistir el estado (otra tabla para algo que se
 reconstruye con una evaluación).
 
+**Frontend de la corrección.** Sólo lo que cambió de forma visible: el fixture del catálogo (la regla de ciclo declara
+`riego.umbral-critico`; el despacho figura en `usadoPor` de los tres parámetros que revalida) y su test anti-drift, la
+traza mock de `CicloLecturaRiegoRule` (R-02 pasa; el riego en curso corta a todos) y la agrupación "Ejecución del
+riego" (sólo lista los parámetros que ninguna regla usa; los compartidos se editan bajo su regla). El descarte por
+revalidación no tiene traza (el despacho no es una regla): no hay nada que espejar.
+
 **Sin corregir (documentado):**
 - R-06 depende de eventos "Insumo" y la bomba conserva el enganche "Dosificando" (rama de insumos, fuera de alcance).
 - "Publicado" = entregado al cliente MQTT, sin ACK: el despacho da la válvula por abierta cuando el cliente la

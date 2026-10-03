@@ -8,5 +8,6 @@
   C4 último riego en memoria — hechas (commit `fix(backend): completar la ronda de riego y revalidar al despachar`).
   C5 el pronóstico no traba el hilo MQTT, C6 índices de `historial_evento` — hechas (commit `fix(backend): que el motor no se trabe sin pronóstico ni con el historial grande`).
   C7 registro de inacción sólo ante un cambio (DA-13) — hecha (commit `perf(backend): registrar la inacción del motor sólo cuando cambia`).
+  Frontend alineado (fixture del catálogo, traza mock de la regla de ciclo y agrupación de consumidores) — hecho (commit `fix(frontend): …`).
 - Sin verificar: arranque real de Spring con el despacho contra el broker; `@Scheduled(scheduler="despachoScheduler")` en vivo;
   el despacho revalidando contra la base real (los tests usan repositorios falsos).

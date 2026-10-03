@@ -137,8 +137,12 @@ describe('filtrarParametros (vista por parámetro)', () => {
 
     expect(enRiego).toContain('riego.sectores-simultaneos');
     expect(enInsumo).not.toContain('riego.sectores-simultaneos');
-    expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'ejecución del riego' }).map((p) => p.clave)).toEqual([
+    // Los que el despacho lee: el suyo y los tres que revalida antes de abrir cada válvula.
+    expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'ejecución del riego' }).map((p) => p.clave).sort()).toEqual([
+      'riego.saturacion-bloqueo',
       'riego.sectores-simultaneos',
+      'riego.ventana-normal',
+      'seguridad.antiguedad-max-lectura',
     ]);
   });
 
@@ -167,6 +171,14 @@ describe('agruparPorConsumidor', () => {
     expect(grupos).toHaveLength(1);
     expect(grupos[0]).toMatchObject({ id: 'DespachoRiego', titulo: 'Ejecución del riego' });
     expect(grupos[0].parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
+  });
+
+  it('los que el despacho revalida pero ya son de una regla se editan bajo la regla: no se repiten en el grupo', () => {
+    const c = catalogoDeFabrica();
+    const ventana = c.parametros.find((p) => p.clave === 'riego.ventana-normal')!;
+
+    expect(ventana.usadoPor).toContain('DespachoRiego');
+    expect(agruparPorConsumidor(c)[0].parametros.map((p) => p.clave)).not.toContain('riego.ventana-normal');
   });
 
   it('un parámetro que usan sólo reglas no genera grupo', () => {

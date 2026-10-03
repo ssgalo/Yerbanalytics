@@ -273,15 +273,46 @@ describe('evaluarMotor · R-06 pausa tras una aplicación', () => {
 });
 
 describe('evaluarMotor · un riego por ciclo de lectura', () => {
-  it('un sector regado en este ciclo no vuelve a regar (ni siquiera por déficit crítico)', () => {
+  it('un sector regado en este ciclo no vuelve a regar por déficit común (R-01)', () => {
     // 09:00 local: el ciclo de 4 h anclado a las 02:00 empezó a las 06:00; el riego fue a las 08:30.
-    const t = evaluarMotor(catalogo, { ...base, humSus: 30, ultimoRiegoMs: ms(TS_DIA) - 30 * 60_000 });
+    const t = evaluarMotor(catalogo, { ...base, humSus: 40, ultimoRiegoMs: ms(TS_DIA) - 30 * 60_000 });
     const r = regla(t, 'CicloLecturaRiegoRule');
 
     expect(r.comparaciones[0]).toMatchObject({ recibido: 30, operador: 'LE', umbral: 180, configurable: false, resultado: 'CUMPLE' });
     expect(tipos(r)).toEqual(['ABORT_RIEGO']);
     expect(r.acciones[0].motivo).toMatch(/ya se regó en este ciclo/);
     expect(regla(t, 'DeficitCriticoRule')).toMatchObject({ estado: 'OMITIDA_RAMA_BLOQUEADA', bloqueadaPor: 'CicloLecturaRiegoRule' });
+  });
+
+  it('con déficit crítico la guarda de ciclo NO corta: R-02 sólo tiene su tope de horas', () => {
+    const t = evaluarMotor(catalogo, { ...base, humSus: 30, ultimoRiegoMs: ms(TS_DIA) - 30 * 60_000 });
+    const r = regla(t, 'CicloLecturaRiegoRule');
+
+    expect(r.comparaciones.at(-1)).toMatchObject({ etiqueta: 'Humedad de sustrato', recibido: 30, operador: 'LT', clave: 'riego.umbral-critico', resultado: 'CUMPLE' });
+    expect(tipos(r)).toEqual(['NOOP_INFO']);
+    expect(r.acciones[0].motivo).toMatch(/no aplica a R-02/);
+    expect(tipos(regla(t, 'DeficitCriticoRule'))).toEqual(['ACTIVAR_VALVULA', 'ALERTA']);
+  });
+
+  it('con déficit crítico y el riego previo también dentro del tope de R-02, el tope corta', () => {
+    const t = evaluarMotor(catalogo, {
+      ...base, humSus: 30, ultimoRiegoMs: ms(TS_DIA) - 30 * 60_000, ultimoRiegoCriticoMs: ms(TS_DIA) - 3 * HORA,
+    });
+
+    expect(tipos(regla(t, 'DeficitCriticoRule'))).toEqual(['ABORT_RIEGO']);
+  });
+
+  it('ya regó en el ciclo y no hay lectura de humedad: corta (sin dato no se arriesga)', () => {
+    const t = evaluarMotor(catalogo, { ...base, humSus: null, ultimoRiegoMs: ms(TS_DIA) - 30 * 60_000 });
+
+    expect(tipos(regla(t, 'CicloLecturaRiegoRule'))).toEqual(['ABORT_RIEGO']);
+  });
+
+  it('un riego abierto en este momento corta también a R-02 (nadie abre una válvula abierta)', () => {
+    const t = evaluarMotor(catalogo, { ...base, humSus: 30, riegoEnCursoHastaMs: ms(TS_DIA) + 120_000 });
+
+    expect(tipos(regla(t, 'CicloLecturaRiegoRule'))).toEqual(['ABORT_RIEGO']);
+    expect(regla(t, 'DeficitCriticoRule').estado).toBe('OMITIDA_RAMA_BLOQUEADA');
   });
 
   it('un riego de un ciclo anterior no cuenta', () => {

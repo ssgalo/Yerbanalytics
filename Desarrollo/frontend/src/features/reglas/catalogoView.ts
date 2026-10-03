@@ -49,12 +49,18 @@ export interface GrupoConsumidor {
   parametros: ParametroRegla[];
 }
 
-/** Parámetros agrupados por el consumidor que no es una regla (los de `usadoPor` que no están en `reglas`). */
+/**
+ * Parámetros agrupados por el consumidor que no es una regla (los de `usadoPor` que no están en `reglas`).
+ * Sólo los que NINGUNA regla usa: el despacho también lee, para revalidar antes de abrir cada válvula, parámetros
+ * que ya son de una regla (antigüedad de la lectura, saturación, ventana horaria). Esos se editan bajo su regla
+ * (donde figura "Compartido con Ejecución del riego"); listarlos acá los duplicaría.
+ */
 export function agruparPorConsumidor(catalogo: CatalogoReglas, parametros: ParametroRegla[] = catalogo.parametros): GrupoConsumidor[] {
   const ids = new Set(catalogo.reglas.map((r) => r.id));
   const grupos = new Map<string, ParametroRegla[]>();
   for (const p of parametros) {
-    for (const u of p.usadoPor.filter((x) => !ids.has(x))) grupos.set(u, [...(grupos.get(u) ?? []), p]);
+    if (p.usadoPor.some((x) => ids.has(x))) continue;
+    for (const u of p.usadoPor) grupos.set(u, [...(grupos.get(u) ?? []), p]);
   }
   return [...grupos].map(([id, params]) => ({
     id,

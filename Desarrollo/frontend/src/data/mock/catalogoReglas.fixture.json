@@ -21,7 +21,9 @@
       "label": "🔁 Un riego por ciclo de lectura",
       "rama": "RIEGO",
       "prioridad": 2,
-      "parametros": []
+      "parametros": [
+        "riego.umbral-critico"
+      ]
     },
     {
       "id": "SustratoSaturadoRule",
@@ -147,7 +149,8 @@
       "refSpec": "motor-reglas: StaleSensorRule",
       "modificado": false,
       "usadoPor": [
-        "StaleSensorRule"
+        "StaleSensorRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -210,6 +213,7 @@
       "refSpec": "reglas_v2 §5 R-02 / §11 Riego",
       "modificado": false,
       "usadoPor": [
+        "CicloLecturaRiegoRule",
         "DeficitCriticoRule",
         "FueraDeVentanaRiegoRule",
         "PausaTrasAplicacionRule",
@@ -316,7 +320,8 @@
       "refSpec": "reglas_v2 §5 R-04 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "SustratoSaturadoRule"
+        "SustratoSaturadoRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -356,7 +361,8 @@
       "refSpec": "reglas_v2 §5 R-05 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "FueraDeVentanaRiegoRule"
+        "FueraDeVentanaRiegoRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null

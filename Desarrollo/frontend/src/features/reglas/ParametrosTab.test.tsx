@@ -82,8 +82,8 @@ describe('ParametrosTab · agrupación (7.2)', () => {
 
   it('muestra "Sin parámetros configurables" para las reglas sin umbrales', () => {
     montar(catalogoDeFabrica());
-    // Bloqueo manual, ciclo de lectura y seguimiento.
-    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(3);
+    // Bloqueo manual y seguimiento (la regla de ciclo lee el umbral crítico para dejar pasar a R-02).
+    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(2);
   });
 });
 

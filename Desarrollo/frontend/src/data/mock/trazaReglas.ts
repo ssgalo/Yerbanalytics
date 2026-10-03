@@ -275,11 +275,18 @@ const EVALUADORES: Record<string, Evaluador> = {
     const yaRegado = ev.compararFijo(etiquetaRiego, minDesdeRiego, 'LE', minDesdeRiego === null ? 0 : minDeCiclo);
     const restante = e.riegoEnCursoHastaMs == null ? 0 : Math.max(0, (e.riegoEnCursoHastaMs - ahora) / 1000);
     const enCurso = ev.compararFijo('Segundos restantes del riego en curso', restante, 'GT', 0);
-    if (yaRegado) {
+    // Ya regó en el ciclo: corta sólo a R-01. Bajo el umbral crítico decide R-02, que no tiene guarda de ciclo
+    // (sólo su tope de horas); sin lectura de humedad corta (sin dato no se arriesga).
+    const deficitCritico = yaRegado && ev.comparar('Humedad de sustrato', e.humSus, 'LT', 'riego.umbral-critico');
+    if (yaRegado && !deficitCritico) {
       return [accion('ABORT_RIEGO', `El sector ya se regó en este ciclo de lectura (último riego a las ${horaLocal(e.ultimoRiegoMs!)}, el ciclo empezó a las ${horaLocal(inicio)}). Un riego por sector y ciclo.`)];
     }
+    // Un riego en curso corta a todos, R-02 incluida.
     if (enCurso) {
       return [accion('ABORT_RIEGO', `El sector tiene un riego en curso hasta las ${horaLocal(e.riegoEnCursoHastaMs!)}: no se riega de nuevo.`)];
+    }
+    if (deficitCritico) {
+      return noop('El sector ya se regó en este ciclo de lectura, pero hay déficit crítico: la guarda de ciclo no aplica a R-02 (sólo su tope de horas).');
     }
     return noop('El sector no regó en este ciclo de lectura ni tiene un riego en curso.');
   },
