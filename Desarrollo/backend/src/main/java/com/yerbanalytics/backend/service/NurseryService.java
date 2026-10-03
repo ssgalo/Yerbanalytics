@@ -29,7 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -57,6 +57,7 @@ public class NurseryService {
     private final DiagnosticoService diagnosticoService;
     private final TrazaEvaluacionStore trazaStore;
     private final CatalogoParametrosService parametros;
+    private final Clock reloj;
     private final int bateriaMinPct;
 
     public NurseryService(NurseryProperties properties,
@@ -73,6 +74,7 @@ public class NurseryService {
                           DiagnosticoService diagnosticoService,
                           TrazaEvaluacionStore trazaStore,
                           CatalogoParametrosService parametros,
+                          Clock reloj,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
@@ -87,6 +89,7 @@ public class NurseryService {
         this.diagnosticoService = diagnosticoService;
         this.trazaStore = trazaStore;
         this.parametros = parametros;
+        this.reloj = reloj;
         this.bateriaMinPct = bateriaMinPct;
     }
 
@@ -437,7 +440,7 @@ public class NurseryService {
 
         // El timestamp del contrato llega en segundos (firmware) o ms (simulador): se normaliza a
         // ms por valor. Si no sirve como fecha real, manda la hora de recepción.
-        long recepcionMs = System.currentTimeMillis();
+        long recepcionMs = reloj.millis();
         Long tsMs = ContratoNodo.timestampAMs(payload.timestamp(), recepcionMs);
         if (tsMs == null) {
             if (zonasConTimestampInvalido.add(zoneId)) {
@@ -579,7 +582,7 @@ public class NurseryService {
                 metrics,
                 configuracionService.getConfiguracionOperativa(),
                 finalStatus,
-                Instant.now(),
+                reloj.instant(),
                 forecast,
                 bloqueoActivo
         );

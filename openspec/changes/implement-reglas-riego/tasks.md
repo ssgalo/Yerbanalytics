@@ -13,25 +13,27 @@ probadas sin registrarlas.
 
 ## 0. Decisiones previas
 
-- [ ] 0.1 Aplicar los defaults de DA-1 … DA-13 (`design.md`). DA-5 es **BLOQUEANTE para operar con
+- [x] 0.1 Aplicar los defaults de DA-1 … DA-13 (`design.md`): confirmados todos con el default del
+      diseño. Estrategia de entrega confirmada: commits por bloque en la rama
+      `feat/implementar-nuevas-reglas` (no PRs encadenados). DA-5 es **BLOQUEANTE para operar con
       plantines reales**, no para implementar: anotarlo en el README del backend (bloque 14).
 - [ ] 0.2 Confirmar que el frontend de `add-catalogo-umbrales-reglas` (§7–8) cerró antes de empezar
       el bloque 13.
 
 ## 1. Reloj y zona horaria (D7)
 
-- [ ] 1.1 Test: `ZonaHorariaVivero.ZONA` es `America/Argentina/Buenos_Aires` y el bean `Clock` del
+- [x] 1.1 Test: `ZonaHorariaVivero.ZONA` es `America/Argentina/Buenos_Aires` y el bean `Clock` del
       contexto de Spring usa esa zona.
-- [ ] 1.2 Test: `NurseryService.updateTelemetry` arma el `RuleContext` con `now` del `Clock`
+- [x] 1.2 Test: `NurseryService.updateTelemetry` arma el `RuleContext` con `now` del `Clock`
       inyectado (`Clock.fixed`), no con `Instant.now()` (`NurseryService.java:582`). Ídem
       `NurseryWatchdog.evaluarTodos` (`NurseryWatchdog.java:130-131`). Implementar.
 
 ## 2. Traza: ventanas horarias (D7)
 
-- [ ] 2.1 Test de `VentanaHoraria.contieneHastaElMinuto`: 05:59:59 ✗, 06:00:00 ✓, 17:59:59 ✓,
+- [x] 2.1 Test de `VentanaHoraria.contieneHastaElMinuto`: 05:59:59 ✗, 06:00:00 ✓, 17:59:59 ✓,
       18:00:00 ✓, 18:00:59 ✓, 18:01:00 ✗; y una ventana que cruza la medianoche (22:00-06:00):
       06:00:30 ✓, 06:01:00 ✗.
-- [ ] 2.2 Test: `Evaluacion.compararVentana("Hora local", 17:42, ventana)` registra
+- [x] 2.2 Test: `Evaluacion.compararVentana("Hora local", 17:42, ventana)` registra
       `Comparacion(clave = riego.ventana-normal, recibido "17:42", operador EN, umbral "06:00-18:00",
       configurable = true, CUMPLE)`; con hora `null` → `SIN_DATO`; con un parámetro no declarado →
       `ParametroNoDeclaradoException`. Agregar `Operador.EN("∈")`. Implementar.

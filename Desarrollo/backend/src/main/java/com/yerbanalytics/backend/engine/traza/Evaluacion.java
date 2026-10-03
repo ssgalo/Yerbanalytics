@@ -7,6 +7,7 @@ import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
 import com.yerbanalytics.backend.engine.parametros.VentanaHoraria;
 
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +23,8 @@ import java.util.stream.Collectors;
  * {@link Rule#parametros()}; cualquier otro lanza {@link ParametroNoDeclaradoException}.
  */
 public final class Evaluacion {
+
+    private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
     private final String regla;
     private final Set<String> declarados;
@@ -70,6 +73,22 @@ public final class Evaluacion {
         boolean sinDato = recibido == null || (recibido instanceof Double d && d.isNaN());
         boolean cumple = !sinDato && aplicar(recibido, op, umbral);
         comparaciones.add(new Comparacion(etiqueta, null, sinDato ? null : recibido, op, umbral, "", false,
+                resultado(sinDato, cumple)));
+        return cumple;
+    }
+
+    /**
+     * Registra "hora ∈ ventana" con el operador {@link Operador#EN}: recibido {@code "HH:mm"}, umbral
+     * la ventana vigente en formato canónico. La ventana está cerrada al minuto en su hora de fin
+     * ({@link VentanaHoraria#contieneHastaElMinuto}). Sin hora ({@code null}) queda como
+     * {@code SIN_DATO} y devuelve {@code false}.
+     */
+    public boolean compararVentana(String etiqueta, LocalTime hora, DefinicionParametro ventana) {
+        VentanaHoraria v = ventana(ventana);
+        boolean sinDato = hora == null;
+        boolean cumple = !sinDato && v.contieneHastaElMinuto(hora);
+        comparaciones.add(new Comparacion(etiqueta, ventana.clave(),
+                sinDato ? null : hora.format(HH_MM), Operador.EN, v.canonico(), ventana.unidad(), true,
                 resultado(sinDato, cumple)));
         return cumple;
     }

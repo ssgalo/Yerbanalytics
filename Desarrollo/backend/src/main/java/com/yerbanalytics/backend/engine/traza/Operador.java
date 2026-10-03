@@ -14,7 +14,9 @@ public enum Operador {
     LE("≤"),
     GT(">"),
     GE("≥"),
-    EQ("=");
+    EQ("="),
+    /** Pertenencia a una ventana horaria ("hora ∈ ventana"); sólo la registra {@code compararVentana}. */
+    EN("∈");
 
     private final String simbolo;
 
@@ -29,6 +31,7 @@ public enum Operador {
             case GT -> recibido > umbral;
             case GE -> recibido >= umbral;
             case EQ -> recibido == umbral;
+            case EN -> throw new IllegalArgumentException("El operador EN sólo aplica a ventanas horarias.");
         };
     }
 }

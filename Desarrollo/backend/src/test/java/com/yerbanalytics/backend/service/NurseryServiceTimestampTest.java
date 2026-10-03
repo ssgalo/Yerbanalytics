@@ -83,7 +83,8 @@ class NurseryServiceTimestampTest {
                 mock(HistorialService.class), mock(ConfiguracionService.class), hardwareService,
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor,
                 mock(WeatherService.class), mock(ManualLockRepository.class),
-                mock(DiagnosticoService.class), store, parametros, 20);
+                mock(DiagnosticoService.class), store, parametros,
+                java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
     }
 
     private static MqttTelemetryPayload payload(Long timestamp) {

@@ -23,6 +23,7 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -57,6 +58,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
     private final WeatherService weatherService;
     private final ManualLockRepository manualLockRepository;
     private final TrazaEvaluacionStore trazaStore;
+    private final Clock reloj;
 
     public NurseryWatchdog(ZonaRepository zonaRepository,
                            SectorRepository sectorRepository,
@@ -65,7 +67,8 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                            ConfiguracionService configuracionService,
                            WeatherService weatherService,
                            ManualLockRepository manualLockRepository,
-                           TrazaEvaluacionStore trazaStore) {
+                           TrazaEvaluacionStore trazaStore,
+                           Clock reloj) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.ruleOrchestrator = ruleOrchestrator;
@@ -74,6 +77,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
         this.weatherService = weatherService;
         this.manualLockRepository = manualLockRepository;
         this.trazaStore = trazaStore;
+        this.reloj = reloj;
     }
 
     @Override
@@ -127,8 +131,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
 
         // Un único instante para todo el barrido: los 600 sectores se evalúan contra la misma
         // foto del tiempo, en vez de contra un reloj que se corre mientras el ciclo avanza.
-        long ahoraMs = System.currentTimeMillis();
-        Instant ahora = Instant.ofEpochMilli(ahoraMs);
+        Instant ahora = reloj.instant();
         int totalSectores = 0;
 
         for (ZonaEntity zona : zonas) {

@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.parametros;
 
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Ventana horaria {@code [desde, hasta)}: incluye el inicio y excluye el fin. Si {@code desde}
@@ -39,6 +40,15 @@ public record VentanaHoraria(LocalTime desde, LocalTime hasta) implements ValorP
             return !t.isBefore(desde) && t.isBefore(hasta);
         }
         return !t.isBefore(desde) || t.isBefore(hasta);
+    }
+
+    /**
+     * Como {@link #contiene} pero cerrada en su hora de fin al minuto: la lectura de las 18:00
+     * todavía entra en la ventana {@code 06:00-18:00} ({@code 18:00:59} adentro, {@code 18:01:00}
+     * afuera). La hora de inicio ya estaba incluida.
+     */
+    public boolean contieneHastaElMinuto(LocalTime t) {
+        return contiene(t) || t.truncatedTo(ChronoUnit.MINUTES).equals(hasta);
     }
 
     @Override
