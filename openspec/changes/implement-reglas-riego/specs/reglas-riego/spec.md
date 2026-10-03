@@ -1,0 +1,262 @@
+## ADDED Requirements
+
+Valores de fábrica salvo que el escenario diga otra cosa: umbral 45 %, crítico 35 %, objetivo 65 %,
+0,2 L/punto, volumen máx. 6 L, caudal 30 L/h, saturación 75 % (alerta 80 %), ventana 06:00–18:00,
+lluvia 70 % / 5 mm / 4 h, pausa 6 h, tope R-02 12 h, 10 sectores simultáneos, ciclo de lectura de
+240 min anclado a las 02:00. "Hora" es hora local `America/Argentina/Buenos_Aires`.
+
+### Requirement: Volumen y tiempo de riego
+Toda orden de riego SHALL llevar su volumen y su duración calculados antes de abrir:
+`V = min((objetivo − humedad) × litrosPorPunto, volumenMax)` para R-01, `V = volumenMax` para R-02, y
+`t = ceil(V / caudal × 3600)` segundos, con `V` redondeado a 0,01 L antes de calcular `t` (para que
+el error de punto flotante no sume un segundo). Si `t` supera la duración máxima del contrato (1200 s), SHALL
+recortarse a 1200 s y la traza SHALL indicarlo.
+
+#### Scenario: Ejemplo de v2
+- **WHEN** R-01 decide regar con humedad 45 % − ε (p. ej. 44,9 %)
+- **THEN** el volumen es 4,02 L y la duración 483 s
+
+#### Scenario: Tope de volumen
+- **WHEN** `riego.litros-por-punto` vale 0,3 y R-01 decide regar con humedad 40 %
+- **THEN** la fórmula da 7,5 L, el volumen es 6 L (tope) y la duración 720 s
+
+#### Scenario: Caudal calibrado distinto
+- **WHEN** `riego.caudal-emisor` vale 60 L/h y R-02 decide regar
+- **THEN** el volumen es 6 L y la duración 360 s
+
+#### Scenario: Configuración que no entra en la válvula
+- **WHEN** se intenta guardar `riego.volumen-max-evento` = 10 con `riego.caudal-emisor` = 20
+- **THEN** el guardado se rechaza (10 / 20 × 3600 = 1800 s > 1200 s) y no persiste nada
+
+### Requirement: R-01 Riego por déficit hídrico
+Con la última lectura de humedad de sustrato `h` tal que `crítico ≤ h < umbral`, dentro de la
+ventana de riego y sin R-03, R-04 ni R-06 aplicando al sector, el motor SHALL ordenar el riego del
+sector con el volumen de la fórmula. La traza SHALL registrar `h` contra ambos umbrales.
+
+#### Scenario: Justo debajo del umbral
+- **WHEN** la humedad es 44 % a las 10:05 sin lluvia prevista ni aplicación reciente
+- **THEN** R-01 emite `ACTIVAR_VALVULA` con 4,2 L y 504 s, y la traza muestra "44 % < 45 % ✓"
+
+#### Scenario: En el umbral no riega
+- **WHEN** la humedad es 45 %
+- **THEN** R-01 emite `NOOP_INFO` y la traza muestra "45 % < 45 % ✗"
+
+#### Scenario: Déficit crítico lo cubre R-02
+- **WHEN** la humedad es 34 %
+- **THEN** R-01 no emite `ACTIVAR_VALVULA` (lo emitió R-02) y su motivo lo dice
+
+#### Scenario: Umbral modificado
+- **WHEN** `riego.umbral-humedad` tiene override 50 y la humedad es 48 %
+- **THEN** R-01 riega
+
+#### Scenario: Sin lectura de humedad
+- **WHEN** la lectura no trae humedad de sustrato
+- **THEN** la comparación queda `SIN_DATO` y no se riega
+
+### Requirement: R-02 Déficit hídrico crítico
+Con `h < crítico`, el motor SHALL ordenar el riego del sector con el volumen máximo, a cualquier
+hora, aunque el pronóstico anuncie lluvia y aunque el sector esté en pausa por R-06, y SHALL emitir
+una alerta `CRITICAL` "Déficit hídrico crítico" por macro-zona. Mientras no exista S-06, R-02 SHALL
+respetar un máximo de un riego por sector cada `riego.exceptuado-bloqueo` horas.
+
+#### Scenario: Justo debajo del crítico, de noche y con lluvia
+- **WHEN** la humedad es 34 % a las 23:30, el pronóstico da 90 % y 12 mm en 4 h, y al sector se le
+  aplicó fitosanitario hace 1 h
+- **THEN** R-02 emite `ACTIVAR_VALVULA` con 6 L y 720 s; R-05, R-06 y R-03 registran "no aplica"
+
+#### Scenario: En el crítico
+- **WHEN** la humedad es 35 %
+- **THEN** R-02 emite `NOOP_INFO` y R-01 decide (si está en ventana)
+
+#### Scenario: Tope de 12 h
+- **WHEN** la humedad es 30 % y R-02 regó el sector hace 11 h 59 min
+- **THEN** R-02 emite `ABORT_RIEGO` citando el tope, y no se riega
+
+#### Scenario: Tope vencido
+- **WHEN** la humedad es 30 % y R-02 regó el sector hace 12 h
+- **THEN** R-02 riega
+
+#### Scenario: Una alerta por macro-zona
+- **WHEN** los 100 sectores de MZ-2 disparan R-02 en el mismo ciclo de lectura
+- **THEN** el historial tiene un solo evento "Alerta" `CRITICAL` de MZ-2 para ese ciclo
+
+### Requirement: R-03 Posponer por lluvia
+Cuando aplica R-01 (`crítico ≤ h < umbral`) y el pronóstico da, en las próximas
+`riego.lluvia-ventana` horas, probabilidad máxima horaria ≥ `riego.lluvia-probabilidad` **y** lluvia
+acumulada ≥ `riego.lluvia-mm`, el motor SHALL emitir `POSTPONE_RIEGO` para el sector y una alerta
+`INFO` "Riego pospuesto por pronóstico de lluvia" por macro-zona. No SHALL hacer nada más.
+
+#### Scenario: Ambos umbrales en el borde
+- **WHEN** la humedad es 40 % y en las 4 h siguientes la probabilidad máxima es 70 % y la suma 5 mm
+- **THEN** R-03 emite `POSTPONE_RIEGO` y R-01 no se evalúa
+
+#### Scenario: Probabilidad alta, pocos milímetros
+- **WHEN** la probabilidad máxima es 95 % y la suma 4,9 mm
+- **THEN** R-03 emite `NOOP_INFO` y R-01 riega
+
+#### Scenario: Muchos milímetros, probabilidad baja
+- **WHEN** la probabilidad máxima es 69 % y la suma 20 mm
+- **THEN** R-03 emite `NOOP_INFO`
+
+#### Scenario: Lluvia fuera de la ventana
+- **WHEN** la lluvia prevista cae entre la hora +5 y +6
+- **THEN** no cuenta para R-03 con ventana de 4 h
+
+#### Scenario: Sin pronóstico
+- **WHEN** el pronóstico no está disponible
+- **THEN** las comparaciones de R-03 quedan `SIN_DATO`, no pospone y R-01 decide
+
+#### Scenario: Sin déficit no hay nada que posponer
+- **WHEN** la humedad es 60 % y el pronóstico da 90 % y 15 mm
+- **THEN** R-03 emite `NOOP_INFO` "no aplica" y no se registra ninguna alerta
+
+### Requirement: R-04 Sustrato saturado
+Con `h ≥ riego.saturacion-bloqueo`, el motor SHALL bloquear todo riego autónomo del sector
+(`ABORT_RIEGO`). Con `h ≥ riego.saturacion-alerta`, además SHALL emitir una alerta `WARNING`
+"Sustrato saturado, riesgo de asfixia radicular y hongos" por macro-zona y ciclo.
+
+#### Scenario: Bajo el bloqueo
+- **WHEN** la humedad es 74 %
+- **THEN** R-04 emite `NOOP_INFO`
+
+#### Scenario: En el bloqueo, sin alerta
+- **WHEN** la humedad es 75 %
+- **THEN** R-04 emite `ABORT_RIEGO` y no hay evento "Alerta"
+
+#### Scenario: En la alerta
+- **WHEN** la humedad es 80 %
+- **THEN** R-04 emite `ABORT_RIEGO` y una alerta `WARNING` de la macro-zona
+
+#### Scenario: Cancela lo pendiente
+- **WHEN** MZ-2 tiene sectores en cola y llega una lectura con 76 %
+- **THEN** esos sectores salen de la cola y los que ya están regando siguen hasta su duración
+
+### Requirement: R-05 Riego fuera de ventana
+Fuera de `riego.ventana-normal`, cuando aplica R-01, el motor SHALL emitir `ABORT_RIEGO`. La ventana
+SHALL incluir el minuto de su hora de fin (la lectura de las 18:00 entra) y su hora de inicio.
+
+#### Scenario: Bordes de la ventana
+- **WHEN** la humedad es 40 % y la hora es 05:59:59 / 06:00:00 / 17:59:59 / 18:00:59 / 18:01:00
+- **THEN** R-05 corta / no corta / no corta / no corta / corta, respectivamente
+
+#### Scenario: Ventana modificada
+- **WHEN** `riego.ventana-normal` vale 07:00-17:00 y la hora es 06:30 con humedad 40 %
+- **THEN** R-05 emite `ABORT_RIEGO` y la traza muestra "06:30 ∈ 07:00–17:00 ✗"
+
+### Requirement: R-06 Pausa después de una aplicación
+Cuando aplica R-01 y al sector se le aplicó fertilizante o fitosanitario hace menos de
+`riego.pausa-tras-aplicacion` horas, el motor SHALL emitir `ABORT_RIEGO` para ese sector. Los demás
+sectores de la macro-zona SHALL seguir su curso.
+
+#### Scenario: Dentro de la pausa
+- **WHEN** la humedad es 40 % a las 11:00 y al sector se le aplicó insumo a las 05:00:01
+- **THEN** R-06 corta la rama del sector
+
+#### Scenario: Pausa cumplida
+- **WHEN** la aplicación fue a las 05:00:00
+- **THEN** R-06 emite `NOOP_INFO` y R-01 riega
+
+#### Scenario: Sólo el sector aplicado
+- **WHEN** a MZ-1-003 se le aplicó insumo hace 2 h y la humedad de MZ-1 es 40 %
+- **THEN** MZ-1-003 no se riega y los otros 99 sectores sí
+
+### Requirement: Ciclo de lectura
+Un sector SHALL recibir como máximo un riego autónomo por ciclo de lectura, y ninguno mientras tiene
+un riego en curso. El ciclo SHALL ser la franja de `intervaloSensadoMinutos` (acotado a 60–360)
+anclada a las 02:00 locales que contiene la hora de evaluación.
+
+#### Scenario: Segunda lectura del mismo ciclo
+- **WHEN** MZ-1-001 se regó a las 10:12 y llega una lectura a las 13:59 con 40 %
+- **THEN** la regla de ciclo emite `ABORT_RIEGO` y no se encola nada
+
+#### Scenario: Ciclo siguiente
+- **WHEN** la misma lectura llega a las 14:00:10
+- **THEN** el sector vuelve a ser elegible
+
+#### Scenario: Intervalo fuera de rango
+- **WHEN** `intervaloSensadoMinutos` guardado vale 5
+- **THEN** el ciclo usa 60 min y se loguea una advertencia
+
+### Requirement: Tandas por macro-zona
+Las órdenes de riego SHALL encolarse por macro-zona y despacharse en orden de numeración de sector,
+con a lo sumo `riego.sectores-simultaneos` válvulas abiertas por macro-zona. Al despachar, el
+backend SHALL publicar el comando `valve ON` con `durationSec`, y registrar el evento "Riego" con
+sector, volumen, duración, humedad y regla. Una solicitud cuyo sector o macro-zona tiene un bloqueo
+manual activo al momento de despachar SHALL descartarse.
+
+#### Scenario: Primera tanda
+- **WHEN** una lectura de MZ-2 con 40 % hace que los 100 sectores pidan riego
+- **THEN** en el siguiente despacho se publican 10 comandos, para MZ-2-001 … MZ-2-010, y los 90
+  restantes quedan "En cola"
+
+#### Scenario: Se libera un lugar
+- **WHEN** vence la duración (más 5 s) de MZ-2-003
+- **THEN** el siguiente despacho abre MZ-2-011 y nunca hay más de 10 abiertas en MZ-2
+
+#### Scenario: Zonas independientes
+- **WHEN** MZ-1 y MZ-2 tienen 10 sectores regando cada una
+- **THEN** ninguna espera por la otra
+
+#### Scenario: Bloqueo manual antes de despachar
+- **WHEN** MZ-2-050 está en cola y un operario bloquea MZ-2
+- **THEN** no se publica comando para MZ-2-050 ni para ningún otro pendiente de MZ-2
+
+#### Scenario: Broker caído
+- **WHEN** la publicación del comando falla
+- **THEN** no se registra el riego y la solicitud sigue en cola
+
+### Requirement: Cierre del ciclo de la válvula
+El estado "regando" de un sector SHALL derivarse del último evento "Riego" (`ts + duracionSeg + 5 s`),
+sin depender de un ACK ni de un campo que haya que volver a cerrar. El sector SHALL poder volver a
+regar en el ciclo siguiente.
+
+#### Scenario: Vuelve a regar
+- **WHEN** un sector regó a las 10:12 por 480 s y a las 14:05 la humedad es 42 %
+- **THEN** se despacha un nuevo riego (hoy nunca ocurre por el enganche "Regando")
+
+#### Scenario: Estado visible
+- **WHEN** se pide el snapshot del vivero a las 10:15 para ese sector
+- **THEN** la válvula figura "Regando"; a las 10:21 figura "Cerrada"; un sector pendiente figura "En cola"
+
+#### Scenario: Reinicio del backend a mitad de riego
+- **WHEN** el backend reinicia a las 10:14 con 10 sectores regando
+- **THEN** el primer despacho cuenta esos 10 como en curso y no abre otros hasta que venzan
+
+### Requirement: Frescura de la humedad de sustrato
+El riego autónomo SHALL bloquearse si la última humedad de sustrato recibida es más vieja que
+`seguridad.antiguedad-max-lectura`, aunque otras métricas de la zona sean frescas.
+
+#### Scenario: Sonda caída
+- **WHEN** el nodo publica temperatura y luz cada 30 s pero no `humSus` desde hace 5 min
+- **THEN** `StaleSensorRule` emite `ABORT_RIEGO` con la comparación "Antigüedad de la humedad de
+  sustrato 300 s > 90 s"
+
+### Requirement: Zona horaria fija
+Todas las ventanas y ciclos de riego SHALL evaluarse en `America/Argentina/Buenos_Aires`,
+independientemente de la zona del JVM, con un reloj inyectable.
+
+#### Scenario: JVM en UTC
+- **WHEN** el JVM corre en UTC y son las 20:30 UTC (17:30 locales) con humedad 40 %
+- **THEN** R-05 no corta y R-01 riega
+
+### Requirement: Parámetros de riego en el catálogo
+Los parámetros de riego de `reglas_v2` §11 SHALL existir una sola vez en el catálogo, y cada regla
+SHALL declarar todos los que lee. `riego.max-riegos-24h`, `riego.max-riegos-24h-sector` y
+`riego.tiempo-max-apertura` SHALL dejar de existir.
+
+#### Scenario: Umbral compartido
+- **WHEN** se pide `GET /api/rules/parametros`
+- **THEN** `riego.umbral-humedad` aparece una vez con `usadoPor` = `[FueraDeVentanaRiegoRule,
+  PausaTrasAplicacionRule, PosponerPorLluviaRule, RiegoPorDeficitRule]`
+
+#### Scenario: Fábrica nueva sin override
+- **WHEN** la base no tiene override de `riego.umbral-humedad`
+- **THEN** su valor vigente es 45
+
+#### Scenario: Override existente
+- **WHEN** la base tiene override 42 de `riego.umbral-humedad`
+- **THEN** su valor vigente sigue siendo 42
+
+#### Scenario: Restricción cruzada
+- **WHEN** se intenta guardar `riego.umbral-critico` = 40 con `riego.umbral-humedad` = 40
+- **THEN** el guardado se rechaza con "El umbral crítico debe ser menor que el umbral de riego."
