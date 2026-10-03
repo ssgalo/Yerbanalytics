@@ -9,10 +9,12 @@ services:
       # existe para que un navegador pueda hablar MQTT, y acá nadie lo hace.
       # Las órdenes de captura van por SSE — la decisión y su porqué están en
       # CapturaService.java. Además el listener de WebSockets ni siquiera está
-      # configurado (no hay mosquitto.conf), así que el mapeo publicaba un
+      # configurado (ver mosquitto.conf), así que el mapeo publicaba un
       # puerto sin nada detrás, y chocaba con otros servicios de la máquina.
       - "1883:1883"
     volumes:
+      # Sin este archivo Mosquitto 2 sólo acepta conexiones locales y el ESP32 no entra.
+      - ./Desarrollo/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
 

@@ -237,7 +237,7 @@ se puede validar la ingesta **antes** de tener el hardware. Para comandos, publi
 manualmente:
 
 ```bash
-mosquitto_pub -h <broker> -t 'nursery/zone/MZ-1/sector/S-001/command' \
+mosquitto_pub -h <broker> -t 'nursery/zone/MZ-1/sector/MZ-1-001/command' \
   -m '{"commandId":"t1","actuador":"valve","accion":"open","parametros":{"durationSec":10}}'
-mosquitto_sub -h <broker> -t 'nursery/zone/MZ-1/sector/S-001/ack'
+mosquitto_sub -h <broker> -t 'nursery/zone/MZ-1/sector/MZ-1-001/ack'
 ```

@@ -125,7 +125,7 @@ Tablas que toca este carril (la foto en sí va al filesystem):
   "mac": "A4:CF:12:9A:00:01",
   "battery": 87,
   "signal": -62,
-  "timestamp": 1782414800,
+  "timestamp": 1782414800,   // segundos (firmware); el simulador manda ms. El backend acepta ambos
   "metrics": { "humSus": 32, "humAmb": 55, "temp": 31, "ce": 850, "uv": 78 }
 }
 ```
@@ -159,7 +159,7 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 | El backend procesa una lectura | Al instante, por cada mensaje (no hace polling) | `MqttTelemetryReceiver.processMessage` |
 | El motor corre por telemetría | Con cada mensaje, sobre todos los sectores de esa zona | `NurseryService.java:509-510` |
 | El motor corre por watchdog | 5 min (`intervaloEvaluacionMinutos`), sobre todo el vivero | `NurseryWatchdog.java:77-98` |
-| Una zona pasa a "sin señal" | Si la última lectura tiene más de 30 s | `stale-threshold-ms`, `application.properties:69` |
+| Una zona pasa a "sin señal" | Si la última lectura tiene más de 90 s (editable) | Parámetro `seguridad.antiguedad-max-lectura` (`ParametrosSeguridad`) |
 | Se mide la efectividad de una acción | Revisión cada 30 s; compara 2 min después de actuar | `HistorialService.java:192-218` |
 | Pronóstico del clima | Caché de 15 min | `weather.cache-ttl-ms`, `application.properties:121` |
 | El dashboard se refresca | 5 s | `frontend/src/hooks/NurseryContext.tsx:30` |
@@ -275,13 +275,13 @@ sus 100 sectores.
 
 Cosas que el diagrama muestra tal cual están, y que conviene tener presentes:
 
-1. **El `timestamp` del firmware está en segundos y el backend lo trata como milisegundos.**
-   `reloj::ahoraEpoch()` devuelve segundos (`embebido/comun/reloj.cpp:51-58`); el backend lo
-   guarda y lo resta de `System.currentTimeMillis()` (`NurseryService.java:444,96`). Con un nodo
-   real la zona quedaría siempre "sin señal". El simulador manda milisegundos, por eso con él
-   funciona. Sale de leer el código; no se probó con hardware.
-2. **El nodo publica cada 30 s y la zona se considera caída a los 30 s.** No hay margen: un
-   mensaje demorado la marca "sin señal".
+1. ~~**El `timestamp` del firmware está en segundos y el backend lo trataba como milisegundos.**~~
+   **Resuelto** (`fix-integracion-nodo-real`): la ingesta lo normaliza por valor a ms
+   (`ContratoNodo.timestampAMs`). Segundos epoch se multiplican por 1000, milisegundos se dejan;
+   si el valor no sirve como fecha (nodo sin NTP, anterior a 2020) se usa la hora de recepción y
+   se loguea un warn por zona. Una lectura más vieja que la guardada (buffer offline) se ignora.
+2. ~~**El nodo publica cada 30 s y la zona se consideraba caída a los 30 s.**~~ **Resuelto**: el
+   parámetro `seguridad.antiguedad-max-lectura` pasó de 30 a **90 s** (3 intervalos).
 3. **El simulador baja solo a una lectura cada 4 h** (toma `intervaloSensadoMinutos`), y contra
    el umbral de 30 s la zona pasa casi todo el tiempo "sin señal". Ese parámetro no llega al
    firmware: el nodo real sigue en 30 s.

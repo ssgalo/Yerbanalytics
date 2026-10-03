@@ -36,7 +36,7 @@
 //  Identidad espacial del nodo (trazabilidad - HU-18)
 // ----------------------------------------------------------------------------
 #define NODO_ZONA_ID           "MZ-1"    // macro-zona
-#define NODO_SECTOR_ID         "S-001"   // sector (usado por command/ack y, si aplica, telemetría)
+#define NODO_SECTOR_ID         "MZ-1-001"   // id REAL del sector en la base (formato {zona}-NNN); el backend publica los comandos a este id
 
 // Nivel del topic de telemetría (flag de compilación: 1 = sí, 0 = no):
 //   1 -> nursery/zone/{zona}/sector/{sector}/telemetry  (nodo combinado)

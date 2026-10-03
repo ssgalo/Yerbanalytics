@@ -34,14 +34,10 @@ probó con hardware**.
 
 4. **Abrir el broker a la red.**
    - Firewall de la PC: permitir el 1883 entrante.
-   - Mosquitto 2 sin archivo de configuración acepta sólo conexiones locales, y el
-     `docker-compose.yml` no monta ninguno. Si el nodo no logra conectar, agregar un
-     `mosquitto.conf` con:
-
-     ```
-     listener 1883
-     allow_anonymous true
-     ```
+   - Mosquitto 2 sin configuración acepta sólo conexiones locales. El compose ya monta
+     `Desarrollo/mosquitto/mosquitto.conf` (`listener 1883`, `allow_anonymous true`, sin
+     autenticación: sólo para una LAN de confianza). Si el contenedor ya estaba corriendo,
+     recrearlo para que tome el archivo: `docker compose up -d --force-recreate mosquitto`.
 
 5. **Levantar todo.** `docker compose up -d mosquitto yerbanalytics-db`, después el backend
    (`./mvnw spring-boot:run`) y el dashboard. **El simulador apagado**, para que no publique
@@ -57,15 +53,14 @@ probó con hardware**.
 
 ## Lo que va a fallar aunque la red ande
 
-Son diferencias entre el firmware y el backend que el simulador no deja ver.
+Son diferencias entre el firmware y el backend que el simulador no deja ver. Dos ya se
+corrigieron en `fix-integracion-nodo-real`: el `timestamp` en segundos (el backend lo normaliza
+a ms) y el umbral de "sin señal" de 30 s (ahora 90 s, 3 intervalos de publicación).
 
 | Problema | Efecto | Arreglo |
 |---|---|---|
-| El firmware manda `timestamp` en segundos y el backend lo trata como milisegundos | La zona figura siempre "sin señal" | Unificar la unidad en uno de los dos lados |
-| El nodo publica cada 30 s y la zona se da por caída a los 30 s | "Sin señal" intermitente | Subir `yerbanalytics.nursery.stale-threshold-ms` o bajar el intervalo del nodo |
 | El comando de la bomba sale sin mililitros | El firmware lo rechaza con `dosis_invalida` | Pendiente en el backend |
 | El backend no escucha el ACK | Marca "Regando" sin confirmación del hardware | Pendiente en el backend |
-| El nodo toma la hora por NTP | Sin internet en esa red, el `timestamp` sale mal | Usar una red con salida a internet |
+| El nodo toma la hora por NTP | Sin internet en esa red, el `timestamp` es inutilizable y el backend usa la hora de recepción (warn en el log) | Usar una red con salida a internet |
 
-Los dos primeros bloquean la prueba y se corrigen en un cambio aparte. El detalle de todo el
-circuito está en `circuito-sensado-a-motor.md`.
+Ninguna de las tres bloquea la prueba de telemetría. El detalle de todo el circuito está en `circuito-sensado-a-motor.md`.
