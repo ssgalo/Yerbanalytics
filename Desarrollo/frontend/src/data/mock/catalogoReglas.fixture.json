@@ -1,0 +1,307 @@
+{
+  "reglas": [
+    {
+      "id": "ManualLockRule",
+      "label": "🔒 Bloqueo manual",
+      "rama": "GLOBAL",
+      "prioridad": 0,
+      "parametros": []
+    },
+    {
+      "id": "StaleSensorRule",
+      "label": "📵 Sensor sin datos recientes",
+      "rama": "GLOBAL",
+      "prioridad": 1,
+      "parametros": [
+        "seguridad.antiguedad-max-lectura"
+      ]
+    },
+    {
+      "id": "WeatherOverrideRule",
+      "label": "🌧️ Condición climática (lluvia)",
+      "rama": "RIEGO",
+      "prioridad": 2,
+      "parametros": [
+        "riego.lluvia-probabilidad"
+      ]
+    },
+    {
+      "id": "DailyVolumeLimitRule",
+      "label": "🛑 Límite de volumen de riego diario",
+      "rama": "RIEGO",
+      "prioridad": 4,
+      "parametros": [
+        "riego.max-riegos-24h"
+      ]
+    },
+    {
+      "id": "DailyDoseLimitRule",
+      "label": "🛑 Límite de dosis diaria",
+      "rama": "INSUMO",
+      "prioridad": 5,
+      "parametros": [
+        "insumo.max-dosis-24h"
+      ]
+    },
+    {
+      "id": "IrrigationRule",
+      "label": "💦 Riego",
+      "rama": "RIEGO",
+      "prioridad": 10,
+      "parametros": [
+        "riego.umbral-humedad",
+        "riego.max-riegos-24h-sector",
+        "riego.tiempo-max-apertura"
+      ]
+    },
+    {
+      "id": "SupplyRule",
+      "label": "🧪 Dosificación de insumo",
+      "rama": "INSUMO",
+      "prioridad": 11,
+      "parametros": [
+        "diagnostico.confianza-minima"
+      ]
+    },
+    {
+      "id": "ShadingRule",
+      "label": "⛅ Control de mediasombra",
+      "rama": "MEDIASOMBRA",
+      "prioridad": 12,
+      "parametros": [
+        "mediasombra.uv-umbral",
+        "mediasombra.apertura-proteccion-uv",
+        "mediasombra.apertura-maxima"
+      ]
+    },
+    {
+      "id": "FollowUpRule",
+      "label": "⏱️ Seguimiento post-acción",
+      "rama": "SEGUIMIENTO",
+      "prioridad": 20,
+      "parametros": []
+    }
+  ],
+  "parametros": [
+    {
+      "clave": "seguridad.antiguedad-max-lectura",
+      "etiqueta": "Antigüedad máxima de la lectura",
+      "descripcion": "Si la última lectura de la zona es más vieja que esto, se considera que el sensor dejó de reportar y se bloquea la evaluación. La fábrica son 3 intervalos de publicación del nodo (30 s).",
+      "familia": "SEGURIDAD",
+      "tipo": "ENTERO",
+      "unidad": "s",
+      "valor": "90",
+      "fabrica": "90",
+      "min": 10.0,
+      "max": 600.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: StaleSensorRule",
+      "modificado": false,
+      "usadoPor": [
+        "StaleSensorRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.lluvia-probabilidad",
+      "etiqueta": "Probabilidad de lluvia que posterga el riego",
+      "descripcion": "Con una probabilidad de lluvia igual o mayor a esta, se posterga el riego.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "60",
+      "fabrica": "60",
+      "min": 50.0,
+      "max": 95.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: WeatherOverrideRule",
+      "modificado": false,
+      "usadoPor": [
+        "WeatherOverrideRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.max-riegos-24h",
+      "etiqueta": "Máximo de riegos en 24 h (límite de volumen)",
+      "descripcion": "Con esta cantidad de riegos en 24 h el sector alcanzó su límite diario y no se riega más.",
+      "familia": "RIEGO",
+      "tipo": "ENTERO",
+      "unidad": "riegos",
+      "valor": "2",
+      "fabrica": "2",
+      "min": 1.0,
+      "max": 10.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: DailyVolumeLimitRule",
+      "modificado": false,
+      "usadoPor": [
+        "DailyVolumeLimitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.max-dosis-24h",
+      "etiqueta": "Máximo de dosis en 24 h",
+      "descripcion": "Con esta cantidad de dosificaciones en 24 h el sector alcanzó su límite y no se le aplican más insumos.",
+      "familia": "INSUMO",
+      "tipo": "ENTERO",
+      "unidad": "dosis",
+      "valor": "1",
+      "fabrica": "1",
+      "min": 1.0,
+      "max": 10.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: DailyDoseLimitRule",
+      "modificado": false,
+      "usadoPor": [
+        "DailyDoseLimitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.max-riegos-24h-sector",
+      "etiqueta": "Máximo de riegos en 24 h (decisión de riego)",
+      "descripcion": "Con esta cantidad de riegos en 24 h la regla de riego no vuelve a regar el sector.",
+      "familia": "RIEGO",
+      "tipo": "ENTERO",
+      "unidad": "riegos",
+      "valor": "1",
+      "fabrica": "1",
+      "min": 1.0,
+      "max": 10.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: IrrigationRule",
+      "modificado": false,
+      "usadoPor": [
+        "IrrigationRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.tiempo-max-apertura",
+      "etiqueta": "Tiempo máximo de apertura de la electroválvula",
+      "descripcion": "Duración máxima de un evento de riego.",
+      "familia": "RIEGO",
+      "tipo": "ENTERO",
+      "unidad": "s",
+      "valor": "120",
+      "fabrica": "120",
+      "min": 10.0,
+      "max": 600.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: IrrigationRule",
+      "modificado": false,
+      "usadoPor": [
+        "IrrigationRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "riego.umbral-humedad",
+      "etiqueta": "Umbral de riego (humedad de sustrato)",
+      "descripcion": "Por debajo de esta humedad de sustrato el sector necesita riego.",
+      "familia": "RIEGO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "42",
+      "fabrica": "42",
+      "min": 35.0,
+      "max": 60.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: IrrigationRule",
+      "modificado": false,
+      "usadoPor": [
+        "IrrigationRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "diagnostico.confianza-minima",
+      "etiqueta": "Confianza mínima del diagnóstico",
+      "descripcion": "Un diagnóstico de IA con confianza menor a esta no es concluyente y no dispara dosificación.",
+      "familia": "DIAGNOSTICO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "85",
+      "fabrica": "85",
+      "min": 50.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: SupplyRule; HU-04 CA-03",
+      "modificado": false,
+      "usadoPor": [
+        "SupplyRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "mediasombra.apertura-maxima",
+      "etiqueta": "Apertura máxima de la mediasombra",
+      "descripcion": "Tope de apertura que admite el plan de rustificación.",
+      "familia": "MEDIASOMBRA",
+      "tipo": "ENTERO",
+      "unidad": "%",
+      "valor": "100",
+      "fabrica": "100",
+      "min": 10.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: ShadingRule",
+      "modificado": false,
+      "usadoPor": [
+        "ShadingRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "mediasombra.apertura-proteccion-uv",
+      "etiqueta": "Apertura protectora ante pico UV",
+      "descripcion": "Apertura de la mediasombra cuando se supera el índice UV de protección.",
+      "familia": "MEDIASOMBRA",
+      "tipo": "ENTERO",
+      "unidad": "%",
+      "valor": "30",
+      "fabrica": "30",
+      "min": 0.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "motor-reglas: ShadingRule",
+      "modificado": false,
+      "usadoPor": [
+        "ShadingRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "mediasombra.uv-umbral",
+      "etiqueta": "Índice UV de protección",
+      "descripcion": "Con un índice UV de pronóstico igual o mayor a este, la mediasombra pasa a posición protectora.",
+      "familia": "MEDIASOMBRA",
+      "tipo": "NUMERO",
+      "unidad": "índice",
+      "valor": "7",
+      "fabrica": "7",
+      "min": 1.0,
+      "max": 11.0,
+      "decimales": 1,
+      "refSpec": "motor-reglas: ShadingRule",
+      "modificado": false,
+      "usadoPor": [
+        "ShadingRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    }
+  ]
+}

@@ -8,10 +8,12 @@ interface NumberFieldProps {
   step?: number;
   min?: number;
   invalid?: boolean;
+  /** Aclaración debajo del campo (p. ej. que no interviene en decisiones del motor). */
+  hint?: string;
   onChange: (value: number) => void;
 }
 
-export function NumberField({ label, unit, value, step = 1, min = 0, invalid, onChange }: NumberFieldProps) {
+export function NumberField({ label, unit, value, step = 1, min = 0, invalid, hint, onChange }: NumberFieldProps) {
   return (
     <div className={styles.field}>
       <label className={styles.label}>{label}</label>
@@ -30,6 +32,7 @@ export function NumberField({ label, unit, value, step = 1, min = 0, invalid, on
         />
         {unit && <span className={styles.unit}>{unit}</span>}
       </div>
+      {hint && <span className={styles.hint}>{hint}</span>}
     </div>
   );
 }

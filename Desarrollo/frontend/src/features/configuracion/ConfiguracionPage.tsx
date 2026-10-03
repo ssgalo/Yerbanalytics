@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useConfig } from '@/hooks/useConfig';
+import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
 import { validateConfig } from '@/lib/configValidation';
 import { buildConfig } from '@/data/mock/config';
 import type { ConfigOperativa, Configuracion, MetricThreshold, RustificacionEtapa } from '@/types/domain';
@@ -24,6 +25,11 @@ function formatTs(ts: number | null): string {
 
 export function ConfiguracionPage() {
   const { config, loading, error, saving, save } = useConfig();
+  // El tope del plan de rustificación es un parámetro del motor de reglas, no de esta página.
+  const { catalogo } = useCatalogoReglas();
+  const aperturaMax = Number(
+    catalogo?.parametros.find((p) => p.clave === 'mediasombra.apertura-maxima')?.valor ?? 100,
+  );
   const [draft, setDraft] = useState<Configuracion | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -32,7 +38,7 @@ export function ConfiguracionPage() {
     if (config) setDraft(structuredClone(config));
   }, [config]);
 
-  const errors = useMemo(() => (draft ? validateConfig(draft) : []), [draft]);
+  const errors = useMemo(() => (draft ? validateConfig(draft, aperturaMax) : []), [draft, aperturaMax]);
   const dirty = useMemo(
     () => (draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false),
     [draft, config],
@@ -99,7 +105,7 @@ export function ConfiguracionPage() {
       <Card className={styles.section}>
         <div className={styles.sectionHead}>
           <span className={styles.sectionTitle}>Límites de riego e insumos</span>
-          <span className={styles.sectionHint}>Topes físicos contra inundaciones y sobredosis</span>
+          <span className={styles.sectionHint}>Topes informativos de volumen y dosis</span>
         </div>
         <LimitesActuadoresForm value={draft.operativa} onChange={patchOperativa} />
       </Card>
@@ -111,7 +117,7 @@ export function ConfiguracionPage() {
         </div>
         <RustificacionPlanForm
           value={draft.rustificacion}
-          aperturaMax={draft.operativa.mediasombraAperturaMaxPct}
+          aperturaMax={aperturaMax}
           onChange={setEtapas}
         />
       </Card>

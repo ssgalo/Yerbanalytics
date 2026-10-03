@@ -124,23 +124,24 @@ comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx,
 - [ ] 5.4 (README hecho; falta CLAUDE.md §6, fuera del alcance del backend) README del backend: sumar el script a la sección de migraciones manuales y documentar
       `/api/rules/parametros` y `/api/rules/evaluaciones`. Actualizar `CLAUDE.md` §6 (migraciones
       pendientes).
-- [ ] 5.5 (pendiente: escribe en el frontend, va con el bloque 6) Test que genera `fe/data/mock/catalogoReglas.fixture.json` desde el catálogo de fábrica y
+- [x] 5.5 (desvío: el fixture se escribió a mano, no lo genera un test del backend; un test del frontend
+      `catalogoReglas.test.ts` lee los enums `Parametros*.java` y falla si divergen) Test que genera `fe/data/mock/catalogoReglas.fixture.json` desde el catálogo de fábrica y
       falla si el archivo commiteado difiere (D8 / *Risks*).
 
 ## 6. Frontend: capa de datos (PR 4)
 
-- [ ] 6.1 Tipos en `fe/types/domain.ts`: `ParametroRegla`, `ReglaCatalogo`, `CatalogoReglas`,
+- [x] 6.1 Tipos en `fe/types/domain.ts`: `ParametroRegla`, `ReglaCatalogo`, `CatalogoReglas`,
       `CambioParametro`, `TrazaEvaluacion`, `TrazaRegla`, `Comparacion`, `OrigenEvaluacion`;
       `RuleNode.parametros: string[]`; quitar los dos campos de `ConfigOperativa`.
-- [ ] 6.2 Test (`httpRepository.test.ts`): `getCatalogoReglas`, `saveParametros` (incluido 400 con
+- [x] 6.2 Test (`httpRepository.test.ts`): `getCatalogoReglas`, `saveParametros` (incluido 400 con
       `errores`), `getRuleSchema`, `getTrazaEvaluacion` (200 / 204 → `null`). Implementar en
       `DataRepository` y `HttpRepository`.
-- [ ] 6.3 Test: el mock arma el catálogo desde `catalogoReglas.fixture.json`; `saveParametros`
+- [x] 6.3 Test: el mock arma el catálogo desde `catalogoReglas.fixture.json`; `saveParametros`
       valida rango con la misma función que la UI y persiste en memoria; la traza mock de un sector
       es determinística y coherente con su lectura (humedad < umbral ⇒ `CUMPLE`). Implementar.
-- [ ] 6.4 Test: `useRuleEngineSchema` obtiene el esquema del repositorio (sin `fetch`); el Historial
+- [x] 6.4 Test: `useRuleEngineSchema` obtiene el esquema del repositorio (sin `fetch`); el Historial
       sigue mostrando el DAG en modo `mock`. Migrar el hook.
-- [ ] 6.5 Test de `lib/parametrosValidation.ts`: valida tipo/rango/decimales/ventana a partir del
+- [x] 6.5 Test de `lib/parametrosValidation.ts`: valida tipo/rango/decimales/ventana a partir del
       DTO, sin constantes propias. Implementar.
 
 ## 7. Frontend: pestaña Parámetros (PR 5)
@@ -158,7 +159,7 @@ comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx,
 - [ ] 7.5 Test: búsqueda, filtro por rama, "sólo modificados" y "Ver por parámetro" (cada clave una
       vez con `usadoPor`).
 - [ ] 7.6 Test: un 400 del servidor muestra cada error junto a su parámetro y conserva el borrador.
-- [ ] 7.7 Configuración: test de que `LimitesActuadoresForm` ya no muestra los dos campos, muestra
+- [x] 7.7 Configuración: test de que `LimitesActuadoresForm` ya no muestra los dos campos, muestra
       el enlace a "Motor de reglas" y rotula volumen diario y dosis máx. como "no intervienen en
       decisiones del motor"; `RustificacionPlanForm` valida contra `mediasombra.apertura-maxima`
       del catálogo. Adaptar `ConfiguracionPage`, `configValidation.ts` y `data/mock/config.ts`.

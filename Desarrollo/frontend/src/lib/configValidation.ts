@@ -44,16 +44,12 @@ export function operativaErrors(op: ConfigOperativa): string[] {
   const positive = (v: number | null | undefined, nombre: string) => {
     if (!(Number(v) > 0)) out.push(`El valor de ${nombre} debe ser mayor a 0.`);
   };
-  positive(op.riegoTiempoMaxSeg, 'el tiempo máximo de apertura de riego');
   positive(op.riegoVolMaxDiarioMl, 'el volumen máximo diario de riego');
   positive(op.insumoDosisMax24hMl, 'la dosis máxima de insumo por 24 h');
   positive(op.seguimientoLatenciaMin, 'la latencia de seguimiento');
   positive(op.seguimientoDeltaMin, 'el delta mínimo de recuperación');
   positive(op.intervaloSensadoMinutos ?? 0, 'el intervalo de sensado');
   positive(op.intervaloEvaluacionMinutos ?? 0, 'el intervalo de evaluación');
-  if (op.mediasombraAperturaMaxPct <= 0 || op.mediasombraAperturaMaxPct > 100) {
-    out.push('La apertura máxima de mediasombra debe estar entre 0 y 100 %.');
-  }
   return out;
 }
 
@@ -77,8 +73,13 @@ export function etapasError(etapas: RustificacionEtapa[], aperturaMax: number): 
   return null;
 }
 
-/** Lista de mensajes de error de toda la configuración. Vacía = válida. */
-export function validateConfig(cfg: Configuracion): string[] {
+/**
+ * Lista de mensajes de error de toda la configuración. Vacía = válida.
+ *
+ * `aperturaMax` es el valor vigente de `mediasombra.apertura-maxima` del catálogo del motor de
+ * reglas: el tope del plan de rustificación ya no vive en la configuración operativa.
+ */
+export function validateConfig(cfg: Configuracion, aperturaMax: number): string[] {
   const out: string[] = [];
   if (!cfg.umbrales || cfg.umbrales.length !== specs.length) {
     out.push(`Se esperan los umbrales de las ${specs.length} métricas.`);
@@ -89,7 +90,7 @@ export function validateConfig(cfg: Configuracion): string[] {
     }
   }
   out.push(...operativaErrors(cfg.operativa));
-  const eEtapas = etapasError(cfg.rustificacion, cfg.operativa.mediasombraAperturaMaxPct);
+  const eEtapas = etapasError(cfg.rustificacion, aperturaMax);
   if (eEtapas) out.push(eEtapas);
   return out;
 }

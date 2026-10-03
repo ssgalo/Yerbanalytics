@@ -9,13 +9,18 @@
    ============================================================ */
 import type {
   ActionRecord,
+  CambioParametro,
+  CatalogoReglas,
   Configuracion,
+  DagSchema,
   DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  OrigenEvaluacion,
   TopologiaVivero,
+  TrazaEvaluacion,
 } from '@/types/domain';
 
 export interface DataRepository {
@@ -39,4 +44,18 @@ export interface DataRepository {
   generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero>;
   /** Actualiza la disposición visual por fila sin regenerar la grilla (HU-18 CA-01). */
   guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero>;
+  /** Catálogo de umbrales del motor de reglas, agrupado por regla (cada parámetro una vez). */
+  getCatalogoReglas(): Promise<CatalogoReglas>;
+  /**
+   * Aplica cambios al catálogo, todo o nada, y devuelve el catálogo actualizado. `valor: null`
+   * restablece el valor de fábrica. Si algo es inválido rechaza con `ParametrosInvalidosError`.
+   */
+  saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas>;
+  /** Esquema base del DAG del motor (topología estática, con los parámetros de cada regla). */
+  getRuleSchema(): Promise<DagSchema>;
+  /**
+   * Última evaluación del motor para un sector. Sin `origen`, la más reciente de las dos.
+   * `null` si todavía no se evaluó desde el arranque.
+   */
+  getTrazaEvaluacion(sectorId: string, origen?: OrigenEvaluacion): Promise<TrazaEvaluacion | null>;
 }

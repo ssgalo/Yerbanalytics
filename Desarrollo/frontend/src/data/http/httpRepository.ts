@@ -4,15 +4,22 @@
    VITE_DATA_SOURCE=http.
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
+import { ParametrosInvalidosError } from '@/data/parametrosError';
 import type {
   ActionRecord,
+  CambioParametro,
+  CatalogoReglas,
   Configuracion,
+  DagSchema,
+  ErrorParametro,
   DisposicionTopologia,
   HardwareData,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
+  OrigenEvaluacion,
   TopologiaVivero,
+  TrazaEvaluacion,
 } from '@/types/domain';
 
 export class HttpRepository implements DataRepository {
@@ -158,5 +165,61 @@ export class HttpRepository implements DataRepository {
       throw new Error(body?.error ?? `Error ${res.status} al guardar la disposición`);
     }
     return (await res.json()) as TopologiaVivero;
+  }
+
+  async getCatalogoReglas(): Promise<CatalogoReglas> {
+    const res = await fetch(`${this.baseUrl}/rules/parametros?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener los parámetros del motor desde ${this.baseUrl}`);
+    }
+    return (await res.json()) as CatalogoReglas;
+  }
+
+  async saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas> {
+    const res = await fetch(`${this.baseUrl}/rules/parametros`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cambios }),
+    });
+    if (!res.ok) {
+      // Un 400 de validación trae { errores: [{ clave, mensaje }] }; uno por JSON inválido
+      // puede venir sin `errores` (o sin cuerpo), así que se tolera cualquiera de las formas.
+      const body = (await res.json().catch(() => null)) as {
+        errores?: ErrorParametro[];
+        error?: string;
+        message?: string;
+      } | null;
+      if (Array.isArray(body?.errores) && body.errores.length > 0) {
+        throw new ParametrosInvalidosError(body.errores);
+      }
+      throw new Error(
+        body?.error ?? body?.message ?? `Error ${res.status} al guardar los parámetros del motor`,
+      );
+    }
+    return (await res.json()) as CatalogoReglas;
+  }
+
+  async getRuleSchema(): Promise<DagSchema> {
+    const res = await fetch(`${this.baseUrl}/rules/schema`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener el esquema del motor`);
+    }
+    return (await res.json()) as DagSchema;
+  }
+
+  async getTrazaEvaluacion(
+    sectorId: string,
+    origen?: OrigenEvaluacion,
+  ): Promise<TrazaEvaluacion | null> {
+    const filtro = origen ? `origen=${origen}&` : '';
+    const res = await fetch(
+      `${this.baseUrl}/rules/evaluaciones/${encodeURIComponent(sectorId)}?${filtro}t=${Date.now()}`,
+    );
+    // 204: el sector existe pero el motor todavía no lo evaluó desde el arranque.
+    if (res.status === 204) return null;
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener la evaluación del sector ${sectorId}`);
+    }
+    return (await res.json()) as TrazaEvaluacion;
   }
 }
