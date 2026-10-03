@@ -93,6 +93,30 @@ describe('HistorialTimeline · riegos y alertas (13.5)', () => {
   });
 });
 
+describe('HistorialTimeline · conteo de sectores evaluados', () => {
+  it('los eventos sin sector ("—": Configuración y alertas de la macro-zona) no cuentan como sectores', () => {
+    const records = [
+      evento({ id: 'HE-1', sectorId: 'MZ-2-014' }),
+      evento({ id: 'HE-2', tipo: 'Alerta', sectorId: '—', regla: 'SustratoSaturadoRule', alerta: 'WARNING' }),
+      evento({ id: 'HE-3', tipo: 'Configuración', sectorId: '—' }),
+    ];
+    render(<HistorialTimeline records={records} schema={schema} schemaLoading={false} />);
+
+    // Encabezado del ciclo: un solo sector real y las tres decisiones.
+    expect(screen.getByRole('button', { name: /Ciclo/ }).textContent).toContain('1 sector evaluados · 3 decisiones');
+    fireEvent.click(screen.getByRole('button', { name: /Ciclo/ }));
+    // Y el de la macro-zona.
+    expect(screen.getByRole('button', { name: /Macro-zona 2/ }).textContent).toContain('1 sector evaluados · 3 decisiones');
+  });
+
+  it('con sólo alertas de zona hay 0 sectores evaluados', () => {
+    const records = [evento({ id: 'HE-2', tipo: 'Alerta', sectorId: '—', alerta: 'WARNING' })];
+    render(<HistorialTimeline records={records} schema={schema} schemaLoading={false} />);
+
+    expect(screen.getByRole('button', { name: /Ciclo/ }).textContent).toContain('0 sectores evaluados · 1 decisión');
+  });
+});
+
 describe('HistorialFilters · tipo de acción (13.5)', () => {
   it('el filtro de tipo suma "Alerta" y el de resultado "Informativo"', () => {
     render(

@@ -19,6 +19,12 @@ export const formatoVolumen = (litros: number): string => `${String(Number(litro
 
 export const formatoDuracion = (segundos: number): string => `${segundos} s`;
 
+/** `sectorId` de los eventos de alcance macro-zona (Configuración y alertas): no pertenecen a ningún sector. */
+export const SIN_SECTOR = '—';
+
+/** {@code true} si el id es de un sector real: los eventos "—" no cuentan como un sector evaluado. */
+export const esSectorReal = (sectorId: string): boolean => sectorId !== SIN_SECTOR;
+
 /** Las alertas son de la macro-zona (el backend las guarda con `sectorId` "—"). */
 export const esAlertaDeZona = (r: ActionRecord): boolean => r.tipo === 'Alerta';
 

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Glyph, Icon } from '@/components/ui/Icon';
 import { RuleGraph } from '@/components/DAGViewer/RuleGraph';
 import type { ActionRecord, Evolution, DagSchema } from '@/types/domain';
-import { esAlertaDeZona, etiquetaTipo, presentacionIcono } from '../eventoPresentacion';
+import { esAlertaDeZona, esSectorReal, etiquetaTipo, presentacionIcono } from '../eventoPresentacion';
 import { EventoMeta } from './EventoMeta';
 import styles from './HistorialTimeline.module.css';
 
@@ -106,7 +106,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
           let totalDecisionsCycle = 0;
           zonaList.forEach(z => {
             const sectors = Object.values(z.sectors);
-            totalSectorsCycle += sectors.length;
+            totalSectorsCycle += sectors.filter((s) => esSectorReal(s.sectorId)).length;
             totalDecisionsCycle += sectors.reduce((acc, s) => acc + s.actions.length, 0);
           });
 
@@ -121,7 +121,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                 <Icon name="calendar" size={18} stroke="var(--ink)" />
                 <span className={styles.cycleTitle}>Ciclo {cycle.fecha}</span>
                 <span className={styles.cycleCount}>
-                  {totalSectorsCycle} sector{totalSectorsCycle !== 1 ? 'es' : ''} evaluados · {totalDecisionsCycle} decisión{totalDecisionsCycle !== 1 ? 'es' : ''}
+                  {totalSectorsCycle} sector{totalSectorsCycle !== 1 ? 'es' : ''} evaluados · {totalDecisionsCycle} {totalDecisionsCycle !== 1 ? 'decisiones' : 'decisión'}
                 </span>
                 <span className={styles.spacer} />
                 <Icon
@@ -139,6 +139,8 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                     const isZonaOpen = !!openZonas[zonaId];
                     const sectorList = Object.values(zona.sectors).sort((a, b) => a.sectorId.localeCompare(b.sectorId));
                     const totalDecisionsZona = sectorList.reduce((acc, s) => acc + s.actions.length, 0);
+                    // Los eventos de alcance macro-zona ("—": Configuración, alertas) no son un sector evaluado.
+                    const totalSectoresZona = sectorList.filter((s) => esSectorReal(s.sectorId)).length;
 
                     return (
                       <div key={zonaId} className={styles.zonaBlock} style={{ marginBottom: '8px', borderLeft: '2px solid var(--border)', paddingLeft: '12px' }}>
@@ -151,7 +153,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                           <Icon name="map-pin" size={16} stroke="var(--ink)" />
                           <span className={styles.cycleTitle} style={{ fontSize: '13px' }}>{zona.zonaName}</span>
                           <span className={styles.cycleCount}>
-                            {sectorList.length} sector{sectorList.length !== 1 ? 'es' : ''} evaluados · {totalDecisionsZona} decisión{totalDecisionsZona !== 1 ? 'es' : ''}
+                            {totalSectoresZona} sector{totalSectoresZona !== 1 ? 'es' : ''} evaluados · {totalDecisionsZona} {totalDecisionsZona !== 1 ? 'decisiones' : 'decisión'}
                           </span>
                           <span className={styles.spacer} />
                           <Icon
