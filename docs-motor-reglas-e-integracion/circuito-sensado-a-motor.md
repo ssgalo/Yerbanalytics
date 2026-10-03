@@ -31,9 +31,10 @@ flowchart TD
         P2["2. CONVIERTE<br/>ce: 850 uS/cm pasa a 0,85 dS/m<br/>Es la unica conversion"]
         P3["3. GUARDA<br/>Pisa la ultima lectura de la zona<br/>y la bateria y senal del nodo"]
         P4["4. EVALUA EL ESTADO<br/>Cada metrica contra sus umbrales<br/>La peor define el estado: ok, warning o critical<br/>Ese estado se copia a todos los sectores de la zona"]
-        P5["5. ARMA EL CONTEXTO (1 por sector)<br/>lectura de la zona + estado + diagnostico IA<br/>+ pronostico + bloqueo manual + sensor viejo?"]
+        P5["5. ARMA EL CONTEXTO (1 por sector)<br/>lectura de la zona + estado + diagnostico IA<br/>+ pronostico + bloqueo manual<br/>+ historia de riego (ciclo, ultima aplicacion)"]
         P6["6. MOTOR DE REGLAS<br/>Corre una vez por cada sector de la zona"]
-        P7["7. ACTION EXECUTOR<br/>Actualiza los actuadores del sector<br/>Registra la decision en el historial<br/>Publica el comando"]
+        P7["7. ACTION EXECUTOR<br/>El riego NO lo abre: lo encola<br/>Registra decisiones y alertas en el historial<br/>Publica bomba y mediasombra"]
+        DESP["7b. DESPACHO DE RIEGO (cada 10 s)<br/>Abre de a 10 valvulas por zona, en orden<br/>Revalida antes de abrir cada una<br/>Publica la duracion ya calculada (volumen / caudal)"]
         WD["WATCHDOG (cada 5 min)<br/>Vuelve a correr el motor sobre TODOS los sectores<br/>aunque no haya llegado ninguna lectura"]
     end
 
@@ -54,13 +55,15 @@ flowchart TD
     DB -- "umbrales, configuracion, bloqueos" --> P5
     WD --> P5
     P7 -- "UPDATE sector<br/>INSERT historial_evento" --> DB
-    P7 -- "publish<br/>nursery/zone/MZ-2/sector/MZ-2-006/command" --> BROKER
+    P7 -- "publish bomba y mediasombra<br/>nursery/zone/MZ-2/sector/MZ-2-006/command" --> BROKER
     BROKER -- "entrega" --> ACT
     ACT -. "publish .../ack<br/>HOY EL BACKEND NO LO ESCUCHA" .-> BROKER
     DB --> DASH
 
     CAMARA["Diagnostico IA del sector<br/>Viene de la camara (diagrama 2)"]
     CAMARA --> P5
+    P7 -- "encola el riego<br/>(en memoria)" --> DESP
+    DESP -- "publish valve ON + durationSec<br/>(registra el riego en historial_evento)" --> BROKER
 
     style CAMARA fill:#efe3f7,stroke:#7b3fa0,stroke-width:2px
     linkStyle 22 stroke:#7b3fa0,stroke-width:3px
@@ -68,6 +71,12 @@ flowchart TD
 
 El violeta marca el único punto donde entra la cámara: el diagnóstico de IA que el paso 5 suma
 al contexto. De dónde sale está en el diagrama 2.
+
+El riego es la excepción del paso 7: el Action Executor lo **encola** y lo abre el despacho (7b),
+de a 10 válvulas por macro-zona, en orden de numeración de sector. Antes de abrir cada una revalida
+con los datos de ese momento (nodo y humedad frescos, humedad bajo el bloqueo por saturación,
+sin bloqueo manual y, para el riego común, dentro de la ventana 06:00-18:00). La bomba y la
+mediasombra siguen saliendo directo desde el paso 7.
 
 ## 1.b Captura y diagnóstico (la cámara)
 
@@ -115,7 +124,7 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 | Dirección | Tópico | Quién publica | Quién escucha |
 |---|---|---|---|
 | Nodo → backend | `nursery/zone/{zona}/telemetry` | Nodo testigo o simulador | Backend |
-| Backend → nodo | `nursery/zone/{zona}/sector/{sector}/command` | Backend | Nodo actuador del sector |
+| Backend → nodo | `nursery/zone/{zona}/sector/{sector}/command` | Backend (el riego, el despacho; bomba y mediasombra, el Action Executor) | Nodo actuador del sector |
 | Nodo → backend | `nursery/zone/{zona}/sector/{sector}/ack` | Nodo actuador | **Nadie** (el backend no se suscribe) |
 
 **Telemetría** (lo que manda el nodo testigo de MZ-2):
@@ -139,13 +148,13 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 **Comando** (lo que publica el backend):
 
 ```json
-{ "commandId": "<uuid>", "actuador": "valve", "accion": "ON", "parametros": { "durationSec": 120 } }
+{ "commandId": "<uuid>", "actuador": "valve", "accion": "ON", "parametros": { "durationSec": 600 } }
 ```
 
 | Actuador | `accion` | `parametros` |
 |---|---|---|
-| `valve` | `ON` | `durationSec` |
-| `pump` | `ON` | vacío |
+| `valve` | `ON` | `durationSec`: calculada, de 1 a 1200 s (600 s = 5 L a 30 L/h, humedad 40 %; R-02: 6 L = 720 s) |
+| `pump` | `ON` | vacío (el firmware lo rechaza, ver sección 5) |
 | `shade` | `SET` | `targetPct` |
 
 ---
@@ -157,14 +166,18 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 | El nodo testigo lee y publica | 30 s | `SENSOR_POLLING_INTERVAL_MS`, `embebido/comun/config.example.h:49` |
 | El simulador publica | 10 s al encenderlo; a los 5 s adopta `intervaloSensadoMinutos` de la base (**240 min**) | `simulador/server/emission.ts:35-47` |
 | El backend procesa una lectura | Al instante, por cada mensaje (no hace polling) | `MqttTelemetryReceiver.processMessage` |
-| El motor corre por telemetría | Con cada mensaje, sobre todos los sectores de esa zona | `NurseryService.java:509-510` |
-| El motor corre por watchdog | 5 min (`intervaloEvaluacionMinutos`), sobre todo el vivero | `NurseryWatchdog.java:77-98` |
-| Una zona pasa a "sin señal" | Si la última lectura tiene más de 90 s (editable) | Parámetro `seguridad.antiguedad-max-lectura` (`ParametrosSeguridad`) |
-| Se mide la efectividad de una acción | Revisión cada 30 s; compara 2 min después de actuar | `HistorialService.java:192-218` |
-| Pronóstico del clima | Caché de 15 min | `weather.cache-ttl-ms`, `application.properties:121` |
+| El motor corre por telemetría | Con cada mensaje, sobre todos los sectores de esa zona | `NurseryService.updateTelemetry`, `NurseryService.java:541-590` |
+| El motor corre por watchdog | 5 min (`intervaloEvaluacionMinutos`), sobre todo el vivero; no riega ni toca la cola | `NurseryWatchdog.java:83-104` |
+| El despacho de riego abre válvulas | 10 s: cierra lo vencido y abre los sectores que entren en el cupo (10 por zona) | `yerbanalytics.riego.despacho-intervalo-ms`, `application.properties:103`; `DespachoRiego.java:216-217` |
+| Se da un riego por terminado | A `ts + duración + 5 s`; el ESP32 cierra solo, el backend no manda orden de cierre | `DespachoRiego.java:81,324` |
+| Ciclo de lectura del riego | Franjas de `intervaloSensadoMinutos` (240 min, acotado a 60-360) desde las 02:00: 02, 06, 10, 14, 18, 22 h. Un riego común por sector y ciclo | `CicloLectura.java:35-55` |
+| Tope del déficit crítico (R-02) | 1 riego cada 12 h por sector (`riego.exceptuado-bloqueo`) | `DeficitCriticoRule.java:84-97` |
+| Una zona pasa a "sin señal" | Si la última lectura **o** la última humedad de sustrato tienen más de 90 s (editable) | Parámetro `seguridad.antiguedad-max-lectura` (`ParametrosSeguridad.java:13-16`, `StaleSensorRule.java:63-92`) |
+| Se mide la efectividad de una acción | Revisión cada 30 s; compara 2 min después de actuar (un riego, desde que se abre la válvula) | `HistorialService.java:265-290` |
+| Pronóstico del clima | Caché de 15 min; un fallo se recuerda 60 s. La telemetría nunca espera: usa lo cacheado (hasta 4 TTL) y refresca aparte | `weather.cache-ttl-ms`, `weather.failure-cache-ttl-ms`, `application.properties:120,130`; `WeatherService.java:132-142` |
 | El dashboard se refresca | 5 s | `frontend/src/hooks/NurseryContext.tsx:30` |
 | Se pide una foto | Sólo cuando alguien emite la orden; no hay pasada automática | `CapturaController.java:70` |
-| Una orden sin imagen se reintenta | A los 60 s, hasta 3 intentos | `capturas.timeout-orden-seg`, `capturas.max-intentos`, `application.properties:137,139` |
+| Una orden sin imagen se reintenta | A los 60 s, hasta 3 intentos | `capturas.timeout-orden-seg`, `capturas.max-intentos`, `application.properties:140,142` |
 | El servicio de inferencia busca capturas | Cada 10 s; el backend se las entrega tras 1 min sin capturas nuevas | `servicio-inferencia/src/main.py:148`, `src/api.py:48` |
 
 ---
@@ -189,6 +202,7 @@ erDiagram
         int nodo_battery
         int nodo_signal
         long last_reading_time
+        long hum_sus_ts "ultima humedad de sustrato"
     }
     sector {
         string id PK "MZ-2-006"
@@ -197,7 +211,7 @@ erDiagram
         string reason
         string diagnosis_estado
         float diagnosis_conf
-        string actuador_valve
+        string actuador_valve "legado, ya no decide"
         string actuador_pump
         int actuador_shade "pct de apertura"
     }
@@ -216,12 +230,16 @@ erDiagram
         string sector_id
         string zona_id
         long ts
-        string tipo "Riego, Insumo, Info"
+        string tipo "Riego, Insumo, Info, Alerta"
         string lectura
         string decision
         string accion
         string res
         string sev
+        string regla "riego y alertas"
+        string alerta "INFO, WARNING, CRITICAL"
+        float volumen_l "riego"
+        int duracion_seg "riego"
     }
     bloqueo_manual {
         long id PK
@@ -240,9 +258,13 @@ erDiagram
     configuracion_operativa {
         int intervalo_sensado_min "240"
         int intervalo_evaluacion_min "5"
-        float riego_tiempo_max_seg
-        float riego_vol_max_diario_ml
         float insumo_dosis_max_24h_ml
+    }
+    parametro_regla {
+        string clave PK "riego.umbral-humedad"
+        string valor "override"
+        string updated_by
+        long updated_ts
     }
 ```
 
@@ -253,7 +275,12 @@ erDiagram
   texto sin clave foránea.
 - "Sin señal" no se guarda: se calcula al leer, comparando `last_reading_time` con la hora actual.
 - `umbral_metrica` y `configuracion_operativa` son tablas sueltas de parámetros (la segunda
-  tiene una sola fila).
+  tiene una sola fila). `umbral_metrica` sólo define el estado y el color de los sectores.
+- Los umbrales que comparan las reglas (humedad de riego, lluvia, volumen, ventana, antigüedad de
+  la lectura, etc.) viven en el catálogo de parámetros: los valores de fábrica están en el código y
+  `parametro_regla` guarda sólo los overrides (`GET/PUT /api/rules/parametros`).
+- La cola de riego y lo que está regando están en memoria; se reconstruyen del historial al
+  reiniciar (`historial_evento`, tipo "Riego"), y lo pendiente se pierde.
 
 **Cómo se decide el estado** (paso 4): fuera de la banda `ideal` es *warning*, fuera de la banda
 `warn` es *critical*. Valores de fábrica para las métricas que mueven el estado:
@@ -273,27 +300,49 @@ sus 100 sectores.
 
 ## 5. Lo que hoy no cierra
 
-Cosas que el diagrama muestra tal cual están, y que conviene tener presentes:
+Lo resuelto va tachado; lo que sigue abierto, con su cita.
 
 1. ~~**El `timestamp` del firmware está en segundos y el backend lo trataba como milisegundos.**~~
    **Resuelto** (`fix-integracion-nodo-real`): la ingesta lo normaliza por valor a ms
    (`ContratoNodo.timestampAMs`). Segundos epoch se multiplican por 1000, milisegundos se dejan;
    si el valor no sirve como fecha (nodo sin NTP, anterior a 2020) se usa la hora de recepción y
-   se loguea un warn por zona. Una lectura más vieja que la guardada (buffer offline) se ignora.
+   se loguea un warn por zona. Una lectura más vieja que la guardada (buffer offline) se ignora
+   (`NurseryService.java:463-482`).
 2. ~~**El nodo publica cada 30 s y la zona se consideraba caída a los 30 s.**~~ **Resuelto**: el
    parámetro `seguridad.antiguedad-max-lectura` pasó de 30 a **90 s** (3 intervalos).
 3. **El simulador baja solo a una lectura cada 4 h** (toma `intervaloSensadoMinutos`), y contra
-   el umbral de 30 s la zona pasa casi todo el tiempo "sin señal". Ese parámetro no llega al
-   firmware: el nodo real sigue en 30 s.
-4. **El ACK del actuador no lo escucha nadie.** El backend marca "Regando" al publicar el
-   comando, sin confirmación del hardware.
-5. **El comando de la bomba sale sin mililitros** (`ActionExecutor.java:94`) y el firmware lo
-   rechaza con `dosis_invalida` (`embebido/actuacion/act_bomba.cpp:24-27`).
-6. **No hay validación de rangos en la ingesta** ni usuario/contraseña en el broker.
+   el umbral de 90 s la zona pasa casi todo el tiempo "sin señal": el riego queda bloqueado
+   (`StaleSensorRule`). Para probar el riego con el simulador hay que acortar ese intervalo. Ese
+   parámetro no llega al firmware: el nodo real sigue en 30 s.
+4. **El ACK del actuador no lo escucha nadie.** El backend da la válvula por abierta cuando el
+   cliente MQTT aceptó el comando (`DespachoRiego.java:312-330`), no cuando el nodo confirmó. Ya no
+   queda una válvula "enganchada" en "Regando": ese estado es `ts + duración + 5 s`
+   (`DespachoRiego.java:177-184`) y se reconstruye del historial tras un reinicio. Sigue abierto
+   que una orden perdida figure como riego hecho.
+5. **El comando de la bomba sale sin mililitros** (`ActionExecutor.java:118`) y el firmware lo
+   rechaza con `dosis_invalida` (`embebido/actuacion/act_bomba.cpp:24-27`). La bomba además
+   conserva el enganche "Dosificando": tras la primera dosificación de un sector no se publican
+   más comandos de bomba ni se registran más eventos "Insumo" (`ActionExecutor.java:114-119`), y
+   la pausa de R-06 depende de esos eventos.
+6. **No hay validación de rangos en la ingesta** (`NurseryService.java:488-507`) ni
+   usuario/contraseña en el broker.
 7. **Nadie pide las fotos solo.** No hay planificador de pasadas ni riel: las órdenes de captura
    se emiten a mano desde el simulador. La spec v2 supone una pasada diaria a las 09:00.
 8. **La telemetría puede pisar el diagnóstico de la cámara.** En cada lectura, si el estado del
    sector es `ok` el backend escribe "Sano" 98 %, y si pasa a un estado no saludable sin
-   diagnóstico previo le asigna uno fijo con 92 % de confianza (`NurseryService.java:472-490`).
+   diagnóstico previo le asigna uno fijo con 92 % de confianza (`NurseryService.java:548-566`).
 9. **Cargar un diagnóstico no dispara el motor.** Las reglas lo ven recién en la siguiente
    evaluación.
+10. **Un sensor de humedad trabado en un valor seco haría regar en cada ciclo.** Sin E-01 ni S-06
+    nada lo detecta: con la humedad fija en 40 %, R-01 riega ~5 L en cada ciclo de la ventana (06,
+    10, 14 y 18 h), unos 20 L por día y por sector. El freno es la guarda de ciclo y, para R-02, el
+    tope de 12 h. Una sonda que *deja de reportar* sí se detecta (la humedad vieja bloquea el
+    riego). Antes de operar con plantines reales hay que resolverlo (E-01 + S-06 o un volumen
+    máximo menor), según el diseño del cambio de riego.
+11. **R-03 no retira una ronda ya encolada.** Si el pronóstico anuncia lluvia después de que se
+    decidió una ronda, el despacho la completa. Pasa también en el primer mensaje tras arrancar,
+    sin pronóstico cacheado (`WeatherService.java:132-142`).
+12. **El cupo de 10 válvulas se llena por número de sector**, no por urgencia ni por humedad, y
+    la cola vive en memoria: un reinicio la pierde y la siguiente telemetría vuelve a decidir.
+13. **El firmware nuevo no se compiló** en esta máquina y nada se probó con hardware: ver
+    `conectar-esp32.md`.
