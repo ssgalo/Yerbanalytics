@@ -1,7 +1,8 @@
 # Circuito de sensado: del sensor al motor de reglas
 
-Cómo viaja una lectura desde el nodo testigo hasta que el motor de reglas decide y actúa.
-Todo sale de leer el código de `develop` (firmware, backend, simulador); no se ejecutó nada.
+Cómo viaja una lectura desde el nodo testigo hasta que el motor de reglas decide y actúa, y por
+dónde entra el diagnóstico de la cámara.
+Todo sale de leer el código (firmware, backend, simulador, servicio de inferencia); no se ejecutó nada.
 El interior del motor está en `diferencias-motor-reglas-vs-reglas-v2.md`.
 
 Ejemplo que recorre los diagramas: **"MZ-2 se está secando"**.
@@ -36,6 +37,14 @@ flowchart TD
         WD["WATCHDOG (cada 5 min)<br/>Vuelve a correr el motor sobre TODOS los sectores<br/>aunque no haya llegado ninguna lectura"]
     end
 
+    subgraph CAM["CAPTURA Y DIAGNOSTICO (carril de la camara)"]
+        CA["A. SE PIDE LA FOTO<br/>POST /api/capturas/ordenes (sector + posicion de riel)<br/>Hoy solo a mano, desde el simulador<br/>PENDIENTE: planificador de pasadas y riel"]
+        CB["B. TELEFONO (PWA iPhone o app Android)<br/>Recibe la orden por SSE<br/>Saca la foto y la sube por REST"]
+        FS[("Filesystem<br/>JPEG de cada captura")]
+        CC["C. SERVICIO DE INFERENCIA (Python)<br/>Pregunta cada 10 s por capturas sin diagnostico<br/>Las recibe tras 1 min sin fotos nuevas<br/>Corre el modelo de vision sobre cada JPEG"]
+        CD["D. ALTA DE DIAGNOSTICO<br/>POST /api/diagnosticos<br/>Deja estado, confianza y severidad en el sector<br/>No dispara el motor"]
+    end
+
     DB[("PostgreSQL")]
     CLIMA["Open-Meteo<br/>cache de 15 min"]
     DASH["Dashboard<br/>pide GET /api/nursery cada 5 s"]
@@ -50,14 +59,26 @@ flowchart TD
     P3 -- "UPDATE zona, dispositivo" --> DB
     P4 -- "UPDATE sector" --> DB
     CLIMA --> P5
-    DB -- "umbrales, configuracion, bloqueos" --> P5
+    DB -- "umbrales, configuracion, bloqueos<br/>y el diagnostico del sector" --> P5
     WD --> P5
     P7 -- "UPDATE sector<br/>INSERT historial_evento" --> DB
     P7 -- "publish<br/>nursery/zone/MZ-2/sector/MZ-2-006/command" --> BROKER
     BROKER -- "entrega" --> ACT
     ACT -. "publish .../ack<br/>HOY EL BACKEND NO LO ESCUCHA" .-> BROKER
     DB --> DASH
+
+    SIM -- "pide la foto" --> CA
+    CA -- "INSERT orden_captura" --> DB
+    CA -- "orden por SSE" --> CB
+    CB -- "sube el JPEG" --> FS
+    CB -- "INSERT captura" --> DB
+    FS --> CC
+    CC --> CD
+    CD -- "INSERT diagnostico<br/>UPDATE sector" --> DB
 ```
+
+Los dos carriles se juntan en el paso 5: el motor no recibe el diagnóstico cuando se carga, lo
+lee del sector la próxima vez que evalúa (con la siguiente lectura o en el barrido del watchdog).
 
 ---
 
@@ -114,6 +135,9 @@ flowchart TD
 | Se mide la efectividad de una acción | Revisión cada 30 s; compara 2 min después de actuar | `HistorialService.java:192-218` |
 | Pronóstico del clima | Caché de 15 min | `weather.cache-ttl-ms`, `application.properties:121` |
 | El dashboard se refresca | 5 s | `frontend/src/hooks/NurseryContext.tsx:30` |
+| Se pide una foto | Sólo cuando alguien emite la orden; no hay pasada automática | `CapturaController.java:70` |
+| Una orden sin imagen se reintenta | A los 60 s, hasta 3 intentos | `capturas.timeout-orden-seg`, `capturas.max-intentos`, `application.properties:137,139` |
+| El servicio de inferencia busca capturas | Cada 10 s; el backend se las entrega tras 1 min sin capturas nuevas | `servicio-inferencia/src/main.py:148`, `src/api.py:48` |
 
 ---
 
@@ -125,6 +149,9 @@ erDiagram
     zona ||..o{ dispositivo : "zona_id"
     sector ||..o{ historial_evento : "sector_id"
     sector ||..o{ bloqueo_manual : "sector_id"
+    sector ||..o{ orden_captura : "sector_id"
+    orden_captura ||..o| captura : "orden_id"
+    captura ||..o| diagnostico : "captura_id"
 
     zona {
         string id PK "MZ-2"
@@ -178,6 +205,32 @@ erDiagram
         string reason
         boolean active
     }
+    orden_captura {
+        string id PK
+        string sector_id
+        int posicion_riel
+        string dispositivo_id
+        string estado
+        int intentos
+        long vence_en
+    }
+    captura {
+        string id PK
+        string orden_id
+        string sector_id
+        string ruta_archivo "JPEG en el filesystem"
+        long capturada_en
+        long recibida_en
+    }
+    diagnostico {
+        string id PK
+        string captura_id
+        string sector_id
+        string estado "Sano, Clorosis..."
+        float conf
+        string sev
+        long creado_en
+    }
     umbral_metrica {
         string metric_key PK "humSus"
         float ideal_min
@@ -199,6 +252,9 @@ erDiagram
   de mediciones.
 - La única relación real en la base es `zona` 1—N `sector`. Las líneas punteadas son ids de
   texto sin clave foránea.
+- De la foto sólo se guarda la metadata (`captura`); el JPEG va al filesystem. Un diagnóstico
+  siempre cita su captura, y además se copia al sector (`diagnosis_estado`, `diagnosis_conf`),
+  que es de donde lo lee el motor.
 - "Sin señal" no se guarda: se calcula al leer, comparando `last_reading_time` con la hora actual.
 - `umbral_metrica` y `configuracion_operativa` son tablas sueltas de parámetros (la segunda
   tiene una sola fila).
@@ -238,3 +294,10 @@ Cosas que el diagrama muestra tal cual están, y que conviene tener presentes:
 5. **El comando de la bomba sale sin mililitros** (`ActionExecutor.java:94`) y el firmware lo
    rechaza con `dosis_invalida` (`embebido/actuacion/act_bomba.cpp:24-27`).
 6. **No hay validación de rangos en la ingesta** ni usuario/contraseña en el broker.
+7. **Nadie pide las fotos solo.** No hay planificador de pasadas ni riel: las órdenes de captura
+   se emiten a mano desde el simulador. La spec v2 supone una pasada diaria a las 09:00.
+8. **La telemetría puede pisar el diagnóstico de la cámara.** En cada lectura, si el estado del
+   sector es `ok` el backend escribe "Sano" 98 %, y si pasa a un estado no saludable sin
+   diagnóstico previo le asigna uno fijo con 92 % de confianza (`NurseryService.java:472-490`).
+9. **Cargar un diagnóstico no dispara el motor.** Las reglas lo ven recién en la siguiente
+   evaluación.
