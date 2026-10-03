@@ -51,7 +51,7 @@ describe('useRuleEngineSchema', () => {
     const { result } = renderHook(() => useRuleEngineSchema());
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.schema?.nodes.map((n) => n.id)).toContain('IrrigationRule');
+    expect(result.current.schema?.nodes.map((n) => n.id)).toContain('RiegoPorDeficitRule');
     expect(fetchEspia).not.toHaveBeenCalled();
   });
 });

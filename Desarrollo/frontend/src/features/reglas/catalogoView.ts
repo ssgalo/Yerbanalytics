@@ -25,6 +25,45 @@ export const DESCRIPCION_RAMA: Record<RamaRegla, string> = {
   SEGUIMIENTO: 'Evaluación posterior a la acción',
 };
 
+/**
+ * Consumidores de parámetros que no son reglas (hoy el despacho de riego): el backend los lista en
+ * `usadoPor` junto a las reglas. Se muestran en su propio grupo de la pestaña Parámetros.
+ */
+export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string; rama: RamaRegla }> = {
+  DespachoRiego: {
+    titulo: 'Ejecución del riego',
+    descripcion: 'Cómo se reparten los riegos ordenados entre los sectores de una macro-zona',
+    rama: 'RIEGO',
+  },
+};
+
+/** Rama a la que pertenece un consumidor que no es una regla (el despacho riega: RIEGO). */
+export const ramaDeConsumidor = (id: string): RamaRegla | undefined => CONSUMIDORES[id]?.rama;
+
+export const nombreConsumidor = (id: string): string => CONSUMIDORES[id]?.titulo ?? id;
+
+export interface GrupoConsumidor {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  parametros: ParametroRegla[];
+}
+
+/** Parámetros agrupados por el consumidor que no es una regla (los de `usadoPor` que no están en `reglas`). */
+export function agruparPorConsumidor(catalogo: CatalogoReglas, parametros: ParametroRegla[] = catalogo.parametros): GrupoConsumidor[] {
+  const ids = new Set(catalogo.reglas.map((r) => r.id));
+  const grupos = new Map<string, ParametroRegla[]>();
+  for (const p of parametros) {
+    for (const u of p.usadoPor.filter((x) => !ids.has(x))) grupos.set(u, [...(grupos.get(u) ?? []), p]);
+  }
+  return [...grupos].map(([id, params]) => ({
+    id,
+    titulo: nombreConsumidor(id),
+    descripcion: CONSUMIDORES[id]?.descripcion ?? 'Lee estos parámetros fuera del motor de reglas',
+    parametros: params,
+  }));
+}
+
 export interface GrupoRama {
   rama: RamaRegla;
   reglas: ReglaCatalogo[];
@@ -95,9 +134,19 @@ export function filtrarParametros(catalogo: CatalogoReglas, f: Filtros): Paramet
 
   return catalogo.parametros.filter((p) => {
     const usuarias = p.usadoPor.map((id) => reglas.get(id)).filter((r): r is ReglaCatalogo => !!r);
-    if (f.rama !== 'TODAS' && !usuarias.some((r) => r.rama === f.rama)) return false;
+    // Los consumidores que no son reglas (despacho de riego) cuentan con la rama que declaran.
+    const ramas = [
+      ...usuarias.map((r) => r.rama),
+      ...p.usadoPor.filter((id) => !reglas.has(id)).map((id) => CONSUMIDORES[id]?.rama),
+    ];
+    if (f.rama !== 'TODAS' && !ramas.includes(f.rama)) return false;
     if (f.soloModificados && !p.modificado) return false;
     if (q === '') return true;
-    return textoParametro(p).includes(q) || usuarias.some((r) => textoRegla(r).includes(q));
+    const consumidores = p.usadoPor.filter((id) => !reglas.has(id)).map((id) => normalizar(nombreConsumidor(id)));
+    return (
+      textoParametro(p).includes(q) ||
+      usuarias.some((r) => textoRegla(r).includes(q)) ||
+      consumidores.some((c) => c.includes(q))
+    );
   });
 }

@@ -143,7 +143,8 @@
 .linea[data-tipo='accion'] .puntoLinea { background: var(--info); }
 .linea[data-tipo='bloqueo'] .puntoLinea,
 .linea[data-tipo='error'] .puntoLinea { background: var(--crit); }
-.linea[data-tipo='pospuso'] .puntoLinea { background: var(--warn); }
+.linea[data-tipo='pospuso'] .puntoLinea,
+.linea[data-tipo='alerta'] .puntoLinea { background: var(--warn); }
 
 /* --- Lienzo + panel --- */
 .cuerpo {
@@ -302,6 +303,13 @@
   font-size: 11.5px;
   font-weight: 700;
   color: var(--g700);
+}
+
+.accionTipo[data-alerta='true'] {
+  color: var(--warn-ink);
+  background: var(--warn-soft);
+  border-radius: 6px;
+  padding: 1px 6px;
 }
 
 .accionMotivo {

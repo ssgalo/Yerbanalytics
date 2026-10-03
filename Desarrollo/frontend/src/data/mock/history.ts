@@ -4,7 +4,7 @@
    El contrato (ActionRecord) es idéntico al DTO HistorialEvento del backend.
    ============================================================ */
 import { createRng, pick, rr } from '@/lib/rng';
-import type { ActionRecord, Evolution, Severity } from '@/types/domain';
+import type { ActionRecord, Evolution, NivelAlerta, Severity } from '@/types/domain';
 import { ACT, resMap, zonaDefs } from './specs';
 
 /** Colores del veredicto del seguimiento post-acción. */
@@ -26,19 +26,53 @@ interface Scenario {
   evo: EvoKind;
   /** valor "antes" de la métrica para el seguimiento. */
   antes?: number;
+  /** Regla que ordenó la acción (nombre de clase en el backend). */
+  regla?: string;
+  /** Riego ordenado: volumen (L) y duración de apertura (s). */
+  volumenL?: number;
+  duracionSeg?: number;
+  /** Alerta de macro-zona: nivel. El evento no pertenece a un sector (`sectorId` "—"). */
+  alerta?: NivelAlerta;
 }
 
 /** Escenarios canónicos de la operación autónoma del vivero. */
 const SCENARIOS: Scenario[] = [
   {
     tipo: 'Riego',
-    lectura: 'Humedad de sustrato 38% bajo el umbral mínimo configurado.',
-    decision: 'El motor de reglas ordena abrir la electroválvula del sector.',
-    accion: 'Microaspersor abierto 95 s · 0,42 L emitidos.',
+    lectura: 'Humedad de sustrato 38% (regla RiegoPorDeficitRule).',
+    decision: 'El motor de reglas ordena regar 5,4 L durante 648 s.',
+    accion: 'Electroválvula abierta · riego autónomo en curso.',
     res: 'Efectiva',
     sev: 'Media',
     evo: 'efectiva',
     antes: 38,
+    regla: 'RiegoPorDeficitRule',
+    volumenL: 5.4,
+    duracionSeg: 648,
+  },
+  {
+    tipo: 'Riego',
+    lectura: 'Humedad de sustrato 31% (regla DeficitCriticoRule).',
+    decision: 'El motor de reglas ordena regar 6 L durante 720 s (déficit crítico: volumen máximo, a cualquier hora).',
+    accion: 'Electroválvula abierta · riego autónomo en curso.',
+    res: 'Efectiva',
+    sev: 'Alta',
+    evo: 'efectiva',
+    antes: 31,
+    regla: 'DeficitCriticoRule',
+    volumenL: 6,
+    duracionSeg: 720,
+  },
+  {
+    tipo: 'Alerta',
+    lectura: 'Alerta de la macro-zona (regla DeficitCriticoRule).',
+    decision: 'Déficit hídrico crítico',
+    accion: 'Alerta CRITICAL registrada para el operador.',
+    res: 'Informativo',
+    sev: '—',
+    evo: null,
+    regla: 'DeficitCriticoRule',
+    alerta: 'CRITICAL',
   },
   {
     tipo: 'Insumo',
@@ -71,12 +105,35 @@ const SCENARIOS: Scenario[] = [
   },
   {
     tipo: 'Riego',
-    lectura: 'Déficit hídrico detectado (humedad 36%).',
-    decision: 'La API meteorológica confirma lluvia inminente (60%): se pospone el riego.',
+    lectura: 'Déficit hídrico detectado (humedad 40%).',
+    decision: 'Lluvia prevista (probabilidad máxima 80% y 8 mm en las próximas 4 h): se pospone el riego.',
     accion: 'Riego pospuesto para evitar saturación hídrica del sustrato.',
     res: 'Pospuesta',
     sev: '—',
     evo: null,
+    regla: 'PosponerPorLluviaRule',
+  },
+  {
+    tipo: 'Alerta',
+    lectura: 'Alerta de la macro-zona (regla PosponerPorLluviaRule).',
+    decision: 'Riego pospuesto por pronóstico de lluvia (probabilidad máxima 80% y 8 mm en las próximas 4 h)',
+    accion: 'Alerta INFO registrada para el operador.',
+    res: 'Informativo',
+    sev: '—',
+    evo: null,
+    regla: 'PosponerPorLluviaRule',
+    alerta: 'INFO',
+  },
+  {
+    tipo: 'Alerta',
+    lectura: 'Alerta de la macro-zona (regla SustratoSaturadoRule).',
+    decision: 'Sustrato saturado, riesgo de asfixia radicular y hongos',
+    accion: 'Alerta WARNING registrada para el operador.',
+    res: 'Informativo',
+    sev: '—',
+    evo: null,
+    regla: 'SustratoSaturadoRule',
+    alerta: 'WARNING',
   },
   {
     tipo: 'Mediasombra',
@@ -95,16 +152,20 @@ const SCENARIOS: Scenario[] = [
     res: 'Abortada',
     sev: '—',
     evo: null,
+    regla: 'StaleSensorRule',
   },
   {
     tipo: 'Riego',
-    lectura: 'Humedad de sustrato 40% bajo el umbral mínimo configurado.',
-    decision: 'El motor de reglas ordena abrir la electroválvula del sector.',
-    accion: 'Microaspersor abierto 110 s · 0,50 L emitidos.',
+    lectura: 'Humedad de sustrato 40% (regla RiegoPorDeficitRule).',
+    decision: 'El motor de reglas ordena regar 5 L durante 600 s.',
+    accion: 'Electroválvula abierta · riego autónomo en curso.',
     res: 'Efectiva',
     sev: 'Media',
     evo: 'efectiva',
     antes: 40,
+    regla: 'RiegoPorDeficitRule',
+    volumenL: 5,
+    duracionSeg: 600,
   },
   {
     tipo: 'Insumo',
@@ -217,7 +278,8 @@ export function buildHistory(seed: number): ActionRecord[] {
     const sc = SCENARIOS[i % SCENARIOS.length];
     const z = pick(r, zonaDefs);
     const n = 1 + Math.floor(r() * 100);
-    const sectorId = `${z.id}-${String(n).padStart(3, '0')}`;
+    // Las alertas son de la macro-zona, no de un sector: el backend las guarda con sectorId "—".
+    const sectorId = sc.alerta ? '—' : `${z.id}-${String(n).padStart(3, '0')}`;
     const ts = Date.now() - cursorMs;
     cursorMs += Math.round(rr(r, 18, 75)) * 60 * 1000; // separa los eventos en el tiempo
 
@@ -232,7 +294,7 @@ export function buildHistory(seed: number): ActionRecord[] {
       time: formatAgo(ts),
       ts,
       fecha: formatFecha(ts),
-      lectura: sc.lectura,
+      lectura: sc.alerta ? sc.lectura.replace('de la macro-zona', `de la macro-zona ${z.id}`) : sc.lectura,
       decision: sc.decision,
       accion: sc.accion,
       res: sc.res,
@@ -243,6 +305,10 @@ export function buildHistory(seed: number): ActionRecord[] {
       ink: meta.ink,
       path: meta.path,
       evo: buildEvo(sc.evo, sc.antes, r),
+      regla: sc.regla ?? null,
+      alerta: sc.alerta ?? null,
+      volumenL: sc.volumenL ?? null,
+      duracionSeg: sc.duracionSeg ?? null,
     });
   }
 

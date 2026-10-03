@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MockRepository } from './mockRepository';
 import fixture from './catalogoReglas.fixture.json';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
@@ -17,7 +17,7 @@ describe('MockRepository · catálogo de reglas', () => {
     const repo = nuevo();
     const c = await repo.getCatalogoReglas();
     param(c, UMBRAL).valor = '1';
-    expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('42');
+    expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('45');
   });
 
   it('saveParametros persiste en memoria y marca el parámetro como modificado', async () => {
@@ -25,7 +25,7 @@ describe('MockRepository · catálogo de reglas', () => {
 
     const guardado = await repo.saveParametros([{ clave: UMBRAL, valor: '40' }]);
 
-    expect(param(guardado, UMBRAL)).toMatchObject({ valor: '40', fabrica: '42', modificado: true });
+    expect(param(guardado, UMBRAL)).toMatchObject({ valor: '40', fabrica: '45', modificado: true });
     expect(param(guardado, UMBRAL).updatedBy).toBeTruthy();
     expect(param(guardado, UMBRAL).updatedTs).toEqual(expect.any(Number));
     expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('40');
@@ -37,7 +37,7 @@ describe('MockRepository · catálogo de reglas', () => {
 
     const c = await repo.saveParametros([{ clave: UMBRAL, valor: null }]);
 
-    expect(param(c, UMBRAL)).toMatchObject({ valor: '42', modificado: false, updatedBy: null });
+    expect(param(c, UMBRAL)).toMatchObject({ valor: '45', modificado: false, updatedBy: null });
   });
 
   it('valida con la misma función que la UI y rechaza con ParametrosInvalidosError', async () => {
@@ -61,7 +61,7 @@ describe('MockRepository · catálogo de reglas', () => {
       ]),
     ).rejects.toBeInstanceOf(ParametrosInvalidosError);
 
-    expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('42');
+    expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('45');
   });
 
   it('rechaza una clave que no existe en el catálogo', async () => {
@@ -72,7 +72,7 @@ describe('MockRepository · catálogo de reglas', () => {
 });
 
 describe('MockRepository · esquema del DAG', () => {
-  it('trae start, las 9 reglas con sus parámetros y los terminales por rama', async () => {
+  it('trae start, las 13 reglas con sus parámetros y los terminales por rama', async () => {
     const schema = await nuevo().getRuleSchema();
     const ids = schema.nodes.map((n) => n.id);
 
@@ -95,8 +95,15 @@ describe('MockRepository · esquema del DAG', () => {
 
     expect(par('start', 'ManualLockRule')).toBe(true);
     expect(par('ManualLockRule', 'StaleSensorRule')).toBe(true);
-    expect(par('WeatherOverrideRule', 'DailyVolumeLimitRule')).toBe(true);
-    expect(par('IrrigationRule', 'success-RIEGO')).toBe(true);
+    // La rama de riego, en el orden en que corre el motor.
+    expect(par('StaleSensorRule', 'CicloLecturaRiegoRule')).toBe(true);
+    expect(par('CicloLecturaRiegoRule', 'SustratoSaturadoRule')).toBe(true);
+    expect(par('SustratoSaturadoRule', 'DeficitCriticoRule')).toBe(true);
+    expect(par('DeficitCriticoRule', 'FueraDeVentanaRiegoRule')).toBe(true);
+    expect(par('FueraDeVentanaRiegoRule', 'PausaTrasAplicacionRule')).toBe(true);
+    expect(par('PausaTrasAplicacionRule', 'PosponerPorLluviaRule')).toBe(true);
+    expect(par('PosponerPorLluviaRule', 'RiegoPorDeficitRule')).toBe(true);
+    expect(par('RiegoPorDeficitRule', 'success-RIEGO')).toBe(true);
     expect(par('FollowUpRule', 'success-SEGUIMIENTO')).toBe(true);
   });
 });
@@ -117,12 +124,12 @@ describe('MockRepository · traza de evaluación', () => {
     for (const z of zonas) {
       const raw = z.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null;
       const traza = await repo.getTrazaEvaluacion(z.sectors[0].id, 'TELEMETRIA');
-      const riego = traza!.reglas.find((r) => r.ruleId === 'IrrigationRule')!;
-      if (riego.estado !== 'EVALUADA') continue; // la rama puede estar cortada por lluvia o lectura vieja
+      const riego = traza!.reglas.find((r) => r.ruleId === 'RiegoPorDeficitRule')!;
+      if (riego.estado !== 'EVALUADA') continue; // la rama puede estar cortada (saturado, ciclo, ventana, lluvia…)
 
-      const c = riego.comparaciones[0];
+      const c = riego.comparaciones[1];
       expect(c.recibido).toBe(raw);
-      expect(c.resultado).toBe(raw !== null && raw < 42 ? 'CUMPLE' : 'NO_CUMPLE');
+      expect(c.resultado).toBe(raw !== null && raw < 45 ? 'CUMPLE' : 'NO_CUMPLE');
       verificadas++;
     }
     expect(verificadas).toBeGreaterThan(0);
@@ -132,7 +139,7 @@ describe('MockRepository · traza de evaluación', () => {
     const traza = await nuevo().getTrazaEvaluacion('MZ-1-001', 'BARRIDO');
 
     expect(traza!.origen).toBe('BARRIDO');
-    const riego = traza!.reglas.find((r) => r.ruleId === 'IrrigationRule')!;
+    const riego = traza!.reglas.find((r) => r.ruleId === 'RiegoPorDeficitRule')!;
     // Con la lectura de 5 min de antigüedad el barrido corta riego antes de llegar a evaluarla.
     expect(riego.estado).toBe('OMITIDA_RAMA_BLOQUEADA');
     expect(traza!.reglas.find((r) => r.ruleId === 'StaleSensorRule')!.acciones[0].tipo).toBe('ABORT_RIEGO');
@@ -145,9 +152,9 @@ describe('MockRepository · traza de evaluación', () => {
 
     for (const z of zonas) {
       const riego = (await repo.getTrazaEvaluacion(z.sectors[0].id, 'TELEMETRIA'))!.reglas.find(
-        (r) => r.ruleId === 'IrrigationRule',
+        (r) => r.ruleId === 'RiegoPorDeficitRule',
       )!;
-      if (riego.estado === 'EVALUADA') expect(riego.comparaciones[0].umbral).toBe(60);
+      if (riego.estado === 'EVALUADA') expect(riego.comparaciones[1].umbral).toBe(60);
     }
   });
 
@@ -158,5 +165,72 @@ describe('MockRepository · traza de evaluación', () => {
 
   it('falla con un sector que no existe', async () => {
     await expect(nuevo().getTrazaEvaluacion('NOPE-1')).rejects.toThrow(/NOPE-1/);
+  });
+});
+
+describe('MockRepository · casos de riego de la demo (13.2)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  /** Mediodía del vivero (15:00 UTC = 12:00 UTC-3): dentro de la ventana de riego. */
+  const alMediodia = () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-03T15:00:00.000Z'));
+    return nuevo();
+  };
+  const tipos = async (repo: MockRepository, sectorId: string, ruleId: string) =>
+    (await repo.getTrazaEvaluacion(sectorId, 'TELEMETRIA'))!.reglas.find((r) => r.ruleId === ruleId)!.acciones.map((a) => a.tipo);
+
+  it('MZ-2 (déficit, sin lluvia): los sectores en cola se evalúan y R-01 ordena regar', async () => {
+    const repo = alMediodia();
+
+    expect(await tipos(repo, 'MZ-2-020', 'RiegoPorDeficitRule')).toEqual(['ACTIVAR_VALVULA']);
+  });
+
+  it('MZ-2: un sector "Regando" ya regó en este ciclo y la regla de ciclo corta la rama', async () => {
+    const repo = alMediodia();
+    const traza = (await repo.getTrazaEvaluacion('MZ-2-003', 'TELEMETRIA'))!;
+
+    expect(traza.reglas.find((r) => r.ruleId === 'CicloLecturaRiegoRule')!.acciones.map((a) => a.tipo)).toEqual(['ABORT_RIEGO']);
+    expect(traza.reglas.find((r) => r.ruleId === 'RiegoPorDeficitRule')!.estado).toBe('OMITIDA_RAMA_BLOQUEADA');
+  });
+
+  it('MZ-3 (déficit con lluvia prevista): R-03 pospone y emite la alerta', async () => {
+    const repo = alMediodia();
+
+    expect(await tipos(repo, 'MZ-3-020', 'PosponerPorLluviaRule')).toEqual(['POSTPONE_RIEGO', 'ALERTA']);
+  });
+
+  it('MZ-4 (déficit crítico): R-02 riega con el volumen máximo y emite la alerta crítica', async () => {
+    const repo = alMediodia();
+
+    expect(await tipos(repo, 'MZ-4-020', 'DeficitCriticoRule')).toEqual(['ACTIVAR_VALVULA', 'ALERTA']);
+  });
+
+  it('MZ-4 de noche: R-02 riega igual, la ventana no lo frena', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-03T03:00:00.000Z')); // 00:00 en el vivero
+    const repo = nuevo();
+
+    expect(await tipos(repo, 'MZ-4-020', 'DeficitCriticoRule')).toEqual(['ACTIVAR_VALVULA', 'ALERTA']);
+  });
+
+  it('MZ-2 de noche: el déficit común lo corta R-05 (ventana horaria, operador EN)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-03T03:00:00.000Z'));
+    const repo = nuevo();
+    const traza = (await repo.getTrazaEvaluacion('MZ-2-020', 'TELEMETRIA'))!;
+    const r05 = traza.reglas.find((r) => r.ruleId === 'FueraDeVentanaRiegoRule')!;
+
+    expect(r05.acciones.map((a) => a.tipo)).toEqual(['ABORT_RIEGO']);
+    const ventana = r05.comparaciones.find((c) => c.operador === 'EN')!;
+    // La lectura es de unos minutos antes: pasadas las 23 h.
+    expect(ventana.recibido).toMatch(/^23:\d\d$/);
+    expect(ventana).toMatchObject({ umbral: '06:00-18:00', resultado: 'NO_CUMPLE' });
+  });
+
+  it('MZ-5 (saturado): R-04 bloquea y emite la alerta', async () => {
+    const repo = alMediodia();
+
+    expect(await tipos(repo, 'MZ-5-020', 'SustratoSaturadoRule')).toEqual(['ABORT_RIEGO', 'ALERTA']);
   });
 });

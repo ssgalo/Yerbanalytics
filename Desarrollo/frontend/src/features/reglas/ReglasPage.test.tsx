@@ -45,8 +45,8 @@ describe('Ruta /reglas (7.1)', () => {
     expect(await screen.findByRole('tab', { name: /^Parámetros/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Inspector' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Parámetros/ }).getAttribute('aria-selected')).toBe('true');
-    // La pestaña Parámetros carga el catálogo del repositorio (mock): las 9 reglas
-    expect(await screen.findByText('💦 Riego')).toBeTruthy();
+    // La pestaña Parámetros carga el catálogo del repositorio (mock): las 13 reglas
+    expect(await screen.findByText('💦 Riego por déficit hídrico (R-01)')).toBeTruthy();
     expect(screen.getByText('🔒 Bloqueo manual')).toBeTruthy();
   });
 
@@ -71,13 +71,13 @@ describe('Ruta /reglas (7.1)', () => {
   });
 
   it('?regla= abre esa regla en Parámetros', async () => {
-    montarEn('/reglas?regla=IrrigationRule');
+    montarEn('/reglas?regla=RiegoPorDeficitRule');
 
     expect(await screen.findByLabelText(/Umbral de riego/)).toBeTruthy();
   });
 
   it('un cambio guardado en la demo se conserva en el repositorio', async () => {
-    montarEn('/reglas?regla=IrrigationRule');
+    montarEn('/reglas?regla=RiegoPorDeficitRule');
     fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
 
@@ -91,7 +91,7 @@ describe('Ruta /reglas (7.1)', () => {
 
 describe('Borrador de Parámetros entre pestañas (#1)', () => {
   it('editar, ir al Inspector y volver conserva el borrador', async () => {
-    montarEn('/reglas?regla=IrrigationRule');
+    montarEn('/reglas?regla=RiegoPorDeficitRule');
     fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
@@ -104,7 +104,7 @@ describe('Borrador de Parámetros entre pestañas (#1)', () => {
   });
 
   it('el aviso de cambios sin guardar se ve desde la pestaña Inspector', async () => {
-    montarEn('/reglas?regla=IrrigationRule');
+    montarEn('/reglas?regla=RiegoPorDeficitRule');
     fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
@@ -116,7 +116,7 @@ describe('Borrador de Parámetros entre pestañas (#1)', () => {
 
   it('sin cambios no hay marca en la pestaña', async () => {
     montarEn('/reglas');
-    await screen.findByText('💦 Riego');
+    await screen.findByText('💦 Riego por déficit hídrico (R-01)');
     expect(screen.queryByTitle(/sin guardar/)).toBeNull();
   });
 });

@@ -62,6 +62,7 @@ export interface Diagnosis {
 
 /** Estado de los actuadores físicos del sector. */
 export interface Actuadores {
+  /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno en la tanda de la macro-zona) o `Cerrada`. */
   valve: string;
   pump: string;
   shade: number;
@@ -278,7 +279,7 @@ export interface ActionRecord {
   id: string;
   sectorId: string;
   zonaName: string;
-  tipo: string; // 'Riego' | 'Insumo' | 'Mediasombra'
+  tipo: string; // 'Riego' | 'Insumo' | 'Mediasombra' | 'Alerta'
   time: string; // tiempo relativo: 'hace 6 min'
   ts: number; // epoch ms (orden y filtro por fecha)
   fecha: string; // 'dd/MM HH:mm'
@@ -295,7 +296,18 @@ export interface ActionRecord {
   path: string; // path SVG del ícono
   /** Seguimiento post-acción; null si la acción no lo requiere. */
   evo: Evolution | null;
+  /** Regla que ordenó la acción (p. ej. `DeficitCriticoRule`); null/ausente si no aplica. */
+  regla?: string | null;
+  /** Nivel de la alerta; sólo en eventos de tipo `Alerta`. */
+  alerta?: NivelAlerta | null;
+  /** Volumen de riego ordenado (L); sólo en eventos de tipo `Riego`. */
+  volumenL?: number | null;
+  /** Duración de apertura ordenada (s); sólo en eventos de tipo `Riego`. */
+  duracionSeg?: number | null;
 }
+
+/** Nivel de una alerta del motor (eventos `Alerta` del historial). */
+export type NivelAlerta = 'INFO' | 'WARNING' | 'CRITICAL';
 
 /** Presentación del diagnóstico en el detalle. */
 export interface DiagnosisDetail {
@@ -578,7 +590,8 @@ export type OrigenEvaluacion = 'TELEMETRIA' | 'BARRIDO';
 
 export type EstadoReglaTraza = 'EVALUADA' | 'OMITIDA_RAMA_BLOQUEADA' | 'NO_ALCANZADA' | 'ERROR';
 
-export type OperadorComparacion = 'LT' | 'LE' | 'GT' | 'GE' | 'EQ';
+/** `EN` es pertenencia ("∈"): la hora local dentro de una ventana horaria. */
+export type OperadorComparacion = 'LT' | 'LE' | 'GT' | 'GE' | 'EQ' | 'EN';
 
 export type ResultadoComparacion = 'CUMPLE' | 'NO_CUMPLE' | 'SIN_DATO';
 

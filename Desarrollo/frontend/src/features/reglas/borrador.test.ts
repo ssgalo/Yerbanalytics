@@ -17,7 +17,7 @@ describe('borrador indexado por clave', () => {
   it('sin edición muestra el valor vigente', () => {
     const c = catalogoDeFabrica();
     const p = c.parametros.find((x) => x.clave === UMBRAL)!;
-    expect(valorMostrado(p, vacio)).toBe('42');
+    expect(valorMostrado(p, vacio)).toBe('45');
   });
 
   it('editar guarda el texto por clave y se ve en cualquier aparición', () => {
@@ -32,9 +32,9 @@ describe('borrador indexado por clave', () => {
 
   it('volver al valor vigente borra la edición (no queda sucio)', () => {
     const p = catalogoDeFabrica().parametros.find((x) => x.clave === UMBRAL)!;
-    expect(editar(editar(vacio, p, '40'), p, '42').size).toBe(0);
-    // Comparación numérica, no de texto: "42.0" es el mismo valor que "42".
-    expect(editar(vacio, p, '42.0').size).toBe(0);
+    expect(editar(editar(vacio, p, '40'), p, '45').size).toBe(0);
+    // Comparación numérica, no de texto: "45.0" es el mismo valor que "45".
+    expect(editar(vacio, p, '45.0').size).toBe(0);
   });
 
   it('editar no muta el borrador anterior', () => {
@@ -59,7 +59,7 @@ describe('cambiosDelBorrador', () => {
     const c = conValor(catalogoDeFabrica(), UMBRAL, '40');
     const p = c.parametros.find((x) => x.clave === UMBRAL)!;
 
-    expect(cambiosDelBorrador(c, editar(vacio, p, '42'))).toEqual([{ clave: UMBRAL, valor: null }]);
+    expect(cambiosDelBorrador(c, editar(vacio, p, '45'))).toEqual([{ clave: UMBRAL, valor: null }]);
     expect(cambiosDelBorrador(c, restablecer(vacio, p))).toEqual([{ clave: UMBRAL, valor: null }]);
   });
 
@@ -72,7 +72,7 @@ describe('cambiosDelBorrador', () => {
   it('restablecer se ve como el valor de fábrica', () => {
     const c = conValor(catalogoDeFabrica(), UMBRAL, '40');
     const p = c.parametros.find((x) => x.clave === UMBRAL)!;
-    expect(valorMostrado(p, restablecer(vacio, p))).toBe('42');
+    expect(valorMostrado(p, restablecer(vacio, p))).toBe('45');
   });
 
   it('un borrador vacío no manda nada', () => {
@@ -110,12 +110,12 @@ describe('sinEnviados', () => {
 
   it('conserva lo editado mientras el PUT estaba en vuelo (clave nueva o valor distinto)', () => {
     const enviado = editar(vacio, umbral, '40');
-    const actual = editar(editar(enviado, umbral, '45'), otro, '2');
+    const actual = editar(editar(enviado, umbral, '38'), otro, '2');
 
     const resto = sinEnviados(actual, enviado);
 
     expect([...resto.entries()]).toEqual([
-      [UMBRAL, '45'],
+      [UMBRAL, '38'],
       [otro.clave, '2'],
     ]);
   });

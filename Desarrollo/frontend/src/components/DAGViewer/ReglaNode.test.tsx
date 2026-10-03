@@ -11,7 +11,7 @@ const cmp = (p: Partial<Comparacion>): Comparacion => ({
   clave: 'riego.umbral-humedad',
   recibido: 38,
   operador: 'LT',
-  umbral: 42,
+  umbral: 45,
   unidad: '%',
   configurable: true,
   resultado: 'CUMPLE',
@@ -19,7 +19,7 @@ const cmp = (p: Partial<Comparacion>): Comparacion => ({
 });
 
 const traza = (p: Partial<TrazaRegla>): TrazaRegla => ({
-  ruleId: 'IrrigationRule',
+  ruleId: 'RiegoPorDeficitRule',
   rama: 'RIEGO',
   prioridad: 10,
   estado: 'EVALUADA',
@@ -35,7 +35,7 @@ const montar = (data: Partial<ReglaNodeData>) =>
     <ReglaNodeView
       data={{
         label: '💦 Riego',
-        ruleId: 'IrrigationRule',
+        ruleId: 'RiegoPorDeficitRule',
         estado: 'accion',
         traza: traza({}),
         bloqueadaPorLabel: null,
@@ -53,7 +53,7 @@ describe('ReglaNodeView', () => {
     expect(linea.textContent).toContain('Humedad de sustrato');
     expect(linea.textContent).toContain('38 %');
     expect(linea.textContent).toContain('<');
-    expect(linea.textContent).toContain('42 %');
+    expect(linea.textContent).toContain('45 %');
     expect(linea.textContent).toContain('✓');
     expect(linea.getAttribute('data-resultado')).toBe('CUMPLE');
   });
@@ -143,7 +143,7 @@ describe('ReglaNodeView', () => {
         estado: 'OMITIDA_RAMA_BLOQUEADA',
         comparaciones: [],
         acciones: [],
-        bloqueadaPor: 'WeatherOverrideRule',
+        bloqueadaPor: 'PosponerPorLluviaRule',
       }),
       bloqueadaPorLabel: '🌧️ Condición climática (lluvia)',
     });

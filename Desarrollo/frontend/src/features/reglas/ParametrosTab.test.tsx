@@ -6,12 +6,13 @@ import { ParametrosTab } from './ParametrosTab';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import type { CambioParametro, CatalogoReglas } from '@/types/domain';
 import type { Borrador } from './borrador';
-import { catalogoConCompartido, catalogoDeFabrica, conValor } from './__fixtures__/catalogos';
+import { catalogoDeFabrica, conValor } from './__fixtures__/catalogos';
 
 afterEach(cleanup);
 
-const COMPARTIDO = 'riego.max-riegos-24h';
-const ETIQUETA_COMPARTIDO = 'Máximo de riegos en 24 h (límite de volumen)';
+/** Lo usan cuatro reglas: R-01, R-03, R-05 y R-06. */
+const COMPARTIDO = 'riego.umbral-humedad';
+const ETIQUETA_COMPARTIDO = 'Umbral de riego (humedad de sustrato)';
 
 /** El dueño del borrador (en la app, `ReglasPage`): acá un host mínimo con el estado y el guardado. */
 function Host({
@@ -63,59 +64,97 @@ describe('ParametrosTab · agrupación (7.2)', () => {
     const grupos = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(grupos).toEqual([
       expect.stringMatching(/Global/),
-      expect.stringMatching(/Riego/),
+      expect.stringMatching(/Riego · 7 reglas/),
+      expect.stringMatching(/Ejecución del riego/),
       expect.stringMatching(/Insumos/),
       expect.stringMatching(/Mediasombra/),
       expect.stringMatching(/Seguimiento/),
     ]);
-    // Colapsadas: ningún campo a la vista
-    expect(screen.queryAllByRole('spinbutton')).toHaveLength(0);
-    // Orden por prioridad dentro de RIEGO: lluvia (2), volumen (4), riego (10)
-    const riego = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent ?? '');
-    const iLluvia = riego.findIndex((t) => t.includes('Condición climática'));
-    const iVolumen = riego.findIndex((t) => t.includes('Límite de volumen'));
-    const iRiego = riego.findIndex((t) => t.includes('💦 Riego'));
-    expect(iLluvia).toBeLessThan(iVolumen);
-    expect(iVolumen).toBeLessThan(iRiego);
+    // Colapsadas: ningún campo de regla a la vista (el grupo de ejecución del riego no se colapsa)
+    expect(screen.queryAllByRole('spinbutton')).toHaveLength(1);
+    // Orden por prioridad dentro de RIEGO: ciclo → R-04 → R-02 → R-05 → R-06 → R-03 → R-01
+    const botones = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent ?? '');
+    const orden = ['Un riego por ciclo', 'Sustrato saturado', 'Déficit hídrico crítico', 'fuera de ventana', 'Pausa tras', 'Posponer por lluvia', 'Riego por déficit'];
+    const posiciones = orden.map((t) => botones.findIndex((b) => b.includes(t)));
+    expect(posiciones.every((p) => p >= 0)).toBe(true);
+    expect(posiciones).toEqual([...posiciones].sort((x, y) => x - y));
   });
 
   it('muestra "Sin parámetros configurables" para las reglas sin umbrales', () => {
     montar(catalogoDeFabrica());
-    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(2);
+    // Bloqueo manual, ciclo de lectura y seguimiento.
+    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(3);
+  });
+});
+
+describe('ParametrosTab · ejecución del riego (13.3)', () => {
+  it('riego.sectores-simultaneos va en el grupo "Ejecución del riego", no bajo una regla', () => {
+    montar(catalogoDeFabrica());
+
+    const grupo = screen.getByRole('region', { name: 'Ejecución del riego' });
+    const campo = within(grupo).getByLabelText(/Sectores regando a la vez/) as HTMLInputElement;
+    expect(campo.value).toBe('10');
+    // No es de una regla: ninguna tarjeta de regla lo declara ni lo marca como compartido.
+    expect(document.querySelectorAll('[data-clave="riego.sectores-simultaneos"]')).toHaveLength(1);
+    expect(within(grupo).queryByText(/Compartido con/)).toBeNull();
+  });
+
+  it('se edita y se guarda como cualquier otro parámetro', async () => {
+    const { onGuardar } = montar(catalogoDeFabrica());
+
+    fireEvent.change(screen.getByLabelText(/Sectores regando a la vez/), { target: { value: '5' } });
+    fireEvent.click(guardar());
+
+    await waitFor(() => expect(onGuardar).toHaveBeenCalledWith([{ clave: 'riego.sectores-simultaneos', valor: '5' }]));
+  });
+
+  it('la rama Insumo no lo muestra, y buscar "ejecución" lo encuentra', () => {
+    montar(catalogoDeFabrica());
+
+    fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
+    expect(screen.queryByRole('region', { name: 'Ejecución del riego' })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'TODAS' } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'ejecución' } });
+    expect(screen.getByRole('region', { name: 'Ejecución del riego' })).toBeTruthy();
   });
 });
 
 describe('ParametrosTab · parámetro compartido (7.3)', () => {
-  it('marca el parámetro compartido con las otras reglas', () => {
-    montar(catalogoConCompartido());
-    abrir(/Límite de volumen/);
+  it('marca el parámetro compartido con las otras tres reglas que lo usan', () => {
+    montar(catalogoDeFabrica());
+    abrir(/Riego por déficit/);
 
-    expect(screen.getByText(/Compartido con 1 regla: 💦 Riego/)).toBeTruthy();
+    const chips = screen.getAllByText(/Compartido con 3 reglas/);
+    const chip = chips.find((c) => c.closest('[data-clave]')?.getAttribute('data-clave') === COMPARTIDO)!;
+    expect(chip.textContent).toMatch(/fuera de ventana.*Pausa tras.*Posponer por lluvia/);
+    // R-01 no se cita a sí misma.
+    expect(chip.textContent).not.toMatch(/Riego por déficit/);
   });
 
   it('editarlo bajo una regla cambia el valor bajo la otra y se guarda UN solo cambio', async () => {
-    const { onGuardar } = montar(catalogoConCompartido());
-    abrir(/Límite de volumen/);
-    abrir(/💦 Riego/);
+    const { onGuardar } = montar(catalogoDeFabrica());
+    abrir(/Riego por déficit/);
+    abrir(/Posponer por lluvia/);
 
     const campos = screen.getAllByLabelText(ETIQUETA_COMPARTIDO) as HTMLInputElement[];
     expect(campos).toHaveLength(2);
 
-    fireEvent.change(campos[0], { target: { value: '3' } });
+    fireEvent.change(campos[0], { target: { value: '40' } });
 
-    expect(campos.map((c) => c.value)).toEqual(['3', '3']);
+    expect(campos.map((c) => c.value)).toEqual(['40', '40']);
     fireEvent.click(guardar());
 
     await waitFor(() => expect(onGuardar).toHaveBeenCalledOnce());
-    expect(onGuardar).toHaveBeenCalledWith([{ clave: COMPARTIDO, valor: '3' }]);
+    expect(onGuardar).toHaveBeenCalledWith([{ clave: COMPARTIDO, valor: '40' }]);
   });
 
   it('la edición resalta todas las apariciones del parámetro', () => {
-    montar(catalogoConCompartido());
-    abrir(/Límite de volumen/);
-    abrir(/💦 Riego/);
+    montar(catalogoDeFabrica());
+    abrir(/Riego por déficit/);
+    abrir(/Posponer por lluvia/);
 
-    fireEvent.change(screen.getAllByLabelText(ETIQUETA_COMPARTIDO)[0], { target: { value: '3' } });
+    fireEvent.change(screen.getAllByLabelText(ETIQUETA_COMPARTIDO)[0], { target: { value: '40' } });
 
     const filas = document.querySelectorAll(`[data-clave="${COMPARTIDO}"]`);
     expect(filas).toHaveLength(2);
@@ -126,7 +165,7 @@ describe('ParametrosTab · parámetro compartido (7.3)', () => {
 describe('ParametrosTab · edición validada (7.4)', () => {
   it('un valor fuera de rango marca el campo y deshabilita Guardar', () => {
     montar(catalogoDeFabrica());
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
 
     const campo = screen.getByLabelText(/Umbral de riego/) as HTMLInputElement;
     fireEvent.change(campo, { target: { value: '99' } });
@@ -138,7 +177,7 @@ describe('ParametrosTab · edición validada (7.4)', () => {
 
   it('sin cambios Guardar está deshabilitado; con un cambio válido, habilitado', () => {
     montar(catalogoDeFabrica());
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     expect(guardar().disabled).toBe(true);
 
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
@@ -147,10 +186,10 @@ describe('ParametrosTab · edición validada (7.4)', () => {
 
   it('"Restablecer" envía valor null', async () => {
     const { onGuardar } = montar(conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40'));
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
 
     fireEvent.click(screen.getByRole('button', { name: /Restablecer/ }));
-    expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('42');
+    expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('45');
     fireEvent.click(guardar());
 
     await waitFor(() => expect(onGuardar).toHaveBeenCalledWith([{ clave: 'riego.umbral-humedad', valor: null }]));
@@ -158,25 +197,25 @@ describe('ParametrosTab · edición validada (7.4)', () => {
 
   it('"Descartar" vuelve al valor vigente', () => {
     montar(catalogoDeFabrica());
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Descartar/ }));
 
-    expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('42');
+    expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('45');
   });
 });
 
 describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
-  it('buscar "lluvia" deja sólo las reglas que coinciden', () => {
+  it('buscar "pausa" deja sólo las reglas que coinciden', () => {
     montar(catalogoDeFabrica());
 
-    fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'lluvia' } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'pausa' } });
 
-    expect(screen.getByText('🌧️ Condición climática (lluvia)')).toBeTruthy();
-    expect(screen.queryByText('💦 Riego')).toBeNull();
+    expect(screen.getByText('⏸️ Pausa tras una aplicación (R-06)')).toBeTruthy();
+    expect(screen.queryByText('🌧️ Posponer por lluvia (R-03)')).toBeNull();
     // Al buscar, las coincidencias se abren solas
-    expect(screen.getByLabelText(/Probabilidad de lluvia/)).toBeTruthy();
+    expect(screen.getByLabelText(/Pausa de riego tras una aplicación/)).toBeTruthy();
   });
 
   it('filtra por rama', () => {
@@ -185,7 +224,7 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
     fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
 
     expect(screen.getByText('🧪 Dosificación de insumo')).toBeTruthy();
-    expect(screen.queryByText('💦 Riego')).toBeNull();
+    expect(screen.queryByText('💦 Riego por déficit hídrico (R-01)')).toBeNull();
   });
 
   it('"sólo modificados" muestra las reglas con algún parámetro editado', () => {
@@ -194,18 +233,21 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
     fireEvent.click(screen.getByLabelText(/Sólo modificados/));
 
     expect(screen.getByText('🛑 Límite de dosis diaria')).toBeTruthy();
-    expect(screen.queryByText('💦 Riego')).toBeNull();
+    expect(screen.queryByText('💦 Riego por déficit hídrico (R-01)')).toBeNull();
   });
 
   it('"Ver por parámetro" lista cada parámetro una sola vez con las reglas que lo usan', () => {
-    montar(catalogoConCompartido());
+    montar(catalogoDeFabrica());
 
     fireEvent.click(screen.getByRole('button', { name: 'Por parámetro' }));
 
     expect(screen.getAllByLabelText(ETIQUETA_COMPARTIDO)).toHaveLength(1);
-    expect(screen.getByText(/Usado por: .*Límite de volumen.*Riego/)).toBeTruthy();
-    // 11 parámetros del catálogo = 11 filas
-    expect(document.querySelectorAll('[data-clave]')).toHaveLength(11);
+    const fila = document.querySelector(`[data-clave="${COMPARTIDO}"]`) as HTMLElement;
+    expect(within(fila).getByText(/Usado por: .*fuera de ventana.*Pausa tras.*Posponer por lluvia.*Riego por déficit/)).toBeTruthy();
+    // El consumidor que no es una regla se rotula por su nombre, no por el id de la clase.
+    expect(screen.getByText(/Usado por: Ejecución del riego/)).toBeTruthy();
+    // 21 parámetros del catálogo = 21 filas
+    expect(document.querySelectorAll('[data-clave]')).toHaveLength(21);
   });
 });
 
@@ -220,7 +262,7 @@ describe('ParametrosTab · errores del servidor (7.6)', () => {
         ]),
       );
     montar(catalogoDeFabrica(), { onGuardar });
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(guardar());
@@ -240,19 +282,20 @@ describe('ParametrosTab · errores del servidor (7.6)', () => {
       .fn()
       .mockRejectedValue(new ParametrosInvalidosError([{ clave: 'riego.umbral-humedad', mensaje: 'Inválido.' }]));
     montar(catalogoDeFabrica(), { onGuardar });
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
-    abrir(/💦 Riego/); // la cierra con la edición pendiente
+    abrir(/Riego por déficit/); // la cierra con la edición pendiente
 
     fireEvent.click(guardar());
 
-    expect(await screen.findByText('Inválido.')).toBeTruthy();
+    // El parámetro es compartido: se abren las cuatro reglas que lo usan, cada una con su aviso.
+    expect(await screen.findAllByText('Inválido.')).toHaveLength(4);
   });
 
   it('un error que no es de validación se muestra como aviso y conserva el borrador', async () => {
     const onGuardar = vi.fn().mockRejectedValue(new Error('Error 500 al guardar los parámetros del motor'));
     montar(catalogoDeFabrica(), { onGuardar });
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(guardar());
@@ -263,7 +306,7 @@ describe('ParametrosTab · errores del servidor (7.6)', () => {
 
   it('al guardar bien, el borrador se vacía', async () => {
     const { onGuardar } = montar(catalogoDeFabrica());
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(guardar());
@@ -275,7 +318,7 @@ describe('ParametrosTab · errores del servidor (7.6)', () => {
 
 describe('ParametrosTab · regla inicial', () => {
   it('abre la regla que llega por parámetro (desde "Editar parámetro" del Inspector)', () => {
-    montar(catalogoDeFabrica(), { reglaInicial: 'IrrigationRule' });
+    montar(catalogoDeFabrica(), { reglaInicial: 'RiegoPorDeficitRule' });
     expect(screen.getByLabelText(/Umbral de riego/)).toBeTruthy();
   });
 });
@@ -285,7 +328,7 @@ describe('ParametrosTab · guardado en vuelo (#2)', () => {
     let resolver: () => void = () => undefined;
     const onGuardar = vi.fn().mockReturnValue(new Promise<void>((r) => (resolver = r)));
     montar(catalogoDeFabrica(), { onGuardar });
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
 
     fireEvent.click(guardar());
@@ -302,8 +345,8 @@ describe('ParametrosTab · guardado en vuelo (#2)', () => {
 describe('ParametrosTab · errores ocultos por los filtros (#5)', () => {
   it('avisa cuántos errores quedaron ocultos y "Ver los que tienen error" limpia los filtros', () => {
     montar(catalogoDeFabrica());
-    abrir(/💦 Riego/);
-    fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '99' } });
+    abrir(/Sustrato saturado/);
+    fireEvent.change(screen.getByLabelText(/Saturación que bloquea/), { target: { value: '99' } });
     expect(screen.queryByText(/oculto/)).toBeNull();
 
     fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'lluvia' } });
@@ -314,7 +357,7 @@ describe('ParametrosTab · errores ocultos por los filtros (#5)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver los que tienen error' }));
 
     expect((screen.getByPlaceholderText(/Buscar/) as HTMLInputElement).value).toBe('');
-    const campo = screen.getByLabelText(/Umbral de riego/) as HTMLInputElement;
+    const campo = screen.getByLabelText(/Saturación que bloquea/) as HTMLInputElement;
     expect(campo.className).toMatch(/inputError/);
     expect(screen.queryByText(/oculto/)).toBeNull();
   });
@@ -324,25 +367,25 @@ describe('ParametrosTab · errores ocultos por los filtros (#5)', () => {
       .fn()
       .mockRejectedValue(new ParametrosInvalidosError([{ clave: 'riego.umbral-humedad', mensaje: 'Inválido.' }]));
     montar(catalogoDeFabrica(), { onGuardar });
-    abrir(/💦 Riego/);
+    abrir(/Riego por déficit/);
     fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '40' } });
     fireEvent.click(guardar());
-    await screen.findByText('Inválido.');
+    await screen.findAllByText('Inválido.');
 
     fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
 
     expect(screen.getByText(/1 parámetro con error queda oculto por los filtros/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Ver los que tienen error' }));
     expect((screen.getByLabelText('Rama') as HTMLSelectElement).value).toBe('TODAS');
-    expect(screen.getByText('Inválido.')).toBeTruthy();
+    expect(screen.getAllByText('Inválido.').length).toBeGreaterThan(0);
   });
 
   it('en plural: "N parámetros con error quedan ocultos"', () => {
     montar(catalogoDeFabrica());
-    abrir(/💦 Riego/);
-    fireEvent.change(screen.getByLabelText(/Umbral de riego/), { target: { value: '99' } });
-    abrir(/Límite de volumen/);
-    fireEvent.change(screen.getByLabelText(ETIQUETA_COMPARTIDO), { target: { value: '0' } });
+    abrir(/Sustrato saturado/);
+    fireEvent.change(screen.getByLabelText(/Saturación que bloquea/), { target: { value: '99' } });
+    abrir(/Déficit hídrico crítico/);
+    fireEvent.change(screen.getByLabelText(/Intervalo mínimo entre riegos/), { target: { value: '0' } });
 
     fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
 

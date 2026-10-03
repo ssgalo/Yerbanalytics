@@ -16,8 +16,8 @@ const base: EntradaMotor = {
   bloqueoManual: false,
   humSus: 55,
   lluviaPct: 10,
+  lluviaMm: 1,
   uvIndex: 3,
-  riegos24h: 0,
   dosis24h: 0,
   estadoSector: 'ok',
   confianza: 92,
@@ -28,7 +28,7 @@ const cmp = (p: Partial<Comparacion>): Comparacion => ({
   clave: 'riego.umbral-humedad',
   recibido: 38,
   operador: 'LT',
-  umbral: 42,
+  umbral: 45,
   unidad: '%',
   configurable: true,
   resultado: 'CUMPLE',
@@ -46,7 +46,7 @@ describe('formatoComparacion', () => {
     expect(formatoComparacion(cmp({}))).toEqual({
       recibido: '38 %',
       operador: '<',
-      umbral: '42 %',
+      umbral: '45 %',
       marca: '✓',
       resultado: 'CUMPLE',
     });
@@ -81,6 +81,29 @@ describe('formatoComparacion', () => {
   });
 });
 
+describe('formatoComparacion · ventana horaria (operador EN)', () => {
+  it('"17:42 ∈ 06:00-18:00 ✓": la hora local contra la ventana, sin unidad', () => {
+    const f = formatoComparacion(
+      cmp({
+        etiqueta: 'Hora local',
+        clave: 'riego.ventana-normal',
+        recibido: '17:42',
+        operador: 'EN',
+        umbral: '06:00-18:00',
+        unidad: '',
+        resultado: 'CUMPLE',
+      }),
+    );
+
+    expect([f.recibido, f.operador, f.umbral, f.marca]).toEqual(['17:42', '∈', '06:00-18:00', '✓']);
+  });
+
+  it('simboloOperador conoce a todos los operadores', () => {
+    expect(simboloOperador('EN')).toBe('∈');
+    expect(simboloOperador('GE')).toBe('≥');
+  });
+});
+
 describe('etiquetaOrigen', () => {
   it('traduce el origen', () => {
     expect(etiquetaOrigen('TELEMETRIA')).toBe('Telemetría');
@@ -99,21 +122,35 @@ describe('resumenTraza', () => {
   it('cuenta qué accionó', () => {
     const r = resumen({ humSus: 38 });
     expect(r).toContainEqual(
-      expect.objectContaining({ tipo: 'accion', ruleId: 'IrrigationRule', texto: expect.stringMatching(/electroválvula/) }),
+      expect.objectContaining({ tipo: 'accion', ruleId: 'RiegoPorDeficitRule', texto: expect.stringMatching(/electroválvula/) }),
     );
   });
 
   it('dice qué se pospuso y qué se omitió por culpa de quién', () => {
-    const r = resumen({ humSus: 38, lluviaPct: 80 });
+    const r = resumen({ humSus: 40, lluviaPct: 80, lluviaMm: 8 });
     expect(r).toContainEqual(
-      expect.objectContaining({ tipo: 'pospuso', ruleId: 'WeatherOverrideRule', texto: expect.stringMatching(/riego/i) }),
+      expect.objectContaining({ tipo: 'pospuso', ruleId: 'PosponerPorLluviaRule', texto: expect.stringMatching(/riego/i) }),
     );
     expect(r).toContainEqual(
       expect.objectContaining({
         tipo: 'omitida',
-        texto: expect.stringMatching(/Límite de volumen.*Riego.*Condición climática/s),
+        texto: expect.stringMatching(/Riego por déficit hídrico \(R-01\) quedó omitida por .*Posponer por lluvia/),
       }),
     );
+  });
+
+  it('una alerta sale en el resumen, junto a lo que accionó o pospuso', () => {
+    const critico = resumen({ humSus: 30 });
+    expect(critico).toContainEqual(
+      expect.objectContaining({ tipo: 'accion', ruleId: 'DeficitCriticoRule', texto: expect.stringMatching(/electroválvula/) }),
+    );
+    expect(critico).toContainEqual(
+      expect.objectContaining({ tipo: 'alerta', ruleId: 'DeficitCriticoRule', texto: expect.stringMatching(/emitió una alerta/) }),
+    );
+
+    const lluvia = resumen({ humSus: 40, lluviaPct: 80, lluviaMm: 8 });
+    expect(lluvia.filter((l) => l.tipo === 'alerta')).toHaveLength(1);
+    expect(lluvia.filter((l) => l.tipo === 'pospuso')).toHaveLength(1);
   });
 
   it('un bloqueo dice qué rama cortó y quién', () => {
@@ -130,6 +167,6 @@ describe('resumenTraza', () => {
   it('el bloqueo total aclara que no se evaluó el resto', () => {
     const r = resumen({ bloqueoManual: true });
     expect(r).toContainEqual(expect.objectContaining({ tipo: 'bloqueo', ruleId: 'ManualLockRule' }));
-    expect(r).toContainEqual(expect.objectContaining({ tipo: 'noAlcanzada', texto: expect.stringMatching(/8 reglas/) }));
+    expect(r).toContainEqual(expect.objectContaining({ tipo: 'noAlcanzada', texto: expect.stringMatching(/12 reglas/) }));
   });
 });

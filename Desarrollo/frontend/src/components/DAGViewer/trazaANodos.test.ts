@@ -17,8 +17,8 @@ const base: EntradaMotor = {
   bloqueoManual: false,
   humSus: 55,
   lluviaPct: 10,
+  lluviaMm: 1,
   uvIndex: 3,
-  riegos24h: 0,
   dosis24h: 0,
   estadoSector: 'ok',
   confianza: 92,
@@ -59,6 +59,13 @@ describe('clasificarRegla', () => {
     expect(clasificarRegla(regla(['ACTIVAR_VALVULA', 'ABORT_RIEGO']))).toBe('bloqueo');
     expect(clasificarRegla(regla(['NOOP_INFO', 'ACTIVAR_VALVULA']))).toBe('accion');
   });
+
+  it('la alerta no es una acción sobre un actuador: acompaña a la que decide el estado', () => {
+    expect(clasificarRegla(regla(['ALERTA']))).toBe('paso');
+    expect(clasificarRegla(regla(['ABORT_RIEGO', 'ALERTA']))).toBe('bloqueo');
+    expect(clasificarRegla(regla(['POSTPONE_RIEGO', 'ALERTA']))).toBe('pospuso');
+    expect(clasificarRegla(regla(['ACTIVAR_VALVULA', 'ALERTA']))).toBe('accion');
+  });
 });
 
 describe('trazaANodos', () => {
@@ -68,7 +75,8 @@ describe('trazaANodos', () => {
     expect(e['start']).toBe('inicio');
     expect(e['ManualLockRule']).toBe('paso');
     expect(e['StaleSensorRule']).toBe('paso');
-    expect(e['IrrigationRule']).toBe('paso');
+    expect(e['CicloLecturaRiegoRule']).toBe('paso');
+    expect(e['RiegoPorDeficitRule']).toBe('paso');
     expect(e['success-RIEGO']).toBe('noAccion');
     expect(e['success-INSUMO']).toBe('noAccion');
     expect(e['success-MEDIASOMBRA']).toBe('noAccion');
@@ -77,17 +85,34 @@ describe('trazaANodos', () => {
   it('humedad bajo el umbral: el riego acciona y el terminal de RIEGO también', () => {
     const e = estados({ humSus: 38 });
 
-    expect(e['IrrigationRule']).toBe('accion');
+    expect(e['RiegoPorDeficitRule']).toBe('accion');
     expect(e['success-RIEGO']).toBe('accion');
     expect(e['success-INSUMO']).toBe('noAccion');
   });
 
-  it('lluvia: pospone, y las siguientes de la rama quedan omitidas', () => {
-    const e = estados({ humSus: 38, lluviaPct: 80 });
+  it('déficit crítico: R-02 acciona (con su alerta) y las compuertas siguientes pasan sin cortar', () => {
+    const e = estados({ humSus: 30 });
 
-    expect(e['WeatherOverrideRule']).toBe('pospuso');
-    expect(e['DailyVolumeLimitRule']).toBe('omitida');
-    expect(e['IrrigationRule']).toBe('omitida');
+    expect(e['DeficitCriticoRule']).toBe('accion');
+    for (const id of ['FueraDeVentanaRiegoRule', 'PausaTrasAplicacionRule', 'PosponerPorLluviaRule', 'RiegoPorDeficitRule']) {
+      expect(e[id]).toBe('paso');
+    }
+    expect(e['success-RIEGO']).toBe('accion');
+  });
+
+  it('sustrato saturado: R-04 bloquea y omite el resto de la rama', () => {
+    const e = estados({ humSus: 82 });
+
+    expect(e['SustratoSaturadoRule']).toBe('bloqueo');
+    expect(e['DeficitCriticoRule']).toBe('omitida');
+    expect(e['RiegoPorDeficitRule']).toBe('omitida');
+  });
+
+  it('lluvia: pospone, y las siguientes de la rama quedan omitidas', () => {
+    const e = estados({ humSus: 40, lluviaPct: 80, lluviaMm: 8 });
+
+    expect(e['PosponerPorLluviaRule']).toBe('pospuso');
+    expect(e['RiegoPorDeficitRule']).toBe('omitida');
     expect(e['success-RIEGO']).toBe('noAccion');
     // Las otras ramas no se enteran
     expect(e['ShadingRule']).toBe('paso');
@@ -97,7 +122,8 @@ describe('trazaANodos', () => {
     const e = estados({ antiguedadSeg: 300 });
 
     expect(e['StaleSensorRule']).toBe('bloqueo');
-    expect(e['IrrigationRule']).toBe('omitida');
+    expect(e['CicloLecturaRiegoRule']).toBe('omitida');
+    expect(e['RiegoPorDeficitRule']).toBe('omitida');
   });
 
   it('bloqueo manual: todo lo demás queda no alcanzado', () => {
@@ -105,7 +131,7 @@ describe('trazaANodos', () => {
 
     expect(e['ManualLockRule']).toBe('bloqueo');
     expect(e['StaleSensorRule']).toBe('noAlcanzada');
-    expect(e['IrrigationRule']).toBe('noAlcanzada');
+    expect(e['RiegoPorDeficitRule']).toBe('noAlcanzada');
     // Ninguna regla de la rama llegó a evaluarse: el terminal no dice "no se regó", dice que no se alcanzó.
     expect(e['success-RIEGO']).toBe('noAlcanzada');
     expect(e['success-INSUMO']).toBe('noAlcanzada');
@@ -120,17 +146,17 @@ describe('trazaANodos', () => {
   it('una rama evaluada que no accionó sigue siendo "no accionó"', () => {
     expect(estados({})['success-RIEGO']).toBe('noAccion');
     // lluvia: la primera regla de la rama corrió y pospuso; el resto se omitió, pero la rama se evaluó
-    expect(estados({ humSus: 38, lluviaPct: 80 })['success-RIEGO']).toBe('noAccion');
+    expect(estados({ humSus: 40, lluviaPct: 80, lluviaMm: 8 })['success-RIEGO']).toBe('noAccion');
   });
 
   it('un nodo que no figura en la traza queda sin evaluar (no se inventa estado)', () => {
     const traza = evaluarMotor(catalogo, base);
     const e = trazaANodos(schema, {
       ...traza,
-      reglas: traza.reglas.filter((r) => r.ruleId !== 'IrrigationRule'),
+      reglas: traza.reglas.filter((r) => r.ruleId !== 'RiegoPorDeficitRule'),
     });
 
-    expect(e['IrrigationRule']).toBe('sinTraza');
+    expect(e['RiegoPorDeficitRule']).toBe('sinTraza');
   });
 
   it('cubre todos los nodos del esquema', () => {

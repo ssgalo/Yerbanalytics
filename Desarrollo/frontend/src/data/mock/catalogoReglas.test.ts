@@ -18,10 +18,36 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
     for (const r of catalogo.reglas) for (const c of r.parametros) expect(claves.has(c)).toBe(true);
   });
 
-  it('usadoPor es exactamente el índice inverso de reglas[].parametros', () => {
+  it('usadoPor es el índice inverso de reglas[].parametros, más los consumidores que no son reglas', () => {
+    const ids = new Set(catalogo.reglas.map((r) => r.id));
     for (const p of catalogo.parametros) {
       const esperado = catalogo.reglas.filter((r) => r.parametros.includes(p.clave)).map((r) => r.id);
-      expect([...p.usadoPor].sort()).toEqual([...esperado].sort());
+      expect(p.usadoPor.filter((u) => ids.has(u)).sort()).toEqual([...esperado].sort());
+    }
+  });
+
+  it('riego.sectores-simultaneos lo usa el despacho (que no es una regla) y ninguna regla', () => {
+    const p = catalogo.parametros.find((x) => x.clave === 'riego.sectores-simultaneos');
+    expect(p?.usadoPor).toEqual(['DespachoRiego']);
+  });
+
+  it('el umbral de riego es compartido por R-01, R-03, R-05 y R-06, y no hay claves de las reglas viejas', () => {
+    const umbral = catalogo.parametros.find((x) => x.clave === 'riego.umbral-humedad');
+    expect(umbral?.usadoPor).toEqual([
+      'FueraDeVentanaRiegoRule',
+      'PausaTrasAplicacionRule',
+      'PosponerPorLluviaRule',
+      'RiegoPorDeficitRule',
+    ]);
+    expect(umbral?.fabrica).toBe('45');
+    expect(catalogo.parametros.find((x) => x.clave === 'riego.lluvia-probabilidad')?.fabrica).toBe('70');
+    const claves = catalogo.parametros.map((x) => x.clave);
+    for (const vieja of ['riego.tiempo-max-apertura', 'riego.max-riegos-24h', 'riego.max-riegos-24h-sector']) {
+      expect(claves).not.toContain(vieja);
+    }
+    const reglas = catalogo.reglas.map((r) => r.id);
+    for (const vieja of ['IrrigationRule', 'WeatherOverrideRule', 'DailyVolumeLimitRule']) {
+      expect(reglas).not.toContain(vieja);
     }
   });
 
@@ -83,10 +109,9 @@ function leerEnumsDelBackend(): EntradaEnum[] {
 }
 
 /**
- * Mientras el backend esté sumando parámetros (cambio de riego v2) que el fixture todavía no
- * incorpora, la comparación se limita a los parámetros que el fixture ya tiene: éstos sí tienen que
- * coincidir exactamente. Los que existen sólo en el backend se informan sin romper la suite; el bloque
- * de frontend de ese cambio actualiza el fixture y entonces corresponde volver a exigir igualdad total.
+ * Igualdad TOTAL: el fixture tiene exactamente los parámetros del backend (ni uno de más ni uno de
+ * menos), con la misma definición y fábrica. Si el backend suma, saca o cambia uno, este test obliga a
+ * regenerar el fixture.
  */
 describe.skipIf(!existsSync(DIR_PARAMETROS))('catalogoReglas.fixture.json · contra los enums del backend', () => {
   const backend = leerEnumsDelBackend();
@@ -97,7 +122,7 @@ describe.skipIf(!existsSync(DIR_PARAMETROS))('catalogoReglas.fixture.json · con
     expect(backend.length).toBeGreaterThan(0);
   });
 
-  it('cada parámetro del fixture existe en el backend con la misma definición y fábrica', () => {
+  it('el fixture tiene exactamente los parámetros del backend, con la misma definición y fábrica', () => {
     const delFixture = catalogo.parametros.map((p) => ({
       clave: p.clave,
       tipo: p.tipo,
@@ -107,18 +132,7 @@ describe.skipIf(!existsSync(DIR_PARAMETROS))('catalogoReglas.fixture.json · con
       max: p.max,
       decimales: p.decimales,
     }));
-    const claves = new Set(delFixture.map((p) => p.clave));
-    const delBackend = backend.filter((e) => claves.has(e.clave)).map(sinConstante);
-    expect(delFixture.sort(porClave)).toEqual(delBackend.sort(porClave));
-  });
-
-  it('informa (sin fallar) los parámetros que el backend declara y el fixture todavía no', () => {
-    const claves = new Set(catalogo.parametros.map((p) => p.clave));
-    const soloBackend = backend.map((e) => e.clave).filter((c) => !claves.has(c));
-    if (soloBackend.length > 0) {
-      console.warn(`[anti-drift] ${soloBackend.length} parámetros sólo en el backend: ${soloBackend.sort().join(', ')}`);
-    }
-    expect(Array.isArray(soloBackend)).toBe(true);
+    expect(delFixture.sort(porClave)).toEqual(backend.map(sinConstante).sort(porClave));
   });
 });
 
@@ -146,6 +160,9 @@ function leerReglasDelBackend(): Record<string, string> {
   }
   return fuentes;
 }
+
+/** Consumidores de parámetros que no son reglas (hoy sólo el despacho de riego): también entran en `usadoPor`. */
+const ARCHIVO_DESPACHO = resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java');
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
   const constantes = new Map([
@@ -179,16 +196,21 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
   'catalogoReglas.fixture.json · reglas y usadoPor contra el código del backend',
   () => {
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));
-    const delBackend = parametrosPorRegla(leerReglasDelBackend(), constantes);
-    // Sólo las reglas que el fixture conoce: una regla nueva del backend la agrega el cambio que la trae.
-    const reglasDelFixture = catalogo.reglas.filter((r) => r.id in delBackend);
+    const fuentes = leerReglasDelBackend();
+    const delBackend = parametrosPorRegla(fuentes, constantes);
+    const despacho = existsSync(ARCHIVO_DESPACHO)
+      ? parametrosPorRegla({ DespachoRiego: readFileSync(ARCHIVO_DESPACHO, 'utf8') }, constantes).DespachoRiego
+      : [];
 
-    it('el backend declara todas las reglas del fixture', () => {
-      expect(reglasDelFixture.map((r) => r.id)).toEqual(catalogo.reglas.map((r) => r.id));
+    it('el fixture tiene exactamente las reglas del backend, con su prioridad', () => {
+      const prioridades = Object.fromEntries(
+        Object.entries(fuentes).map(([id, src]) => [id, Number(/PRIORITY\s*=\s*(\d+)/.exec(src)?.[1])]),
+      );
+      expect(Object.fromEntries(catalogo.reglas.map((r) => [r.id, r.prioridad]))).toEqual(prioridades);
     });
 
     it('cada regla declara los mismos parámetros que el fixture (reglas[].parametros)', () => {
-      for (const r of reglasDelFixture) {
+      for (const r of catalogo.reglas) {
         expect({ regla: r.id, parametros: [...r.parametros].sort() }).toEqual({
           regla: r.id,
           parametros: [...delBackend[r.id]].sort(),
@@ -196,9 +218,10 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
       }
     });
 
-    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas del backend', () => {
+    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y el despacho) del backend', () => {
       for (const p of catalogo.parametros) {
-        const esperado = reglasDelFixture.filter((r) => delBackend[r.id].includes(p.clave)).map((r) => r.id);
+        const esperado = catalogo.reglas.filter((r) => delBackend[r.id].includes(p.clave)).map((r) => r.id);
+        if (despacho.includes(p.clave)) esperado.push('DespachoRiego');
         expect({ clave: p.clave, usadoPor: [...p.usadoPor].sort() }).toEqual({
           clave: p.clave,
           usadoPor: esperado.sort(),

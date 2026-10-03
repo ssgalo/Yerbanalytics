@@ -5,19 +5,6 @@ import type { CatalogoReglas, ParametroRegla } from '@/types/domain';
 /** El catálogo de fábrica tal cual lo entrega el backend. */
 export const catalogoDeFabrica = (): CatalogoReglas => structuredClone(fixture as CatalogoReglas);
 
-/**
- * El catálogo de fábrica, pero con `riego.max-riegos-24h` declarado también por `IrrigationRule`:
- * hoy ningún parámetro real es compartido, y el caso central del cambio necesita uno.
- */
-export function catalogoConCompartido(): CatalogoReglas {
-  const c = catalogoDeFabrica();
-  const irrigation = c.reglas.find((r) => r.id === 'IrrigationRule')!;
-  irrigation.parametros.push('riego.max-riegos-24h');
-  const p = c.parametros.find((x) => x.clave === 'riego.max-riegos-24h')!;
-  p.usadoPor = ['DailyVolumeLimitRule', 'IrrigationRule'];
-  return c;
-}
-
 /** Marca un parámetro como editado (valor distinto de fábrica). */
 export function conValor(c: CatalogoReglas, clave: string, valor: string): CatalogoReglas {
   const out = structuredClone(c);

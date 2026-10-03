@@ -256,9 +256,16 @@ export class MockRepository implements DataRepository {
     const slot = nursery.weather.forecast[zonaIdx % nursery.weather.forecast.length];
 
     const historial = await this.getHistory();
-    const en24h = (tipo: string) =>
-      historial.filter((h) => h.sectorId === sectorId && h.tipo === tipo && h.ts <= ref && h.ts > ref - 86_400_000)
-        .length;
+    const delSector = (tipo: string) =>
+      historial.filter((h) => h.sectorId === sectorId && h.tipo === tipo && h.ts <= ref);
+    const ultimo = (eventos: { ts: number }[]) => eventos.reduce<number | null>((m, h) => (m === null || h.ts > m ? h.ts : m), null);
+    const dosis24h = delSector('Insumo').filter((h) => h.ts > ref - 86_400_000).length;
+
+    // El despacho riega de a tandas: los sectores que el mapa muestra "Regando" ya tienen su riego
+    // despachado (y abierto) en este ciclo; los "En cola" todavía no. Así la demo muestra el corte
+    // "ya regó en este ciclo" en unos y el riego por déficit en otros.
+    const regando = sector.actuadores.valve === 'Regando';
+    const ultimoRiegoMs = regando ? ref - 60_000 : ultimo(delSector('Riego'));
 
     // La telemetría dispara la evaluación al llegar (lectura fresca y con métricas); el barrido
     // corre 5 min después y no trae métricas, igual que `NurseryWatchdog`.
@@ -275,10 +282,14 @@ export class MockRepository implements DataRepository {
       humSus: telemetria ? (zona.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null) : null,
       lluviaPct: slot?.rain ?? null,
       uvIndex: slot?.uv ?? null,
-      riegos24h: en24h('Riego'),
-      dosis24h: en24h('Insumo'),
+      dosis24h,
       estadoSector: sector.status,
       confianza: sector.diagnosis.conf,
+      lluviaMm: slot ? Math.round(slot.rain) / 10 : null,
+      ultimoRiegoMs,
+      ultimoRiegoCriticoMs: ultimo(delSector('Riego').filter((h) => h.regla === 'DeficitCriticoRule')),
+      ultimaAplicacionMs: ultimo(delSector('Insumo')),
+      riegoEnCursoHastaMs: regando ? ref + 300_000 : null,
     });
   }
 }

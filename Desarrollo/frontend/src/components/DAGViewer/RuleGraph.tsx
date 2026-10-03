@@ -123,12 +123,16 @@ const STYLE_SUCCESS_TERMINAL: React.CSSProperties = {
 // Helpers
 // -----------------------------------------------------------------------
 
-/** Extrae el nombre de la regla desde el campo `lectura` de un ActionRecord. */
+/** Regla que se pinta para un riego sin `regla` informada (la de riego por déficit, R-01). */
+const REGLA_RIEGO_POR_DEFECTO = 'RiegoPorDeficitRule';
+
+/** Extrae el nombre de la regla de un ActionRecord. */
 function extractRuleName(record: ActionRecord): string | null {
   const match = record.lectura?.match(/Ciclo de evaluaci[oó]n:\s*(\w+)/i);
   if (match) return match[1];
   switch (record.tipo) {
-    case 'Riego':      return 'IrrigationRule';
+    // El riego lo ordenó R-01 o R-02 (campo `regla`); sin él, el de siempre.
+    case 'Riego':      return record.regla || REGLA_RIEGO_POR_DEFECTO;
     case 'Insumo':     return 'SupplyRule';
     case 'Mediasombra':
     case 'Sombra':     return 'ShadingRule';
@@ -138,6 +142,8 @@ function extractRuleName(record: ActionRecord): string | null {
 
 /** Determina si el evento es una acción de éxito (actuó físicamente). */
 function isActionEvent(record: ActionRecord): boolean {
+  // Un riego pospuesto o abortado quedó registrado pero no abrió la válvula: no es una acción.
+  if (record.res === 'Pospuesta' || record.res === 'Abortada') return false;
   return ['Riego', 'Insumo', 'Mediasombra', 'Sombra'].includes(record.tipo);
 }
 
@@ -222,6 +228,7 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
               else if (isPostpone(e)) isPostponed = true;
               else if (
                 e.tipo.startsWith('ABORT') ||
+                e.res === 'Abortada' ||
                 e.accion?.includes('bloqueada') ||
                 (e.tipo === 'Info' && e.lectura?.includes('Sensor sin datos'))
               ) {
@@ -274,7 +281,7 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
             sourceNode && (sourceNode.branch === 'GLOBAL' || sourceNode.branch === evNode.branch);
 
           if (isRelevantBranch) {
-            const isBlock = ev.tipo.startsWith('ABORT') || ev.accion?.includes('bloqueada') || (ev.tipo === 'Info' && ev.lectura?.includes('Sensor sin datos'));
+            const isBlock = ev.tipo.startsWith('ABORT') || ev.res === 'Abortada' || ev.accion?.includes('bloqueada') || (ev.tipo === 'Info' && ev.lectura?.includes('Sensor sin datos'));
             const isPass = !isBlock && !isActionEvent(ev); // e.g. NOOP_INFO
 
             if (e.label === 'Continúa' && srcPriority < evNode.priority && tgtPriority <= evNode.priority) {

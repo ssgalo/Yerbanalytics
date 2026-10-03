@@ -64,3 +64,44 @@ describe('buildNursery (fidelidad del RNG)', () => {
     });
   });
 });
+
+describe('buildNursery · válvulas del riego por tandas (13.5)', () => {
+  const valvulas = (zonaId: string) => {
+    const z = buildNursery(SEED).zonas.find((x) => x.id === zonaId)!;
+    return z.sectors.filter((s) => s.status !== 'offline').map((s) => s.actuadores.valve);
+  };
+  const humSus = (zonaId: string) =>
+    buildNursery(SEED).zonas.find((x) => x.id === zonaId)!.lectura.metrics.find((m) => m.key === 'humSus')!.raw;
+
+  it('con déficit el despacho riega de a 10 sectores y el resto queda "En cola"', () => {
+    // MZ-2: déficit común (40 % bajo el umbral de 45 %) y pronóstico sin lluvia que alcance.
+    expect(humSus('MZ-2')).toBe(40);
+    const z = buildNursery(SEED).zonas.find((x) => x.id === 'MZ-2')!;
+    const regando = z.sectors.filter((s) => s.actuadores.valve === 'Regando');
+    const enCola = z.sectors.filter((s) => s.actuadores.valve === 'En cola');
+
+    expect(regando).toHaveLength(10);
+    expect(regando.every((s) => s.n <= 10)).toBe(true);
+    expect(enCola.length).toBeGreaterThan(0);
+    expect(enCola.every((s) => s.n > 10)).toBe(true);
+  });
+
+  it('una zona con la humedad dentro del rango ideal (sobre el umbral de 45 %) tiene todas las válvulas cerradas', () => {
+    expect(new Set(valvulas('MZ-1'))).toEqual(new Set(['Cerrada']));
+  });
+
+  it('con lluvia prevista suficiente el déficit común espera: no hay válvulas abiertas ni en cola', () => {
+    expect(humSus('MZ-3')).toBe(41);
+    expect(new Set(valvulas('MZ-3'))).toEqual(new Set(['Cerrada']));
+  });
+
+  it('el déficit crítico riega aunque se prevea lluvia (R-02 no la espera)', () => {
+    expect(humSus('MZ-4')).toBe(30);
+    expect(valvulas('MZ-4')).toContain('Regando');
+  });
+
+  it('un sustrato saturado no riega', () => {
+    expect(humSus('MZ-5')).toBe(82);
+    expect(new Set(valvulas('MZ-5'))).toEqual(new Set(['Cerrada']));
+  });
+});

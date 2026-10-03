@@ -27,11 +27,11 @@ import styles from './TrazaGraph.module.css';
 const nodeTypes = { regla: ReglaNode };
 
 /** Los nodos con comparaciones son más grandes que los del Historial. */
-const ALTO_FILA = 142;
+const ALTO_FILA = 172;
 const ANCHO_COLUMNA = 330;
 const ANCHO_NODO = 270;
-/** Alto aproximado del nodo más alto (dos comparaciones y una nota). */
-const ALTO_NODO_MAX = 135;
+/** Alto aproximado del nodo más alto (dos comparaciones de etiqueta larga, título en dos líneas). */
+const ALTO_NODO_MAX = 165;
 const ALTO_TERMINAL = 40;
 const PADDING_FIT = 0.08;
 

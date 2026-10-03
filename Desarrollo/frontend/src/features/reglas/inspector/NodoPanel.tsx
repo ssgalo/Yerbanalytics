@@ -85,7 +85,9 @@ export function NodoPanel({ regla, label, tieneParametros, nombreDe, onEditar, o
           <h4 className={styles.panelSeccion}>Acción y motivo</h4>
           {regla.acciones.map((a, i) => (
             <div key={i} className={styles.accion}>
-              <code className={styles.accionTipo}>{a.tipo}</code>
+              <code className={styles.accionTipo} data-alerta={a.tipo === 'ALERTA'}>
+                {a.tipo === 'ALERTA' ? '⚠ ALERTA' : a.tipo}
+              </code>
               <p className={styles.accionMotivo}>{a.motivo}</p>
             </div>
           ))}

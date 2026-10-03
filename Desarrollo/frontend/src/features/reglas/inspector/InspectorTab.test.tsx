@@ -67,9 +67,9 @@ describe('InspectorTab · selección (8.4)', () => {
   it('muestra el DAG con la traza del sector elegido', async () => {
     montar({ sectorInicial: 'MZ-1-001' });
 
-    await waitFor(() => expect(nodo('IrrigationRule')).toBeTruthy());
-    expect(nodo('IrrigationRule').querySelector('[data-estado]')).toBeTruthy();
-    expect(within(nodo('IrrigationRule')).getByTestId('comparacion-0').textContent).toMatch(/%/);
+    await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
+    expect(nodo('RiegoPorDeficitRule').querySelector('[data-estado]')).toBeTruthy();
+    expect(within(nodo('RiegoPorDeficitRule')).getByTestId('comparacion-0').textContent).toMatch(/%/);
   });
 
   it('resume de un vistazo qué pasó', async () => {
@@ -81,7 +81,7 @@ describe('InspectorTab · selección (8.4)', () => {
 
   it('el barrido muestra su propia traza', async () => {
     montar({ sectorInicial: 'MZ-1-001' });
-    await waitFor(() => expect(nodo('IrrigationRule')).toBeTruthy());
+    await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText('Origen'), { target: { value: 'BARRIDO' } });
 
@@ -95,7 +95,7 @@ describe('InspectorTab · selección (8.4)', () => {
     montar({ sectorInicial: 'MZ-1-001' });
 
     expect(await screen.findByText(/sin evaluaciones desde el último arranque/i)).toBeTruthy();
-    expect(nodo('IrrigationRule')).toBeNull();
+    expect(nodo('RiegoPorDeficitRule')).toBeNull();
   });
 
   it('un error al pedir la traza se muestra', async () => {
@@ -119,9 +119,9 @@ describe('InspectorTab · selección (8.4)', () => {
 describe('InspectorTab · detalle de un nodo (8.5)', () => {
   it('el clic en un nodo abre el panel con todas las comparaciones, la acción y el motivo', async () => {
     montar({ sectorInicial: 'MZ-1-001' });
-    await waitFor(() => expect(nodo('IrrigationRule')).toBeTruthy());
+    await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
 
-    fireEvent.click(nodo('IrrigationRule'));
+    fireEvent.click(nodo('RiegoPorDeficitRule'));
 
     const panel = await screen.findByRole('complementary', { name: /Detalle de .*Riego/ });
     expect(within(panel).getAllByTestId('fila-comparacion').length).toBeGreaterThanOrEqual(1);
@@ -131,12 +131,12 @@ describe('InspectorTab · detalle de un nodo (8.5)', () => {
 
   it('"Editar parámetro" lleva a Parámetros con esa regla abierta', async () => {
     const { onEditarRegla } = montar({ sectorInicial: 'MZ-1-001' });
-    await waitFor(() => expect(nodo('IrrigationRule')).toBeTruthy());
-    fireEvent.click(nodo('IrrigationRule'));
+    await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
+    fireEvent.click(nodo('RiegoPorDeficitRule'));
 
     fireEvent.click(await screen.findByRole('button', { name: /Editar parámetro/ }));
 
-    expect(onEditarRegla).toHaveBeenCalledWith('IrrigationRule');
+    expect(onEditarRegla).toHaveBeenCalledWith('RiegoPorDeficitRule');
   });
 
   it('una regla sin parámetros no ofrece "Editar parámetro"', async () => {
@@ -151,8 +151,8 @@ describe('InspectorTab · detalle de un nodo (8.5)', () => {
 
   it('al cambiar de sector se cierra el panel', async () => {
     montar({ sectorInicial: 'MZ-1-001' });
-    await waitFor(() => expect(nodo('IrrigationRule')).toBeTruthy());
-    fireEvent.click(nodo('IrrigationRule'));
+    await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
+    fireEvent.click(nodo('RiegoPorDeficitRule'));
     await screen.findByRole('complementary');
 
     fireEvent.change(screen.getByLabelText('Sector'), { target: { value: 'MZ-1-002' } });

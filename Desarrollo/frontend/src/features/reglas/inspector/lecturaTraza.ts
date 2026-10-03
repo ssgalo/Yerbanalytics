@@ -12,7 +12,7 @@ import type {
   TrazaEvaluacion,
 } from '@/types/domain';
 
-const SIMBOLOS: Record<OperadorComparacion, string> = { LT: '<', LE: '≤', GT: '>', GE: '≥', EQ: '=' };
+const SIMBOLOS: Record<OperadorComparacion, string> = { LT: '<', LE: '≤', GT: '>', GE: '≥', EQ: '=', EN: '∈' };
 
 export const simboloOperador = (op: OperadorComparacion): string => SIMBOLOS[op];
 
@@ -48,7 +48,7 @@ export function formatoComparacion(c: Comparacion): ComparacionFormateada {
   };
 }
 
-export type TipoLineaResumen = 'accion' | 'bloqueo' | 'pospuso' | 'omitida' | 'noAlcanzada' | 'error' | 'nada';
+export type TipoLineaResumen = 'accion' | 'alerta' | 'bloqueo' | 'pospuso' | 'omitida' | 'noAlcanzada' | 'error' | 'nada';
 
 export interface LineaResumen {
   tipo: TipoLineaResumen;
@@ -80,6 +80,8 @@ export function resumenTraza(schema: DagSchema, traza: TrazaEvaluacion): LineaRe
     for (const a of r.acciones) {
       if (QUE_HACE[a.tipo]) {
         lineas.push({ tipo: 'accion', ruleId: r.ruleId, texto: `${nombre(r.ruleId)} ${QUE_HACE[a.tipo]}.` });
+      } else if (a.tipo === 'ALERTA') {
+        lineas.push({ tipo: 'alerta', ruleId: r.ruleId, texto: `${nombre(r.ruleId)} emitió una alerta.` });
       } else if (a.tipo === 'POSTPONE_RIEGO') {
         lineas.push({ tipo: 'pospuso', ruleId: r.ruleId, texto: `${nombre(r.ruleId)} pospuso el riego.` });
       } else if (QUE_CORTA[a.tipo]) {

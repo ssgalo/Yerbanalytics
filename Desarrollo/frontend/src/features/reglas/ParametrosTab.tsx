@@ -9,7 +9,7 @@
    El borrador NO vive acá: lo posee `ReglasPage`, porque esta pestaña se desmonta al ir al
    Inspector y las ediciones sin guardar no pueden perderse en el viaje.
    ============================================================ */
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { Fragment, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { contar } from '@/lib/plural';
 import type { CambioParametro, CatalogoReglas, ParametroRegla, RamaRegla } from '@/types/domain';
@@ -23,15 +23,19 @@ import {
   type Borrador,
 } from './borrador';
 import {
+  agruparPorConsumidor,
   agruparPorRama,
   DESCRIPCION_RAMA,
   filtrarParametros,
   filtrarReglas,
   indicePorClave,
+  nombreConsumidor,
   NOMBRE_RAMA,
+  ramaDeConsumidor,
   ORDEN_RAMAS,
   SIN_FILTROS,
   type Filtros,
+  type GrupoConsumidor,
 } from './catalogoView';
 import { ParametroRow } from './components/ParametroRow';
 import { ReglaCard } from './components/ReglaCard';
@@ -66,8 +70,12 @@ export function ParametrosTab({
   const [erroresGenerales, setErroresGenerales] = useState<string[]>([]);
 
   const indice = useMemo(() => indicePorClave(catalogo), [catalogo]);
+  // También rotula a los consumidores que no son reglas (p. ej. `DespachoRiego` → "Ejecución del riego").
   const nombresReglas = useMemo(
-    () => Object.fromEntries(catalogo.reglas.map((r) => [r.id, r.label])),
+    () => ({
+      ...Object.fromEntries(catalogo.parametros.flatMap((p) => p.usadoPor).map((id) => [id, nombreConsumidor(id)])),
+      ...Object.fromEntries(catalogo.reglas.map((r) => [r.id, r.label])),
+    }),
     [catalogo],
   );
   const erroresCliente = useMemo(() => erroresDelBorrador(catalogo, borrador), [catalogo, borrador]);
@@ -76,6 +84,8 @@ export function ParametrosTab({
   const reglas = useMemo(() => filtrarReglas(catalogo, filtros), [catalogo, filtros]);
   const grupos = useMemo(() => agruparPorRama(reglas), [reglas]);
   const parametros = useMemo(() => filtrarParametros(catalogo, filtros), [catalogo, filtros]);
+  // Parámetros que lee algo que no es una regla: grupo aparte, siempre visible (no se colapsa).
+  const consumidores = useMemo(() => agruparPorConsumidor(catalogo, parametros), [catalogo, parametros]);
 
   const patchFiltros = (p: Partial<Filtros>) => setFiltros((f) => ({ ...f, ...p }));
 
@@ -157,8 +167,8 @@ export function ParametrosTab({
   );
   const clavesVisibles = useMemo(() => {
     if (vista === 'parametro') return new Set(parametros.map((p) => p.clave));
-    return new Set(reglas.flatMap((r) => r.parametros));
-  }, [vista, parametros, reglas]);
+    return new Set([...reglas.flatMap((r) => r.parametros), ...consumidores.flatMap((g) => g.parametros.map((p) => p.clave))]);
+  }, [vista, parametros, reglas, consumidores]);
   const ocultosConError = [...clavesConError].filter((c) => !clavesVisibles.has(c)).length;
 
   const verConError = () => {
@@ -169,6 +179,32 @@ export function ParametrosTab({
       return n;
     });
   };
+
+  const grupoConsumidor = (g: GrupoConsumidor) => (
+    <section key={g.id} className={styles.grupo} aria-label={g.titulo}>
+      <div className={styles.grupoCabecera}>
+        <h2 className={styles.grupoTitulo}>{g.titulo}</h2>
+        <span className={styles.grupoDesc}>{g.descripcion}</span>
+      </div>
+      <div className={`${styles.regla} ${styles.listaParametros}`}>
+        {g.parametros.map((p) => (
+          <ParametroRow
+            key={p.clave}
+            parametro={p}
+            valor={valorMostrado(p, borrador)}
+            editado={borrador.has(p.clave)}
+            errorCliente={erroresCliente.get(p.clave) ?? null}
+            errorServidor={erroresServidor.get(p.clave) ?? null}
+            nombresReglas={nombresReglas}
+            reglaActual={g.id}
+            disabled={saving}
+            onChange={(texto) => onEditar(p, texto)}
+            onRestablecer={() => onRestablecer(p)}
+          />
+        ))}
+      </div>
+    </section>
+  );
 
   const hayErroresCliente = erroresCliente.size > 0;
   const puedeGuardar = cambios.length > 0 && !hayErroresCliente && !saving;
@@ -234,35 +270,43 @@ export function ParametrosTab({
       )}
 
       {vista === 'regla' ? (
-        grupos.length === 0 ? (
+        grupos.length === 0 && consumidores.length === 0 ? (
           <div className={styles.vacio}>Ninguna regla coincide con los filtros.</div>
         ) : (
-          grupos.map((g) => (
-            <section key={g.rama} className={styles.grupo}>
-              <div className={styles.grupoCabecera}>
-                <h2 className={styles.grupoTitulo}>
-                  {NOMBRE_RAMA[g.rama]} · {contar(g.reglas.length, 'regla', 'reglas')}
-                </h2>
-                <span className={styles.grupoDesc}>{DESCRIPCION_RAMA[g.rama]}</span>
-              </div>
-              {g.reglas.map((r) => (
-                <ReglaCard
-                  key={r.id}
-                  regla={r}
-                  indice={indice}
-                  nombresReglas={nombresReglas}
-                  borrador={borrador}
-                  erroresCliente={erroresCliente}
-                  erroresServidor={erroresServidor}
-                  abierta={abiertas.has(r.id)}
-                  disabled={saving}
-                  onToggle={() => alternar(r.id)}
-                  onEditar={onEditar}
-                  onRestablecer={onRestablecer}
-                />
-              ))}
-            </section>
-          ))
+          <>
+            {grupos.map((g) => (
+              <Fragment key={g.rama}>
+                <section className={styles.grupo}>
+                  <div className={styles.grupoCabecera}>
+                    <h2 className={styles.grupoTitulo}>
+                      {NOMBRE_RAMA[g.rama]} · {contar(g.reglas.length, 'regla', 'reglas')}
+                    </h2>
+                    <span className={styles.grupoDesc}>{DESCRIPCION_RAMA[g.rama]}</span>
+                  </div>
+                  {g.reglas.map((r) => (
+                    <ReglaCard
+                      key={r.id}
+                      regla={r}
+                      indice={indice}
+                      nombresReglas={nombresReglas}
+                      borrador={borrador}
+                      erroresCliente={erroresCliente}
+                      erroresServidor={erroresServidor}
+                      abierta={abiertas.has(r.id)}
+                      disabled={saving}
+                      onToggle={() => alternar(r.id)}
+                      onEditar={onEditar}
+                      onRestablecer={onRestablecer}
+                    />
+                  ))}
+                </section>
+                {/* Lo que lee parámetros sin ser una regla va justo después de la rama a la que pertenece. */}
+                {consumidores.filter((c) => ramaDeConsumidor(c.id) === g.rama).map(grupoConsumidor)}
+              </Fragment>
+            ))}
+            {/* Consumidores de una rama que los filtros ocultaron (o desconocida): al final. */}
+            {consumidores.filter((c) => !grupos.some((g) => g.rama === ramaDeConsumidor(c.id))).map(grupoConsumidor)}
+          </>
         )
       ) : parametros.length === 0 ? (
         <div className={styles.vacio}>Ningún parámetro coincide con los filtros.</div>

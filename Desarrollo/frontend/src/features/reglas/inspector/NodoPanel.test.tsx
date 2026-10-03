@@ -7,7 +7,7 @@ import type { TrazaRegla } from '@/types/domain';
 afterEach(cleanup);
 
 const regla = (p: Partial<TrazaRegla> = {}): TrazaRegla => ({
-  ruleId: 'IrrigationRule',
+  ruleId: 'RiegoPorDeficitRule',
   rama: 'RIEGO',
   prioridad: 10,
   estado: 'EVALUADA',
@@ -17,14 +17,14 @@ const regla = (p: Partial<TrazaRegla> = {}): TrazaRegla => ({
       clave: 'riego.umbral-humedad',
       recibido: 38,
       operador: 'LT',
-      umbral: 42,
+      umbral: 45,
       unidad: '%',
       configurable: true,
       resultado: 'CUMPLE',
     },
     {
       etiqueta: 'Riegos en las últimas 24 h',
-      clave: 'riego.max-riegos-24h-sector',
+      clave: 'riego.umbral-critico',
       recibido: 0,
       operador: 'GE',
       umbral: 1,
@@ -43,7 +43,7 @@ const regla = (p: Partial<TrazaRegla> = {}): TrazaRegla => ({
       resultado: 'CUMPLE',
     },
   ],
-  acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Humedad de sustrato 38% bajo el umbral mínimo de 42%.' }],
+  acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Humedad de sustrato 38% bajo el umbral de riego (45%).' }],
   bloqueadaPor: null,
   error: null,
   ...p,
@@ -57,7 +57,7 @@ const montar = (r: TrazaRegla, extra: Partial<React.ComponentProps<typeof NodoPa
       regla={r}
       label="💦 Riego"
       tieneParametros
-      nombreDe={(id) => (id === 'WeatherOverrideRule' ? '🌧️ Condición climática (lluvia)' : id)}
+      nombreDe={(id) => (id === 'PosponerPorLluviaRule' ? '🌧️ Condición climática (lluvia)' : id)}
       onEditar={onEditar}
       onCerrar={onCerrar}
       {...extra}
@@ -74,7 +74,7 @@ describe('NodoPanel', () => {
     expect(filas).toHaveLength(3);
     expect(filas[0].textContent).toContain('Humedad de sustrato');
     expect(filas[0].textContent).toContain('38 %');
-    expect(filas[0].textContent).toContain('42 %');
+    expect(filas[0].textContent).toContain('45 %');
     expect(filas[0].textContent).toContain('✓');
     expect(filas[1].textContent).toContain('✗');
   });
@@ -91,7 +91,47 @@ describe('NodoPanel', () => {
     montar(regla());
 
     expect(screen.getByText('ACTIVAR_VALVULA')).toBeTruthy();
-    expect(screen.getByText(/bajo el umbral mínimo de 42%/)).toBeTruthy();
+    expect(screen.getByText(/bajo el umbral de riego \(45%\)/)).toBeTruthy();
+  });
+
+  it('una alerta se rotula como tal, junto a la acción que decide el estado', () => {
+    montar(
+      regla({
+        acciones: [
+          { tipo: 'ACTIVAR_VALVULA', motivo: 'Déficit hídrico crítico: regar 6 L (720 s).' },
+          { tipo: 'ALERTA', motivo: 'Humedad de sustrato 30% bajo el umbral crítico.' },
+        ],
+      }),
+    );
+
+    expect(screen.getByText('ACTIVAR_VALVULA')).toBeTruthy();
+    expect(screen.getByText('⚠ ALERTA')).toBeTruthy();
+    expect(screen.getByText(/bajo el umbral crítico/)).toBeTruthy();
+  });
+
+  it('una comparación de ventana horaria se lee "17:42 ∈ 06:00-18:00"', () => {
+    montar(
+      regla({
+        comparaciones: [
+          {
+            etiqueta: 'Hora local',
+            clave: 'riego.ventana-normal',
+            recibido: '17:42',
+            operador: 'EN',
+            umbral: '06:00-18:00',
+            unidad: '',
+            configurable: true,
+            resultado: 'CUMPLE',
+          },
+        ],
+      }),
+    );
+
+    const fila = screen.getByTestId('fila-comparacion');
+    expect(fila.textContent).toContain('17:42');
+    expect(fila.textContent).toContain('∈');
+    expect(fila.textContent).toContain('06:00-18:00');
+    expect(fila.textContent).toContain('riego.ventana-normal');
   });
 
   it('"Editar parámetro" avisa qué regla abrir en Parámetros', () => {
@@ -99,7 +139,7 @@ describe('NodoPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Editar parámetro/ }));
 
-    expect(onEditar).toHaveBeenCalledWith('IrrigationRule');
+    expect(onEditar).toHaveBeenCalledWith('RiegoPorDeficitRule');
   });
 
   it('una regla sin parámetros no ofrece editar', () => {
@@ -114,7 +154,7 @@ describe('NodoPanel', () => {
   });
 
   it('una omitida dice quién cortó la rama', () => {
-    montar(regla({ estado: 'OMITIDA_RAMA_BLOQUEADA', comparaciones: [], acciones: [], bloqueadaPor: 'WeatherOverrideRule' }));
+    montar(regla({ estado: 'OMITIDA_RAMA_BLOQUEADA', comparaciones: [], acciones: [], bloqueadaPor: 'PosponerPorLluviaRule' }));
 
     expect(screen.getByText(/Omitida: la rama la cortó/)).toBeTruthy();
     expect(screen.getByText(/🌧️ Condición climática \(lluvia\)/)).toBeTruthy();
@@ -130,7 +170,7 @@ describe('NodoPanel', () => {
     montar(
       regla({
         comparaciones: [
-          { etiqueta: 'Humedad de sustrato', clave: 'riego.umbral-humedad', recibido: null, operador: 'LT', umbral: 42, unidad: '%', configurable: true, resultado: 'SIN_DATO' },
+          { etiqueta: 'Humedad de sustrato', clave: 'riego.umbral-humedad', recibido: null, operador: 'LT', umbral: 45, unidad: '%', configurable: true, resultado: 'SIN_DATO' },
         ],
       }),
     );

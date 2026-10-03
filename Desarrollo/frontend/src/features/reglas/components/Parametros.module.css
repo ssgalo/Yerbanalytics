@@ -284,8 +284,11 @@
   background: var(--g800);
   color: var(--cream);
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Con 4–5 reglas la lista no entra en una línea: baja a la siguiente en lugar de cortarse. */
+  white-space: normal;
+  line-height: 1.4;
+  border-radius: 12px;
+  overflow-wrap: break-word;
 }
 
 .descripcion {

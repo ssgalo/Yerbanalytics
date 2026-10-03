@@ -194,16 +194,16 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
 
 ## 13. Frontend (D12) — después de 0.2
 
-- [ ] 13.1 `OperadorComparacion` suma `'EN'`; el Inspector lo muestra como "∈" (test del render de
+- [x] 13.1 `OperadorComparacion` suma `'EN'`; el Inspector lo muestra como "∈" (test del render de
       una comparación de ventana).
-- [ ] 13.2 Regenerar `fe/data/mock/catalogoReglas.fixture.json` con el catálogo real (las 7 reglas
+- [x] 13.2 Regenerar `fe/data/mock/catalogoReglas.fixture.json` con el catálogo real (las 7 reglas
       nuevas, sin las 3 viejas) y reescribir `fe/data/mock/trazaReglas.ts` para esas reglas; tests
       del mock en verde.
-- [ ] 13.3 Test: la pestaña Parámetros muestra `riego.sectores-simultaneos` en el grupo "Ejecución del
+- [x] 13.3 Test: la pestaña Parámetros muestra `riego.sectores-simultaneos` en el grupo "Ejecución del
       riego" (parámetros cuyo `usadoPor` no es una regla).
-- [ ] 13.4 Test: `RuleGraph` mapea un evento "Riego" a `record.regla` (o `RiegoPorDeficitRule` si
+- [x] 13.4 Test: `RuleGraph` mapea un evento "Riego" a `record.regla` (o `RiegoPorDeficitRule` si
       falta) en vez de `IrrigationRule` (`RuleGraph.tsx:129`).
-- [ ] 13.5 Test: el Historial muestra volumen, duración y regla de los riegos y nivel de las
+- [x] 13.5 Test: el Historial muestra volumen, duración y regla de los riegos y nivel de las
       alertas; el filtro de tipo suma "Alerta". El mock del mapa usa 45 % y "En cola".
 
 ## 14. Documentación

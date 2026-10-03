@@ -1,8 +1,8 @@
 /* Barra de filtros del historial: tipo · macro-zona · sector · resultado · rango de fechas */
 import styles from './HistorialFilters.module.css';
 
-const TIPO_OPTS = ['Todas', 'Riego', 'Insumo', 'Mediasombra'];
-const RES_OPTS = ['Todas', 'Efectiva', 'En seguimiento', 'Pospuesta', 'Abortada'];
+const TIPO_OPTS = ['Todas', 'Riego', 'Insumo', 'Mediasombra', 'Alerta'];
+const RES_OPTS = ['Todas', 'Efectiva', 'En seguimiento', 'Pospuesta', 'Abortada', 'Informativo'];
 
 export interface HistorialFilterState {
   tipo: string;

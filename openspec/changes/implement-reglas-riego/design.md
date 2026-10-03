@@ -554,3 +554,31 @@ Anotados al implementar los bloques 0–8 (los bloques siguientes parten de esto
 - **Pruebas de §9 con fábricas 42/60.** Mientras las reglas viejas estuvieron registradas, los tests fijaban a
   mano 45 / 70 (`evV2`); al pasar las fábricas en 10.5 se volvió a `ev`.
 
+### Desvíos de los bloques 11 a 13 (contrato, baja de `riegoVolMaxDiarioMl`, frontend)
+
+- **Firmware sin compilar (11.2).** No hay toolchain en la máquina de desarrollo (`pio`, `platformio` ni `arduino-cli`):
+  el cambio de `act_valvula.cpp` (`static_assert`, `#error` si falta `CAUDALIMETRO_INSTALADO`, y verificación de flujo
+  bajo `#if CAUDALIMETRO_INSTALADO`) se revisó a mano y queda **sin compilar**. Un `config.h` local sin el flag o con
+  `LIMITE_VALVULA_SEG_MAX 120` falla al compilar a propósito.
+- **Test del simulador (11.3).** El simulador no tenía runner: se sumó `npm test` (`tsx --test`, nativo de Node) y la lógica
+  del aviso vive en `valveDurationWarning` (`contract.ts`), que `mqtt.ts` sólo llama. El test de 11.1 del backend además
+  compara el valor contra `contrato.h` (se saltea si el firmware no está en el checkout).
+- **`riegoVolMaxDiarioMl` (DA-10).** `DROP COLUMN` en `migracion-reglas-riego.sql` (con su rollback comentado). La columna
+  era `NOT NULL`: hasta correr el script, el primer guardado de Configuración sobre una base **sin fila** falla; con la
+  fila existente no. Un cliente viejo que todavía mande el campo no rompe (Jackson ignora lo desconocido).
+- **Fixture del mock regenerado desde el backend (13.2).** Se generó leyendo los enums y las reglas del backend (no a mano) y
+  el test anti-drift vuelve a exigir igualdad total: mismas claves y definiciones, mismas reglas con su prioridad y sus
+  parámetros, y `usadoPor` incluyendo a los consumidores que no son reglas (`DespachoRiego`).
+- **Demo con casos de riego (13.2).** La lectura sorteada del vivero demo casi nunca está seca, así que MZ-2/3/4/5 fuerzan su
+  humedad de sustrato (40, 41, 30 y 82 %) para mostrar déficit común, pospuesto por lluvia, déficit crítico y saturado;
+  esas zonas cambian de estado (la humedad baja es "en observación" o "crítico"). Con la lluvia prevista (MZ-3) el déficit
+  común no deja válvulas abiertas ni en cola; el crítico riega igual. Los "Regando" (los 10 primeros de cada zona con
+  déficit) tienen un riego despachado en el ciclo: ahí corta la regla de ciclo.
+- **Grupo "Ejecución del riego" (13.3).** Va justo después de la rama a la que pertenece el consumidor (Riego) y no se
+  colapsa (un solo parámetro); el consumidor se rotula por un nombre legible en lugar del id de la clase.
+- **Layout del DAG del Inspector.** Con la rama de riego en siete nodos y etiquetas largas (`Minutos desde el último riego
+  (contra los del ciclo en curso)`), los nodos se solapaban: `ALTO_FILA` 142 → 172.
+- **Historial (13.4/13.5).** Un riego "Pospuesta" o "Abortada" ya no se pinta como acción en el DAG del Historial. Las
+  alertas (`sectorId` "—") no se atribuyen a ningún nodo ni ofrecen "razonamiento del motor"; se agrupan como "Alertas de
+  la macro-zona" y llevan un ícono propio (el backend les cae en el de riego por no definir uno para "Alerta").
+
