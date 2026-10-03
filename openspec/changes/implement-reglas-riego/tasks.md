@@ -177,12 +177,13 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
 
 ## 11. Contrato MQTT, firmware y simulador (D13)
 
-- [ ] 11.1 Test: `ContratoNodo.DURACION_VALVULA_MAX_SEG == 1200` y `CalculoRiego` lo usa como tope.
+- [x] 11.1 Test: `ContratoNodo.DURACION_VALVULA_MAX_SEG == 1200` y `CalculoRiego` lo usa como tope.
 - [ ] 11.2 `fw/comun/contrato.h`: `CONTRATO_VALVULA_DURACION_MAX_SEG 1200` con comentario de fuente
       de verdad. `fw/comun/config.example.h`: `LIMITE_VALVULA_SEG_MAX 1200` (con el porqué: 6 L a
       30 L/h = 720 s; 10 L = 1200 s) y `CAUDALIMETRO_INSTALADO 0`. `fw/actuacion/act_valvula.cpp`:
       `static_assert` del límite y saltear la verificación de flujo con el flag en 0. Compilar.
-- [ ] 11.3 Test (simulador): `contract.ts` exporta `VALVE_MAX_DURATION_SEC = 1200` y el log de
+      _(Escrito y revisado a mano; SIN COMPILAR: no hay toolchain en esta máquina. Queda sin tildar hasta compilar.)_
+- [x] 11.3 Test (simulador): `contract.ts` exporta `VALVE_MAX_DURATION_SEC = 1200` y el log de
       comandos avisa si `durationSec` lo supera. Sin cambios en su API ni en el backend.
 
 ## 12. Baja de `riegoVolMaxDiarioMl` (DA-10)

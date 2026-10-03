@@ -93,11 +93,19 @@
 // ----------------------------------------------------------------------------
 //  Límites de seguridad locales (última barrera física)
 // ----------------------------------------------------------------------------
-#define LIMITE_VALVULA_SEG_MAX     120    // apertura continua máx (s)
+// Apertura continua máx de la válvula (s). Debe ser >= CONTRATO_VALVULA_DURACION_MAX_SEG
+// (1200 s, contrato.h): el backend puede pedir hasta eso (10 L a 30 L/h = 1200 s; el
+// volumen por defecto de 6 L a 30 L/h son 720 s). Si tu config.h local dice 120, el
+// firmware no compila (act_valvula.cpp): actualizalo.
+#define LIMITE_VALVULA_SEG_MAX     1200
 #define LIMITE_BOMBA_ML_MAX        50     // dosis máx por comando (ml)
 #define LIMITE_CORRIENTE_MOTOR_MAX 3000   // umbral ADC de sobrecorriente
 #define TIMEOUT_FIN_CARRERA_MS     15000  // sin fin de carrera => atasco
 #define TIMEOUT_CAUDAL_MS          10000  // sin flujo => falla hidráulica
+// 1 => hay caudalímetro cableado: la válvula se cierra con falla_hidraulica si no hay
+// pulsos en TIMEOUT_CAUDAL_MS. 0 (prototipo, riega una bomba sin caudalímetro) => se
+// saltea la verificación de flujo; si no, todo riego terminaría en falla a los 10 s.
+#define CAUDALIMETRO_INSTALADO     0
 
 // Factor de calibración de la bomba peristáltica (ms de bombeo por ml).
 #define BOMBA_MS_POR_ML            1000

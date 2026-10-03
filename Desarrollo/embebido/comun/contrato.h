@@ -66,6 +66,14 @@ static const char* ACT_VALVE      = "valve";
 static const char* ACT_PUMP       = "pump";
 static const char* ACT_SHADE      = "shade";
 
+// Duración máxima de apertura de la válvula que el backend puede pedir en "durationSec" (s).
+// Fuente de verdad del valor: este archivo. Espejos que deben decir lo mismo:
+//   - backend:   ContratoNodo.DURACION_VALVULA_MAX_SEG
+//   - simulador: simulador/server/contract.ts (VALVE_MAX_DURATION_SEC)
+// El límite local LIMITE_VALVULA_SEG_MAX (config.h) debe ser >= a este valor
+// (act_valvula.cpp lo verifica al compilar).
+#define CONTRATO_VALVULA_DURACION_MAX_SEG 1200
+
 // ----------------------------------------------------------------------------
 //  Claves JSON - Ack
 // ----------------------------------------------------------------------------

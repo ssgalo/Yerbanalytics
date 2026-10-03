@@ -11,7 +11,8 @@
     "dev": "tsx watch --ignore \"**/*.timestamp-*.mjs\" --ignore \"data/**\" server/index.ts",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts --prod",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test server/*.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",

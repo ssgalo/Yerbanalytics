@@ -1,5 +1,16 @@
 #include "act_valvula.h"
 #include "config.h"
+#include "contrato.h"
+
+#ifndef CAUDALIMETRO_INSTALADO
+#error "Falta CAUDALIMETRO_INSTALADO en config.h: copiá el bloque de config.example.h (0 = sin caudalímetro)"
+#endif
+
+// El límite local es la última barrera, pero no puede quedar por debajo de lo que el
+// contrato permite pedir: recortaría los riegos largos en silencio. Un config.h viejo
+// (120 s) falla acá al compilar.
+static_assert(LIMITE_VALVULA_SEG_MAX >= CONTRATO_VALVULA_DURACION_MAX_SEG,
+              "LIMITE_VALVULA_SEG_MAX (config.h) debe ser >= CONTRATO_VALVULA_DURACION_MAX_SEG (contrato.h)");
 
 namespace act_valvula {
 
@@ -38,8 +49,10 @@ void ejecutar(const Comando& cmd, Ack& ack) {
   digitalWrite(PIN_RELE_VALVULA, HIGH);
   Serial.printf("[valvula] Abierta por %lds\n", duracion);
 
-  // Verificar que haya flujo dentro del timeout (detección de falla hidráulica).
   uint32_t inicio = millis();
+
+#if CAUDALIMETRO_INSTALADO
+  // Verificar que haya flujo dentro del timeout (detección de falla hidráulica).
   bool hayFlujo = false;
   while (millis() - inicio < (uint32_t) TIMEOUT_CAUDAL_MS) {
     if (pulsosCaudal > 0) { hayFlujo = true; break; }
@@ -52,6 +65,7 @@ void ejecutar(const Comando& cmd, Ack& ack) {
     strncpy(ack.tipoDetalle, "falla_hidraulica", sizeof(ack.tipoDetalle));
     return;
   }
+#endif
 
   // Mantener abierta el resto de la duración.
   long restanteMs = duracion * 1000L - (long)(millis() - inicio);

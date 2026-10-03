@@ -91,6 +91,16 @@ Flags clave:
   (nodo combinado). Solo afecta a los nodos que sensan.
 - **`ENVIAR_METRICAS_EXTENDIDAS`**: `0` → solo las 5 métricas base (100% compatible
   con el backend actual). `1` → agrega pH/N/P/K/etc. **Requiere cambio backend** (ver §7).
+- **`CAUDALIMETRO_INSTALADO`**: `0` (de fábrica, el prototipo no tiene caudalímetro) →
+  la válvula no verifica flujo; `1` → si no hay pulsos en `TIMEOUT_CAUDAL_MS` cierra y
+  reporta `falla_hidraulica`. Con el flag en `1` y sin caudalímetro, todo riego falla a los 10 s.
+
+Límite de la válvula: **`LIMITE_VALVULA_SEG_MAX` = 1200 s**, igual al máximo del contrato
+(`CONTRATO_VALVULA_DURACION_MAX_SEG` en `comun/contrato.h`; espejo en `ContratoNodo.java` y
+en `simulador/server/contract.ts`). El backend calcula la duración de cada riego (volumen ÷
+caudal) y nunca pide más de 1200 s; el límite local sigue siendo la última barrera. Si tu
+`config.h` local es anterior y dice 120, **el firmware no compila** (`static_assert` en
+`actuacion/act_valvula.cpp`): copiá el valor nuevo y el flag de `config.example.h`.
 
 ---
 

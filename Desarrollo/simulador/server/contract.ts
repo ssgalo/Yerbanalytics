@@ -27,6 +27,32 @@ export function ceToMicroSPerCm(ceDsPerM: number | null | undefined): number | u
   return ceDsPerM === null || ceDsPerM === undefined ? undefined : ceDsPerM * CE_USCM_PER_DSM;
 }
 
+/**
+ * Longest valve opening, in seconds, the backend may ask for in a `valve ON` command's
+ * `durationSec`. Mirrors CONTRATO_VALVULA_DURACION_MAX_SEG in contrato.h (and
+ * ContratoNodo.DURACION_VALVULA_MAX_SEG on the backend). The real firmware's local limit is
+ * the same value; a command above it means the three copies of the contract drifted apart.
+ */
+export const VALVE_MAX_DURATION_SEC = 1200;
+
+/**
+ * Warning for a command that asks the valve to stay open longer than the contract allows, or
+ * `null` when it is fine (or is not a valve command). The simulator only logs it: it does not
+ * reject anything, so the problem stays visible instead of being silently trimmed.
+ */
+export function valveDurationWarning(command: {
+  actuador?: string;
+  parametros?: Record<string, unknown>;
+}): string | null {
+  if (command.actuador !== 'valve') return null;
+  const duration = command.parametros?.durationSec;
+  if (typeof duration !== 'number' || duration <= VALVE_MAX_DURATION_SEC) return null;
+  return (
+    `valve durationSec=${duration} exceeds the contract maximum of ${VALVE_MAX_DURATION_SEC} s;` +
+    ' the real firmware would trim it'
+  );
+}
+
 /** Telemetry topic of a macro-zone. The one the backend listens on and the firmware publishes to. */
 export function telemetryTopic(zonaId: string): string {
   return `nursery/zone/${zonaId}/telemetry`;
