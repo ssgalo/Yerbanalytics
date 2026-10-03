@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.riego.ColaRiego;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.service.HistorialService;
@@ -20,9 +22,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Caracterización del {@code ActionExecutor} al sacar la publicación MQTT a
- * {@link ComandoActuadorPublisher} (tarea 8.2): el riego actual (válvula con duración del motivo,
- * enganche "Regando"), la bomba y la mediasombra publican exactamente lo mismo que antes.
+ * La publicación MQTT del {@code ActionExecutor}: la bomba y la mediasombra publican exactamente lo mismo
+ * que siempre. La válvula ya NO se publica acá: {@code ACTIVAR_VALVULA} se encola y la abre el despacho
+ * (ver {@code ActionExecutorColaTest}).
  */
 @DisplayName("ActionExecutor - publicación de comandos")
 class ActionExecutorPublicacionTest {
@@ -39,7 +41,7 @@ class ActionExecutorPublicacionTest {
         publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c-1", null));
-        executor = new ActionExecutor(historial, publisher);
+        executor = new ActionExecutor(historial, publisher, new ColaRiego());
         ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-1");
         sector = RuleContextTestFactory.sectorBasico("MZ-1-001");
         sector.setZona(zona);
@@ -48,36 +50,8 @@ class ActionExecutorPublicacionTest {
     }
 
     @Test
-    void activarValvulaRegistraElRiegoYPublicaConLaDuracionDelMotivo() {
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_VALVULA, "IrrigationRule",
-                "Humedad 38%. [tiempo-max-seg=120]")), ctx);
-
-        verify(historial).registrarRiego(sector);
-        verify(publisher).publicar("MZ-1", "MZ-1-001", "valve", "ON", Map.of("durationSec", 120));
-        assertThat(sector.getActuadorValve()).isEqualTo("Regando");
-    }
-
-    @Test
-    void conLaValvulaYaRegandoNoVuelveARegarNiARegistrar() {
-        sector.setActuadorValve("Regando");
-
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_VALVULA, "IrrigationRule",
-                "Humedad 38%. [tiempo-max-seg=120]")), ctx);
-
-        verify(historial, never()).registrarRiego(any());
-        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void sinDuracionEnElMotivoUsaLos600SegundosDeSiempre() {
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_VALVULA, "IrrigationRule", "sin patrón")), ctx);
-
-        verify(publisher).publicar("MZ-1", "MZ-1-001", "valve", "ON", Map.of("durationSec", 600));
-    }
-
-    @Test
     void activarBombaPublicaPumpOn() {
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis")), ctx);
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis")), ctx, OrigenEvaluacion.TELEMETRIA);
 
         verify(historial).registrarInsumo(sector);
         verify(publisher).publicar("MZ-1", "MZ-1-001", "pump", "ON", Map.of());
@@ -85,7 +59,7 @@ class ActionExecutorPublicacionTest {
 
     @Test
     void moverMediasombraPublicaElPorcentajeDelMotivo() {
-        executor.execute(List.of(RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "ShadingRule", "cerrar [apertura=40]")), ctx);
+        executor.execute(List.of(RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "ShadingRule", "cerrar [apertura=40]")), ctx, OrigenEvaluacion.TELEMETRIA);
 
         verify(publisher).publicar("MZ-1", "MZ-1-001", "shade", "SET", Map.of("targetPct", 40));
         assertThat(sector.getActuadorShade()).isEqualTo(40);
@@ -98,7 +72,7 @@ class ActionExecutorPublicacionTest {
 
         executor.execute(List.of(
                 RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "ShadingRule", "cerrar [apertura=40]"),
-                RuleAction.noopInfo("X", "m")), ctx);
+                RuleAction.noopInfo("X", "m")), ctx, OrigenEvaluacion.TELEMETRIA);
 
         verify(historial).registrarInaccion(eq(sector), eq(ActionType.NOOP_INFO), eq("X"), eq("m"));
     }

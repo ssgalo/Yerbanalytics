@@ -9,6 +9,8 @@ import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -19,6 +21,7 @@ import java.util.List;
  * ventana incluye el minuto de su hora de fin: la lectura de las 18:00 todavía entra (18:00:59 adentro,
  * 18:01:00 afuera).
  */
+@Component
 public class FueraDeVentanaRiegoRule implements Rule {
 
     private static final int PRIORITY = 6;

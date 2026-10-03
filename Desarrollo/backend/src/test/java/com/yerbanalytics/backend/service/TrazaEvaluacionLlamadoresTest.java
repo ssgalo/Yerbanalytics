@@ -33,6 +33,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -97,7 +98,7 @@ class TrazaEvaluacionLlamadoresTest {
         NurseryService service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 historialService, configuracionService, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
-                manualLockRepository, mock(DiagnosticoService.class), store, parametros,
+                manualLockRepository, mock(DiagnosticoService.class), store, parametros, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
                 java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
 
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, System.currentTimeMillis(),
@@ -108,7 +109,7 @@ class TrazaEvaluacionLlamadoresTest {
             assertThat(store.ultima(sector, OrigenEvaluacion.BARRIDO)).isEmpty();
         }
         ArgumentCaptor<List<RuleAction>> acciones = ArgumentCaptor.forClass(List.class);
-        verify(actionExecutor, times(2)).execute(acciones.capture(), any(RuleContext.class));
+        verify(actionExecutor, times(2)).execute(acciones.capture(), any(RuleContext.class), eq(OrigenEvaluacion.TELEMETRIA));
         assertThat(acciones.getAllValues()).allSatisfy(l -> assertThat(l).extracting(RuleAction::type)
                 .containsExactly(ActionType.NOOP_INFO));
     }
@@ -148,6 +149,6 @@ class TrazaEvaluacionLlamadoresTest {
         }
         assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA)).isPresent();
         assertThat(store.ultima("MZ-1-002", OrigenEvaluacion.TELEMETRIA)).isEmpty();
-        verify(actionExecutor, times(2)).execute(any(), any(RuleContext.class));
+        verify(actionExecutor, times(2)).execute(any(), any(RuleContext.class), eq(OrigenEvaluacion.BARRIDO));
     }
 }

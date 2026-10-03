@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static com.yerbanalytics.backend.engine.ReglaTestSupport.evV2;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("PausaTrasAplicacionRule (R-06)")
@@ -26,7 +26,7 @@ class PausaTrasAplicacionRuleTest {
     @Test
     @DisplayName("aplicación hace 5 h 59 min 59 s → ABORT_RIEGO del sector")
     void dentroDeLaPausa() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
         RuleContext ctx = RiegoCtx.a("11:00").humedad(40.0).ultimaAplicacionHace(5, 59, 59).build();
 
         List<RuleAction> acciones = rule.evaluate(ctx, ev);
@@ -43,13 +43,13 @@ class PausaTrasAplicacionRuleTest {
     void pausaCumplida() {
         RuleContext ctx = RiegoCtx.a("11:00").humedad(40.0).ultimaAplicacionHace(6, 0, 0).build();
 
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule)))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
     @DisplayName("sin aplicaciones → NOOP_INFO")
     void sinAplicaciones() {
-        assertThat(tipos(rule.evaluate(RiegoCtx.a("11:00").humedad(40.0).build(), evV2(rule))))
+        assertThat(tipos(rule.evaluate(RiegoCtx.a("11:00").humedad(40.0).build(), ev(rule))))
                 .containsExactly(ActionType.NOOP_INFO);
     }
 
@@ -58,7 +58,7 @@ class PausaTrasAplicacionRuleTest {
     void conDeficitCritico_noAplica() {
         RuleContext ctx = RiegoCtx.a("11:00").humedad(34.0).ultimaAplicacionHace(1, 0, 0).build();
 
-        List<RuleAction> acciones = rule.evaluate(ctx, evV2(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx, ev(rule));
 
         assertThat(tipos(acciones)).containsExactly(ActionType.NOOP_INFO);
         assertThat(acciones.get(0).motivo()).containsIgnoringCase("no aplica");
@@ -69,7 +69,7 @@ class PausaTrasAplicacionRuleTest {
     void sinDeficit_noAplica() {
         RuleContext ctx = RiegoCtx.a("11:00").humedad(50.0).ultimaAplicacionHace(1, 0, 0).build();
 
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule)))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
@@ -77,9 +77,9 @@ class PausaTrasAplicacionRuleTest {
     void overrideDeLaPausa() {
         RuleContext ctx = RiegoCtx.a("11:00").humedad(40.0).ultimaAplicacionHace(3, 0, 0).build();
 
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule, Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "2")))))
+        assertThat(tipos(rule.evaluate(ctx, ev(rule, Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "2")))))
                 .containsExactly(ActionType.NOOP_INFO);
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule, Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "24")))))
+        assertThat(tipos(rule.evaluate(ctx, ev(rule, Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "24")))))
                 .containsExactly(ActionType.ABORT_RIEGO);
     }
 

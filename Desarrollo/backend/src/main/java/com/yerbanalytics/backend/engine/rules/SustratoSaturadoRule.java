@@ -12,6 +12,8 @@ import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -25,6 +27,7 @@ import java.util.List;
  * <p>Va antes que R-02: son excluyentes (una sola humedad por macro-zona y {@code bloqueo > crítico}
  * por rango), así que nunca le quita el paso.
  */
+@Component
 public class SustratoSaturadoRule implements Rule {
 
     private static final int PRIORITY = 3;

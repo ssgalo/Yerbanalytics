@@ -520,3 +520,37 @@ Anotados al implementar los bloques 0–8 (los bloques siguientes parten de esto
   snapshot de `NurseryService` y el día de ciclo de `ShadingRule` usan el `Clock` del vivero y su zona.
 - **Topología regenerada.** Después del commit se vacían también la cola de riego y lo que estaba regando.
 
+### Desvíos de los bloques 9 y 10 (reglas y conmutación)
+
+- **Compuertas R-03/R-05/R-06 y "aplica R-01".** Registran SIEMPRE las dos comparaciones `humedad ≥ crítico` y
+  `humedad < umbral` (no sólo la que falla), así el Inspector muestra por qué aplicaron o no. El motivo de
+  "no aplica" distingue "lo cubre R-02" de "no hay déficit" y de "sin lectura".
+- **Regla de ciclo (D5).** Sus comparaciones son en minutos ("desde el último riego" ≤ "desde el inicio del
+  ciclo") y en segundos restantes del riego en curso (0 si no hay): el Inspector no muestra epoch ms. Un sector
+  que nunca regó queda `SIN_DATO` en la primera comparación (no corta). El "riego en curso" lo da
+  `DespachoRiego.finRiegoEnCurso` (memoria, incluye el margen de 5 s), que además cubre la ventana entre el
+  despacho y la escritura del historial.
+- **R-02 sin riego crítico previo** no registra la comparación del tope (no hay con qué comparar); con uno
+  previo la registra (`horas desde el último riego crítico < exceptuado-bloqueo`).
+- **R-03 y "sin dato".** Probabilidad y milímetros se comparan por separado; si falta cualquiera de los dos
+  (sin pronóstico, sin marcas horarias o la API devolvió `null`) esa comparación queda `SIN_DATO` y no pospone.
+- **Alertas (D10).** `registrarAlerta` guarda `sectorId = "—"` (alcance macro-zona, como los eventos de
+  Configuración) y `sev = "—"`. La deduplicación `zona|regla → inicio de ciclo` es en memoria; sin inicio de
+  ciclo en el contexto (barrido) lo calcula del reloj y del intervalo; si la persistencia falla se reintenta
+  en la próxima evaluación del ciclo.
+- **`ContextoRiego.humSusTs`** se completa con `zona.humSusTs` (no lo lee ninguna regla: `StaleSensorRule` sigue
+  leyendo la entidad).
+- **10.4 sin `@SpringBootTest`.** Levantar el contexto apunta a la base de desarrollo y al broker reales y el
+  despacho publicaría comandos de verdad; el test de punta a punta cablea las piezas reales a mano (reglas,
+  orquestador, executor, cola, despacho, `NurseryService` y `NurseryWatchdog`) con repositorios en memoria,
+  publicador falso y `RelojDePrueba`. El cableado de Spring lo cubren `ReglasParametrosCatalogoRealTest` (arranca
+  el contexto con las siete reglas y el `DespachoRiego`) y `SchedulersConfigTest`.
+- **10.6 con contexto real.** El orden de la rama RIEGO del DAG, las etiquetas y el `usadoPor` se verifican en
+  `ReglasParametrosCatalogoRealTest` (contexto real); `RuleEngineSchemaControllerTest` (`@WebMvcTest`) sólo
+  conserva la forma del DTO con reglas falsas.
+- **Barrido (D4).** Sin cambios de diseño: evalúa sin métricas y con `ContextoRiego.vacio()`, `BARRIDO` no toca
+  la cola, y una lectura vieja la corta `StaleSensorRule`. No hay riegos duplicados ni reencolado por pasada
+  (cubierto en `RiegoIntegracionTest`).
+- **Pruebas de §9 con fábricas 42/60.** Mientras las reglas viejas estuvieron registradas, los tests fijaban a
+  mano 45 / 70 (`evV2`); al pasar las fábricas en 10.5 se volvió a `ev`.
+

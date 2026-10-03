@@ -5,13 +5,15 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /**
- * Parámetros de la rama de riego.
+ * Parámetros de la rama de riego: los de las reglas R-01…R-06 y la regla de ciclo, con los valores de
+ * {@code reglas_v2} §5 y §11. Un parámetro compartido (umbral de riego, umbral crítico, ventana…) existe UNA
+ * vez y lo declaran todas las reglas que lo leen.
  *
- * <p>Conviven dos generaciones. Los de las reglas viejas ({@code tiempo-max-apertura},
- * {@code max-riegos-24h}, {@code max-riegos-24h-sector}) salen con la conmutación a las reglas
- * R-01…R-06 (valores de {@code reglas_v2} §5 y §11), y {@code umbral-humedad} / {@code lluvia-probabilidad}
- * pasan entonces de 42 / 60 a 45 / 70 de fábrica: hasta ese momento las reglas viejas siguen leyéndolos,
- * así que sus valores no se tocan.
+ * <p>Las claves de las reglas anteriores ({@code tiempo-max-apertura}, {@code max-riegos-24h},
+ * {@code max-riegos-24h-sector}) ya no existen: el tiempo sale del volumen ÷ caudal y el riego en bucle lo evita
+ * el ciclo de lectura. Un override viejo de esas claves se ignora (ver {@code migracion-reglas-riego.sql}).
+ * {@code umbral-humedad} y {@code lluvia-probabilidad} pasaron de 42 / 60 a 45 / 70 de fábrica; un override
+ * existente se respeta.
  */
 @Getter
 @Accessors(fluent = true)
@@ -21,23 +23,11 @@ public enum ParametrosRiego implements DefinicionParametro {
     UMBRAL_HUMEDAD("riego.umbral-humedad",
             "Umbral de riego (humedad de sustrato)",
             "Por debajo de esta humedad de sustrato el sector necesita riego.",
-            TipoParametro.NUMERO, "%", "42", 35.0, 60.0, 0, "motor-reglas: IrrigationRule"),
-    TIEMPO_MAX_APERTURA("riego.tiempo-max-apertura",
-            "Tiempo máximo de apertura de la electroválvula",
-            "Duración máxima de un evento de riego.",
-            TipoParametro.ENTERO, "s", "120", 10.0, 600.0, 0, "motor-reglas: IrrigationRule"),
-    MAX_RIEGOS_24H("riego.max-riegos-24h",
-            "Máximo de riegos en 24 h (límite de volumen)",
-            "Con esta cantidad de riegos en 24 h el sector alcanzó su límite diario y no se riega más.",
-            TipoParametro.ENTERO, "riegos", "2", 1.0, 10.0, 0, "motor-reglas: DailyVolumeLimitRule"),
-    MAX_RIEGOS_24H_SECTOR("riego.max-riegos-24h-sector",
-            "Máximo de riegos en 24 h (decisión de riego)",
-            "Con esta cantidad de riegos en 24 h la regla de riego no vuelve a regar el sector.",
-            TipoParametro.ENTERO, "riegos", "1", 1.0, 10.0, 0, "motor-reglas: IrrigationRule"),
+            TipoParametro.NUMERO, "%", "45", 35.0, 60.0, 0, "reglas_v2 §5 R-01 / §11 Riego"),
     LLUVIA_PROBABILIDAD("riego.lluvia-probabilidad",
             "Probabilidad de lluvia que posterga el riego",
-            "Con una probabilidad de lluvia igual o mayor a esta, se posterga el riego.",
-            TipoParametro.NUMERO, "%", "60", 50.0, 95.0, 0, "motor-reglas: WeatherOverrideRule"),
+            "Con una probabilidad de lluvia igual o mayor a esta (y los milímetros configurados), se posterga el riego.",
+            TipoParametro.NUMERO, "%", "70", 50.0, 95.0, 0, "reglas_v2 §5 R-03 / §11 Riego"),
 
     // --- Reglas de riego v2 (reglas_v2 §5 y §11) ---
 

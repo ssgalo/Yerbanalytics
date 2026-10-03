@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static com.yerbanalytics.backend.engine.ReglaTestSupport.evV2;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("SustratoSaturadoRule (R-04)")
@@ -25,7 +25,7 @@ class SustratoSaturadoRuleTest {
     }
 
     private List<RuleAction> con(Double h) {
-        return rule.evaluate(RiegoCtx.a("10:05").humedad(h).build(), evV2(rule));
+        return rule.evaluate(RiegoCtx.a("10:05").humedad(h).build(), ev(rule));
     }
 
     @Test
@@ -66,7 +66,7 @@ class SustratoSaturadoRuleTest {
     @Test
     @DisplayName("override de bloqueo 70: 72 % bloquea")
     void overrideDelBloqueo() {
-        Evaluacion ev = evV2(rule, Map.of(ParametrosRiego.SATURACION_BLOQUEO, "70"));
+        Evaluacion ev = ev(rule, Map.of(ParametrosRiego.SATURACION_BLOQUEO, "70"));
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").humedad(72.0).build(), ev);
 
@@ -76,7 +76,7 @@ class SustratoSaturadoRuleTest {
     @Test
     @DisplayName("override de alerta 78: 78 % alerta")
     void overrideDeLaAlerta() {
-        Evaluacion ev = evV2(rule, Map.of(ParametrosRiego.SATURACION_ALERTA, "78"));
+        Evaluacion ev = ev(rule, Map.of(ParametrosRiego.SATURACION_ALERTA, "78"));
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").humedad(78.0).build(), ev);
 
@@ -86,7 +86,7 @@ class SustratoSaturadoRuleTest {
     @Test
     @DisplayName("sin lectura de humedad → SIN_DATO y NOOP_INFO (no bloquea)")
     void sinHumedad() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").build(), ev);
 
@@ -97,7 +97,7 @@ class SustratoSaturadoRuleTest {
     @Test
     @DisplayName("la traza registra la humedad contra el bloqueo (≥) y, si bloquea, contra la alerta")
     void traza() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         rule.evaluate(RiegoCtx.a("10:05").humedad(76.0).build(), ev);
 

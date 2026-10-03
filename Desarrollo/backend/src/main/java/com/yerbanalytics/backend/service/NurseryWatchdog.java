@@ -156,7 +156,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
 
                 ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.BARRIDO);
                 trazaStore.guardar(resultado.traza());
-                actionExecutor.execute(resultado.acciones(), ctx);
+                actionExecutor.execute(resultado.acciones(), ctx, OrigenEvaluacion.BARRIDO);
                 totalSectores++;
             }
         }

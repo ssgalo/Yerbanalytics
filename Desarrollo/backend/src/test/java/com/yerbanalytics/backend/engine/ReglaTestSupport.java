@@ -28,28 +28,6 @@ public final class ReglaTestSupport {
         return ParametrosVigentes.de(valores);
     }
 
-    /**
-     * Fábrica con los umbrales de v2 fijados a mano (umbral de riego 45 %, lluvia 70 %): hasta la
-     * conmutación (10.5) las fábricas de esas dos claves siguen en 42 / 60 porque las reglas viejas las leen.
-     * En 10.5 este método se reemplaza por {@link #ev(Rule)}.
-     */
-    public static ParametrosVigentes vigentesV2() {
-        return con(Map.of(com.yerbanalytics.backend.engine.parametros.ParametrosRiego.UMBRAL_HUMEDAD, "45",
-                com.yerbanalytics.backend.engine.parametros.ParametrosRiego.LLUVIA_PROBABILIDAD, "70"));
-    }
-
-    public static Evaluacion evV2(Rule rule) {
-        return evV2(rule, Map.of());
-    }
-
-    public static Evaluacion evV2(Rule rule, Map<DefinicionParametro, String> overrides) {
-        Map<DefinicionParametro, String> todos = new HashMap<>();
-        todos.put(com.yerbanalytics.backend.engine.parametros.ParametrosRiego.UMBRAL_HUMEDAD, "45");
-        todos.put(com.yerbanalytics.backend.engine.parametros.ParametrosRiego.LLUVIA_PROBABILIDAD, "70");
-        todos.putAll(overrides);
-        return new Evaluacion(rule, con(todos));
-    }
-
     public static Evaluacion ev(Rule rule) {
         return new Evaluacion(rule, fabrica());
     }

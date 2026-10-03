@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.util.List;
 import java.util.Map;
 
-import static com.yerbanalytics.backend.engine.ReglaTestSupport.evV2;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("FueraDeVentanaRiegoRule (R-05)")
@@ -39,7 +39,7 @@ class FueraDeVentanaRiegoRuleTest {
     })
     @DisplayName("bordes de la ventana 06:00-18:00 (cerrada al minuto)")
     void bordesDeLaVentana(String hora, ActionType esperado) {
-        List<RuleAction> acciones = rule.evaluate(RiegoCtx.a(hora).humedad(40.0).build(), evV2(rule));
+        List<RuleAction> acciones = rule.evaluate(RiegoCtx.a(hora).humedad(40.0).build(), ev(rule));
 
         assertThat(tipos(acciones)).containsExactly(esperado);
     }
@@ -47,7 +47,7 @@ class FueraDeVentanaRiegoRuleTest {
     @Test
     @DisplayName("la traza muestra 'Hora local 17:42 ∈ 06:00-18:00' con la clave de la ventana")
     void trazaDeLaVentana() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         rule.evaluate(RiegoCtx.a("17:42").humedad(40.0).build(), ev);
 
@@ -65,13 +65,13 @@ class FueraDeVentanaRiegoRuleTest {
         RuleContext ctx = RiegoCtx.a("17:30").humedad(40.0).build();
         assertThat(ctx.now().toString()).isEqualTo("2026-10-05T20:30:00Z");
 
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule)))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
     @DisplayName("ventana modificada 07:00-17:00 y 06:30 con 40 % → ABORT_RIEGO con '06:30 ∈ 07:00-17:00 ✗'")
     void ventanaModificada() {
-        Evaluacion ev = evV2(rule, Map.of(ParametrosRiego.VENTANA_NORMAL, "07:00-17:00"));
+        Evaluacion ev = ev(rule, Map.of(ParametrosRiego.VENTANA_NORMAL, "07:00-17:00"));
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("06:30").humedad(40.0).build(), ev);
 
@@ -86,7 +86,7 @@ class FueraDeVentanaRiegoRuleTest {
     @CsvSource({"34", "45", "50", "80"})
     @DisplayName("sin déficit común (h < crítico o h ≥ umbral) no aplica: lo cubre R-02 o no hay déficit")
     void noAplica(double h) {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("23:30").humedad(h).build(), ev);
 
@@ -98,14 +98,14 @@ class FueraDeVentanaRiegoRuleTest {
     @Test
     @DisplayName("35 % (en el crítico) ya es déficit común: a las 23:30 corta")
     void enElCritico_aplicaYCorta() {
-        assertThat(tipos(rule.evaluate(RiegoCtx.a("23:30").humedad(35.0).build(), evV2(rule))))
+        assertThat(tipos(rule.evaluate(RiegoCtx.a("23:30").humedad(35.0).build(), ev(rule))))
                 .containsExactly(ActionType.ABORT_RIEGO);
     }
 
     @Test
     @DisplayName("sin humedad → no aplica (SIN_DATO) y NOOP_INFO")
     void sinHumedad() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("23:30").build(), ev);
 

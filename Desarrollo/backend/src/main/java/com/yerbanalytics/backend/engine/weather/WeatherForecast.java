@@ -12,7 +12,7 @@ import java.util.List;
  * <p>Campos que consumen las reglas del motor:
  * <ul>
  *   <li>{@link #probLluviaPct} — probabilidad de lluvia en el horizonte próximo (0–100).
- *       Evaluado por {@code WeatherOverrideRule} para posponer el riego.</li>
+ *       Evaluado por {@code PosponerPorLluviaRule} (junto con los milímetros) para posponer el riego.</li>
  *   <li>{@link #uvIndex} — índice UV (0–11+). Evaluado por {@code ShadingRule}.</li>
  *   <li>{@link #timestamp} — momento en que se obtuvo el pronóstico; permite detectar
  *       si la cache está desactualizada.</li>

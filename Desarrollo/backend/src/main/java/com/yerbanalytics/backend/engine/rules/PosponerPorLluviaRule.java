@@ -13,6 +13,8 @@ import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -26,6 +28,7 @@ import java.util.List;
  * <p>Sin pronóstico (o sin marcas horarias) las comparaciones quedan {@code SIN_DATO} y no pospone (O-01:
  * se asume que no llueve). Con déficit crítico no aplica: R-02 gana al clima (principio 3).
  */
+@Component
 public class PosponerPorLluviaRule implements Rule {
 
     private static final int PRIORITY = 8;

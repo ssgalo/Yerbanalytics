@@ -50,13 +50,13 @@ class RuleEngineSchemaControllerTest {
     void cadaNodoDeReglaTraeSusParametros_yLosEspecialesUnaListaVacia() throws Exception {
         when(orchestrator.getRules()).thenReturn(List.of(
                 regla("ManualLockRule", 1, RuleBranch.GLOBAL),
-                regla("IrrigationRule", 10, RuleBranch.RIEGO,
-                        ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.TIEMPO_MAX_APERTURA)));
+                regla("RiegoPorDeficitRule", 10, RuleBranch.RIEGO,
+                        ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.HUMEDAD_OBJETIVO)));
 
         mockMvc.perform(get("/api/rules/schema"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nodes[?(@.id=='IrrigationRule')].parametros[*]",
-                        contains("riego.umbral-humedad", "riego.tiempo-max-apertura")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='RiegoPorDeficitRule')].parametros[*]",
+                        contains("riego.umbral-humedad", "riego.humedad-objetivo")))
                 .andExpect(jsonPath("$.nodes[?(@.id=='ManualLockRule')].parametros[*]", empty()))
                 // Los nodos especiales siempre traen el campo, aunque vacío.
                 .andExpect(jsonPath("$.nodes[?(@.id=='start')].parametros", hasSize(1)))

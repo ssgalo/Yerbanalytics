@@ -10,6 +10,8 @@ import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -19,6 +21,7 @@ import java.util.List;
  * {@code riego.pausa-tras-aplicacion} horas, emite {@code ABORT_RIEGO} para ese sector (el agua lavaría el
  * producto). Los demás sectores de la macro-zona siguen su curso; R-02 sí puede regarlo.
  */
+@Component
 public class PausaTrasAplicacionRule implements Rule {
 
     private static final int PRIORITY = 7;

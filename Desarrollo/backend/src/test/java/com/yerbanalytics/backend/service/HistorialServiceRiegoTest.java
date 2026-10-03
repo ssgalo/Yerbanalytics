@@ -89,4 +89,26 @@ class HistorialServiceRiegoTest {
         assertThat(e.getUmbralRecuperacion()).isEqualTo(5.0);
         assertThat(e.getEvoEvaluadoTs()).isNull();
     }
+
+    @Test
+    void registrarAlertaGuardaUnEventoAlertaDeLaMacroZonaConSuNivelYRegla() {
+        service.registrarAlerta("MZ-2", "Macro-zona 2", "DeficitCriticoRule",
+                new com.yerbanalytics.backend.engine.DetalleAlerta(com.yerbanalytics.backend.engine.NivelAlerta.CRITICAL,
+                        "Déficit hídrico crítico"), 9_999L);
+
+        ArgumentCaptor<HistorialEventoEntity> c = ArgumentCaptor.forClass(HistorialEventoEntity.class);
+        verify(historialRepository).save(c.capture());
+        HistorialEventoEntity e = c.getValue();
+        assertThat(e.getTipo()).isEqualTo("Alerta");
+        assertThat(e.getZonaId()).isEqualTo("MZ-2");
+        assertThat(e.getZonaName()).isEqualTo("Macro-zona 2");
+        assertThat(e.getSectorId()).isEqualTo("—");
+        assertThat(e.getAlerta()).isEqualTo("CRITICAL");
+        assertThat(e.getRegla()).isEqualTo("DeficitCriticoRule");
+        assertThat(e.getTs()).isEqualTo(9_999L);
+        assertThat(e.getDecision()).contains("Déficit hídrico crítico");
+        assertThat(e.isEvoShow()).isFalse();
+        assertThat(e.getVolumenL()).isNull();
+        assertThat(e.getDuracionSeg()).isNull();
+    }
 }

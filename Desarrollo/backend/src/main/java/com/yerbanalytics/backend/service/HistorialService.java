@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
 import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
+import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -30,6 +31,8 @@ import java.util.*;
  */
 @Service
 public class HistorialService {
+
+    private static final String EMDASH = "—";
 
     private static final ColorPair VERDICT_EFECTIVA = new ColorPair("#E7F1EA", "#2E7A4F");
     private static final ColorPair VERDICT_SEGUIMIENTO = new ColorPair("#F3ECDD", "#8A6A22");
@@ -97,6 +100,31 @@ public class HistorialService {
                 + (detalle.recortado() ? " (duración recortada al máximo de la válvula)." : "."));
         e.setAccion("Electroválvula abierta · riego autónomo en curso.");
         withSeguimiento(e, detalle.humedad());
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra una alerta del motor (INFO | WARNING | CRITICAL). Su alcance es la macro-zona, no un sector:
+     * el evento queda con {@code sectorId = "—"} (igual que los de Configuración) y se filtra por zona.
+     * {@code ts} es el instante de la evaluación (reloj del vivero).
+     */
+    public void registrarAlerta(String zonaId, String zonaName, String regla, DetalleAlerta detalle, long ts) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(zonaId);
+        e.setZonaName(zonaName != null ? zonaName : zonaId);
+        e.setTipo("Alerta");
+        e.setTs(ts);
+        e.setRegla(regla);
+        e.setAlerta(detalle.nivel().name());
+        e.setLectura("Alerta de la macro-zona " + zonaId + " (regla " + regla + ").");
+        e.setDecision(detalle.texto());
+        e.setAccion("Alerta " + detalle.nivel().name() + " registrada para el operador.");
+        e.setRes("Informativo");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
         historialRepository.save(e);
     }
 

@@ -149,28 +149,28 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
 
 ## 10. Conmutación (cambia el comportamiento)
 
-- [ ] 10.1 Test: `ActionExecutor.execute(acciones, ctx, TELEMETRIA)` con `ACTIVAR_VALVULA` encola y
+- [x] 10.1 Test: `ActionExecutor.execute(acciones, ctx, TELEMETRIA)` con `ACTIVAR_VALVULA` encola y
       no publica; sin ella retira; con `BARRIDO` no toca la cola; `ALERTA` se persiste como evento
       "Alerta" una vez por (MZ, regla, inicio de ciclo) aunque llegue de 100 sectores.
-- [ ] 10.2 Test: `updateTelemetry` arma `ContextoRiego` con **una** consulta por zona (verificar con
+- [x] 10.2 Test: `updateTelemetry` arma `ContextoRiego` con **una** consulta por zona (verificar con
       el mock del repositorio) y el inicio de ciclo del `Clock`.
-- [ ] 10.3 Test: el snapshot toma la válvula de `DespachoRiego.estadoValvula`
+- [x] 10.3 Test: el snapshot toma la válvula de `DespachoRiego.estadoValvula`
       (`NurseryService.java:148-149`).
-- [ ] 10.4 Test de integración (`@SpringBootTest`, broker falso, reloj fijo 10:05): telemetría de
+- [x] 10.4 Test de integración (**sin** `@SpringBootTest`: piezas reales cableadas a mano, repositorios y broker falsos, reloj fijo 10:05; ver desvíos de `design.md`): telemetría de
       MZ-2 con `humSus` 40 → tras un tick, 10 comandos `valve ON` con `durationSec` 600 (5 L) y 90
       sectores "En cola"; segunda telemetría a las 10:06 → ningún comando nuevo para los 10 ya
       regados; avanzar el reloj 605 s → tick abre los 10 siguientes.
-- [ ] 10.5 Registrar las siete reglas (`@Component`). Pasar las fábricas de `riego.umbral-humedad`
+- [x] 10.5 Registrar las siete reglas (`@Component`). Pasar las fábricas de `riego.umbral-humedad`
       a 45 y `riego.lluvia-probabilidad` a 70 (ver desvío de 6.1; ajustar `ParametrosRealesTest`). Borrar `IrrigationRule`,
       `WeatherOverrideRule`, `DailyVolumeLimitRule`, sus tests, y las claves
       `riego.tiempo-max-apertura`, `riego.max-riegos-24h`, `riego.max-riegos-24h-sector`
       (actualizar `ParametrosRealesTest`). Borrar `TIEMPO_MAX_PATTERN`/`parseTiempoMax` y el enganche
       "Regando" de `ActionExecutor`. `ReglasArquitecturaTest` sigue en verde.
-- [ ] 10.6 Test (`@WebMvcTest`): `/api/rules/schema` lista en RIEGO, en orden, Ciclo → R-04 → R-02 →
+- [x] 10.6 Test (`@WebMvcTest`): `/api/rules/schema` lista en RIEGO, en orden, Ciclo → R-04 → R-02 →
       R-05 → R-06 → R-03 → R-01, cada uno con sus claves; `/api/rules/parametros` da a
       `riego.umbral-humedad` el `usadoPor` de la spec y a `riego.sectores-simultaneos`
       `["DespachoRiego"]`.
-- [ ] 10.7 `res/migracion-reglas-riego.sql`: borra overrides de las tres claves eliminadas, consulta
+- [x] 10.7 `res/migracion-reglas-riego.sql`: borra overrides de las tres claves eliminadas, consulta
       comentada para detectar overrides que violan las restricciones nuevas, índice opcional
       `historial_evento(zona_id, tipo, ts)`, bloque de rollback comentado (`actuador_valve` →
       'Cerrada'). Property `yerbanalytics.riego.despacho-intervalo-ms=10000`.

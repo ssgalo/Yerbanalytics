@@ -12,6 +12,7 @@ import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -33,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -89,14 +91,14 @@ class RelojInyectadoTest {
         NurseryService service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 mock(HistorialService.class), mock(ConfiguracionService.class), mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, mock(WeatherService.class),
-                mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, parametros, RELOJ, 20);
+                mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, parametros, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class), RELOJ, 20);
 
         // timestamp del nodo = 10 segundos antes del "ahora" del reloj fijo, en segundos epoch.
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, AHORA.getEpochSecond() - 10,
                 new MqttTelemetryPayload.MetricsPayload(38.0, 70.0, 22.0, 20.0, 40.0, null, null, null, null, null)));
 
         ArgumentCaptor<RuleContext> ctx = ArgumentCaptor.forClass(RuleContext.class);
-        verify(actionExecutor).execute(any(), ctx.capture());
+        verify(actionExecutor).execute(any(), ctx.capture(), eq(OrigenEvaluacion.TELEMETRIA));
         assertThat(ctx.getValue().now()).isEqualTo(AHORA);
     }
 
@@ -111,7 +113,7 @@ class RelojInyectadoTest {
         watchdog.evaluarTodos();
 
         ArgumentCaptor<RuleContext> ctx = ArgumentCaptor.forClass(RuleContext.class);
-        verify(actionExecutor).execute(any(), ctx.capture());
+        verify(actionExecutor).execute(any(), ctx.capture(), eq(OrigenEvaluacion.BARRIDO));
         assertThat(ctx.getValue().now()).isEqualTo(AHORA);
     }
 }

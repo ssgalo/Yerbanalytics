@@ -39,7 +39,7 @@ class RiegoOrquestacionTest {
     @BeforeEach
     void setUp() {
         CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.vigentesV2());
+        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
         List<Rule> reglas = new java.util.ArrayList<>(List.of(
                 new ManualLockRule(mock(ManualLockRepository.class)), new StaleSensorRule(),
                 new CicloLecturaRiegoRule(), new SustratoSaturadoRule(), new DeficitCriticoRule(),

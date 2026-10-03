@@ -1,29 +1,41 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.riego.CicloLectura;
+import com.yerbanalytics.backend.engine.riego.ColaRiego;
+import com.yerbanalytics.backend.engine.riego.SolicitudRiego;
+import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Único punto donde las acciones del motor se convierten en efectos reales.
  *
- * <p>En la <b>Fase 1 (Downlink habilitado)</b>, los efectos son:
  * <ul>
- *   <li>{@code ACTIVAR_VALVULA}: actualiza el campo del sector, registra en historial
- *       y publica el comando MQTT {@code valve ON} al sector.</li>
- *   <li>{@code ACTIVAR_BOMBA}: ídem para la bomba peristáltica ({@code pump ON}).</li>
- *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} del sector con el
- *       porcentaje objetivo extraído del motivo de la acción ({@code [apertura=N]}).</li>
- *   <li>{@code NOOP_INFO}: persiste el motivo de inacción en el historial.</li>
- *   <li>Acciones bloqueantes ({@code ABORT_*}, {@code POSTPONE_RIEGO}): se loguean y
- *       se persiste un registro de inacción; la cadena ya fue detenida por el
- *       {@link RuleOrchestrator}.</li>
+ *   <li>{@code ACTIVAR_VALVULA}: <b>no abre la válvula</b>. Encola una solicitud tipada (volumen, duración,
+ *       humedad, regla) en la {@link ColaRiego} de la macro-zona; la abre el {@code DespachoRiego}, de a
+ *       {@code riego.sectores-simultaneos} válvulas por zona, que publica el comando y registra el riego.
+ *       Es la excepción explícita a "el executor materializa todo": el cupo por zona no se puede decidir
+ *       sector por sector.</li>
+ *   <li>En una evaluación de <b>telemetría</b> la última decisión manda: sin {@code ACTIVAR_VALVULA} la
+ *       solicitud del sector sale de la cola (R-04, bloqueo manual, la ventana cerró). El <b>barrido</b> del
+ *       watchdog evalúa sin lectura fresca y no toca la cola.</li>
+ *   <li>{@code ACTIVAR_BOMBA}: actualiza el campo del sector, registra en historial y publica
+ *       {@code pump ON}.</li>
+ *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} con el porcentaje del motivo
+ *       ({@code [apertura=N]}) y publica {@code shade SET}.</li>
+ *   <li>{@code ALERTA}: se persiste como evento "Alerta", una sola vez por macro-zona, regla y ciclo de
+ *       lectura (el motor evalúa 100 sectores por mensaje: sin esto serían 100 alertas iguales).</li>
+ *   <li>{@code NOOP_INFO} y las bloqueantes ({@code ABORT_*}, {@code POSTPONE_RIEGO}): se persiste el motivo
+ *       como Registro de Inacción; el corte ya lo aplicó el {@link RuleOrchestrator}.</li>
  * </ul>
  *
  * <p>El tópico de comando tiene la forma {@code nursery/zone/{zonaId}/sector/{sectorId}/command},
@@ -37,15 +49,22 @@ public class ActionExecutor {
     /** Extrae el porcentaje de apertura del motivo de MOVER_MEDIASOMBRA: {@code [apertura=N]}. */
     private static final Pattern APERTURA_PATTERN = Pattern.compile("\\[apertura=(\\d+)\\]");
 
-    /** Extrae el tiempo máximo de riego del motivo de RiegoRule: {@code [tiempo-max-seg=N]}. */
-    private static final Pattern TIEMPO_MAX_PATTERN = Pattern.compile("\\[tiempo-max-seg=(\\d+(?:\\.\\d+)?)\\]");
+    private static final int INTERVALO_SENSADO_DEFAULT_MIN = 240;
 
     private final HistorialService historialService;
     private final ComandoActuadorPublisher publisher;
+    private final ColaRiego cola;
 
-    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher) {
+    /**
+     * Último ciclo de lectura en que se persistió una alerta, por {@code zona|regla}. En memoria: tras un
+     * reinicio una alerta puede repetirse una vez, a cambio de no sumar una tabla.
+     */
+    private final Map<String, Instant> alertasPorCiclo = new ConcurrentHashMap<>();
+
+    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola) {
         this.historialService = historialService;
         this.publisher = publisher;
+        this.cola = cola;
     }
 
     /**
@@ -53,25 +72,21 @@ public class ActionExecutor {
      *
      * @param actions lista de acciones a ejecutar (puede ser vacía)
      * @param ctx     snapshot inmutable del sector para extraer datos de persistencia
+     * @param origen  qué disparó la evaluación: sólo la telemetría decide sobre la cola de riego
      */
-    public void execute(List<RuleAction> actions, RuleContext ctx) {
-        String oldValve = ctx.sector().getActuadorValve();
-        String oldPump  = ctx.sector().getActuadorPump();
+    public void execute(List<RuleAction> actions, RuleContext ctx, OrigenEvaluacion origen) {
+        String oldPump = ctx.sector().getActuadorPump();
+
+        if (origen == OrigenEvaluacion.TELEMETRIA) {
+            actualizarCola(actions, ctx);
+        }
 
         for (RuleAction action : actions) {
             switch (action.type()) {
 
-                case ACTIVAR_VALVULA -> {
+                case ACTIVAR_VALVULA ->
+                    // El efecto (encolar o retirar) ya se resolvió arriba, una vez por evaluación.
                     log.info("Sector {}: ACTIVAR_VALVULA — {}", ctx.sector().getId(), action.motivo());
-                    ctx.sector().setActuadorValve("Regando");
-                    // Registrar en historial solo en la transición (no en cada ciclo de telemetría)
-                    if (!"Regando".equals(oldValve)) {
-                        historialService.registrarRiego(ctx.sector());
-                        // --- Downlink: enviar orden física al nodo actuador ---
-                        int duracionSeg = parseTiempoMax(action.motivo(), 600);
-                        publishCommand(ctx, "valve", "ON", Map.of("durationSec", duracionSeg));
-                    }
-                }
 
                 case ACTIVAR_BOMBA -> {
                     log.info("Sector {}: ACTIVAR_BOMBA — {}", ctx.sector().getId(), action.motivo());
@@ -105,9 +120,79 @@ public class ActionExecutor {
                     historialService.registrarInaccion(ctx.sector(), action.type(), action.ruleName(), action.motivo());
                 }
 
+                case ALERTA -> persistirAlerta(action, ctx);
+
                 default -> log.warn("Sector {}: acción desconocida '{}'", ctx.sector().getId(), action.type());
             }
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Cola de riego
+    // -------------------------------------------------------------------------
+
+    /**
+     * La última decisión de la telemetría manda: con una orden de riego válida se encola (o reemplaza) la
+     * solicitud del sector; sin ella se retira.
+     */
+    private void actualizarCola(List<RuleAction> actions, RuleContext ctx) {
+        if (ctx.zona() == null) {
+            return;
+        }
+        String zonaId = ctx.zona().getId();
+        String sectorId = ctx.sector().getId();
+        RuleAction orden = actions.stream()
+                .filter(a -> a.type() == ActionType.ACTIVAR_VALVULA)
+                .findFirst().orElse(null);
+        if (orden == null) {
+            cola.retirar(zonaId, sectorId);
+            return;
+        }
+        if (!(orden.detalle() instanceof DetalleRiego detalle)) {
+            log.error("Sector {}: ACTIVAR_VALVULA de {} sin detalle de riego: no se encola.", sectorId, orden.ruleName());
+            cola.retirar(zonaId, sectorId);
+            return;
+        }
+        Integer numero = ctx.sector().getN();
+        cola.solicitar(new SolicitudRiego(zonaId, sectorId, numero != null ? numero : 0, detalle,
+                orden.ruleName(), ctx.now()));
+    }
+
+    // -------------------------------------------------------------------------
+    // Alertas
+    // -------------------------------------------------------------------------
+
+    /** Persiste la alerta una sola vez por macro-zona, regla y ciclo de lectura. */
+    private void persistirAlerta(RuleAction action, RuleContext ctx) {
+        if (!(action.detalle() instanceof DetalleAlerta detalle) || ctx.zona() == null) {
+            log.warn("Sector {}: ALERTA de {} sin detalle o sin macro-zona: se ignora.",
+                    ctx.sector().getId(), action.ruleName());
+            return;
+        }
+        Instant ciclo = ctx.riego().inicioCiclo() != null ? ctx.riego().inicioCiclo()
+                : CicloLectura.inicio(ctx.now(), intervaloSensado(ctx));
+        String clave = ctx.zona().getId() + "|" + action.ruleName();
+        Instant previo = alertasPorCiclo.put(clave, ciclo);
+        if (ciclo.equals(previo)) {
+            return;   // ya se avisó en este ciclo
+        }
+        try {
+            historialService.registrarAlerta(ctx.zona().getId(), ctx.zona().getName(), action.ruleName(),
+                    detalle, ctx.now().toEpochMilli());
+        } catch (RuntimeException e) {
+            // Que no quede marcada como avisada: la próxima evaluación del ciclo lo reintenta.
+            if (previo == null) {
+                alertasPorCiclo.remove(clave, ciclo);
+            } else {
+                alertasPorCiclo.put(clave, previo);
+            }
+            log.error("Zona {}: no se pudo registrar la alerta de {}.", ctx.zona().getId(), action.ruleName(), e);
+        }
+    }
+
+    private static int intervaloSensado(RuleContext ctx) {
+        return ctx.config() != null && ctx.config().getIntervaloSensadoMinutos() != null
+                ? ctx.config().getIntervaloSensadoMinutos() : INTERVALO_SENSADO_DEFAULT_MIN;
     }
 
     // -------------------------------------------------------------------------
@@ -142,20 +227,5 @@ public class ActionExecutor {
         if (motivo == null) return fallback;
         Matcher m = APERTURA_PATTERN.matcher(motivo);
         return m.find() ? Integer.parseInt(m.group(1)) : fallback;
-    }
-
-    /**
-     * Extrae el tiempo máximo de riego (segundos) del motivo emitido por {@code RiegoRule}.
-     * Si el motivo no contiene el patrón {@code [tiempo-max-seg=N]}, retorna {@code fallback}.
-     */
-    private static int parseTiempoMax(String motivo, int fallback) {
-        if (motivo == null) return fallback;
-        Matcher m = TIEMPO_MAX_PATTERN.matcher(motivo);
-        if (!m.find()) return fallback;
-        try {
-            return (int) Double.parseDouble(m.group(1));
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
     }
 }

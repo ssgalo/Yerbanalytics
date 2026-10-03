@@ -135,6 +135,16 @@ public class DespachoRiego implements ConsumidorParametros {
     }
 
     /**
+     * Cuándo termina (epoch ms, con el margen incluido) el riego en curso del sector, o {@code null} si no
+     * tiene uno. Lo usa la regla de ciclo de lectura para no regar un sector que todavía está abierto.
+     */
+    public Long finRiegoEnCurso(String sectorId) {
+        asegurarReconstruido();
+        Curso c = enCurso.get(sectorId);
+        return c != null && c.finMs() > reloj.millis() ? c.finMs() : null;
+    }
+
+    /**
      * Olvida lo pendiente y lo que estaba regando (en memoria): se llama al regenerar la topología, cuando
      * los sectores del vivero anterior ya no existen o sus ids se van a reutilizar.
      */

@@ -3,9 +3,13 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
+import com.yerbanalytics.backend.engine.ContextoRiego;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.riego.CicloLectura;
+import com.yerbanalytics.backend.engine.riego.DespachoRiego;
+import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
@@ -17,6 +21,8 @@ import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
+import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
+import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
@@ -30,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,6 +44,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NurseryService {
 
     private static final Logger log = LoggerFactory.getLogger(NurseryService.class);
+
+    /**
+     * Cuánto del historial mira el contexto de riego: lo más largo que pueden pedir el tope de R-02
+     * ({@code riego.exceptuado-bloqueo}, hasta 24 h) y la pausa de R-06 ({@code riego.pausa-tras-aplicacion},
+     * hasta 24 h). Un evento más viejo no cambia ninguna decisión.
+     */
+    private static final long VENTANA_HISTORIAL_RIEGO_MS = 24L * 3_600_000L;
 
     /** Zonas cuyo nodo ya avisó de un timestamp inutilizable: el warn sale una vez por zona, no por mensaje. */
     private final Set<String> zonasConTimestampInvalido = ConcurrentHashMap.newKeySet();
@@ -57,6 +71,8 @@ public class NurseryService {
     private final DiagnosticoService diagnosticoService;
     private final TrazaEvaluacionStore trazaStore;
     private final CatalogoParametrosService parametros;
+    private final HistorialRepository historialRepository;
+    private final DespachoRiego despacho;
     private final Clock reloj;
     private final int bateriaMinPct;
 
@@ -74,6 +90,8 @@ public class NurseryService {
                           DiagnosticoService diagnosticoService,
                           TrazaEvaluacionStore trazaStore,
                           CatalogoParametrosService parametros,
+                          HistorialRepository historialRepository,
+                          DespachoRiego despacho,
                           Clock reloj,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -89,6 +107,8 @@ public class NurseryService {
         this.diagnosticoService = diagnosticoService;
         this.trazaStore = trazaStore;
         this.parametros = parametros;
+        this.historialRepository = historialRepository;
+        this.despacho = despacho;
         this.reloj = reloj;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -149,7 +169,9 @@ public class NurseryService {
                             se.getDiagnosisSev()
                     );
                     actuators = new Actuadores(
-                            se.getActuadorValve(),
+                            // Derivado por tiempo del despacho (Regando / En cola / Cerrada): la columna
+                            // sector.actuador_valve es legado y nadie la escribe ni la lee para decidir.
+                            despacho.estadoValvula(se.getId()),
                             se.getActuadorPump(),
                             se.getActuadorShade()
                     );
@@ -507,6 +529,12 @@ public class NurseryService {
         }
         String finalStatus = hasCritical ? "critical" : (hasWarning ? "warning" : "ok");
 
+        // Lo que las reglas de riego necesitan del pasado reciente, UNA consulta por zona (no una por sector y
+        // por regla): último riego, último riego crítico y última aplicación de cada sector.
+        Instant ahora = reloj.instant();
+        Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
+        Map<String, ContextoRiego> riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
+
         for (SectorEntity s : sectors) {
             String oldStatus = s.getStatus();
             s.setStatus(finalStatus);
@@ -551,11 +579,11 @@ public class NurseryService {
 
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
-            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus);
+            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, riegoPorSector.get(s.getId()));
             // La traza queda en memoria (última por sector y origen); no toca la base.
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
-            actionExecutor.execute(resultado.acciones(), ctx);
+            actionExecutor.execute(resultado.acciones(), ctx, OrigenEvaluacion.TELEMETRIA);
         }
         sectorRepository.saveAll(sectors);
 
@@ -573,7 +601,8 @@ public class NurseryService {
      *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
      * </ul>
      */
-    private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus) {
+    private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus,
+                                         Instant ahora, ContextoRiego riego) {
         ZonaEntity zona = s.getZona();
         WeatherForecast forecast = weatherService.getForecast();
 
@@ -587,10 +616,47 @@ public class NurseryService {
                 metrics,
                 configuracionService.getConfiguracionOperativa(),
                 finalStatus,
-                reloj.instant(),
+                ahora,
                 forecast,
-                bloqueoActivo
+                bloqueoActivo,
+                riego != null ? riego : ContextoRiego.vacio()
         );
+    }
+
+    /** Intervalo de sensado guardado (el ciclo de lectura lo acota a 60–360 min); 240 si no hay configuración. */
+    private int intervaloSensadoMinutos() {
+        ConfiguracionOperativaEntity op = configuracionService.getConfiguracionOperativa();
+        return op != null && op.getIntervaloSensadoMinutos() != null ? op.getIntervaloSensadoMinutos() : 240;
+    }
+
+    /**
+     * Arma el {@link ContextoRiego} de cada sector de la zona con UNA consulta agrupada. El último riego de
+     * un sector es el mayor {@code ts} de sus filas "Riego"; el último ordenado por R-02, el de la fila cuya
+     * regla es {@code DeficitCriticoRule}; la última aplicación, la de sus filas "Insumo". El riego en curso
+     * lo da el despacho (memoria), que además cubre la ventana antes de que el riego llegue al historial.
+     */
+    private Map<String, ContextoRiego> contextosDeRiego(String zonaId, ZonaEntity zona, List<SectorEntity> sectores,
+                                                        Instant inicioCiclo, Instant ahora) {
+        long desde = ahora.toEpochMilli() - VENTANA_HISTORIAL_RIEGO_MS;
+        Map<String, Long> riego = new HashMap<>();
+        Map<String, Long> riegoCritico = new HashMap<>();
+        Map<String, Long> aplicacion = new HashMap<>();
+        for (HistorialRepository.UltimoEvento f : historialRepository.ultimosPorSector(zonaId, desde)) {
+            if ("Riego".equals(f.getTipo())) {
+                riego.merge(f.getSectorId(), f.getTs(), Math::max);
+                if (DeficitCriticoRule.NAME.equals(f.getRegla())) {
+                    riegoCritico.merge(f.getSectorId(), f.getTs(), Math::max);
+                }
+            } else if ("Insumo".equals(f.getTipo())) {
+                aplicacion.merge(f.getSectorId(), f.getTs(), Math::max);
+            }
+        }
+        Map<String, ContextoRiego> out = new HashMap<>();
+        for (SectorEntity s : sectores) {
+            out.put(s.getId(), new ContextoRiego(inicioCiclo, riego.get(s.getId()), riegoCritico.get(s.getId()),
+                    aplicacion.get(s.getId()), despacho.finRiegoEnCurso(s.getId()), zona.getHumSusTs()));
+        }
+        return out;
     }
 
     /**

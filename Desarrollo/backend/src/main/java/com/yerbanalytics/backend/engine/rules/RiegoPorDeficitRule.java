@@ -10,6 +10,8 @@ import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.riego.CalculoRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -22,6 +24,7 @@ import java.util.List;
  *
  * <p>No emite una orden vacía: si el volumen redondea a 0 L (duración 0 s) queda como {@code NOOP_INFO}.
  */
+@Component
 public class RiegoPorDeficitRule implements Rule {
 
     private static final int PRIORITY = 10;

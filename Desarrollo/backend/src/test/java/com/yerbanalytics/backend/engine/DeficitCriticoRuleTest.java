@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static com.yerbanalytics.backend.engine.ReglaTestSupport.evV2;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("DeficitCriticoRule (R-02)")
@@ -27,7 +27,7 @@ class DeficitCriticoRuleTest {
     @Test
     @DisplayName("34 % → ACTIVAR_VALVULA con 6 L y 720 s, más ALERTA CRITICAL")
     void justoBajoElCritico() {
-        List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("23:30").humedad(34.0).build(), evV2(rule));
+        List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("23:30").humedad(34.0).build(), ev(rule));
 
         assertThat(tipos(acciones)).containsExactlyInAnyOrder(ActionType.ACTIVAR_VALVULA, ActionType.ALERTA);
         RuleAction riego = acciones.stream().filter(a -> a.type() == ActionType.ACTIVAR_VALVULA).findFirst().orElseThrow();
@@ -47,7 +47,7 @@ class DeficitCriticoRuleTest {
     @Test
     @DisplayName("35 % (en el crítico) → NOOP_INFO: decide R-01")
     void enElCritico_noRiega() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").humedad(35.0).build(), ev);
 
@@ -63,13 +63,13 @@ class DeficitCriticoRuleTest {
     void aCualquierHora_ignoraLluviaYPausa() {
         RuleContext ctx = RiegoCtx.a("23:30").humedad(20.0).ultimaAplicacionHace(1, 0, 0).build();
 
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule)))).contains(ActionType.ACTIVAR_VALVULA);
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).contains(ActionType.ACTIVAR_VALVULA);
     }
 
     @Test
     @DisplayName("último riego crítico hace 11 h 59 min → ABORT_RIEGO por el tope")
     void tope_cortaA11h59() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
         RuleContext ctx = RiegoCtx.a("12:00").humedad(30.0).ultimoRiegoCriticoHace(11, 59).build();
 
         List<RuleAction> acciones = rule.evaluate(ctx, ev);
@@ -87,13 +87,13 @@ class DeficitCriticoRuleTest {
     void tope_vencidoA12h() {
         RuleContext ctx = RiegoCtx.a("12:00").humedad(30.0).ultimoRiegoCriticoHace(12, 0).build();
 
-        assertThat(tipos(rule.evaluate(ctx, evV2(rule)))).containsExactlyInAnyOrder(ActionType.ACTIVAR_VALVULA, ActionType.ALERTA);
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).containsExactlyInAnyOrder(ActionType.ACTIVAR_VALVULA, ActionType.ALERTA);
     }
 
     @Test
     @DisplayName("override del tope (6 h): hace 7 h riega")
     void tope_override() {
-        Evaluacion ev = evV2(rule, Map.of(ParametrosRiego.EXCEPTUADO_BLOQUEO, "6"));
+        Evaluacion ev = ev(rule, Map.of(ParametrosRiego.EXCEPTUADO_BLOQUEO, "6"));
         RuleContext ctx = RiegoCtx.a("12:00").humedad(30.0).ultimoRiegoCriticoHace(7, 0).build();
 
         assertThat(tipos(rule.evaluate(ctx, ev))).contains(ActionType.ACTIVAR_VALVULA);
@@ -102,7 +102,7 @@ class DeficitCriticoRuleTest {
     @Test
     @DisplayName("sin humedad → SIN_DATO y NOOP_INFO")
     void sinHumedad() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").build(), ev);
 
@@ -113,7 +113,7 @@ class DeficitCriticoRuleTest {
     @Test
     @DisplayName("el volumen máximo y el caudal vienen del catálogo (override 3 L a 60 L/h → 180 s)")
     void volumenYCaudalDelCatalogo() {
-        Evaluacion ev = evV2(rule, Map.of(ParametrosRiego.VOLUMEN_MAX_EVENTO, "3", ParametrosRiego.CAUDAL_EMISOR, "60"));
+        Evaluacion ev = ev(rule, Map.of(ParametrosRiego.VOLUMEN_MAX_EVENTO, "3", ParametrosRiego.CAUDAL_EMISOR, "60"));
 
         List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").humedad(30.0).build(), ev);
 

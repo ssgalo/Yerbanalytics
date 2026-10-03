@@ -439,6 +439,17 @@ class DespachoRiegoTest {
         assertThat(cola.pendientes("MZ-2")).isEmpty();
     }
 
+    @Test
+    void finRiegoEnCursoDaCuandoTerminaConElMargenOnullSiNoRiega() {
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+
+        assertThat(despacho.finRiegoEnCurso("MZ-2-001")).isEqualTo(T0.toEpochMilli() + 605_000L);
+        assertThat(despacho.finRiegoEnCurso("MZ-2-002")).isNull();
+        reloj.avanzar(Duration.ofSeconds(605));
+        assertThat(despacho.finRiegoEnCurso("MZ-2-001")).isNull();
+    }
+
     // ------------------------------------------------------------------ topología regenerada
 
     @Test

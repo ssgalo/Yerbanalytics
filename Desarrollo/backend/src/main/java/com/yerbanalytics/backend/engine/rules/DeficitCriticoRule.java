@@ -13,6 +13,8 @@ import com.yerbanalytics.backend.engine.riego.CalculoRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -32,10 +34,12 @@ import java.util.List;
  * 10 L de sustrato): el tope se aplica SIEMPRE, con {@code riego.exceptuado-bloqueo}. Con el tope vencido
  * emite {@code ABORT_RIEGO} citándolo.
  */
+@Component
 public class DeficitCriticoRule implements Rule {
 
     private static final int PRIORITY = 4;
-    private static final String NAME = "DeficitCriticoRule";
+    /** Nombre de la regla: también es la {@code regla} que queda en los eventos "Riego" que ordenó R-02. */
+    public static final String NAME = "DeficitCriticoRule";
     static final String TEXTO_ALERTA = "Déficit hídrico crítico";
 
     @Override

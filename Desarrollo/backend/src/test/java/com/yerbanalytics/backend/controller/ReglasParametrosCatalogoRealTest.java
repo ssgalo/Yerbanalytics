@@ -56,7 +56,78 @@ class ReglasParametrosCatalogoRealTest {
     void devuelveLosParametrosRealesConSuFabrica() throws Exception {
         mockMvc.perform(get("/api/rules/parametros"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.parametros[?(@.clave=='riego.umbral-humedad')].fabrica").value("42"));
+                .andExpect(jsonPath("$.parametros[?(@.clave=='riego.umbral-humedad')].fabrica").value("45"));
+    }
+
+    @Test
+    void elUmbralDeRiegoLoCompartenLasCuatroReglasQueLoUsanYElSimultaneoLoUsaElDespacho() throws Exception {
+        JsonNode json = catalogoJson();
+
+        List<String> umbral = usadoPor(json, "riego.umbral-humedad");
+        assertThat(umbral).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule",
+                "PosponerPorLluviaRule", "RiegoPorDeficitRule");
+        assertThat(usadoPor(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
+        assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactly("PosponerPorLluviaRule");
+        assertThat(usadoPor(json, "riego.exceptuado-bloqueo")).containsExactly("DeficitCriticoRule");
+    }
+
+    @Test
+    void lasClavesDeLasReglasViejasNoEstanEnElCatalogo() throws Exception {
+        List<String> claves = new ArrayList<>();
+        catalogoJson().get("parametros").forEach(p -> claves.add(p.get("clave").asText()));
+
+        assertThat(claves).doesNotContain("riego.tiempo-max-apertura", "riego.max-riegos-24h", "riego.max-riegos-24h-sector");
+    }
+
+    @Test
+    void laRamaRiegoDelDagVaEnOrdenYConEtiquetasLegibles() throws Exception {
+        String cuerpo = mockMvc.perform(get("/api/rules/schema")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        JsonNode dag = new ObjectMapper().readTree(cuerpo);
+
+        Map<String, JsonNode> nodos = new LinkedHashMap<>();
+        dag.get("nodes").forEach(n -> nodos.put(n.get("id").asText(), n));
+        // Se sigue la cadena "Continúa" de la rama RIEGO desde el último nodo global.
+        List<String> cadena = new ArrayList<>();
+        String actual = "StaleSensorRule";
+        while (true) {
+            String origen = actual;
+            String siguiente = null;
+            for (JsonNode e : dag.get("edges")) {
+                String destino = e.get("target").asText();
+                if (e.get("source").asText().equals(origen) && "Continúa".equals(e.get("label").asText())
+                        && nodos.containsKey(destino)
+                        && ("RIEGO".equals(nodos.get(destino).get("branch").asText()))) {
+                    siguiente = destino;
+                }
+            }
+            if (siguiente == null || siguiente.startsWith("success-")) {
+                break;
+            }
+            cadena.add(siguiente);
+            actual = siguiente;
+        }
+
+        assertThat(cadena).containsExactly("CicloLecturaRiegoRule", "SustratoSaturadoRule", "DeficitCriticoRule",
+                "FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule");
+        for (String id : cadena) {
+            String etiqueta = nodos.get(id).get("label").asText();
+            assertThat(etiqueta).as(id).isNotBlank().isNotEqualTo(id).doesNotContain("Rule");
+        }
+        // Cada regla de la cadena figura una sola vez y con sus claves.
+        assertThat(nodos.get("DeficitCriticoRule").get("parametros").toString()).contains("riego.exceptuado-bloqueo");
+        assertThat(nodos.get("CicloLecturaRiegoRule").get("parametros")).isEmpty();
+        assertThat(nodos).doesNotContainKeys("IrrigationRule", "WeatherOverrideRule", "DailyVolumeLimitRule");
+    }
+
+    private static List<String> usadoPor(JsonNode json, String clave) {
+        List<String> out = new ArrayList<>();
+        json.get("parametros").forEach(p -> {
+            if (p.get("clave").asText().equals(clave)) {
+                p.get("usadoPor").forEach(x -> out.add(x.asText()));
+            }
+        });
+        return out;
     }
 
     @Test

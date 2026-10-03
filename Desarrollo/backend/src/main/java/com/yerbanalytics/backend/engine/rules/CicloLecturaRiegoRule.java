@@ -9,6 +9,8 @@ import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 
 /**
@@ -24,6 +26,7 @@ import java.util.List;
  * inicio del ciclo, que viaja en el {@link ContextoRiego}. Con {@link ContextoRiego#vacio()} (el barrido)
  * no corta.
  */
+@Component
 public class CicloLecturaRiegoRule implements Rule {
 
     private static final int PRIORITY = 2;

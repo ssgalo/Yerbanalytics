@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static com.yerbanalytics.backend.engine.ReglaTestSupport.evV2;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("PosponerPorLluviaRule (R-03)")
@@ -38,7 +38,7 @@ class PosponerPorLluviaRuleTest {
     @Test
     @DisplayName("(70 %, 5 mm) con h 40 → POSTPONE_RIEGO + ALERTA INFO")
     void ambosUmbralesEnElBorde() {
-        List<RuleAction> acciones = rule.evaluate(ctx(40.0, lluvia(70, 5.0)), evV2(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx(40.0, lluvia(70, 5.0)), ev(rule));
 
         assertThat(tipos(acciones)).containsExactlyInAnyOrder(ActionType.POSTPONE_RIEGO, ActionType.ALERTA);
         DetalleAlerta d = (DetalleAlerta) acciones.stream().filter(a -> a.type() == ActionType.ALERTA)
@@ -50,19 +50,19 @@ class PosponerPorLluviaRuleTest {
     @Test
     @DisplayName("(95 %, 4,9 mm) → NOOP_INFO")
     void muchaProbabilidadPocosMm() {
-        assertThat(tipos(rule.evaluate(ctx(40.0, lluvia(95, 4.9)), evV2(rule)))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(tipos(rule.evaluate(ctx(40.0, lluvia(95, 4.9)), ev(rule)))).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
     @DisplayName("(69 %, 20 mm) → NOOP_INFO")
     void muchosMmPocaProbabilidad() {
-        assertThat(tipos(rule.evaluate(ctx(40.0, lluvia(69, 20.0)), evV2(rule)))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(tipos(rule.evaluate(ctx(40.0, lluvia(69, 20.0)), ev(rule)))).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
     @DisplayName("sin pronóstico → dos SIN_DATO y NOOP_INFO (no pospone)")
     void sinPronostico() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(ctx(40.0, null), ev);
 
@@ -76,7 +76,7 @@ class PosponerPorLluviaRuleTest {
     @DisplayName("pronóstico sin marcas horarias (modo degradado) → SIN_DATO, no pospone")
     void pronosticoSinHoras() {
         WeatherForecast sinHoras = new WeatherForecast(90, 5, RiegoCtx.instante("10:05"), 22, "x", 70, List.of());
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         assertThat(tipos(rule.evaluate(ctx(40.0, sinHoras), ev))).containsExactly(ActionType.NOOP_INFO);
         assertThat(ev.comparaciones()).anyMatch(c -> c.resultado() == ResultadoComparacion.SIN_DATO);
@@ -87,7 +87,7 @@ class PosponerPorLluviaRuleTest {
     void milimetrosSinDato() {
         WeatherForecast f = new WeatherForecast(90, 5, RiegoCtx.instante("10:05"), 22, "x", 70, List.of(), List.of(
                 new WeatherForecast.PronosticoHora(java.time.LocalDateTime.of(RiegoCtx.DIA, java.time.LocalTime.of(11, 0)), 95.0, null)));
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         List<RuleAction> acciones = rule.evaluate(ctx(40.0, f), ev);
 
@@ -99,7 +99,7 @@ class PosponerPorLluviaRuleTest {
     @Test
     @DisplayName("h 60 con lluvia fuerte → no aplica, sin alerta")
     void sinDeficit_noAplica() {
-        List<RuleAction> acciones = rule.evaluate(ctx(60.0, lluvia(90, 15.0)), evV2(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx(60.0, lluvia(90, 15.0)), ev(rule));
 
         assertThat(tipos(acciones)).containsExactly(ActionType.NOOP_INFO);
         assertThat(acciones.get(0).motivo()).containsIgnoringCase("no aplica");
@@ -108,7 +108,7 @@ class PosponerPorLluviaRuleTest {
     @Test
     @DisplayName("h 34 con lluvia fuerte → no aplica (R-02 gana)")
     void deficitCritico_noAplica() {
-        List<RuleAction> acciones = rule.evaluate(ctx(34.0, lluvia(90, 12.0)), evV2(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx(34.0, lluvia(90, 12.0)), ev(rule));
 
         assertThat(tipos(acciones)).containsExactly(ActionType.NOOP_INFO);
         assertThat(acciones.get(0).motivo()).containsIgnoringCase("no aplica");
@@ -120,11 +120,11 @@ class PosponerPorLluviaRuleTest {
         WeatherForecast f = RiegoCtx.pronostico(RiegoCtx.instante("10:05"),
                 new double[]{10, 10, 90, 10}, new double[]{0, 0, 12, 0});
 
-        List<RuleAction> acciones = rule.evaluate(ctx(40.0, f), evV2(rule, Map.of(ParametrosRiego.LLUVIA_VENTANA, "2")));
+        List<RuleAction> acciones = rule.evaluate(ctx(40.0, f), ev(rule, Map.of(ParametrosRiego.LLUVIA_VENTANA, "2")));
 
         assertThat(tipos(acciones)).containsExactly(ActionType.NOOP_INFO);
         // con la ventana de 4 h (fábrica) esa misma lluvia sí pospone
-        assertThat(tipos(rule.evaluate(ctx(40.0, f), evV2(rule)))).contains(ActionType.POSTPONE_RIEGO);
+        assertThat(tipos(rule.evaluate(ctx(40.0, f), ev(rule)))).contains(ActionType.POSTPONE_RIEGO);
     }
 
     @Test
@@ -133,13 +133,13 @@ class PosponerPorLluviaRuleTest {
         WeatherForecast f = RiegoCtx.pronostico(RiegoCtx.instante("10:05"),
                 new double[]{10, 10, 10, 10, 95, 95}, new double[]{0, 0, 0, 0, 10, 10});
 
-        assertThat(tipos(rule.evaluate(ctx(40.0, f), evV2(rule)))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(tipos(rule.evaluate(ctx(40.0, f), ev(rule)))).containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
     @DisplayName("la traza compara probabilidad máxima (≥ 70 %) y milímetros (≥ 5 mm)")
     void traza() {
-        Evaluacion ev = evV2(rule);
+        Evaluacion ev = ev(rule);
 
         rule.evaluate(ctx(40.0, lluvia(70, 5.0)), ev);
 

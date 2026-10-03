@@ -21,17 +21,13 @@ class ParametrosRealesTest {
     /**
      * Valor actual en el código → clave del catálogo.
      *
-     * <p>Umbral de riego y probabilidad de lluvia valen 42 y 60 TODAVÍA: las reglas viejas
-     * (IrrigationRule, WeatherOverrideRule) siguen activas hasta la conmutación (bloque 10) y los
-     * leen de acá. La conmutación los pasa a 45 y 70 de fábrica, junto con las reglas nuevas.
+     * <p>Tras la conmutación (bloque 10) el umbral de riego vale 45 y la probabilidad de lluvia 70 de
+     * fábrica ({@code reglas_v2} §11), y las tres claves de las reglas viejas ya no existen.
      */
     private static final Map<String, Double> VALORES_DE_HOY = Map.ofEntries(
             Map.entry("seguridad.antiguedad-max-lectura", 90.0),     // 3 intervalos de publicación del nodo (30 s)
-            Map.entry("riego.umbral-humedad", 42.0),                 // idealMin de humSus (seed); 45 al conmutar
-            Map.entry("riego.tiempo-max-apertura", 120.0),           // configuracion_operativa; sale al conmutar
-            Map.entry("riego.max-riegos-24h", 2.0),                  // DailyVolumeLimitRule:61; sale al conmutar
-            Map.entry("riego.max-riegos-24h-sector", 1.0),           // IrrigationRule:98; sale al conmutar
-            Map.entry("riego.lluvia-probabilidad", 60.0),            // rain-threshold-pct; 70 al conmutar
+            Map.entry("riego.umbral-humedad", 45.0),                 // reglas_v2 §11 (era 42, idealMin de humSus)
+            Map.entry("riego.lluvia-probabilidad", 70.0),            // reglas_v2 §11 (era 60)
             Map.entry("insumo.max-dosis-24h", 1.0),                  // DailyDoseLimitRule:80
             Map.entry("mediasombra.uv-umbral", 7.0),                 // uv-threshold
             Map.entry("mediasombra.apertura-proteccion-uv", 30.0),   // ShadingRule:90
@@ -61,6 +57,13 @@ class ParametrosRealesTest {
     void cadaFabricaCoincideConElValorActual() {
         VALORES_DE_HOY.forEach((clave, esperado) ->
                 assertThat(catalogo.fabricas().numero(clave)).as(clave).isEqualTo(esperado));
+    }
+
+    @Test
+    void lasClavesDeLasReglasViejasYaNoExisten() {
+        assertThat(catalogo.definicion("riego.tiempo-max-apertura")).isEmpty();
+        assertThat(catalogo.definicion("riego.max-riegos-24h")).isEmpty();
+        assertThat(catalogo.definicion("riego.max-riegos-24h-sector")).isEmpty();
     }
 
     @Test
