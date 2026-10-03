@@ -1,6 +1,6 @@
 -- ============================================================================
 --  Migración manual · mudanza de dos columnas de `configuracion_operativa` al
---  catálogo de parámetros de reglas
+--  catálogo de parámetros de reglas, y copia del umbral de riego editado
 --  (openspec/changes/add-catalogo-umbrales-reglas)
 -- ----------------------------------------------------------------------------
 --  ESTE SCRIPT NO SE EJECUTA SOLO. `ddl-auto=update` agrega columnas y tablas
@@ -17,10 +17,19 @@
 --    pasaron al catálogo, que es la única fuente de umbrales de reglas. Se
 --    editan desde `PUT /api/rules/parametros`.
 --
+--    · `umbral_metrica.ideal_min` de `humSus` → parámetro `riego.umbral-humedad` (%)
+--    Antes `IrrigationRule` regaba por debajo del `ideal_min` de la humedad de
+--    sustrato (editable en la configuración agronómica); ahora lo hace por
+--    `riego.umbral-humedad` (fábrica 42, rango 35-60). Si en la base ese
+--    `ideal_min` es distinto de 42, sin copiarlo el riego cambiaría en silencio.
+--    El `ideal_min` sigue existiendo como umbral de estado (colorea el mapa); lo
+--    que se copia es su valor, una sola vez, a un override.
+--
 --  QUÉ SE PIERDE
 --    Nada. Cada valor se copia a `parametro_regla` SÓLO si difiere del de
 --    fábrica (120 s y 100 %), redondeado y acotado al rango del catálogo
---    (10-600 s y 10-100 %). Si coincide con la fábrica no hace falta fila:
+--    (10-600 s y 10-100 %); el umbral de riego, a 35-60 sin decimales, con un
+--    `RAISE NOTICE` si hubo que acotarlo. Si coincide con la fábrica no hace falta fila:
 --    "modificado" significa "hay override".
 --
 --  ORDEN DE EJECUCIÓN
@@ -29,7 +38,8 @@
 --    3. Correr este script.
 --    4. Volver a arrancar.
 --
---  El script es idempotente: si las columnas ya no existen, no hace nada.
+--  El script es idempotente: si las columnas ya no existen, no hace nada; el
+--  umbral de riego nunca pisa un override existente.
 --
 --  Reversión: ver el bloque comentado al final. `ddl-auto=update` NO puede
 --  volver a agregar las columnas por su cuenta: intentaría `NOT NULL` sin
@@ -75,6 +85,31 @@ BEGIN
 END
 $$;
 
+-- Umbral de riego: copiar el `ideal_min` de humSus si difiere de la fábrica (42) y todavía
+-- no hay un override. Idempotente: con el override ya creado (por esto o por la API) no hace nada.
+DO $$
+DECLARE
+    original double precision;
+    acotado  numeric;
+BEGIN
+    SELECT ideal_min INTO original FROM umbral_metrica WHERE metric_key = 'humSus';
+    IF original IS NULL THEN
+        RETURN;
+    END IF;
+    acotado := LEAST(GREATEST(ROUND(original::numeric), 35), 60);
+    IF acotado <> 42
+       AND NOT EXISTS (SELECT 1 FROM parametro_regla WHERE clave = 'riego.umbral-humedad') THEN
+        IF acotado <> original::numeric THEN
+            RAISE NOTICE 'riego.umbral-humedad: ideal_min de humSus = % se acotó a % (rango 35-60, sin decimales).',
+                original, acotado;
+        END IF;
+        INSERT INTO parametro_regla (clave, valor, updated_by, updated_ts)
+        VALUES ('riego.umbral-humedad', acotado::text, 'migracion-catalogo-parametros',
+                (EXTRACT(EPOCH FROM now()) * 1000)::bigint);
+    END IF;
+END
+$$;
+
 COMMIT;
 
 -- ----------------------------------------------------------------------------
@@ -87,7 +122,7 @@ COMMIT;
 --
 --   -- 2. Los overrides migrados (sólo los que diferían de fábrica):
 --   SELECT * FROM parametro_regla
---   WHERE clave IN ('riego.tiempo-max-apertura', 'mediasombra.apertura-maxima');
+--   WHERE clave IN ('riego.tiempo-max-apertura', 'mediasombra.apertura-maxima', 'riego.umbral-humedad');
 -- ----------------------------------------------------------------------------
 
 -- ----------------------------------------------------------------------------

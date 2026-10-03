@@ -65,7 +65,8 @@ Corré `src/main/resources/migracion-catalogo-parametros.sql`:
 4. Volver a arrancar.
 
 Copia cada valor a `parametro_regla` **sólo si difiere de fábrica** (120 s y 100 %) y baja las
-columnas. Es idempotente y trae, comentado, el bloque inverso (`ADD COLUMN … DEFAULT …`) para un
+columnas. También copia el `ideal_min` de `humSus` como override de `riego.umbral-humedad` (fábrica
+42, rango 35-60) si difiere y no hay uno: antes el riego usaba ese umbral y ahora usa el del catálogo. Es idempotente y trae, comentado, el bloque inverso (`ADD COLUMN … DEFAULT …`) para un
 rollback del código.
 
 ### Migración manual pendiente · baja del estado del simulador

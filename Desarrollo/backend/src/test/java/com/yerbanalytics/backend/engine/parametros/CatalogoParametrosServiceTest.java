@@ -330,19 +330,6 @@ class CatalogoParametrosServiceTest {
     }
 
     @Test
-    void cache_noSeRepueblaMientrasHayUnaTransaccionActiva() {
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            service.vigentes();
-            service.vigentes();
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-
-        verify(repository, org.mockito.Mockito.times(2)).findAll();
-    }
-
-    @Test
     void guardar_alCerrarLaTransaccionInvalidaLoQueOtroHiloRepoblo() {
         ParametrosVigentes previo;
         TransactionSynchronizationManager.initSynchronization();
@@ -358,6 +345,32 @@ class CatalogoParametrosServiceTest {
         }
 
         assertThat(service.vigentes()).isNotSameAs(previo);
+    }
+
+    @Test
+    void vigentes_dentroDeUnaTransaccionAjenaConCacheFrioCargaUnaSolaVez() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            for (int i = 0; i < 5; i++) {
+                service.vigentes();
+            }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(repository, org.mockito.Mockito.times(1)).findAll();
+    }
+
+    @Test
+    void guardar_noPublicaEnElCacheLoQueLeyoDentroDeSuTransaccion() {
+        service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
+        // guardar cargó una vez para decidir y otra al armar su respuesta; ninguna se publicó
+        // (podía incluir datos sin commit): la próxima lectura va a la base.
+        verify(repository, org.mockito.Mockito.times(2)).findAll();
+
+        service.vigentes();
+
+        verify(repository, org.mockito.Mockito.times(3)).findAll();
     }
 
     @Test

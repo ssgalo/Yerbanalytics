@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -54,6 +55,12 @@ public class CatalogoParametrosService {
     /** Serializa los guardados: cada uno valida contra la base, así que no pueden solaparse. */
     private final Object escritura = new Object();
 
+    /**
+     * Marca del hilo que está dentro de la transacción de {@link #guardar}: sólo ahí una carga
+     * puede incluir datos sin commit y no debe publicarse en el cache.
+     */
+    private final ThreadLocal<Boolean> enGuardado = new ThreadLocal<>();
+
     private volatile Estado cache;
     /** Sube con cada invalidación: una carga que empezó antes de una no puede publicar su resultado. */
     private final AtomicLong generacion = new AtomicLong();
@@ -63,6 +70,8 @@ public class CatalogoParametrosService {
                                      HistorialService historialService,
                                      PlatformTransactionManager transactionManager) {
         this.transaccion = new TransactionTemplate(transactionManager);
+        // Transacción propia: el lock de guardar tiene que soltarse DESPUÉS del commit.
+        this.transaccion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.catalogo = catalogo;
         this.repository = repository;
         this.historialService = historialService;
@@ -111,11 +120,14 @@ public class CatalogoParametrosService {
     }
 
     /**
-     * Publica el estado cargado sólo si nadie invalidó mientras se cargaba, y nunca dentro de una
-     * transacción: ahí la lectura puede incluir cambios sin commit (que podrían revertirse).
+     * Publica el estado cargado sólo si nadie invalidó mientras se cargaba, y nunca desde la
+     * transacción de {@link #guardar}: ahí la lectura puede incluir cambios sin commit (que
+     * podrían revertirse). En cualquier otra transacción (telemetría, barrido) la lectura es de
+     * datos commiteados y publicar es correcto: si no, el cache quedaría frío y cada
+     * {@code vigentes()} iría a la base.
      */
     private synchronized void publicar(Estado e, long gen) {
-        if (gen == generacion.get() && !TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (gen == generacion.get() && enGuardado.get() == null) {
             cache = e;
         }
     }
@@ -158,6 +170,10 @@ public class CatalogoParametrosService {
      * override. Valida tipo, rango, existencia de la clave y restricciones cruzadas sobre el
      * conjunto resultante.
      *
+     * <p><b>No invocar desde una transacción externa:</b> corre en una transacción propia
+     * ({@code REQUIRES_NEW}) para que el lock se suelte después del commit; desde una externa
+     * seguiría tomando una conexión extra mientras la otra espera.
+     *
      * @throws ParametrosInvalidosException si algo no cumple; no se persiste nada
      */
     public CatalogoReglasDto guardar(List<CambioParametro> cambios, String usuario) {
@@ -166,7 +182,14 @@ public class CatalogoParametrosService {
         }
         // El lock envuelve a la transacción (no al revés): el siguiente guardado ya ve el commit.
         synchronized (escritura) {
-            return transaccion.execute(status -> guardarEnTransaccion(cambios, usuario));
+            return transaccion.execute(status -> {
+                enGuardado.set(Boolean.TRUE);
+                try {
+                    return guardarEnTransaccion(cambios, usuario);
+                } finally {
+                    enGuardado.remove();
+                }
+            });
         }
     }
 
