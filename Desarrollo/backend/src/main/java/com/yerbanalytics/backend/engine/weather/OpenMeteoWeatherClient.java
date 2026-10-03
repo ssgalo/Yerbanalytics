@@ -7,10 +7,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import com.yerbanalytics.backend.config.ZonaHorariaVivero;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +34,16 @@ import java.util.Map;
  * <h3>Campos usados de la API</h3>
  * <ul>
  *   <li>{@code hourly.precipitation_probability} — probabilidad de lluvia en %</li>
+ *   <li>{@code hourly.precipitation} — precipitación en mm</li>
  *   <li>{@code hourly.uv_index} — índice UV</li>
  *   <li>{@code hourly.temperature_2m} — temperatura del aire en °C</li>
  *   <li>{@code hourly.relative_humidity_2m} — humedad relativa del aire en %</li>
  *   <li>{@code hourly.weathercode} — código WMO de condición climática</li>
  * </ul>
+ *
+ * <p>El pedido lleva {@code timezone=America/Argentina/Buenos_Aires}: las marcas llegan en hora
+ * local del vivero (sin el parámetro Open-Meteo devuelve GMT), y la hora actual se busca con el
+ * {@link Clock} del vivero, no con el del JVM. Cada valor horario describe la hora ANTERIOR a su marca.
  */
 @Component
 public class OpenMeteoWeatherClient implements WeatherClient {
@@ -46,20 +53,25 @@ public class OpenMeteoWeatherClient implements WeatherClient {
     private static final String BASE_URL = "https://api.open-meteo.com/v1";
     /** Número de slots horarios futuros a incluir en el pronóstico del widget. */
     private static final int FORECAST_SLOTS = 4;
+    /** Horas hacia adelante que se conservan para evaluar la lluvia de una ventana (R-03). */
+    private static final int HORAS_PRONOSTICO = 24;
 
     private final RestClient restClient;
     private final double lat;
     private final double lon;
+    private final Clock reloj;
 
     public OpenMeteoWeatherClient(
             RestClient.Builder restClientBuilder,
             @Value("${yerbanalytics.weather.lat:-25.29}") double lat,
-            @Value("${yerbanalytics.weather.lon:-57.64}") double lon) {
+            @Value("${yerbanalytics.weather.lon:-57.64}") double lon,
+            Clock reloj) {
         this.restClient = restClientBuilder
                 .baseUrl(BASE_URL)
                 .build();
         this.lat = lat;
         this.lon = lon;
+        this.reloj = reloj;
     }
 
     /**
@@ -77,7 +89,8 @@ public class OpenMeteoWeatherClient implements WeatherClient {
                             .path("/forecast")
                             .queryParam("latitude", lat)
                             .queryParam("longitude", lon)
-                            .queryParam("hourly", "precipitation_probability,uv_index,temperature_2m,relative_humidity_2m,weathercode")
+                            .queryParam("hourly", "precipitation_probability,precipitation,uv_index,temperature_2m,relative_humidity_2m,weathercode")
+                            .queryParam("timezone", ZonaHorariaVivero.ZONA.getId())
                             .queryParam("forecast_days", 2)
                             .build())
                     .retrieve()
@@ -95,13 +108,14 @@ public class OpenMeteoWeatherClient implements WeatherClient {
             }
 
             List<Number> precipProb = (List<Number>) hourly.get("precipitation_probability");
+            List<Number> precipMm   = (List<Number>) hourly.get("precipitation");
             List<Number> uvList     = (List<Number>) hourly.get("uv_index");
             List<Number> tempList   = (List<Number>) hourly.get("temperature_2m");
             List<Number> humList    = (List<Number>) hourly.get("relative_humidity_2m");
             List<Number> wmoList    = (List<Number>) hourly.get("weathercode");
             List<String> timeList   = (List<String>) hourly.get("time");
 
-            if (precipProb == null || uvList == null || tempList == null
+            if (precipProb == null || precipMm == null || uvList == null || tempList == null
                     || humList == null || wmoList == null || precipProb.isEmpty()) {
                 log.warn("WeatherClient: campos de pronóstico ausentes o vacíos.");
                 return null;
@@ -128,8 +142,17 @@ public class OpenMeteoWeatherClient implements WeatherClient {
                 slots.add(new WeatherForecast.ForecastSlotRaw(label, slotUv, slotRain));
             }
 
+            List<WeatherForecast.PronosticoHora> horas = new ArrayList<>();
+            for (int i = 0; i <= HORAS_PRONOSTICO; i++) {
+                int idx = currentIdx + i;
+                if (idx >= precipProb.size()) break;
+                LocalDateTime marca = parseMarca(timeList, idx);
+                if (marca == null) break;
+                horas.add(new WeatherForecast.PronosticoHora(marca, safeDouble(precipProb, idx), safeDouble(precipMm, idx)));
+            }
+
             log.debug("WeatherClient: temp={}°C cond={} lluvia={}% UV={}", tempC, cond, prob, uv);
-            return new WeatherForecast(prob, uv, Instant.now(), tempC, cond, humRel, slots);
+            return new WeatherForecast(prob, uv, reloj.instant(), tempC, cond, humRel, slots, horas);
 
         } catch (RestClientException e) {
             log.warn("WeatherClient: error de red al consultar Open-Meteo: {}", e.getMessage());
@@ -144,18 +167,29 @@ public class OpenMeteoWeatherClient implements WeatherClient {
     // Helpers
     // -----------------------------------------------------------------------
 
-    /** Índice de la hora actual dentro del array horario de Open-Meteo. */
+    /**
+     * Índice de la hora actual (en hora local del vivero) dentro del array horario de Open-Meteo.
+     * Compara la marca completa (fecha y hora), no sólo la hora del día, y cae al primero si no la encuentra.
+     */
     private int currentHourIndex(List<String> times) {
         if (times == null || times.isEmpty()) return 0;
-        int hour = LocalTime.now(ZoneId.systemDefault()).getHour();
-        // Open-Meteo devuelve timestamps en formato "2026-09-19T15:00"; buscamos la hora actual.
+        LocalDateTime ahora = LocalDateTime.now(reloj).truncatedTo(ChronoUnit.HOURS);
         for (int i = 0; i < times.size(); i++) {
-            String t = times.get(i);
-            if (t != null && t.endsWith("T" + String.format("%02d:00", hour))) {
+            if (ahora.equals(parseMarca(times, i))) {
                 return i;
             }
         }
         return 0;
+    }
+
+    /** Marca horaria del índice ("2026-09-19T15:00") o {@code null} si falta o no se puede leer. */
+    private static LocalDateTime parseMarca(List<String> times, int idx) {
+        if (times == null || idx < 0 || idx >= times.size() || times.get(idx) == null) return null;
+        try {
+            return LocalDateTime.parse(times.get(idx));
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     /** Etiqueta legible para un slot futuro: "16 h", "17 h", … o "Mañana" si cruza medianoche. */
@@ -165,7 +199,7 @@ public class OpenMeteoWeatherClient implements WeatherClient {
             if (t != null && t.length() >= 13) {
                 String hPart = t.substring(11, 13); // "HH"
                 int slotHour = Integer.parseInt(hPart);
-                int todayHour = LocalTime.now(ZoneId.systemDefault()).getHour();
+                int todayHour = LocalDateTime.now(reloj).getHour();
                 if (slotHour < todayHour && offset > 0) {
                     return "Mañana";
                 }
