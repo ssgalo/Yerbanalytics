@@ -169,4 +169,33 @@ class NurseryServiceTimestampTest {
         assertThat(zona.getLastReadingTime()).isCloseTo(ahoraS * 1000, within(1L));
         verify(zonaRepository).save(zona);
     }
+
+    @Test
+    @DisplayName("la humedad de sustrato recibida deja su propia marca de tiempo (4.1)")
+    void conHumSus_escribeHumSusTs() {
+        long ahoraMs = System.currentTimeMillis();
+        zona.setLastReadingTime(null);
+        zona.setHumSusTs(null);
+
+        service.updateTelemetry("MZ-1", payload(ahoraMs));
+
+        assertThat(zona.getHumSusTs()).isEqualTo(ahoraMs);
+    }
+
+    @Test
+    @DisplayName("una lectura sin humSus conserva la marca anterior de la humedad (4.1)")
+    void sinHumSus_noTocaHumSusTs() {
+        long antes = System.currentTimeMillis() - 300_000;
+        zona.setLastReadingTime(antes);
+        zona.setHumSusRaw(41.0);
+        zona.setHumSusTs(antes);
+        long ahoraMs = System.currentTimeMillis();
+
+        service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, ahoraMs,
+                new MqttTelemetryPayload.MetricsPayload(null, 70.0, 22.0, 20.0, 40.0, null, null, null, null, null)));
+
+        assertThat(zona.getLastReadingTime()).isEqualTo(ahoraMs);
+        assertThat(zona.getHumSusRaw()).isEqualTo(41.0);
+        assertThat(zona.getHumSusTs()).isEqualTo(antes);
+    }
 }

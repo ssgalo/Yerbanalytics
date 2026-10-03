@@ -465,7 +465,12 @@ public class NurseryService {
         // manual de una sola métrica) conserva el último valor de las demás.
         MqttTelemetryPayload.MetricsPayload pm = payload.metrics();
         if (pm != null) {
-            if (pm.humSus() != null) zona.setHumSusRaw(pm.humSus());
+            if (pm.humSus() != null) {
+                zona.setHumSusRaw(pm.humSus());
+                // Marca propia: si la sonda cae, el resto de la lectura sigue refrescando la zona
+                // y sólo esta marca delata que la humedad está congelada (StaleSensorRule).
+                zona.setHumSusTs(tsMs);
+            }
             if (pm.humAmb() != null) zona.setHumAmbRaw(pm.humAmb());
             if (pm.temp() != null) zona.setTempRaw(pm.temp());
             if (pm.tempSuelo() != null) zona.setTempSueloRaw(pm.tempSuelo());

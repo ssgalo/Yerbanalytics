@@ -40,24 +40,24 @@ probadas sin registrarlas.
 
 ## 3. Modelo: acción tipada, contexto de riego y columnas (D2, D11)
 
-- [ ] 3.1 Test: `RuleAction.of(...)` y `noopInfo(...)` siguen dando `detalle == null`; una acción
+- [x] 3.1 Test: `RuleAction.of(...)` y `noopInfo(...)` siguen dando `detalle == null`; una acción
       con `DetalleRiego` lo conserva; `ActionType.ALERTA.isBlocking()` es `false`.
-- [ ] 3.2 Test: el constructor de 9 argumentos de `RuleContext` deja `riego() == ContextoRiego.vacio()`.
+- [x] 3.2 Test: el constructor de 9 argumentos de `RuleContext` deja `riego() == ContextoRiego.vacio()`.
       Agregar `ContextoRiego` y el constructor secundario (los 13 `new RuleContext(...)` no cambian).
-- [ ] 3.3 Test (`@DataJpaTest`): `HistorialEventoEntity` guarda y lee `regla`, `alerta`, `volumenL`,
+- [x] 3.3 Test (`@DataJpaTest`): `HistorialEventoEntity` guarda y lee `regla`, `alerta`, `volumenL`,
       `duracionSeg` (nulos por defecto); `ZonaEntity` guarda `humSusTs`.
-- [ ] 3.4 Test (`@DataJpaTest`): `HistorialRepository.ultimosPorSector(zonaId, desde)` devuelve el
+- [x] 3.4 Test (`@DataJpaTest`): `HistorialRepository.ultimosPorSector(zonaId, desde)` devuelve el
       `MAX(ts)` por sector y tipo (`Riego`, `Insumo`) y, para `Riego`, el último con
       `regla = DeficitCriticoRule`; ignora otras zonas y eventos anteriores a `desde`.
-- [ ] 3.5 Test (`@DataJpaTest`): `HistorialRepository.riegosDesde(desde)` devuelve los "Riego" con
+- [x] 3.5 Test (`@DataJpaTest`): `HistorialRepository.riegosDesde(desde)` devuelve los "Riego" con
       `duracionSeg` no nulo y `ts ≥ desde`. Implementar.
-- [ ] 3.6 Test: `HistorialEvento` (DTO) expone los cuatro campos nuevos (aditivo).
+- [x] 3.6 Test: `HistorialEvento` (DTO) expone los cuatro campos nuevos (aditivo).
 
 ## 4. Frescura de la humedad de sustrato (D9.1)
 
-- [ ] 4.1 Test: `updateTelemetry` escribe `zona.humSusTs` sólo si el payload trae `humSus`; una
+- [x] 4.1 Test: `updateTelemetry` escribe `zona.humSusTs` sólo si el payload trae `humSus`; una
       lectura sin `humSus` lo deja como estaba.
-- [ ] 4.2 Test de `StaleSensorRule`: zona fresca y `humSusTs` de hace 300 s con umbral 90 →
+- [x] 4.2 Test de `StaleSensorRule`: zona fresca y `humSusTs` de hace 300 s con umbral 90 →
       `ABORT_RIEGO` y comparación "Antigüedad de la humedad de sustrato 300 > 90"; con 89 s →
       `NOOP_INFO`; sin `humSusTs` → `SIN_DATO` y `ABORT_RIEGO`. Implementar.
 
