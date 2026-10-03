@@ -102,7 +102,7 @@ public class ConfiguracionService {
 
     private ConfiguracionOperativa buildOperativaDto(ConfiguracionOperativaEntity e) {
         return new ConfiguracionOperativa(
-                e.getRiegoVolMaxDiarioMl(), e.getInsumoDosisMax24hMl(),
+                e.getInsumoDosisMax24hMl(),
                 e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
                 e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : 240,
                 e.getIntervaloEvaluacionMinutos() != null ? e.getIntervaloEvaluacionMinutos() : 5,
@@ -141,7 +141,6 @@ public class ConfiguracionService {
         ConfiguracionOperativaEntity oe = operativaRepository.findById(OPERATIVA_ID)
                 .orElseGet(ConfiguracionOperativaEntity::new);
         oe.setId(OPERATIVA_ID);
-        oe.setRiegoVolMaxDiarioMl(op.riegoVolMaxDiarioMl());
         oe.setInsumoDosisMax24hMl(op.insumoDosisMax24hMl());
         oe.setSeguimientoLatenciaMin(op.seguimientoLatenciaMin());
         oe.setSeguimientoDeltaMin(op.seguimientoDeltaMin());
@@ -216,7 +215,6 @@ public class ConfiguracionService {
         if (op == null) {
             throw new InvalidConfigurationException("Faltan los límites operativos.");
         }
-        requirePositive(op.riegoVolMaxDiarioMl(), "el volumen máximo diario de riego");
         requirePositive(op.insumoDosisMax24hMl(), "la dosis máxima de insumo por 24 h");
         requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
         requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
@@ -340,7 +338,6 @@ public class ConfiguracionService {
     private ConfiguracionOperativaEntity defaultOperativa() {
         ConfiguracionOperativaEntity e = new ConfiguracionOperativaEntity();
         e.setId(OPERATIVA_ID);
-        e.setRiegoVolMaxDiarioMl(2000);
         e.setInsumoDosisMax24hMl(15);
         e.setSeguimientoLatenciaMin(2);
         e.setSeguimientoDeltaMin(5);

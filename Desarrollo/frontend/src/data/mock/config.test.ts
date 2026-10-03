@@ -53,7 +53,7 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
 
   it('rechaza límites operativos no positivos', () => {
     const cfg = buildConfig();
-    cfg.operativa = { ...cfg.operativa, riegoVolMaxDiarioMl: 0 };
+    cfg.operativa = { ...cfg.operativa, insumoDosisMax24hMl: 0 };
     expect(operativaErrors(cfg.operativa).length).toBeGreaterThan(0);
   });
 

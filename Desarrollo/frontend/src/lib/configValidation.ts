@@ -44,7 +44,6 @@ export function operativaErrors(op: ConfigOperativa): string[] {
   const positive = (v: number | null | undefined, nombre: string) => {
     if (!(Number(v) > 0)) out.push(`El valor de ${nombre} debe ser mayor a 0.`);
   };
-  positive(op.riegoVolMaxDiarioMl, 'el volumen máximo diario de riego');
   positive(op.insumoDosisMax24hMl, 'la dosis máxima de insumo por 24 h');
   positive(op.seguimientoLatenciaMin, 'la latencia de seguimiento');
   positive(op.seguimientoDeltaMin, 'el delta mínimo de recuperación');

@@ -34,16 +34,17 @@ class ConfiguracionControllerContratoTest {
     private ConfiguracionService service;
 
     private static Configuracion cfg() {
-        return new Configuracion(List.of(), new ConfiguracionOperativa(2000, 15, 2, 5.0, 240, 5, "Ana", 1L), List.of());
+        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "Ana", 1L), List.of());
     }
 
     @Test
-    void get_laOperativaNoIncluyeLosCamposMudados() throws Exception {
+    void get_laOperativaNoIncluyeLosCamposMudadosNiElVolumenDiario() throws Exception {
         when(service.getConfiguracion()).thenReturn(cfg());
 
         mockMvc.perform(get("/api/configuracion"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.operativa.riegoVolMaxDiarioMl").value(2000.0))
+                .andExpect(jsonPath("$.operativa.riegoVolMaxDiarioMl").doesNotExist())
+                .andExpect(jsonPath("$.operativa.insumoDosisMax24hMl").value(15.0))
                 .andExpect(jsonPath("$.operativa.riegoTiempoMaxSeg").doesNotExist())
                 .andExpect(jsonPath("$.operativa.mediasombraAperturaMaxPct").doesNotExist());
     }
@@ -54,7 +55,7 @@ class ConfiguracionControllerContratoTest {
 
         mockMvc.perform(put("/api/configuracion").header("X-Usuario", "Ana")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{\"riegoVolMaxDiarioMl\":2000,"
+                        .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
                                 + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
                                 + "\"intervaloSensadoMinutos\":240,\"intervaloEvaluacionMinutos\":5}}"))
                 .andExpect(status().isOk());

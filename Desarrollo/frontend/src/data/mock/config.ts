@@ -32,7 +32,6 @@ export function buildConfig(): Configuracion {
       provisional: !s.afectaEstado,
     })),
     operativa: {
-      riegoVolMaxDiarioMl: 2000,
       insumoDosisMax24hMl: 15,
       seguimientoLatenciaMin: 2,
       seguimientoDeltaMin: 5,

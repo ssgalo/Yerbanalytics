@@ -44,7 +44,6 @@ CREATE TABLE IF NOT EXISTS dispositivo (
 
 CREATE TABLE IF NOT EXISTS configuracion_operativa (
     id INTEGER PRIMARY KEY,
-    riego_vol_max_diario_ml DOUBLE PRECISION NOT NULL,
     insumo_dosis_max_24h_ml DOUBLE PRECISION NOT NULL,
     seguimiento_latencia_min INTEGER NOT NULL,
     seguimiento_delta_min DOUBLE PRECISION NOT NULL,

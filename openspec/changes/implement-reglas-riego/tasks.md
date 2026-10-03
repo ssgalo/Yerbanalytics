@@ -188,9 +188,9 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
 
 ## 12. Baja de `riegoVolMaxDiarioMl` (DA-10)
 
-- [ ] 12.1 Test backend: `GET /api/configuracion` ya no trae `riegoVolMaxDiarioMl`; sacarlo de la
+- [x] 12.1 Test backend: `GET /api/configuracion` ya no trae `riegoVolMaxDiarioMl`; sacarlo de la
       entidad, el DTO y `ConfiguracionService`. Sumar `DROP COLUMN riego_vol_max_diario_ml` al script.
-- [ ] 12.2 Test frontend: `LimitesActuadoresForm` ya no muestra el campo; tipos y mock sin él.
+- [x] 12.2 Test frontend: `LimitesActuadoresForm` ya no muestra el campo; tipos y mock sin él.
 
 ## 13. Frontend (D12) — después de 0.2
 

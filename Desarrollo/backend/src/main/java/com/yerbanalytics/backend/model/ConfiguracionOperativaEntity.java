@@ -25,10 +25,6 @@ public class ConfiguracionOperativaEntity {
     @Id
     private Integer id;
 
-    // --- Riego (HU-15 CA-04). El tiempo máx. de apertura vive en el catálogo de parámetros de reglas. ---
-    @Column(name = "riego_vol_max_diario_ml", nullable = false)
-    private double riegoVolMaxDiarioMl;
-
     // --- Insumos / bomba peristáltica (HU-15 CA-05) ---
     @Column(name = "insumo_dosis_max_24h_ml", nullable = false)
     private double insumoDosisMax24hMl;

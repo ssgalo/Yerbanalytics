@@ -29,13 +29,17 @@ describe('LimitesActuadoresForm', () => {
     expect(enlace.getAttribute('href')).toBe('/reglas');
   });
 
-  it('rotula volumen diario y dosis máx. como no intervinientes en las decisiones del motor', () => {
+  it('ya no muestra el volumen máx. diario de riego (los límites diarios se eliminaron)', () => {
     montar();
 
-    const volumen = screen.getByLabelText(/Volumen máx\. diario de riego/);
-    const dosis = screen.getByLabelText(/Dosis máx\. de insumo/);
-    expect(volumen).toBeTruthy();
-    expect(dosis).toBeTruthy();
+    expect(screen.queryByLabelText(/Volumen máx\. diario de riego/)).toBeNull();
+    expect(screen.queryByText(/ml\/día/)).toBeNull();
+  });
+
+  it('rotula la dosis máx. de insumo como no interviniente en las decisiones del motor', () => {
+    montar();
+
+    expect(screen.getByLabelText(/Dosis máx\. de insumo/)).toBeTruthy();
     expect(screen.getAllByText(/no intervienen en decisiones del motor/i).length).toBeGreaterThanOrEqual(1);
   });
 });

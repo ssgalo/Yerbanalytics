@@ -17,6 +17,8 @@
 --      solo al desplegar; si lo hay, se respeta (no se toca acá).
 --    · `historial_evento` suma `regla`, `alerta`, `volumen_l` y `duracion_seg`, y
 --      `zona` suma `hum_sus_ts`: las agrega `ddl-auto=update`, nulas.
+--    · `configuracion_operativa.riego_vol_max_diario_ml` se da de baja (DA-10): salió de la entidad, del DTO
+--      y de la pantalla de Configuración. Es NOT NULL: hay que borrarla con este script.
 --    · `sector.actuador_valve` queda como columna legada: nadie la escribe ni la
 --      lee para decidir. El estado de la válvula (Regando / En cola / Cerrada) lo
 --      deriva el despacho del último evento "Riego" (ts + duración + 5 s).
@@ -41,6 +43,12 @@ DELETE FROM parametro_regla
 --    Opcional: sin él la consulta funciona, sólo más lenta con un historial grande.
 CREATE INDEX IF NOT EXISTS idx_historial_evento_zona_tipo_ts
     ON historial_evento (zona_id, tipo, ts);
+
+-- 3. Baja de `configuracion_operativa.riego_vol_max_diario_ml` (DA-10). Era un límite diario que sólo leía
+--    el texto de la regla vieja y que ya no existe (los límites diarios se eliminaron). Ojo: la columna es
+--    NOT NULL, así que el código nuevo NO la completa al insertar: mientras exista, el primer guardado de
+--    Configuración sobre una base sin fila falla. Correr este paso antes de eso (o al desplegar).
+ALTER TABLE configuracion_operativa DROP COLUMN IF EXISTS riego_vol_max_diario_ml;
 
 COMMIT;
 
@@ -73,9 +81,11 @@ COMMIT;
 --  ROLLBACK (comentado). Después de revertir el código:
 --    · `actuador_valve` vuelve a leerse: los sectores que quedaron "Regando" del código viejo no se cierran
 --      solos, así que se vuelven a "Cerrada".
+--    · `riego_vol_max_diario_ml` vuelve a existir (con 2000 de fábrica) para que el código viejo pueda leerla.
 --    · Las columnas nuevas quedan sin uso (nulas); no hace falta bajarlas.
 --
 --    BEGIN;
+--    ALTER TABLE configuracion_operativa ADD COLUMN IF NOT EXISTS riego_vol_max_diario_ml DOUBLE PRECISION NOT NULL DEFAULT 2000;
 --    UPDATE sector SET actuador_valve = 'Cerrada' WHERE actuador_valve <> 'Cerrada';
 --    DROP INDEX IF EXISTS idx_historial_evento_zona_tipo_ts;
 --    COMMIT;

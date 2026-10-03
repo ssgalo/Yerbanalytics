@@ -66,7 +66,7 @@ class ConfiguracionServiceCatalogoTest {
 
     private static Configuracion cfg(List<RustificacionEtapa> etapas) {
         return new Configuracion(umbralesDeFabrica(),
-                new ConfiguracionOperativa(2000, 15, 2, 5.0, 240, 5, "x", 1L), etapas);
+                new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "x", 1L), etapas);
     }
 
     // ------------------------------------------------------------------ 5.1
@@ -76,7 +76,7 @@ class ConfiguracionServiceCatalogoTest {
         String json = new ObjectMapper().writeValueAsString(service.getConfiguracion().operativa());
 
         assertThat(json).doesNotContain("riegoTiempoMaxSeg").doesNotContain("mediasombraAperturaMaxPct");
-        assertThat(json).contains("riegoVolMaxDiarioMl").contains("insumoDosisMax24hMl")
+        assertThat(json).doesNotContain("riegoVolMaxDiarioMl").contains("insumoDosisMax24hMl")
                 .contains("seguimientoLatenciaMin").contains("intervaloEvaluacionMinutos");
     }
 
