@@ -23,15 +23,23 @@ import com.yerbanalytics.backend.repository.TopologiaLayoutRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class NurseryService {
+
+    private static final Logger log = LoggerFactory.getLogger(NurseryService.class);
+
+    /** Zonas cuyo nodo ya avisó de un timestamp inutilizable: el warn sale una vez por zona, no por mensaje. */
+    private final Set<String> zonasConTimestampInvalido = ConcurrentHashMap.newKeySet();
 
     /** Identidad de la fila única de disposición visual. */
     private static final int LAYOUT_ID = 1;
@@ -426,6 +434,27 @@ public class NurseryService {
         if (zona == null) {
             return;
         }
+
+        // El timestamp del contrato llega en segundos (firmware) o ms (simulador): se normaliza a
+        // ms por valor. Si no sirve como fecha real, manda la hora de recepción.
+        long recepcionMs = System.currentTimeMillis();
+        Long tsMs = ContratoNodo.timestampAMs(payload.timestamp(), recepcionMs);
+        if (tsMs == null) {
+            if (zonasConTimestampInvalido.add(zoneId)) {
+                log.warn("Zona {}: el nodo mandó un timestamp inutilizable ({}); se usa la hora de recepción. "
+                        + "Sin NTP el nodo publica segundos desde el arranque.", zoneId, payload.timestamp());
+            }
+            tsMs = recepcionMs;
+        } else {
+            zonasConTimestampInvalido.remove(zoneId);
+        }
+        // Lectura vieja (buffer offline del nodo, que conserva su hora original): no pisa una más
+        // nueva ni cuenta como "recién leída". Sólo se ignora con timestamp legítimo.
+        if (zona.getLastReadingTime() != null && tsMs < zona.getLastReadingTime()) {
+            log.debug("Zona {}: lectura de {} ignorada por ser anterior a la última guardada ({})",
+                    zoneId, tsMs, zona.getLastReadingTime());
+            return;
+        }
         List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
 
         // La lectura se persiste UNA vez, en la zona. Sólo se actualizan las métricas
@@ -449,7 +478,7 @@ public class NurseryService {
         if (payload.mac() != null && !payload.mac().isBlank()) zona.setNodoMac(payload.mac().trim());
         if (payload.battery() != null) zona.setNodoBattery(payload.battery());
         if (payload.signal() != null) zona.setNodoSignal(payload.signal());
-        zona.setLastReadingTime(payload.timestamp() != null ? payload.timestamp() : System.currentTimeMillis());
+        zona.setLastReadingTime(tsMs);
         zonaRepository.save(zona);
 
         // El estado de cada sector se deriva de esa única lectura. Sólo las métricas no
@@ -524,7 +553,7 @@ public class NurseryService {
 
         // Heartbeat del nodo testigo de la zona: batería/señal/último update (HU-21 CA-01).
         // Antes el mac/battery del payload se descartaban; ahora alimentan el registro de hardware.
-        hardwareService.actualizarHeartbeat(zoneId, payload.mac(), payload.battery(), payload.signal(), payload.timestamp());
+        hardwareService.actualizarHeartbeat(zoneId, payload.mac(), payload.battery(), payload.signal(), tsMs);
     }
 
     /**

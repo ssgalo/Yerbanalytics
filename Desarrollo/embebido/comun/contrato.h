@@ -29,6 +29,10 @@ static const uint8_t QOS_ACK         = 1;
 static const char* KEY_MAC        = "mac";
 static const char* KEY_BATTERY    = "battery";
 static const char* KEY_SIGNAL     = "signal";
+// timestamp: SEGUNDOS epoch (reloj::ahoraEpoch(), uint32_t). Sin NTP son segundos desde el
+// arranque. El backend lo normaliza a ms por valor (ContratoNodo.timestampAMs): segundos
+// plausibles se multiplican por 1000; uno inutilizable se reemplaza por la hora de recepción.
+// El simulador publica milisegundos y el backend también lo acepta.
 static const char* KEY_TIMESTAMP  = "timestamp";
 static const char* KEY_METRICS    = "metrics";
 //  Métricas base (contrato actual del backend)

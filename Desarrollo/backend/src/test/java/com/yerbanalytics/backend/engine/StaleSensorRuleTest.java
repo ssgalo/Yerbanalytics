@@ -50,7 +50,7 @@ class StaleSensorRuleTest {
     @Test
     @DisplayName("lectura más vieja que el umbral → ABORT_RIEGO")
     void cuandoLaLecturaEsVieja_emiteAbortRiego() {
-        List<RuleAction> acciones = evaluar(rule, conLecturaHace(31.0));
+        List<RuleAction> acciones = evaluar(rule, conLecturaHace(91.0));
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.ABORT_RIEGO);
@@ -68,7 +68,7 @@ class StaleSensorRuleTest {
     @Test
     @DisplayName("exactamente en el umbral todavía es fresca (comparación estricta)")
     void exactamenteEnElUmbral_esFresca() {
-        assertThat(evaluar(rule, conLecturaHace(30.0))).extracting(RuleAction::type)
+        assertThat(evaluar(rule, conLecturaHace(90.0))).extracting(RuleAction::type)
                 .containsExactly(ActionType.NOOP_INFO);
     }
 
@@ -100,13 +100,13 @@ class StaleSensorRuleTest {
     void laTrazaRegistraLaAntiguedadContraElParametro() {
         Evaluacion ev = ev(rule);
 
-        rule.evaluate(conLecturaHace(45.0), ev);
+        rule.evaluate(conLecturaHace(95.0), ev);
 
         assertThat(rule.parametros()).containsExactly(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
         Comparacion c = ev.comparaciones().get(0);
-        assertThat(c.recibido()).isEqualTo(45.0);
+        assertThat(c.recibido()).isEqualTo(95.0);
         assertThat(c.operador()).isEqualTo(Operador.GT);
-        assertThat(c.umbral()).isEqualTo(30.0);
+        assertThat(c.umbral()).isEqualTo(90.0);
         assertThat(c.unidad()).isEqualTo("s");
         assertThat(c.clave()).isEqualTo("seguridad.antiguedad-max-lectura");
         assertThat(c.resultado()).isEqualTo(ResultadoComparacion.CUMPLE);
@@ -115,9 +115,9 @@ class StaleSensorRuleTest {
     @Test
     @DisplayName("el umbral sale del catálogo")
     void elUmbralSaleDelCatalogo() {
-        // Con 60 s de tolerancia, una lectura de 45 s sigue siendo fresca.
-        List<RuleAction> acciones = rule.evaluate(conLecturaHace(45.0),
-                ev(rule, Map.of(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, "60")));
+        // Con 120 s de tolerancia, una lectura de 95 s (vieja para la fábrica) sigue siendo fresca.
+        List<RuleAction> acciones = rule.evaluate(conLecturaHace(95.0),
+                ev(rule, Map.of(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, "120")));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);
     }

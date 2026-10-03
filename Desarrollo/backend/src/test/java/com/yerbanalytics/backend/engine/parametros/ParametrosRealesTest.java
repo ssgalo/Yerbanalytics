@@ -18,7 +18,7 @@ class ParametrosRealesTest {
 
     /** Valor actual en el código → clave del catálogo (con la fuente citada en D7). */
     private static final Map<String, Double> VALORES_DE_HOY = Map.ofEntries(
-            Map.entry("seguridad.antiguedad-max-lectura", 30.0),     // stale-threshold-ms=30000
+            Map.entry("seguridad.antiguedad-max-lectura", 90.0),     // 3 intervalos de publicación del nodo (30 s)
             Map.entry("riego.umbral-humedad", 42.0),                 // idealMin de humSus (seed)
             Map.entry("riego.tiempo-max-apertura", 120.0),           // configuracion_operativa
             Map.entry("riego.max-riegos-24h", 2.0),                  // DailyVolumeLimitRule:61

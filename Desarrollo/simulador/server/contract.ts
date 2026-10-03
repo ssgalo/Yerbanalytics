@@ -53,6 +53,10 @@ export interface TelemetryPayload {
   mac: string;
   battery?: number | null;
   signal?: number | null;
+  /**
+   * Epoch in milliseconds here. The firmware publishes seconds; the backend normalizes
+   * either one by value (ContratoNodo.timestampAMs), so this is documentation only.
+   */
   timestamp: number;
   metrics: ContractMetrics;
 }
