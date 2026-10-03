@@ -5,7 +5,6 @@ import { useHistory } from '@/hooks/useHistory';
 import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
 import { HistorialFilters, type HistorialFilterState } from './components/HistorialFilters';
 import { HistorialTimeline } from './components/HistorialTimeline';
-import type { ActionRecord } from '@/types/domain';
 import styles from './HistorialPage.module.css';
 
 const INITIAL: HistorialFilterState = {

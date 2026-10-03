@@ -221,7 +221,7 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphProps) {
       (e) => !e.target.startsWith('abort-') && !e.source.startsWith('abort-')
     );
     return { nodes, edges };
-  }, [schema, activeEvents]);
+  }, [schema]);
 
   const positions = useMemo(() => computeLayout(filteredSchema), [filteredSchema]);
 

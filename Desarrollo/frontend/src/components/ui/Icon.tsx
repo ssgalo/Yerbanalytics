@@ -24,7 +24,13 @@ export type IconName =
   | 'cube'
   | 'signal'
   | 'battery'
-  | 'clock';
+  | 'clock'
+  | 'sensor'
+  | 'wifi-off'
+  | 'camera'
+  | 'calendar'
+  | 'chevron-down'
+  | 'map-pin';
 
 const PATHS: Record<IconName, JSX.Element> = {
   leaf: (
@@ -126,6 +132,31 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5.2l3.2 1.9" />
+    </>
+  ),
+  /* Nodo testigo: sensor con antena */
+  sensor: <path d="M12 2v6M8.5 5.5a5 5 0 0 0 7 0M5 9a9 9 0 0 0 14 0M12 10v12" />,
+  'wifi-off': (
+    <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+  ),
+  camera: (
+    <>
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <circle cx="12" cy="13" r="4" />
+      <path d="M8 6l1.5-2.5h5L16 6" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </>
+  ),
+  'chevron-down': <path d="M6 9l6 6 6-6" />,
+  'map-pin': (
+    <>
+      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
     </>
   ),
 };

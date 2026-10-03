@@ -90,7 +90,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
       </div>
 
       <div className={styles.feed}>
-        {groupedCycles.map((cycle, cycleIndex) => {
+        {groupedCycles.map((cycle) => {
           const isCycleOpen = !!openCycles[cycle.fecha];
           const zonaList = Object.values(cycle.zonas).sort((a, b) => a.zonaName.localeCompare(b.zonaName));
           
@@ -223,7 +223,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                             </div>
                                             <Chain 
                                               label="Lectura / diagnóstico" 
-                                              text={r.lectura.replace(/Ciclo de evaluaci[oó]n:\s*(\w+)\.?/i, (match, ruleName) => {
+                                              text={r.lectura.replace(/Ciclo de evaluaci[oó]n:\s*(\w+)\.?/i, (_match, ruleName) => {
                                                 const node = schema?.nodes.find((n) => n.id === ruleName);
                                                 return `Evaluando: ${node ? node.label : ruleName}`;
                                               })} 

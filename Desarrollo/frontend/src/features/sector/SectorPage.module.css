@@ -14,27 +14,36 @@
 .crumbs {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   flex-shrink: 0;
 }
 
-.backBtn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.crumbBtn {
   border: none;
   background: transparent;
-  color: var(--muted);
+  color: var(--brand);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 12.5px;
-  padding: 2px 4px 2px 0;
+  padding: 2px 4px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: color 0.15s;
 }
 
-.backBtn:hover {
+.crumbBtn:hover {
+  background: var(--ok-soft);
+}
+
+.sep {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.current {
   color: var(--ink);
+  font-weight: 600;
+  font-size: 12.5px;
 }
 
 /* Header del sector */
@@ -80,4 +89,62 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* Dibujo del sector físico */
+.dibujo {
+  padding: 18px 20px;
+}
+
+.dibujoHead {
+  margin-bottom: 12px;
+}
+
+.dibujoTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dibujoSub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sinSenal {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.que {
+  margin-top: 14px;
+}
+
+.que summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--brand);
+}
+
+.que p {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.que b {
+  color: var(--ink);
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
