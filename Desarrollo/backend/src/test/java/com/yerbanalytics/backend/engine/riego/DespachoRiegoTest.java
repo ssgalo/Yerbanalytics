@@ -2,11 +2,15 @@ package com.yerbanalytics.backend.engine.riego;
 
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.DetalleRiego;
+import com.yerbanalytics.backend.engine.RiegoCtx;
+import com.yerbanalytics.backend.engine.weather.WeatherService;
+import com.yerbanalytics.backend.service.ConfiguracionService;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException;
+import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -74,6 +78,8 @@ class DespachoRiegoTest {
     private final Set<String> zonasSinLecturaNueva = new HashSet<>();
     private ManualLockRepository bloqueos;
     private CatalogoParametrosService parametros;
+    private WeatherService clima;
+    private ConfiguracionService configuracion;
     private DespachoRiego despacho;
     /** begin / commit / rollback de las transacciones y "publish" de cada comando, en orden. */
     private List<String> eventos;
@@ -112,12 +118,15 @@ class DespachoRiegoTest {
         when(bloqueos.findByActiveTrue()).thenReturn(List.of());
         parametros = mock(CatalogoParametrosService.class);
         when(parametros.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        clima = mock(WeatherService.class);                      // por defecto, sin pronóstico (O-01)
+        configuracion = mock(ConfiguracionService.class);
+        when(configuracion.getConfiguracionOperativa()).thenReturn(RuleContextTestFactory.defaultConfig());   // ciclo de 240 min
         despacho = nuevoDespacho();
     }
 
     private DespachoRiego nuevoDespacho() {
         return new DespachoRiego(cola, publisher, historial, historialRepository, sectorRepository, zonaRepository,
-                bloqueos, parametros, reloj, new TxFalso(eventos));
+                bloqueos, parametros, clima, configuracion, reloj, new TxFalso(eventos));
     }
 
     private static String zonaDe(String sectorId) {
@@ -583,7 +592,9 @@ class DespachoRiegoTest {
         assertThat(despacho.parametros()).containsExactlyInAnyOrder(ParametrosRiego.SECTORES_SIMULTANEOS,
                 // los que revalida antes de abrir cada válvula
                 ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, ParametrosRiego.SATURACION_BLOQUEO,
-                ParametrosRiego.VENTANA_NORMAL);
+                ParametrosRiego.VENTANA_NORMAL, ParametrosRiego.PAUSA_TRAS_APLICACION,
+                ParametrosRiego.LLUVIA_PROBABILIDAD, ParametrosRiego.LLUVIA_MM, ParametrosRiego.LLUVIA_VENTANA,
+                ParametrosRiego.EXCEPTUADO_BLOQUEO);
     }
 
     @Test
@@ -605,6 +616,7 @@ class DespachoRiegoTest {
                     for (int n = 1; n <= 50; n++) {
                         pedir("MZ-2", n, 600);
                     }
+                    pausaCorta();   // la telemetría real reemplaza cada solicitud cada 30 s, no en un bucle cerrado
                 }
             });
         }
@@ -616,11 +628,19 @@ class DespachoRiegoTest {
         assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
 
         List<String> abiertos = sectoresPublicados();
-        assertThat(abiertos).hasSize(10);
+        assertThat(abiertos).isNotEmpty().hasSizeLessThanOrEqualTo(10);   // nunca más del cupo
         Set<String> unicos = new HashSet<>(abiertos);
         assertThat(unicos).hasSameSizeAs(abiertos);
         assertThat(Collections.max(abiertos.stream().map(s -> Integer.parseInt(s.substring(s.lastIndexOf('-') + 1))).toList()))
                 .isLessThanOrEqualTo(50);
+    }
+
+    private static void pausaCorta() {
+        try {
+            Thread.sleep(5);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test
@@ -645,7 +665,7 @@ class DespachoRiegoTest {
     }
 
     @Test
-    void conLaLecturaDeLaZonaVieja_noSeAbreNingunaValvulaYLosPendientesSeDescartan() {
+    void conLaLecturaDeLaZonaVieja_PAUSA_noSeAbreNingunaValvulaYLaRondaSeConserva() {
         pedirZona("MZ-2", 30, 600);
         nodoMuere("MZ-2");
         reloj.avanzar(Duration.ofSeconds(91));                       // umbral de fábrica: 90 s
@@ -653,9 +673,106 @@ class DespachoRiegoTest {
         despacho.tick();
 
         verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.pendientes("MZ-2")).as("pausa: no se descarta nada").hasSize(30);
+        verify(historial, never()).registrarAlerta(any(), any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void alVolverElNodoSeRetomaLaRondaPausada() {
+        pedirZona("MZ-2", 30, 600);
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofMinutes(3));                        // hueco de lectura de 3 minutos
+        despacho.tick();
+        reloj.avanzar(Duration.ofSeconds(10));
+        despacho.tick();
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+
+        zonasSinLecturaNueva.remove("MZ-2");                         // el nodo vuelve
+        reloj.avanzar(Duration.ofSeconds(10));
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly(
+                "MZ-2-001", "MZ-2-002", "MZ-2-003", "MZ-2-004", "MZ-2-005",
+                "MZ-2-006", "MZ-2-007", "MZ-2-008", "MZ-2-009", "MZ-2-010");
+        assertThat(cola.pendientes("MZ-2")).hasSize(20);
+    }
+
+    // ------------------------------------------------------------------ vencimiento de las solicitudes
+
+    @Test
+    void unaSolicitudNoVenceEnElCicloSiguienteAlQueSePidio() {
+        pedirZona("MZ-2", 5, 600);                                   // 10:05, ciclo 10:00-14:00
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofHours(4));                          // 14:05: el ciclo siguiente (gracia)
+
+        despacho.tick();
+
+        assertThat(cola.pendientes("MZ-2")).hasSize(5);
+        verify(historial, never()).registrarAlerta(any(), any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void unaSolicitudVenceAlEmpezarElTercerCicloYDejaUnaAlertaWarningPorZona() {
+        pedirZona("MZ-2", 5, 600);
+        pedirCritico("MZ-2", 9, 720);
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofHours(8));                          // 18:05: tercer ciclo (18:00-22:00)
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
         assertThat(cola.zonas()).isEmpty();
-        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
-                argThat(a -> a.nivel() == NivelAlerta.WARNING && a.texto().contains("30 solicitudes")), anyLong());
+        verify(historial, times(1)).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.nivel() == NivelAlerta.WARNING && a.texto().contains("6 solicitudes")
+                        && a.texto().contains("venci")), anyLong());
+    }
+
+    @Test
+    void elNodoQueNoVuelveNuncaNoRiegaYLaColaSeVaciaAlVencer() {
+        pedirZona("MZ-2", 90, 600);
+        nodoMuere("MZ-2");
+
+        reloj.avanzar(Duration.ofSeconds(91));                       // la lectura ya no es vigente (umbral: 90 s)
+        for (int i = 0; i < 6; i++) {                                // 3 minutos de hueco: pausa
+            reloj.avanzar(Duration.ofSeconds(30));
+            despacho.tick();
+        }
+        assertThat(cola.pendientes("MZ-2")).hasSize(90);
+
+        reloj.avanzar(Duration.ofHours(8));                          // y sigue sin volver: vence
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void conElNodoVivoUnaSolicitudViejaTampocoSeRiega() {
+        pedirCritico("MZ-2", 1, 720);                                // 10:05
+        reloj.avanzar(Duration.ofHours(8));                          // 18:05, la lectura es de ahora
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void elVencimientoUsaElIntervaloDeSensadoConfigurado() {
+        // 60 min: ciclo 10:00-11:00, la solicitud de las 10:05 vale hasta las 12:00.
+        ConfiguracionOperativaEntity cfg = RuleContextTestFactory.defaultConfig();
+        cfg.setIntervaloSensadoMinutos(60);
+        when(configuracion.getConfiguracionOperativa()).thenReturn(cfg);
+        pedir("MZ-2", 1, 600);
+        nodoMuere("MZ-2");
+
+        reloj.avanzar(Duration.ofMinutes(114));                      // 11:59
+        despacho.tick();
+        assertThat(cola.contiene("MZ-2-001")).isTrue();
+
+        reloj.avanzar(Duration.ofMinutes(2));                        // 12:01
+        despacho.tick();
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
     }
 
     @Test
@@ -679,7 +796,7 @@ class DespachoRiegoTest {
         despacho.tick();
 
         verify(publisher, times(10)).publicar(any(), any(), any(), any(), any());
-        assertThat(cola.zonas()).isEmpty();
+        assertThat(cola.pendientes("MZ-2")).as("pausa, no descarte").hasSize(90);
     }
 
     @Test
@@ -693,7 +810,7 @@ class DespachoRiegoTest {
         despacho.tick();
 
         verify(publisher, never()).publicar(any(), any(), any(), any(), any());
-        assertThat(cola.zonas()).isEmpty();
+        assertThat(cola.contiene("MZ-2-001")).as("pausa: la sonda puede volver").isTrue();
     }
 
     @Test
@@ -733,9 +850,10 @@ class DespachoRiegoTest {
 
     @Test
     void unaSolicitudDeR01FueraDeLaVentanaSeDescartaAunSinCupo() {
+        reloj.avanzar(Duration.ofHours(7).plusMinutes(50));           // 17:55
         pedirZona("MZ-2", 30, 600);
-        despacho.tick();                                              // 10:05: abre 1-10, quedan 20
-        reloj.avanzar(Duration.ofHours(8));                           // 18:05: la ventana cerró
+        despacho.tick();                                              // abre 1-10, quedan 20
+        reloj.avanzar(Duration.ofMinutes(10));                        // 18:05: la ventana cerró (la solicitud sigue vigente)
 
         despacho.tick();
 
@@ -795,10 +913,9 @@ class DespachoRiegoTest {
     @Test
     void siFallaElRegistroDeLaAlertaElTickSigue() {
         pedirZona("MZ-2", 5, 600);
-        nodoMuere("MZ-2");
-        reloj.avanzar(Duration.ofSeconds(120));
+        reloj.avanzar(Duration.ofHours(8));                          // 18:05: fuera de la ventana, se descartan con alerta
         doThrow(new IllegalStateException("base caída")).when(historial).registrarAlerta(any(), any(), any(), any(), anyLong());
-        pedir("MZ-3", 1, 600);
+        pedirCritico("MZ-3", 1, 720);
 
         despacho.tick();
 
@@ -835,5 +952,190 @@ class DespachoRiegoTest {
         despacho.tick();
 
         assertThat(despacho.ultimoRiegoMs("MZ-2-001")).isNull();
+    }
+
+    // ------------------------------------------------------------------ precondiciones de R-01 que no son la humedad
+
+    private static HistorialRepository.UltimoEvento fila(String sectorId, String tipo, String regla, Instant ts) {
+        return new HistorialRepository.UltimoEvento() {
+            @Override public String getSectorId() { return sectorId; }
+            @Override public String getTipo() { return tipo; }
+            @Override public String getRegla() { return regla; }
+            @Override public Long getTs() { return ts.toEpochMilli(); }
+        };
+    }
+
+    private void historia(HistorialRepository.UltimoEvento... filas) {
+        when(historialRepository.ultimosPorSector(eq("MZ-2"), anyLong())).thenReturn(List.of(filas));
+    }
+
+    private void lluviaFuerte() {
+        when(clima.getForecastSinEspera()).thenReturn(
+                RiegoCtx.pronostico(T0, new double[]{90, 90, 90, 90}, new double[]{3, 3, 3, 3}));
+    }
+
+    @Test
+    void unaDosificacionPosteriorALaDecisionDescartaLaSolicitudDeR01_peroNoLaDeR02_R06() {
+        pedir("MZ-2", 1, 600);                                        // con insumo hace 2 h
+        pedirCritico("MZ-2", 2, 720);                                 // también con insumo reciente
+        pedir("MZ-2", 3, 600);                                        // insumo hace 7 h: la pausa ya se cumplió
+        historia(fila("MZ-2-001", "Insumo", null, T0.minusSeconds(2 * 3600)),
+                fila("MZ-2-002", "Insumo", null, T0.minusSeconds(3600)),
+                fila("MZ-2-003", "Insumo", null, T0.minusSeconds(7 * 3600)));
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-002", "MZ-2-003");
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
+        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.nivel() == NivelAlerta.WARNING && a.texto().contains("insumo")), anyLong());
+    }
+
+    @Test
+    void laPausaDeR06UsaElParametroDelCatalogo() {
+        when(parametros.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "2")));
+        pedir("MZ-2", 1, 600);
+        historia(fila("MZ-2-001", "Insumo", null, T0.minusSeconds(3 * 3600)));    // hace 3 h, pausa de 2 h
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001");
+    }
+
+    @Test
+    void llegaElPronosticoDeLluviaConLaRondaYaEncolada_R03_laSolicitudDeR01SeDescartaYLaDeR02NoSeToca() {
+        pedir("MZ-2", 1, 600);
+        pedirCritico("MZ-2", 2, 720);
+        lluviaFuerte();                                               // el pronóstico llegó DESPUÉS de decidir
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-002");
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
+        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.nivel() == NivelAlerta.WARNING && a.texto().contains("lluvia")), anyLong());
+    }
+
+    @Test
+    void sinDatoDePronosticoNoPospone_O01() {
+        pedir("MZ-2", 1, 600);
+        when(clima.getForecastSinEspera()).thenReturn(null);
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001");
+    }
+
+    @Test
+    void lluviaQueNoAlcanzaLosDosUmbralesNoPospone() {
+        when(clima.getForecastSinEspera()).thenReturn(                // probabilidad alta pero 1 mm: no llega a 5 mm
+                RiegoCtx.pronostico(T0, new double[]{90, 90, 90, 90}, new double[]{0.25, 0.25, 0.25, 0.25}));
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001");
+
+        when(clima.getForecastSinEspera()).thenReturn(                // 12 mm pero probabilidad 50 < 70
+                RiegoCtx.pronostico(T0, new double[]{50, 50, 50, 50}, new double[]{3, 3, 3, 3}));
+        pedir("MZ-2", 2, 600);
+        despacho.tick();
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-002");
+    }
+
+    @Test
+    void elPronosticoSePideSinEsperarYUnaVezPorZonaPorTick() {
+        pedirZona("MZ-2", 25, 600);
+
+        despacho.tick();
+
+        verify(clima, times(1)).getForecastSinEspera();
+        verify(clima, never()).getForecast();
+    }
+
+    @Test
+    void unaRondaSoloDeR02NoPideElPronostico() {
+        pedirCritico("MZ-2", 1, 720);
+
+        despacho.tick();
+
+        verify(clima, never()).getForecastSinEspera();
+    }
+
+    @Test
+    void unSectorQueYaRegoEnEsteCicloSegunElHistorialNoVuelveAAbrirseConR01_peroSiConR02() {
+        pedir("MZ-2", 1, 600);
+        pedirCritico("MZ-2", 2, 720);
+        pedir("MZ-2", 3, 600);
+        historia(fila("MZ-2-001", "Riego", "RiegoPorDeficitRule", T0.minusSeconds(180)),      // 10:02: este ciclo
+                fila("MZ-2-002", "Riego", "RiegoPorDeficitRule", T0.minusSeconds(180)),
+                fila("MZ-2-003", "Riego", "RiegoPorDeficitRule", T0.minusSeconds(600)));    // 09:55: ciclo anterior
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-002", "MZ-2-003");
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
+        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.texto().contains("ciclo")), anyLong());
+    }
+
+    @Test
+    void conUnaDuracionMasCortaQueElTickUnSectorReencoladoNoSeAbreDosVecesEnElCiclo_R01() {
+        pedir("MZ-2", 1, 3);                                           // 3 s + 5 s de margen < 10 s del tick
+        despacho.tick();
+        reloj.avanzar(Duration.ofSeconds(10));
+        pedir("MZ-2", 1, 3);                                           // la telemetría lo vuelve a pedir
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
+    }
+
+    @Test
+    void conUnaDuracionCortaR02TampocoSeAbreDosVecesPorElTopeDeHoras() {
+        pedirCritico("MZ-2", 1, 3);
+        despacho.tick();
+        reloj.avanzar(Duration.ofSeconds(10));
+        pedirCritico("MZ-2", 1, 3);
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
+        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.texto().contains("tope")), anyLong());
+    }
+
+    @Test
+    void elTopeDeR02SeLeeTambienDelHistorial() {
+        pedirCritico("MZ-2", 1, 720);
+        pedirCritico("MZ-2", 2, 720);
+        historia(fila("MZ-2-001", "Riego", "DeficitCriticoRule", T0.minusSeconds(11 * 3600)),       // hace 11 h: dentro del tope
+                fila("MZ-2-002", "Riego", "DeficitCriticoRule", T0.minusSeconds(13 * 3600)));      // hace 13 h: ya pasó
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-002");
+    }
+
+    @Test
+    void haberRegadoConR01EnElCicloNoFrenaAR02() {
+        pedirCritico("MZ-2", 1, 720);
+        historia(fila("MZ-2-001", "Riego", "RiegoPorDeficitRule", T0.minusSeconds(180)));
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001");
+    }
+
+    @Test
+    void siNoSePuedeLeerElHistorialR01EsperaPeroR02SigueConLoQueRecuerdaEnMemoria() {
+        when(historialRepository.ultimosPorSector(anyString(), anyLong())).thenThrow(new IllegalStateException("base caída"));
+        pedir("MZ-2", 1, 600);
+        pedirCritico("MZ-2", 2, 720);
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-002");
+        assertThat(cola.contiene("MZ-2-001")).as("sin saber si ya regó ni si hay pausa: espera").isTrue();
     }
 }

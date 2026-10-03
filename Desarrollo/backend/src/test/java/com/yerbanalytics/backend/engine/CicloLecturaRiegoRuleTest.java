@@ -122,7 +122,7 @@ class CicloLecturaRiegoRuleTest {
     @DisplayName("es una regla de la rama RIEGO; sólo lee el umbral crítico del catálogo (para dejar pasar a R-02)")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(2);
+        assertThat(rule.priority()).isEqualTo(3);
         assertThat(rule.parametros()).containsExactly(com.yerbanalytics.backend.engine.parametros.ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.name()).isEqualTo("CicloLecturaRiegoRule");
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());

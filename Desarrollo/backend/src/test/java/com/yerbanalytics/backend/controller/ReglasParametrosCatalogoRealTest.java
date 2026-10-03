@@ -67,8 +67,11 @@ class ReglasParametrosCatalogoRealTest {
         assertThat(umbral).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule",
                 "PosponerPorLluviaRule", "RiegoPorDeficitRule");
         assertThat(usadoPor(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
-        assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactly("PosponerPorLluviaRule");
-        assertThat(usadoPor(json, "riego.exceptuado-bloqueo")).containsExactly("DeficitCriticoRule");
+        assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.lluvia-mm")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.lluvia-ventana")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.pausa-tras-aplicacion")).containsExactlyInAnyOrder("PausaTrasAplicacionRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.exceptuado-bloqueo")).containsExactlyInAnyOrder("DeficitCriticoRule", "DespachoRiego");
         // Lo que el despacho revalida antes de abrir cada válvula, junto a las reglas que ya lo decidieron.
         assertThat(usadoPor(json, "seguridad.antiguedad-max-lectura")).contains("StaleSensorRule", "DespachoRiego");
         assertThat(usadoPor(json, "riego.saturacion-bloqueo")).containsExactlyInAnyOrder("SustratoSaturadoRule", "DespachoRiego");
@@ -114,7 +117,7 @@ class ReglasParametrosCatalogoRealTest {
             actual = siguiente;
         }
 
-        assertThat(cadena).containsExactly("CicloLecturaRiegoRule", "SustratoSaturadoRule", "DeficitCriticoRule",
+        assertThat(cadena).containsExactly("SustratoSaturadoRule", "CicloLecturaRiegoRule", "DeficitCriticoRule",
                 "FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule");
         for (String id : cadena) {
             String etiqueta = nodos.get(id).get("label").asText();

@@ -189,4 +189,28 @@ class StaleSensorRuleTest {
         assertThat(ev.comparaciones()).extracting(Comparacion::resultado)
                 .containsExactly(ResultadoComparacion.CUMPLE, ResultadoComparacion.NO_CUMPLE);
     }
+
+    @Test
+    @DisplayName("lectura vieja: el ABORT_RIEGO NO lleva marca de cancelación (el despacho PAUSA, no retira la cola)")
+    void lecturaViejaNoCancelaLaCola() {
+        List<RuleAction> acciones = evaluar(rule, conLecturaHace(120.0));
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isNull();
+    }
+
+    @Test
+    @DisplayName("sin lectura: tampoco cancela la cola")
+    void sinLecturaNoCancelaLaCola() {
+        assertThat(evaluar(rule, conLecturaHace(null)).get(0).detalle()).isNull();
+    }
+
+    @Test
+    @DisplayName("humedad de sustrato congelada: ABORT_RIEGO sin marca de cancelación")
+    void humedadCongeladaNoCancelaLaCola() {
+        List<RuleAction> acciones = evaluar(rule, conLecturaYHumedadHace(10.0, 300.0));
+
+        assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isNull();
+    }
 }

@@ -12,7 +12,10 @@ import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.parametros.VentanaHoraria;
+import com.yerbanalytics.backend.engine.weather.WeatherForecast;
+import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
+import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -21,6 +24,7 @@ import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.service.ConfiguracionService;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +35,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,13 +60,29 @@ import java.util.stream.Collectors;
  *       publica {@code valve ON durationSec} y registra el riego en el historial.</li>
  * </ol>
  *
- * <p><b>Revalidación (S-02, R-05):</b> una solicitud encolada es una decisión vieja (una ronda de 100 sectores
- * tarda ~80 min en despacharse). Las reglas la completan aunque la humedad se recupere, así que acá se mira el
- * mundo de AHORA antes de abrir cada válvula: bloqueo manual; lectura y humedad de la zona vigentes (mismo
- * parámetro y misma definición que {@code StaleSensorRule}: si el nodo murió con 90 sectores en cola, no se abre
- * ninguno); humedad actual menor que {@code riego.saturacion-bloqueo}; y, para las de R-01, hora dentro de
- * {@code riego.ventana-normal} (cerrada al minuto). R-02 no depende de la ventana. Lo que no pasa se descarta de
- * la cola, se loguea y deja UNA alerta WARNING por zona y motivo.
+ * <p><b>Revalidación:</b> una solicitud encolada es una decisión vieja (una ronda de 100 sectores tarda ~80 min
+ * en despacharse). Las reglas la completan aunque la humedad se recupere, así que acá se mira el mundo de AHORA antes
+ * de abrir cada válvula, con los MISMOS parámetros del catálogo y las mismas condiciones
+ * ({@link PrecondicionesRiego}) que las reglas:
+ * <ul>
+ *   <li><b>PAUSA</b> (no abre ninguna válvula y CONSERVA la ronda): la lectura o la humedad de la zona no están
+ *       vigentes (mismo parámetro y misma definición que {@code StaleSensorRule}) o falta la humedad. El nodo
+ *       publica cada 30 s y el umbral es 90 s: dos mensajes perdidos no pueden tirar una ronda cuyo testigo ya
+ *       se regó (la humedad subió, R-01 y R-02 no vuelven a aplicar y los sectores pendientes quedarían sin agua).
+ *       Se retoma sola cuando hay lectura vigente.</li>
+ *   <li><b>VENCIMIENTO</b>: una solicitud es válida durante el ciclo de lectura en que se pidió y el siguiente, y
+ *       vence al empezar el tercero ({@link CicloLectura#vencida}); sin esto una pausa larga dejaría solicitudes
+ *       eternas o rondas viejas que se riegan horas después. Al vencer se descarta con una alerta WARNING por zona.</li>
+ *   <li><b>RETIRA</b> (se descarta de la cola, se loguea y deja UNA alerta WARNING por zona y motivo): bloqueo
+ *       manual; humedad actual {@code >= riego.saturacion-bloqueo} (R-04); y, sólo para las de R-01, hora fuera de
+ *       {@code riego.ventana-normal} (cerrada al minuto, R-05), pausa tras una aplicación de insumo (R-06), lluvia
+ *       prevista (R-03, con el pronóstico cacheado y sin esperar: sin dato no pospone) y "ya regó en este ciclo de
+ *       lectura". Para las de R-02: el tope de {@code riego.exceptuado-bloqueo} horas desde el último riego crítico.
+ *       R-02 no depende de la ventana, de la pausa, de la lluvia ni de la guarda de ciclo.</li>
+ * </ul>
+ * El último riego, el último riego crítico y la última aplicación salen del historial (una consulta agrupada por
+ * zona y tick) y de la memoria del despacho, la más reciente de las dos. Si el historial no se puede leer, las de R-01
+ * esperan (no se sabe si hay pausa o si ya regó) y las de R-02 siguen con lo que el despacho recuerda.
  *
  * <p><b>"Regando" no es un estado guardado:</b> es "existe un riego cuyo {@code ts + duración + 5 s}
  * es mayor que ahora". Coincide con el principio 6 de {@code reglas_v2} (el ESP32 corta solo al cumplir
@@ -82,6 +104,9 @@ public class DespachoRiego implements ConsumidorParametros {
     /** Lo más atrás que hay que mirar el historial: un riego dura a lo sumo la duración máxima más el margen. */
     private static final long VENTANA_RECONSTRUCCION_MS = ContratoNodo.DURACION_VALVULA_MAX_SEG * 1000L + MARGEN_MS;
 
+    /** Lo más atrás que se mira el historial para el último riego y la última aplicación (24 h, como el contexto de las reglas). */
+    private static final long VENTANA_HISTORIAL_MS = 24L * 3_600_000L;
+
     /** Riego en curso de un sector: de qué zona es y cuándo se da por cerrado. */
     private record Curso(String zonaId, long finMs) {
     }
@@ -94,6 +119,8 @@ public class DespachoRiego implements ConsumidorParametros {
     private final ZonaRepository zonaRepository;
     private final ManualLockRepository manualLockRepository;
     private final CatalogoParametrosService parametros;
+    private final WeatherService clima;
+    private final ConfiguracionService configuracion;
     private final Clock reloj;
     private final TransactionTemplate transaccion;
 
@@ -106,6 +133,8 @@ public class DespachoRiego implements ConsumidorParametros {
     private final Map<String, Long> ultimoRiego = new ConcurrentHashMap<>();
     private final Map<String, Long> ultimoRiegoCritico = new ConcurrentHashMap<>();
     private volatile boolean reconstruido;
+    /** Zonas que están en pausa por falta de lectura vigente: para loguear la transición y no cada 10 s. */
+    private final Set<String> zonasEnPausa = ConcurrentHashMap.newKeySet();
 
     public DespachoRiego(ColaRiego cola,
                          ComandoActuadorPublisher publisher,
@@ -117,6 +146,9 @@ public class DespachoRiego implements ConsumidorParametros {
                          // Perezoso: el catálogo necesita a este bean (es un consumidor de parámetros)
                          // para armarse, y este necesita el catálogo para leer el valor vigente.
                          @Lazy CatalogoParametrosService parametros,
+                         WeatherService clima,
+                         // Perezoso por la misma razón de ciclos: no se necesita hasta el primer tick.
+                         @Lazy ConfiguracionService configuracion,
                          Clock reloj,
                          PlatformTransactionManager transacciones) {
         this.cola = cola;
@@ -127,6 +159,8 @@ public class DespachoRiego implements ConsumidorParametros {
         this.zonaRepository = zonaRepository;
         this.manualLockRepository = manualLockRepository;
         this.parametros = parametros;
+        this.clima = clima;
+        this.configuracion = configuracion;
         this.reloj = reloj;
         this.transaccion = new TransactionTemplate(transacciones);
     }
@@ -141,7 +175,9 @@ public class DespachoRiego implements ConsumidorParametros {
         return List.of(ParametrosRiego.SECTORES_SIMULTANEOS,
                 // La revalidación al despachar: los mismos parámetros que las reglas que ya decidieron.
                 ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, ParametrosRiego.SATURACION_BLOQUEO,
-                ParametrosRiego.VENTANA_NORMAL);
+                ParametrosRiego.VENTANA_NORMAL, ParametrosRiego.PAUSA_TRAS_APLICACION,
+                ParametrosRiego.LLUVIA_PROBABILIDAD, ParametrosRiego.LLUVIA_MM, ParametrosRiego.LLUVIA_VENTANA,
+                ParametrosRiego.EXCEPTUADO_BLOQUEO);
     }
 
     /** Lee un parámetro del catálogo, y sólo uno de los que declara: misma garantía que {@code Evaluacion}. */
@@ -202,6 +238,7 @@ public class DespachoRiego implements ConsumidorParametros {
         enCurso.clear();
         ultimoRiego.clear();
         ultimoRiegoCritico.clear();
+        zonasEnPausa.clear();
     }
 
     /**
@@ -226,6 +263,7 @@ public class DespachoRiego implements ConsumidorParametros {
         purgar(ahora);
 
         int cupo = (int) numero(ParametrosRiego.SECTORES_SIMULTANEOS);
+        int minutosDeCiclo = intervaloSensadoMinutos();
         List<ManualLockEntity> bloqueos = manualLockRepository.findByActiveTrue();
         Set<String> sectoresBloqueados = bloqueos.stream().map(ManualLockEntity::getSectorId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
@@ -233,11 +271,28 @@ public class DespachoRiego implements ConsumidorParametros {
                 .filter(Objects::nonNull).collect(Collectors.toSet());
 
         for (String zonaId : zonas) {
-            despacharZona(zonaId, ahora, cupo, zonasBloqueadas.contains(zonaId), sectoresBloqueados);
+            despacharZona(zonaId, ahora, cupo, minutosDeCiclo, zonasBloqueadas.contains(zonaId), sectoresBloqueados);
         }
     }
 
-    private void despacharZona(String zonaId, long ahora, int cupo, boolean zonaBloqueada, Set<String> sectoresBloqueados) {
+    /** Intervalo de sensado guardado (el ciclo lo acota a 60–360 min); 240 si no hay configuración o no se puede leer. */
+    private int intervaloSensadoMinutos() {
+        try {
+            ConfiguracionOperativaEntity op = configuracion.getConfiguracionOperativa();
+            if (op != null && op.getIntervaloSensadoMinutos() != null) {
+                return op.getIntervaloSensadoMinutos();
+            }
+        } catch (RuntimeException e) {
+            log.warn("Despacho de riego: no se pudo leer el intervalo de sensado ({}); se usa {} min.",
+                    e.getMessage(), INTERVALO_SENSADO_DEFAULT_MIN);
+        }
+        return INTERVALO_SENSADO_DEFAULT_MIN;
+    }
+
+    private static final int INTERVALO_SENSADO_DEFAULT_MIN = 240;
+
+    private void despacharZona(String zonaId, long ahora, int cupo, int minutosDeCiclo, boolean zonaBloqueada,
+                               Set<String> sectoresBloqueados) {
         // Los datos de AHORA, no los que vieron las reglas al decidir. Sin poder leerlos no se abre nada (y no se
         // descarta: la solicitud sigue para el próximo tick).
         ZonaEntity zona;
@@ -248,23 +303,65 @@ public class DespachoRiego implements ConsumidorParametros {
                     zonaId, e.getMessage());
             return;
         }
-        String motivoZona = motivoDeZonaNoVigente(zona, ahora);
         // La copia de la cola se toma DESPUÉS de leer la zona y lo más cerca posible del reclamo de cada solicitud:
         // cuanto más vieja la copia, más chances de que la telemetría la haya reemplazado (y no se abre ese tick).
         List<SolicitudRiego> pendientes = cola.pendientes(zonaId);
         if (pendientes.isEmpty()) {
+            zonasEnPausa.remove(zonaId);
             return;
         }
-        if (motivoZona != null) {
-            for (SolicitudRiego s : pendientes) {
-                cola.retirarSiCoincide(s);
+        Map<String, Integer> descartes = new LinkedHashMap<>();
+        if (zona == null) {
+            retirarTodas(pendientes, descartes, "la macro-zona ya no existe");
+            descartadas(zonaId, null, ahora, descartes);
+            return;
+        }
+
+        // Vencimiento primero: aunque la zona esté en pausa, una ronda vieja no se conserva para siempre.
+        Instant ahoraInstante = Instant.ofEpochMilli(ahora);
+        List<SolicitudRiego> vigentes = new ArrayList<>();
+        for (SolicitudRiego s : pendientes) {
+            if (CicloLectura.vencida(s.solicitadaEn(), ahoraInstante, minutosDeCiclo)) {
+                if (cola.retirarSiCoincide(s)) {
+                    descartes.merge(MOTIVO_VENCIDA, 1, Integer::sum);
+                }
+            } else {
+                vigentes.add(s);
             }
-            descartadas(zonaId, zona, ahora, Map.of(motivoZona, pendientes.size()));
+        }
+        pendientes = vigentes;
+        if (pendientes.isEmpty()) {
+            zonasEnPausa.remove(zonaId);
+            descartadas(zonaId, zona, ahora, descartes);
             return;
         }
+
+        Estado estado = estadoDeLaZona(zona, ahora);
+        if (estado.cancela()) {
+            retirarTodas(pendientes, descartes, estado.motivo());
+            descartadas(zonaId, zona, ahora, descartes);
+            return;
+        }
+        if (estado.motivo() != null) {
+            // PAUSA: no se abre nada y la ronda se conserva; se retoma cuando haya lectura vigente.
+            if (zonasEnPausa.add(zonaId)) {
+                log.warn("Zona {}: despacho en PAUSA con {} solicitud(es) en cola — {}. Se retoma al volver la lectura.",
+                        zonaId, pendientes.size(), estado.motivo());
+            }
+            descartadas(zonaId, zona, ahora, descartes);
+            return;
+        }
+        if (zonasEnPausa.remove(zonaId)) {
+            log.info("Zona {}: vuelve la lectura vigente; se retoma el despacho de {} solicitud(es).", zonaId, pendientes.size());
+        }
+
         boolean enVentana = ventana(ParametrosRiego.VENTANA_NORMAL)
                 .contieneHastaElMinuto(LocalTime.ofInstant(reloj.instant(), ZonaHorariaVivero.ZONA));
-        Map<String, Integer> descartes = new LinkedHashMap<>();
+        boolean hayR01 = pendientes.stream().anyMatch(s -> !s.esDeficitCritico());
+        // Sólo R-01 depende del pronóstico: se pide una vez por zona y tick, y sin esperar (cacheado).
+        WeatherForecast pronostico = hayR01 ? pronosticoSinEspera() : null;
+        Historia historia = historia(zonaId, ahora);
+        Instant inicioCiclo = CicloLectura.inicio(ahoraInstante, minutosDeCiclo);
 
         long abiertos = enCurso.values().stream().filter(c -> c.zonaId().equals(zonaId)).count();
         long libres = cupo - abiertos;
@@ -280,10 +377,16 @@ public class DespachoRiego implements ConsumidorParametros {
                 cola.retirarSiCoincide(s);
                 continue;
             }
-            if (!enVentana && !s.esDeficitCritico()) {
-                // R-05: de noche sólo riega R-02. Se mira aunque no haya cupo: lo vencido no espera.
+            // Precondiciones que no son la humedad. Se miran aunque no haya cupo: lo vencido no espera lugar.
+            String motivoDescarte = s.esDeficitCritico()
+                    ? motivoDeDescarteDeR02(s, ahoraInstante, historia)
+                    : motivoDeDescarteDeR01(s, ahoraInstante, inicioCiclo, enVentana, pronostico, historia);
+            if (MOTIVO_ESPERA.equals(motivoDescarte)) {
+                continue;     // no se sabe todavía: la solicitud sigue en la cola
+            }
+            if (motivoDescarte != null) {
                 if (cola.retirarSiCoincide(s)) {
-                    descartes.merge(MOTIVO_FUERA_DE_VENTANA, 1, Integer::sum);
+                    descartes.merge(motivoDescarte, 1, Integer::sum);
                 }
                 continue;
             }
@@ -332,34 +435,136 @@ public class DespachoRiego implements ConsumidorParametros {
         descartadas(zonaId, zona, ahora, descartes);
     }
 
+    private void retirarTodas(List<SolicitudRiego> pendientes, Map<String, Integer> descartes, String motivo) {
+        for (SolicitudRiego s : pendientes) {
+            if (cola.retirarSiCoincide(s)) {
+                descartes.merge(motivo, 1, Integer::sum);
+            }
+        }
+    }
+
     private static final String MOTIVO_FUERA_DE_VENTANA =
             "el riego por déficit común quedó fuera de la ventana horaria de riego";
+    private static final String MOTIVO_VENCIDA =
+            "la solicitud venció sin despacharse (se pidió antes del ciclo de lectura anterior al actual)";
+    private static final String MOTIVO_PAUSA_APLICACION =
+            "al sector se le aplicó un insumo hace menos de la pausa configurada (R-06)";
+    private static final String MOTIVO_LLUVIA =
+            "hay lluvia prevista que supera los umbrales de probabilidad y milímetros (R-03)";
+    private static final String MOTIVO_CICLO =
+            "el sector ya se regó en este ciclo de lectura";
+    private static final String MOTIVO_TOPE_CRITICO =
+            "el sector ya recibió un riego por déficit crítico dentro del tope de horas (R-02)";
+    /** Centinela (se compara por identidad): no se puede decidir todavía, la solicitud espera en la cola. */
+    private static final String MOTIVO_ESPERA = "espera";
 
     /**
-     * Por qué NO se puede abrir ninguna válvula de la zona con los datos de ahora, o {@code null} si se puede.
-     * La lectura y la humedad se miden como {@code StaleSensorRule}; la saturación, contra el mismo bloqueo de R-04.
+     * Las precondiciones de R-01 que no son la humedad (R-05, R-06, R-03 y la guarda de ciclo), con los parámetros del
+     * catálogo y las condiciones compartidas con las reglas. {@code null} si puede abrirse.
      */
-    private String motivoDeZonaNoVigente(ZonaEntity zona, long ahora) {
-        if (zona == null) {
-            return "la macro-zona ya no existe";
+    private String motivoDeDescarteDeR01(SolicitudRiego s, Instant ahora, Instant inicioCiclo, boolean enVentana,
+                                         WeatherForecast pronostico, Historia historia) {
+        if (!enVentana) {
+            return MOTIVO_FUERA_DE_VENTANA;           // R-05: de noche sólo riega R-02
         }
+        if (!historia.disponible()) {
+            return MOTIVO_ESPERA;                      // sin saber si hay pausa o si ya regó, no se abre
+        }
+        String sector = s.sectorId();
+        if (PrecondicionesRiego.enPausaPorAplicacion(historia.aplicacion().get(sector), ahora,
+                numero(ParametrosRiego.PAUSA_TRAS_APLICACION))) {
+            return MOTIVO_PAUSA_APLICACION;           // R-06
+        }
+        int horas = (int) numero(ParametrosRiego.LLUVIA_VENTANA);
+        WeatherForecast.LluviaPrevista lluvia = PrecondicionesRiego.lluviaPrevista(pronostico,
+                ahora.atZone(ZonaHorariaVivero.ZONA).toLocalDateTime(), horas);
+        if (PrecondicionesRiego.lluviaPospone(lluvia, numero(ParametrosRiego.LLUVIA_PROBABILIDAD),
+                numero(ParametrosRiego.LLUVIA_MM))) {
+            return MOTIVO_LLUVIA;                      // R-03 (sin pronóstico: no pospone)
+        }
+        Long ultimo = masReciente(historia.riego().get(sector), ultimoRiego.get(sector));
+        if (PrecondicionesRiego.yaRegoEnElCiclo(ultimo, inicioCiclo)) {
+            return MOTIVO_CICLO;                       // guarda de ciclo: un riego por sector y ciclo
+        }
+        return null;
+    }
+
+    /** Tope de R-02 (un riego crítico cada {@code riego.exceptuado-bloqueo} h por sector); lo demás no la afecta. */
+    private String motivoDeDescarteDeR02(SolicitudRiego s, Instant ahora, Historia historia) {
+        // Sin historial se usa lo que el despacho recuerda: un déficit crítico no se deja sin regar por una falla de lectura.
+        Long ultimo = masReciente(historia.riegoCritico().get(s.sectorId()), ultimoRiegoCritico.get(s.sectorId()));
+        if (PrecondicionesRiego.dentroDelTopeCritico(ultimo, ahora, numero(ParametrosRiego.EXCEPTUADO_BLOQUEO))) {
+            return MOTIVO_TOPE_CRITICO;
+        }
+        return null;
+    }
+
+    private static Long masReciente(Long a, Long b) {
+        return a == null ? b : (b == null ? a : Long.valueOf(Math.max(a, b)));
+    }
+
+    /** Lo que el historial dice del último riego, riego crítico y aplicación de cada sector de la zona. */
+    private record Historia(boolean disponible, Map<String, Long> riego, Map<String, Long> riegoCritico,
+                            Map<String, Long> aplicacion) {
+    }
+
+    private Historia historia(String zonaId, long ahora) {
+        try {
+            Map<String, Long> riego = new HashMap<>();
+            Map<String, Long> critico = new HashMap<>();
+            Map<String, Long> aplicacion = new HashMap<>();
+            for (HistorialRepository.UltimoEvento f : historialRepository.ultimosPorSector(zonaId, ahora - VENTANA_HISTORIAL_MS)) {
+                if ("Riego".equals(f.getTipo())) {
+                    riego.merge(f.getSectorId(), f.getTs(), Math::max);
+                    if (SolicitudRiego.REGLA_DEFICIT_CRITICO.equals(f.getRegla())) {
+                        critico.merge(f.getSectorId(), f.getTs(), Math::max);
+                    }
+                } else if ("Insumo".equals(f.getTipo())) {
+                    aplicacion.merge(f.getSectorId(), f.getTs(), Math::max);
+                }
+            }
+            return new Historia(true, riego, critico, aplicacion);
+        } catch (RuntimeException e) {
+            log.warn("Zona {}: no se pudo leer el historial de riego ({}); las solicitudes de R-01 esperan.", zonaId, e.getMessage());
+            return new Historia(false, Map.of(), Map.of(), Map.of());
+        }
+    }
+
+    private WeatherForecast pronosticoSinEspera() {
+        try {
+            return clima.getForecastSinEspera();
+        } catch (RuntimeException e) {
+            log.warn("Despacho de riego: no se pudo pedir el pronóstico ({}); se asume que no llueve.", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Qué dice la zona de AHORA: {@code motivo == null} se puede abrir; {@code cancela} retira la ronda
+     * (la zona ya no tiene nada que regar); con motivo y sin {@code cancela} es una PAUSA (la ronda se conserva).
+     */
+    private record Estado(String motivo, boolean cancela) {
+        static final Estado LISTA = new Estado(null, false);
+    }
+
+    private Estado estadoDeLaZona(ZonaEntity zona, long ahora) {
         double max = numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
         Double lectura = FrescuraLectura.antiguedadSegundos(zona, ahora);
         if (lectura == null || lectura > max) {
-            return "el nodo testigo no reportó dentro del umbral de antigüedad";
+            return new Estado("el nodo testigo no reportó dentro del umbral de antigüedad", false);
         }
         Double antiguedadHumedad = FrescuraLectura.antiguedadHumedadSegundos(zona, ahora);
         if (antiguedadHumedad == null || antiguedadHumedad > max) {
-            return "la humedad de sustrato no se actualizó dentro del umbral de antigüedad (¿falla de la sonda?)";
+            return new Estado("la humedad de sustrato no se actualizó dentro del umbral de antigüedad (¿falla de la sonda?)", false);
         }
         Double humedad = zona.getHumSusRaw();
         if (humedad == null || humedad.isNaN()) {
-            return "sin lectura de humedad de sustrato";
+            return new Estado("sin lectura de humedad de sustrato", false);
         }
         if (humedad >= numero(ParametrosRiego.SATURACION_BLOQUEO)) {
-            return "el sustrato ya está en o sobre el umbral de saturación";
+            return new Estado("el sustrato ya está en o sobre el umbral de saturación", true);   // R-04: cancela
         }
-        return null;
+        return Estado.LISTA;
     }
 
     /** Deja constancia (log y una alerta WARNING por zona y motivo) de lo que se descartó por revalidación. */

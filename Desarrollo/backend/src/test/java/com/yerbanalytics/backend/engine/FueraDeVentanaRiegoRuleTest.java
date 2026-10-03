@@ -122,4 +122,19 @@ class FueraDeVentanaRiegoRuleTest {
                 ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());
     }
+
+    @Test
+    @DisplayName("el ABORT_RIEGO de R-05 lleva la marca SOLO_DEFICIT_COMUN: retira a R-01, no a R-02")
+    void emiteLaMarcaSoloDeficitComun() {
+        List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("19:00").humedad(40.0).build(), ev(rule));
+
+        assertThat(tipos(acciones)).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isEqualTo(CancelaRiego.SOLO_DEFICIT_COMUN);
+    }
+
+    @Test
+    @DisplayName("dentro de la ventana no lleva marca")
+    void dentroDeLaVentanaNoCancela() {
+        assertThat(rule.evaluate(RiegoCtx.a("10:00").humedad(40.0).build(), ev(rule)).get(0).detalle()).isNull();
+    }
 }

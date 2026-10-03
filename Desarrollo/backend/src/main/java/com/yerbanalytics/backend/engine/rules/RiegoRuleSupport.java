@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.rules;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
+import com.yerbanalytics.backend.engine.riego.PrecondicionesRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
@@ -78,7 +79,7 @@ final class RiegoRuleSupport {
 
     /** Horas (con decimales) entre un instante en epoch ms y {@code ahora}. */
     static double horasDesde(long epochMs, Instant ahora) {
-        return (ahora.toEpochMilli() - epochMs) / 3_600_000.0;
+        return PrecondicionesRiego.horasDesde(epochMs, ahora);
     }
 
     /** Número sin ceros de más: 44 → "44", 4.2 → "4,2", 4.02 → "4,02". */

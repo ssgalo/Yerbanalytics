@@ -111,7 +111,8 @@ acumulada ≥ `riego.lluvia-mm`, el motor SHALL emitir `POSTPONE_RIEGO` para el 
 - **THEN** R-03 emite `NOOP_INFO` "no aplica" y no se registra ninguna alerta
 
 ### Requirement: R-04 Sustrato saturado
-Con `h ≥ riego.saturacion-bloqueo`, el motor SHALL bloquear todo riego autónomo del sector
+R-04 SHALL evaluarse ANTES de la guarda de ciclo (prioridad 2 contra 3): un sector recién regado ya tiene riego
+"en el ciclo" y si la guarda cortara primero la saturación quedaría sin evaluar. Con `h ≥ riego.saturacion-bloqueo`, el motor SHALL bloquear todo riego autónomo del sector
 (`ABORT_RIEGO`). Con `h ≥ riego.saturacion-alerta`, además SHALL emitir una alerta `WARNING`
 "Sustrato saturado, riesgo de asfixia radicular y hongos" por macro-zona y ciclo.
 
@@ -126,6 +127,10 @@ Con `h ≥ riego.saturacion-bloqueo`, el motor SHALL bloquear todo riego autóno
 #### Scenario: En la alerta
 - **WHEN** la humedad es 80 %
 - **THEN** R-04 emite `ABORT_RIEGO` y una alerta `WARNING` de la macro-zona
+
+#### Scenario: Recién regado
+- **WHEN** el sector regó en este ciclo y la lectura siguiente es 82 %
+- **THEN** R-04 emite `ABORT_RIEGO` y la alerta `WARNING`, y la guarda de ciclo queda omitida
 
 #### Scenario: Cancela lo pendiente
 - **WHEN** MZ-2 tiene sectores en cola y llega una lectura con 76 %
@@ -222,8 +227,9 @@ manual activo al momento de despachar SHALL descartarse.
 Una solicitud en cola SHALL pertenecer a la ronda decidida y completarse: que R-01 o R-02 dejen de
 pedir riego porque la humedad se recuperó NO SHALL retirarla (el nodo testigo mide un solo sector y su
 humedad sube cuando el despacho lo riega). Sólo SHALL retirarla una cancelación explícita de seguridad:
-sustrato saturado (R-04), bloqueo manual, sensor sin datos o humedad congelada (S-02) y, sólo para las
-solicitudes de R-01, ventana horaria cerrada (R-05) o pausa por aplicación de ESE sector (R-06). Una nueva
+sustrato saturado (R-04), bloqueo manual y, sólo para las solicitudes de R-01, ventana horaria cerrada (R-05) o
+pausa por aplicación de ESE sector (R-06). El sensor sin datos o con la humedad congelada (S-02) NO SHALL retirarla:
+SHALL pausarla (ver "Revalidación al despachar"). Una nueva
 decisión de riego para un sector ya encolado SHALL actualizar su solicitud sin duplicarla y SHALL NOT
 degradar una de R-02 a R-01.
 
@@ -240,16 +246,30 @@ degradar una de R-02 a R-01.
 - **THEN** MZ-2-007 sale de la cola y MZ-2-008 sigue
 
 ### Requirement: Revalidación al despachar
-Antes de abrir CADA válvula el despacho SHALL revalidar con datos actuales: bloqueo manual; lectura de la
-zona y humedad de sustrato vigentes (misma definición y mismo `seguridad.antiguedad-max-lectura` que
-`StaleSensorRule`); humedad actual menor que `riego.saturacion-bloqueo`; y, para las solicitudes de R-01,
-hora dentro de `riego.ventana-normal` (cerrada al minuto). Las de R-02 SHALL NOT depender de la ventana. Una
-solicitud que no pasa SHALL retirarse de la cola, loguearse y dejar una alerta `WARNING` por zona y motivo; si
-no se puede leer la zona no SHALL abrirse ninguna válvula y la solicitud SHALL seguir en cola.
+Antes de abrir CADA válvula el despacho SHALL revalidar con datos actuales y con los MISMOS parámetros del
+catálogo y las mismas condiciones que las reglas:
+- **Pausa** (no abre ninguna válvula de la zona y CONSERVA la cola): lectura de la zona o humedad de sustrato no
+  vigentes (misma definición y mismo `seguridad.antiguedad-max-lectura` que `StaleSensorRule`) o sin humedad. Se
+  retoma sola cuando hay lectura vigente. No deja alerta ni retira solicitudes.
+- **Retira** (se descarta de la cola, se loguea y deja una alerta `WARNING` por zona y motivo): bloqueo manual;
+  humedad actual `>= riego.saturacion-bloqueo` (R-04, vale para R-01 y R-02); y, sólo para las de R-01, hora fuera
+  de `riego.ventana-normal` (cerrada al minuto, R-05), última aplicación de insumo hace menos de
+  `riego.pausa-tras-aplicacion` (R-06), lluvia prevista que alcanza `riego.lluvia-probabilidad` Y `riego.lluvia-mm`
+  en `riego.lluvia-ventana` h con el pronóstico cacheado y sin esperar (R-03; sin dato de pronóstico no pospone) y
+  "ya regó en este ciclo de lectura". Para las de R-02: un riego crítico hace menos de `riego.exceptuado-bloqueo` h
+  (tope). R-02 SHALL NOT depender de la ventana, la pausa de aplicación, la lluvia ni la guarda de ciclo.
+- Si no se puede leer la zona no SHALL abrirse ninguna válvula y la solicitud SHALL seguir en cola. Si no se puede
+  leer el historial, las de R-01 SHALL esperar y las de R-02 SHALL seguir con el último riego que el despacho recuerda.
+El último riego, el último riego crítico y la última aplicación SHALL ser el más reciente entre el historial y la
+memoria del despacho (el ciclo y el tope no deben depender de que el registro haya sido exitoso).
 
 #### Scenario: El nodo muere con la ronda a medias
 - **WHEN** hay 90 sectores en cola, la última lectura tiene 91 s y hay cupo libre
-- **THEN** no se publica ningún comando y la cola de la zona queda vacía
+- **THEN** no se publica ningún comando y los 90 siguen en la cola, sin alerta
+
+#### Scenario: Hueco de lectura de 3 minutos
+- **WHEN** hay 90 sectores en cola, la humedad ya subió a 65 %, el nodo calla 3 minutos y vuelve
+- **THEN** durante el hueco no se abre ninguna válvula y al volver el nodo se riegan los 90
 
 #### Scenario: Solicitud de R-01 de las 17:58
 - **WHEN** a las 18:10 se despacha una solicitud de R-01 encolada a las 17:58
@@ -258,6 +278,32 @@ no se puede leer la zona no SHALL abrirse ninguna válvula y la solicitud SHALL 
 #### Scenario: Borde de la ventana
 - **WHEN** se despacha una solicitud de R-01 a las 18:00:59 / 18:01:00
 - **THEN** se abre / se descarta
+
+#### Scenario: Dosificación mientras espera
+- **WHEN** MZ-2-015 espera su tanda con R-01 y recibe una aplicación de insumo hace menos de 6 h
+- **THEN** su solicitud se descarta y no se riega (una de R-02 del mismo sector se abriría)
+
+#### Scenario: Pronóstico que llega tarde
+- **WHEN** R-01 encoló la ronda sin pronóstico (primer mensaje tras arrancar) y luego llega lluvia que supera los dos umbrales
+- **THEN** el despacho descarta las solicitudes de R-01 sin abrir válvulas; las de R-02 no se tocan
+
+#### Scenario: Duración corta
+- **WHEN** un sector regó 3 s y 10 s después se vuelve a encolar en el mismo ciclo
+- **THEN** no se abre otra vez (R-01 por la guarda de ciclo, R-02 por su tope de horas)
+
+### Requirement: Vencimiento de las solicitudes
+Una solicitud de riego SHALL ser válida durante el ciclo de lectura en que se pidió y durante el siguiente, y SHALL
+vencer al empezar el tercero (es decir, vence si `solicitadaEn` es anterior al inicio del ciclo anterior al de ahora,
+con el intervalo de `CicloLectura`). El despacho SHALL descartar lo vencido aunque la zona esté en pausa y dejar una
+alerta `WARNING` por zona.
+
+#### Scenario: Ciclo siguiente
+- **WHEN** una solicitud de las 10:05 (ciclo 10:00-14:00) se mira a las 14:05
+- **THEN** sigue en la cola
+
+#### Scenario: Tercer ciclo
+- **WHEN** la misma solicitud se mira a las 18:00 y el nodo no volvió
+- **THEN** se descarta con una alerta `WARNING` y la cola de la zona queda vacía sin haber regado
 
 ### Requirement: Último riego en memoria
 El ciclo de lectura y el tope de R-02 SHALL ver el último riego despachado aunque su registro en el historial

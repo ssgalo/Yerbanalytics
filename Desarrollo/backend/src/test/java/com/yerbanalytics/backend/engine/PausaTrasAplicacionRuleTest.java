@@ -92,4 +92,23 @@ class PausaTrasAplicacionRuleTest {
                 ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());
     }
+
+    @Test
+    @DisplayName("el ABORT_RIEGO de R-06 lleva la marca SOLO_DEFICIT_COMUN: retira a R-01 del sector, no a R-02")
+    void emiteLaMarcaSoloDeficitComun() {
+        RuleContext ctx = RiegoCtx.a("11:00").humedad(40.0).ultimaAplicacionHace(2, 0, 0).build();
+
+        List<RuleAction> acciones = rule.evaluate(ctx, ev(rule));
+
+        assertThat(tipos(acciones)).containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isEqualTo(CancelaRiego.SOLO_DEFICIT_COMUN);
+    }
+
+    @Test
+    @DisplayName("con la pausa cumplida no lleva marca")
+    void pausaCumplidaNoCancela() {
+        RuleContext ctx = RiegoCtx.a("11:00").humedad(40.0).ultimaAplicacionHace(7, 0, 0).build();
+
+        assertThat(rule.evaluate(ctx, ev(rule)).get(0).detalle()).isNull();
+    }
 }

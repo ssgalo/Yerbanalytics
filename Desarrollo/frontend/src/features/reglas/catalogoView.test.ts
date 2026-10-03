@@ -15,10 +15,10 @@ describe('agruparPorRama', () => {
     const grupos = agruparPorRama(catalogoDeFabrica().reglas);
 
     expect(grupos.map((g) => g.rama)).toEqual(['GLOBAL', 'RIEGO', 'INSUMO', 'MEDIASOMBRA', 'SEGUIMIENTO']);
-    // El orden en que corre el motor: ciclo → R-04 → R-02 → R-05 → R-06 → R-03 → R-01.
+    // El orden en que corre el motor: R-04 → ciclo → R-02 → R-05 → R-06 → R-03 → R-01.
     expect(grupos[1].reglas.map((r) => r.id)).toEqual([
-      'CicloLecturaRiegoRule',
       'SustratoSaturadoRule',
+      'CicloLecturaRiegoRule',
       'DeficitCriticoRule',
       'FueraDeVentanaRiegoRule',
       'PausaTrasAplicacionRule',
@@ -137,8 +137,13 @@ describe('filtrarParametros (vista por parámetro)', () => {
 
     expect(enRiego).toContain('riego.sectores-simultaneos');
     expect(enInsumo).not.toContain('riego.sectores-simultaneos');
-    // Los que el despacho lee: el suyo y los tres que revalida antes de abrir cada válvula.
+    // Los que el despacho lee: el suyo y los que revalida antes de abrir cada válvula (con los mismos parámetros que las reglas).
     expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'ejecución del riego' }).map((p) => p.clave).sort()).toEqual([
+      'riego.exceptuado-bloqueo',
+      'riego.lluvia-mm',
+      'riego.lluvia-probabilidad',
+      'riego.lluvia-ventana',
+      'riego.pausa-tras-aplicacion',
       'riego.saturacion-bloqueo',
       'riego.sectores-simultaneos',
       'riego.ventana-normal',

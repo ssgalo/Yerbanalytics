@@ -156,4 +156,29 @@ class WeatherServiceFalloTest {
         assertThat(servicio.getForecastSinEspera()).isNull();
         assertThat(pendientes).hasSize(1);
     }
+
+    @Test
+    @DisplayName("precalentar() pide el pronóstico aparte al arrancar: el primer mensaje del nodo ya lo encuentra cacheado")
+    void precalentarPideElPronosticoAparte() {
+        servicio.precalentar();
+
+        assertThat(llamadas.get()).as("no llama en el hilo llamador").isZero();
+        assertThat(pendientes).hasSize(1);
+        correrPendientes();
+        assertThat(llamadas.get()).isEqualTo(1);
+
+        assertThat(servicio.getForecastSinEspera()).as("el primer mensaje ya tiene pronóstico").isNotNull();
+        assertThat(pendientes).isEmpty();
+    }
+
+    @Test
+    @DisplayName("precalentar() con la API caída no tira el arranque")
+    void precalentarConLaApiCaidaNoFalla() {
+        apiCaida = true;
+
+        servicio.precalentar();
+        correrPendientes();
+
+        assertThat(servicio.getForecastSinEspera()).isNull();
+    }
 }

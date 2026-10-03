@@ -1,7 +1,6 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
-import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
@@ -28,7 +27,9 @@ import java.util.List;
  *
  * <p><b>Acción si se cumple:</b> {@code ABORT_RIEGO} — el motor detiene toda actuación
  * de riego para el sector. Regar sin lectura válida puede causar encharcamiento o
- * daño físico a los plantines.
+ * daño físico a los plantines. NO lleva marca de cancelación: el sensor sin datos <b>pausa</b> (el despacho no abre
+ * ninguna válvula mientras la lectura no esté vigente) pero no retira la ronda ya encolada, que se retoma cuando el
+ * nodo vuelve (o vence). Un hueco de lectura de minutos no debe dejar sectores sin regar.
  *
  * <p><b>Acción si no se cumple:</b> {@code NOOP_INFO} — confirmación de que el sensor
  * reportó a tiempo; la cadena continúa evaluando las reglas ejecutoras.
@@ -78,7 +79,7 @@ public class StaleSensorRule implements Rule {
                     "El nodo testigo de la macro-zona %s no reportó dentro del umbral " +
                     "de antigüedad configurado. Actuación autónoma anulada por seguridad.",
                     zonaId);
-            return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, motivo, CancelaRiego.TODAS));
+            return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, motivo));
         }
 
         if (antiguedadHumedad == null || humedadVieja) {
@@ -88,7 +89,7 @@ public class StaleSensorRule implements Rule {
                     "umbral de antigüedad configurado (¿falla de la sonda?). " +
                     "Riego autónomo anulado por seguridad.",
                     zonaId);
-            return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, motivo, CancelaRiego.TODAS));
+            return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, motivo));
         }
 
         return List.of(RuleAction.noopInfo(NAME,

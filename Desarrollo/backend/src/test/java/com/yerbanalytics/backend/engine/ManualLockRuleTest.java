@@ -102,4 +102,20 @@ class ManualLockRuleTest {
     void prioridad_esLaMasAlta() {
         assertThat(rule.priority()).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("el ABORT_ALL lleva la marca CancelaRiego.TODAS: retira de la cola la solicitud de R-01 y de R-02")
+    void emiteLaMarcaDeCancelacionTotal() {
+        List<RuleAction> acciones = evaluar(rule, RuleContextTestFactory.conBloqueo(sector, zona, true));
+
+        assertThat(acciones.get(0).detalle()).isEqualTo(CancelaRiego.TODAS);
+    }
+
+    @Test
+    @DisplayName("sin bloqueo el NOOP_INFO no lleva marca de cancelación")
+    void sinBloqueoNoCancela() {
+        List<RuleAction> acciones = evaluar(rule, RuleContextTestFactory.conBloqueo(sector, zona, false));
+
+        assertThat(acciones.get(0).detalle()).isNull();
+    }
 }

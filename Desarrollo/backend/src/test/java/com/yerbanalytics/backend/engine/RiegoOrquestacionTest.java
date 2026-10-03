@@ -155,6 +155,20 @@ class RiegoOrquestacionTest {
     }
 
     @Test
+    @DisplayName("recién regado (en el ciclo, riego en curso) con la humedad en 82: R-04 sale igual, con su alerta WARNING; la guarda de ciclo ya no la tapa")
+    void saturadoTrasRegarNoQuedaTapadoPorElCiclo() {
+        ResultadoEvaluacion r = evaluar(RiegoCtx.a("10:20").humedad(82.0).inicioCiclo("10:00").ultimoRiego("10:12")
+                .riegoEnCursoHasta("10:25"));
+
+        assertThat(de(r, ActionType.ABORT_RIEGO)).extracting(RuleAction::ruleName).containsExactly("SustratoSaturadoRule");
+        assertThat(de(r, ActionType.ALERTA)).extracting(a -> ((DetalleAlerta) a.detalle()).nivel())
+                .containsExactly(NivelAlerta.WARNING);
+        assertThat(regla(r, "SustratoSaturadoRule").estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(regla(r, "CicloLecturaRiegoRule").estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
+        assertThat(regla(r, "CicloLecturaRiegoRule").bloqueadaPor()).isEqualTo("SustratoSaturadoRule");
+    }
+
+    @Test
     @DisplayName("ya regó en el ciclo con déficit común (h 40): la regla de ciclo corta a R-01")
     void unRiegoPorCicloParaR01() {
         ResultadoEvaluacion r = evaluar(RiegoCtx.a("13:59").humedad(40.0).inicioCiclo("10:00").ultimoRiego("10:12"));
@@ -237,10 +251,10 @@ class RiegoOrquestacionTest {
     }
 
     @Test
-    @DisplayName("el orden de la rama RIEGO es Ciclo → R-04 → R-02 → R-05 → R-06 → R-03 → R-01")
+    @DisplayName("el orden de la rama RIEGO es R-04 → Ciclo → R-02 → R-05 → R-06 → R-03 → R-01")
     void ordenDeLaRama() {
         assertThat(orquestador.getRules().stream().filter(x -> x.branch() == RuleBranch.RIEGO).map(Rule::name).toList())
-                .containsExactly("CicloLecturaRiegoRule", "SustratoSaturadoRule", "DeficitCriticoRule",
+                .containsExactly("SustratoSaturadoRule", "CicloLecturaRiegoRule", "DeficitCriticoRule",
                         "FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule");
     }
 }

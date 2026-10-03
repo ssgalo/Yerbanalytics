@@ -691,3 +691,78 @@ revalidación no tiene traza (el despacho no es una regla): no hay nada que espe
 - R-03 no cancela lo ya encolado (la lluvia pronosticada después de decidir no retira la ronda): la lista de
   cancelaciones de seguridad es la confirmada y R-03 no está. Además, en el primer mensaje tras arrancar (sin
   pronóstico cacheado) R-03 no tiene dato; ver C5.
+
+### Correcciones de la revisión del estado `221f5d9` (C8–C11)
+
+Una revisión independiente de `221f5d9` y una verificación en ejecución real encontraron cuatro problemas más; el
+criterio de desempate es el mismo (nunca regar con datos inválidos, nunca dejar sin regar un déficit crítico).
+
+**C8 · Con lectura no vigente el despacho PAUSA, no descarta (cambia C2).** C2 descartaba TODA la cola de la zona si la
+lectura o la humedad tenían más de `seguridad.antiguedad-max-lectura` (90 s; el nodo publica cada 30 s). Si pasaba
+después de regar al sector testigo, la humedad ya había subido, R-01 y R-02 no volvían a aplicar al volver el nodo y
+los sectores pendientes quedaban sin regar (dos mensajes perdidos por WiFi alcanzaban). Ahora la lectura o la humedad
+no vigentes (y la falta de humedad) **pausan**: no se abre ninguna válvula de la zona, la cola se conserva, sin alerta, y
+se retoma sola cuando hay lectura vigente. Siguen **retirando** el bloqueo manual y la saturación actual (R-04): no son
+"datos inciertos" sino una orden o una condición presente. `StaleSensorRule` deja de emitir `CancelaRiego.TODAS`: el
+sensor sin datos sólo corta la evaluación (el motor no pide riego sin lectura) pero no vacía la cola.
+
+| Motivo | ¿Qué hace? | ¿Quién decide? | R-01 | R-02 |
+|---|---|---|---|---|
+| Sensor sin datos / humedad congelada (S-02) | PAUSA (no abre, conserva) | despacho (telemetría: ninguna marca) | sí | sí |
+| Bloqueo manual | RETIRA | telemetría (marca) y despacho | sí | sí |
+| Saturación R-04 | RETIRA | telemetría (marca) y despacho | sí | sí |
+| Ventana R-05 | RETIRA | telemetría (marca) y despacho | sí | no |
+| Pausa tras aplicación R-06 | RETIRA | telemetría (marca) y despacho (C9) | sí | no |
+| Lluvia R-03 | RETIRA | despacho (C9) | sí | no |
+| Ya regó en el ciclo | RETIRA | despacho (C9) | sí | no |
+| Tope de R-02 | RETIRA | despacho (C9) | no | sí |
+| Vencimiento (C8) | RETIRA con alerta | despacho | sí | sí |
+| La humedad se recuperó | NADA | — | — | — |
+
+**Vencimiento.** Para que la pausa no deje solicitudes eternas ni se rieguen rondas de horas atrás, cada solicitud es
+válida durante el ciclo de lectura en que se pidió **y el siguiente**, y vence al empezar el tercero:
+`CicloLectura.vencida(solicitadaEn, ahora, minutos) = solicitadaEn < inicioDelCicloAnterior(ahora)`, donde el inicio
+del ciclo anterior es el del ciclo que contiene el último milisegundo antes del inicio del actual (respeta el último
+ciclo del día cortado a las 02:00). Con 240 min, una solicitud de las 10:05 sigue vigente hasta las 17:59:59 y vence a
+las 18:00. El despacho lo mira primero, aunque la zona esté en pausa, y deja una alerta `WARNING` por zona al vencer
+(sólo una vez: lo vencido se descarta de una vez). El intervalo sale de `configuracion_operativa` como el ciclo de las
+reglas (acotado a 60–360). Costo conocido: con la ronda más larga de fábrica (~2 h) cabe sobrada en dos ciclos de 4 h;
+con un intervalo de 60 min una ronda de 10 tandas (~2 h) no cabría en el ciclo + gracia y se cortaría: ajustar
+`riego.sectores-simultaneos` o el caudal.
+
+**C9 · El despacho revalida todas las precondiciones de R-01 que no son la humedad.** Faltaban tres: (a) R-06: una
+dosificación recibida mientras R-01 esperaba su tanda no la retiraba (`PausaTrasAplicacionRule` sólo evalúa cuando aplica
+R-01 y la humedad ya había subido) y el agua lavaba el producto; (b) R-03: el primer mensaje tras arrancar no tiene
+pronóstico (`getForecastSinEspera` devuelve `null` en frío), R-01 encola la ronda y, cuando llega el pronóstico,
+`POSTPONE_RIEGO` no retira nada; (c) la guarda de ciclo y el tope de R-02: con `duración + 5 s` menor que el tick (10 s)
+un sector reencolado podía abrirse dos veces. Ahora, por solicitud de R-01, antes del cupo: ventana (ya estaba), pausa
+R-06 (última aplicación `< riego.pausa-tras-aplicacion`), lluvia R-03 (pronóstico cacheado, sin esperar, con los dos
+umbrales; sin dato no pospone, O-01) y "ya regó en este ciclo"; por solicitud de R-02, el tope
+`riego.exceptuado-bloqueo`. Las condiciones viven en `PrecondicionesRiego` y las usan las reglas y el despacho (nada de
+umbrales ni lógica duplicados); el despacho declara en `parametros()` todos los que lee (`pausa-tras-aplicacion`,
+`lluvia-probabilidad`, `lluvia-mm`, `lluvia-ventana`, `exceptuado-bloqueo`, además de los de C2), así que el catálogo los
+muestra en `usadoPor`. El último riego, riego crítico y aplicación salen de `ultimosPorSector` (una consulta por zona y
+tick, sólo si hay algo en cola) mezclado con la memoria del despacho (C4). Sin poder leer el historial, las de R-01
+esperan (no se sabe si hay pausa ni si ya regó) y las de R-02 siguen con la memoria: un déficit crítico no se deja sin
+regar por una falla de lectura. Además `WeatherService.precalentar()` (`ApplicationReadyEvent`) pide el pronóstico en el
+hilo de refresco al arrancar: reduce la ventana en frío, sin eliminarla (por eso la revalidación).
+
+**C10 · R-04 antes de la guarda de ciclo (prioridades 2 y 3).** Verificado en ejecución: recién regado, cualquier
+lectura con humedad alta (82 %) caía en `CicloLecturaRiegoRule` (prioridad 2), que cortaba la rama, y
+`SustratoSaturadoRule` (3) quedaba omitida: sin alerta WARNING de saturación justo después de regar y sin cancelar la cola
+por esa vía. Ahora `SustratoSaturadoRule` tiene prioridad 2 y la guarda de ciclo 3. Orden final de la rama RIEGO:
+R-04 (2) → ciclo (3) → R-02 (4) → R-05 (6) → R-06 (7) → R-03 (8) → R-01 (10). R-04 y R-02 siguen siendo excluyentes y R-04
+no mira el ciclo, así que el cambio no puede dejar a R-02 sin regar.
+
+**C11 · Las marcas de cancelación tienen tests propios.** Antes ningún test comprobaba que `ManualLockRule`,
+`FueraDeVentanaRiegoRule`, `PausaTrasAplicacionRule` y `SustratoSaturadoRule` emitieran su `CancelaRiego` (borrar la
+marca no rompía nada); ahora cada regla lo prueba y `RiegoIntegracionTest` lo prueba de punta a punta, incluido que
+`StaleSensorRule` NO la emite.
+
+**Riesgos que quedan sólo documentados (no se corrigieron):**
+- El firmware no cierra la válvula antes de tiempo y abre hasta 20 min seguidos (necesita rediseño del firmware, sin
+  toolchain acá): una orden de 1200 s no se puede cancelar una vez publicada.
+- R-02 encolada no baja a R-01 (si la humedad mejora, sigue con el volumen máximo; es C1 a propósito).
+- Sin ACK: "publicado" es entregado al cliente MQTT.
+- La bomba conserva el enganche "Dosificando" (R-06 depende de eventos "Insumo", rama de insumos fuera de alcance).
+- La tarjeta "Clima y riesgo" del panel usa otro criterio que el motor para la lluvia (probabilidad de la hora actual).

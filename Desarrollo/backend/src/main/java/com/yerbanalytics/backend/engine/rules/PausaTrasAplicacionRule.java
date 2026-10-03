@@ -8,6 +8,7 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
+import com.yerbanalytics.backend.engine.riego.PrecondicionesRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
@@ -20,7 +21,9 @@ import java.util.List;
  *
  * <p>Cuando aplica R-01 y al sector se le aplicó fertilizante o fitosanitario hace menos de
  * {@code riego.pausa-tras-aplicacion} horas, emite {@code ABORT_RIEGO} para ese sector (el agua lavaría el
- * producto). Los demás sectores de la macro-zona siguen su curso; R-02 sí puede regarlo.
+ * producto). Los demás sectores de la macro-zona siguen su curso; R-02 sí puede regarlo. La condición vive en
+ * {@link PrecondicionesRiego#enPausaPorAplicacion}: el despacho la revalida, porque una dosificación puede llegar
+ * mientras el sector espera su tanda con R-01 encolado.
  */
 @Component
 public class PausaTrasAplicacionRule implements Rule {

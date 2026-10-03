@@ -113,11 +113,20 @@ class SustratoSaturadoRuleTest {
     }
 
     @Test
-    @DisplayName("metadatos: RIEGO, prioridad 3, declara bloqueo y alerta")
+    @DisplayName("metadatos: RIEGO, prioridad 2 (antes de la guarda de ciclo), declara bloqueo y alerta")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(3);
+        assertThat(rule.priority()).isEqualTo(2);
         assertThat(rule.parametros()).containsExactly(ParametrosRiego.SATURACION_BLOQUEO, ParametrosRiego.SATURACION_ALERTA);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());
+    }
+
+    @Test
+    @DisplayName("el ABORT_RIEGO de R-04 lleva la marca CancelaRiego.TODAS (retira cualquier solicitud del sector)")
+    void emiteLaMarcaDeCancelacionTotal() {
+        List<RuleAction> acciones = rule.evaluate(RiegoCtx.a("10:05").humedad(80.0).build(), ev(rule));
+
+        assertThat(acciones.get(0).type()).isEqualTo(ActionType.ABORT_RIEGO);
+        assertThat(acciones.get(0).detalle()).isEqualTo(CancelaRiego.TODAS);
     }
 }

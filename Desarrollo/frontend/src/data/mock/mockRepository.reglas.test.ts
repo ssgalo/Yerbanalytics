@@ -96,9 +96,9 @@ describe('MockRepository · esquema del DAG', () => {
     expect(par('start', 'ManualLockRule')).toBe(true);
     expect(par('ManualLockRule', 'StaleSensorRule')).toBe(true);
     // La rama de riego, en el orden en que corre el motor.
-    expect(par('StaleSensorRule', 'CicloLecturaRiegoRule')).toBe(true);
-    expect(par('CicloLecturaRiegoRule', 'SustratoSaturadoRule')).toBe(true);
-    expect(par('SustratoSaturadoRule', 'DeficitCriticoRule')).toBe(true);
+    expect(par('StaleSensorRule', 'SustratoSaturadoRule')).toBe(true);
+    expect(par('SustratoSaturadoRule', 'CicloLecturaRiegoRule')).toBe(true);
+    expect(par('CicloLecturaRiegoRule', 'DeficitCriticoRule')).toBe(true);
     expect(par('DeficitCriticoRule', 'FueraDeVentanaRiegoRule')).toBe(true);
     expect(par('FueraDeVentanaRiegoRule', 'PausaTrasAplicacionRule')).toBe(true);
     expect(par('PausaTrasAplicacionRule', 'PosponerPorLluviaRule')).toBe(true);

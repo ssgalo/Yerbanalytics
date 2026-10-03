@@ -26,6 +26,7 @@ import com.yerbanalytics.backend.engine.rules.SustratoSaturadoRule;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
+import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
@@ -84,6 +85,8 @@ class RiegoIntegracionTest {
     private ZonaEntity zona;
     private NurseryWatchdog watchdog;
     private HistorialService historialService;
+    private WeatherService clima;
+    private ManualLockRepository bloqueosDelNodo;
 
     @BeforeEach
     void setUp() {
@@ -160,15 +163,17 @@ class RiegoIntegracionTest {
         RuleOrchestrator orquestador = new RuleOrchestrator(reglas, catalogo, trazas);
         ActionExecutor executor = new ActionExecutor(historialService, publisher, cola);
         ManualLockRepository bloqueos = mock(ManualLockRepository.class);
-        despacho = new DespachoRiego(cola, publisher, historialService, historialRepository, sectorRepository,
-                zonaRepository, bloqueos, catalogo, reloj, new TxSimple());
-
+        clima = mock(WeatherService.class);                // sin pronóstico, como el primer mensaje tras arrancar
         ConfiguracionService configuracion = mock(ConfiguracionService.class);
+        despacho = new DespachoRiego(cola, publisher, historialService, historialRepository, sectorRepository,
+                zonaRepository, bloqueos, catalogo, clima, configuracion, reloj, new TxSimple());
+
+        bloqueosDelNodo = mock(ManualLockRepository.class);
         when(configuracion.getEffectiveSpecs()).thenReturn(NurseryConstants.SPECS);
         when(configuracion.getConfiguracionOperativa()).thenReturn(RuleContextTestFactory.defaultConfig());
         nursery = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository, historialService,
                 configuracion, mock(HardwareService.class), mock(TopologiaLayoutRepository.class), orquestador,
-                executor, mock(WeatherService.class), mock(ManualLockRepository.class),
+                executor, clima, bloqueosDelNodo,
                 mock(DiagnosticoService.class), trazas, catalogo, historialRepository, despacho, reloj, 20);
         watchdog = new NurseryWatchdog(zonaRepository, sectorRepository, orquestador, executor, configuracion,
                 mock(WeatherService.class), mock(ManualLockRepository.class), trazas, reloj);
@@ -345,7 +350,7 @@ class RiegoIntegracionTest {
     }
 
     @Test
-    @DisplayName("con la lectura vieja el barrido corta (StaleSensorRule) y el despacho NO abre nada más ni deja la cola")
+    @DisplayName("con la lectura vieja el barrido corta (StaleSensorRule) y el despacho NO abre nada más; la cola queda pausada")
     void barridoConLecturaViejaNoRiega() {
         telemetria(40.0);
         despacho.tick();                                   // abre 1-10; los 90 restantes esperan
@@ -355,7 +360,7 @@ class RiegoIntegracionTest {
         despacho.tick();                                   // cupo libre, pero con datos viejos no se abre ninguna
 
         assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
-        assertThat(cola.zonas()).isEmpty();
+        assertThat(cola.pendientes("MZ-2")).hasSize(90);
     }
 
     // ------------------------------------------------------------------ el registro de inacción sólo cuando cambia
@@ -467,7 +472,7 @@ class RiegoIntegracionTest {
     // ------------------------------------------------------------------ el despacho revalida con datos actuales
 
     @Test
-    @DisplayName("el nodo muere con 90 en cola: el despacho no abre más válvulas y los pendientes se descartan (S-02)")
+    @DisplayName("el nodo muere con 90 en cola: el despacho no abre más válvulas y PAUSA (los pendientes se conservan) (S-02)")
     void nodoMuertoNoSigueRegando() {
         telemetria(30.0);
         despacho.tick();
@@ -478,7 +483,7 @@ class RiegoIntegracionTest {
         despacho.tick();
 
         assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
-        assertThat(cola.zonas()).isEmpty();
+        assertThat(cola.pendientes("MZ-2")).hasSize(90);
     }
 
     @Test
@@ -492,7 +497,7 @@ class RiegoIntegracionTest {
         despacho.tick();
 
         assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
-        assertThat(cola.zonas()).isEmpty();
+        assertThat(cola.pendientes("MZ-2")).hasSize(90);
     }
 
     @Test
@@ -537,6 +542,205 @@ class RiegoIntegracionTest {
 
         assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
         assertThat(cola.zonas()).isEmpty();
+    }
+
+    // ------------------------------------------------------------------ pausa y vencimiento de la ronda
+
+    @Test
+    @DisplayName("hueco de lectura de 3 min con 90 en cola y la humedad ya en 65: no se abre nada durante el hueco y al volver el nodo se riegan los 100")
+    void huecoDeLecturaPausaYSeRetomaAlVolver() {
+        telemetria(40.0);
+        despacho.tick();                                   // abre 1-10 (600 s)
+        avanzarConTelemetria(510, 65.0);                   // 10:13:30: el testigo ya está mojado; última lectura
+
+        for (int t = 0; t < 180; t += 10) {                // hueco: la tanda 1 cierra a las 10:15:05, la lectura tiene > 90 s
+            reloj.avanzar(Duration.ofSeconds(10));
+            despacho.tick();
+        }
+        assertThat(comandos).as("durante el hueco no se abre ninguna válvula").containsExactlyElementsOf(rango(1, 10));
+        assertThat(cola.pendientes("MZ-2")).as("y la ronda se conserva").hasSize(90);
+
+        telemetria(65.0);                                  // vuelve el nodo
+        despacho.tick();
+        assertThat(comandos).containsExactlyElementsOf(rango(1, 20));
+
+        avanzarConTelemetria(8 * 630 + 60, 65.0);
+
+        assertThat(comandos).containsExactlyElementsOf(rango(1, 100));
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("dos mensajes perdidos (60 s sin publicar, lectura de 100 s) no pierden la ronda")
+    void dosMensajesPerdidosNoPierdenLaRonda() {
+        telemetria(40.0);
+        despacho.tick();
+        avanzarConTelemetria(510, 65.0);
+        reloj.avanzar(Duration.ofSeconds(100));            // 2 mensajes perdidos + el atraso: lectura de 100 s
+        despacho.tick();
+        assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
+
+        telemetria(65.0);
+        despacho.tick();
+
+        assertThat(comandos).containsExactlyElementsOf(rango(1, 20));
+    }
+
+    @Test
+    @DisplayName("el nodo no vuelve nunca: no se riega y la cola se vacía al vencer la ronda (alerta WARNING)")
+    void nodoQueNoVuelveVenceLaRonda() {
+        telemetria(40.0);
+        despacho.tick();
+        avanzarConTelemetria(510, 65.0);                   // última lectura 10:13:30
+
+        reloj.avanzar(Duration.ofHours(8));                // 18:13: tercer ciclo; el nodo sigue mudo
+        despacho.tick();
+
+        assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
+        assertThat(cola.zonas()).isEmpty();
+        org.mockito.Mockito.verify(historialService).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                org.mockito.ArgumentMatchers.argThat(a -> a.texto().contains("venci") && a.texto().contains("90 solicitudes")),
+                anyLong());
+    }
+
+    // ------------------------------------------------------------------ el despacho revalida las precondiciones de R-01
+
+    private void insumo(String sectorId, long ts) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId("i" + historia.size());
+        e.setSectorId(sectorId);
+        e.setZonaId("MZ-2");
+        e.setTipo("Insumo");
+        e.setTs(ts);
+        historia.add(e);
+    }
+
+    @Test
+    @DisplayName("R-06: un sector con R-01 encolado que recibe una dosificación mientras espera NO se riega")
+    void dosificacionMientrasEsperaNoSeRiega() {
+        telemetria(40.0);
+        despacho.tick();                                   // abre 1-10
+        insumo(id(15), reloj.millis() + 30_000L);          // se dosifica el 15 mientras espera su tanda
+        reloj.avanzar(Duration.ofSeconds(30));
+
+        avanzarConTelemetria(9 * 630, 65.0);
+
+        assertThat(comandos).doesNotContain(id(15)).contains(id(14), id(16));
+        assertThat(cola.contiene(id(15))).isFalse();
+    }
+
+    @Test
+    @DisplayName("R-03: el primer mensaje tras arrancar no tenía pronóstico; cuando llega la lluvia la ronda de R-01 no se riega")
+    void pronosticoQueLlegaTardePosponeLaRonda() {
+        telemetria(40.0);                                  // sin pronóstico: R-03 sin dato, R-01 encola los 100
+        assertThat(cola.pendientes("MZ-2")).hasSize(SECTORES);
+        when(clima.getForecastSinEspera()).thenReturn(
+                RiegoCtx.pronostico(reloj.instant(), new double[]{90, 90, 90, 90}, new double[]{3, 3, 3, 3}));
+
+        despacho.tick();
+
+        assertThat(comandos).isEmpty();
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R-03 no frena a R-02: con déficit crítico y lluvia prevista la ronda se riega")
+    void lluviaNoFrenaAR02() {
+        telemetria(30.0);
+        when(clima.getForecastSinEspera()).thenReturn(
+                RiegoCtx.pronostico(reloj.instant(), new double[]{90, 90, 90, 90}, new double[]{3, 3, 3, 3}));
+
+        despacho.tick();
+
+        assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
+    }
+
+    // ------------------------------------------------------------------ las marcas de cancelación, de punta a punta
+
+    @Test
+    @DisplayName("marca de ManualLockRule: un bloqueo manual activo retira de la cola la solicitud del sector (R-01 y R-02)")
+    void bloqueoManualRetiraDeLaCola() {
+        for (double humedad : new double[]{40.0, 30.0}) {
+            cola.limpiar();
+            telemetria(humedad);
+            assertThat(cola.contiene(id(5))).isTrue();
+            ManualLockEntity bloqueo = new ManualLockEntity();
+            bloqueo.setSectorId(id(5));
+            when(bloqueosDelNodo.findBySectorIdAndActiveTrue(id(5))).thenReturn(List.of(bloqueo));
+
+            reloj.avanzar(Duration.ofSeconds(30));
+            telemetria(humedad);
+
+            assertThat(cola.contiene(id(5))).as("humedad " + humedad).isFalse();
+            assertThat(cola.contiene(id(6))).isTrue();
+            when(bloqueosDelNodo.findBySectorIdAndActiveTrue(id(5))).thenReturn(List.of());
+        }
+    }
+
+    @Test
+    @DisplayName("marca de FueraDeVentanaRiegoRule: al cerrar la ventana la telemetría retira lo de R-01, no lo de R-02")
+    void ventanaCerradaRetiraSoloR01() {
+        reloj.avanzar(Duration.ofMinutes(470));            // 17:55
+        telemetria(40.0);
+        assertThat(cola.pendientes("MZ-2")).hasSize(SECTORES);
+        reloj.avanzar(Duration.ofMinutes(10));             // 18:05: la ventana cerró
+        telemetria(40.0);
+        assertThat(cola.zonas()).isEmpty();
+
+        cola.limpiar();
+        telemetria(30.0);                                  // R-02 de noche
+        assertThat(cola.pendientes("MZ-2")).hasSize(SECTORES);
+        reloj.avanzar(Duration.ofSeconds(30));
+        telemetria(30.0);
+        assertThat(cola.pendientes("MZ-2")).hasSize(SECTORES);
+    }
+
+    @Test
+    @DisplayName("marca de PausaTrasAplicacionRule: una dosificación retira de la cola el R-01 de ESE sector, no el R-02 ni los demás")
+    void pausaPorAplicacionRetiraSoloR01DeEseSector() {
+        telemetria(40.0);
+        insumo(id(7), reloj.millis() - 3_600_000L);
+        reloj.avanzar(Duration.ofSeconds(30));
+        telemetria(40.0);
+
+        assertThat(cola.contiene(id(7))).isFalse();
+        assertThat(cola.contiene(id(8))).isTrue();
+
+        cola.limpiar();
+        telemetria(30.0);                                  // R-02
+        reloj.avanzar(Duration.ofSeconds(30));
+        telemetria(30.0);
+        assertThat(cola.contiene(id(7))).as("R-02 no depende de la pausa").isTrue();
+    }
+
+    @Test
+    @DisplayName("marca de StaleSensorRule: el sensor sin datos NO retira la cola (pausa), sólo impide abrir")
+    void sensorSinDatosNoRetiraLaCola() {
+        telemetria(40.0);
+        zona.setHumSusTs(reloj.millis() - 300_000L);       // la sonda calló: la evaluación de la telemetría la ve vieja
+        // (el mensaje siguiente trae humSus y la refresca, así que se evalúa el barrido: no toca la cola)
+        reloj.avanzar(Duration.ofMinutes(5));
+        watchdog.evaluarTodos();
+        despacho.tick();
+
+        assertThat(cola.pendientes("MZ-2")).hasSize(SECTORES);
+        assertThat(comandos).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R-04 tras regar: una lectura de 82 % deja la alerta WARNING aunque el sector ya haya regado en el ciclo")
+    void saturacionTrasRegarDejaLaAlerta() {
+        telemetria(40.0);
+        despacho.tick();                                   // 1-10 regando, en el ciclo
+        reloj.avanzar(Duration.ofSeconds(30));
+
+        telemetria(82.0);
+
+        org.mockito.Mockito.verify(historialService, org.mockito.Mockito.atLeastOnce()).registrarAlerta(eq("MZ-2"), any(),
+                eq("SustratoSaturadoRule"),
+                org.mockito.ArgumentMatchers.argThat(a -> a.nivel() == com.yerbanalytics.backend.engine.NivelAlerta.WARNING),
+                anyLong());
+        assertThat(cola.pendientes("MZ-2")).as("y R-04 cancela la ronda pendiente").isEmpty();
     }
 
     // ------------------------------------------------------------------ el riego sobrevive en memoria si falla el historial

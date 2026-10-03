@@ -9,6 +9,7 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
+import com.yerbanalytics.backend.engine.riego.PrecondicionesRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
@@ -24,6 +25,10 @@ import java.util.List;
  * probabilidad horaria máxima ≥ {@code riego.lluvia-probabilidad} Y lluvia acumulada ≥
  * {@code riego.lluvia-mm}, emite {@code POSTPONE_RIEGO} y una alerta {@code INFO} por macro-zona. No hace
  * nada más: en la próxima lectura decide la regla que corresponda.
+ *
+ * <p>La condición (los dos umbrales sobre la lluvia prevista) vive en {@link PrecondicionesRiego#lluviaPospone}: el
+ * {@code DespachoRiego} la revalida al abrir cada válvula, porque el pronóstico puede llegar DESPUÉS de que R-01
+ * encoló la ronda (el primer mensaje tras arrancar no tiene pronóstico cacheado).
  *
  * <p>Sin pronóstico (o sin marcas horarias) las comparaciones quedan {@code SIN_DATO} y no pospone (O-01:
  * se asume que no llueve). Con déficit crítico no aplica: R-02 gana al clima (principio 3).
@@ -71,8 +76,8 @@ public class PosponerPorLluviaRule implements Rule {
 
         int horas = (int) ev.numero(ParametrosRiego.LLUVIA_VENTANA);
         WeatherForecast pronostico = ctx.forecast();
-        WeatherForecast.LluviaPrevista lluvia = pronostico == null ? null
-                : pronostico.lluviaProxima(RiegoRuleSupport.fechaHoraLocal(ctx), horas);
+        WeatherForecast.LluviaPrevista lluvia =
+                PrecondicionesRiego.lluviaPrevista(pronostico, RiegoRuleSupport.fechaHoraLocal(ctx), horas);
         // Una hora sin dato no es una hora seca: si falta la probabilidad o los milímetros, esa comparación
         // queda SIN_DATO y no se pospone (O-01: sin pronóstico se asume que no llueve).
         Double probMax = lluvia == null ? null : lluvia.probMaxPct();
@@ -87,7 +92,7 @@ public class PosponerPorLluviaRule implements Rule {
             return List.of(RuleAction.noopInfo(NAME,
                     "Pronóstico de lluvia incompleto o no disponible: se asume que no llueve y el riego sigue su curso."));
         }
-        if (probable && abundante) {
+        if (probable && abundante) {   // == PrecondicionesRiego.lluviaPospone, con la traza de cada umbral
             String detalle = String.format("probabilidad máxima %s%% y %s mm en las próximas %d h",
                     RiegoRuleSupport.num(probMax), RiegoRuleSupport.num(mmTotal), horas);
             RuleAction pospone = RuleAction.of(ActionType.POSTPONE_RIEGO, NAME,

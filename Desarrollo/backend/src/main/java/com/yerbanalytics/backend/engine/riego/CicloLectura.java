@@ -53,4 +53,26 @@ public final class CicloLectura {
         long transcurridos = ChronoUnit.MINUTES.between(ancla, local);
         return ancla.plusMinutes((transcurridos / paso) * paso).toInstant();
     }
+
+    /**
+     * Inicio del ciclo de lectura inmediatamente anterior al que contiene {@code ahora}. Se calcula como el
+     * ciclo que contiene el último milisegundo antes del inicio del actual, así respeta el último ciclo del día
+     * cortado a las 02:00.
+     */
+    public static Instant inicioDelCicloAnterior(Instant ahora, int minutos) {
+        return inicio(inicio(ahora, minutos).minusMillis(1), minutos);
+    }
+
+    /**
+     * {@code true} si una solicitud de riego pedida en {@code solicitadaEn} ya venció a {@code ahora}: una solicitud
+     * es válida durante el ciclo de lectura en que se pidió y durante el siguiente (el de gracia), y vence al empezar
+     * el tercero. Dicho de otro modo, vence si es anterior al inicio del ciclo anterior al actual.
+     *
+     * <p>Una ronda encolada no puede ser eterna ni regarse horas después de la decisión que la originó; pero el
+     * despacho PAUSA (no descarta) mientras no hay lectura vigente, así que un hueco de lectura de minutos u horas
+     * dentro de este plazo no la pierde.
+     */
+    public static boolean vencida(Instant solicitadaEn, Instant ahora, int minutos) {
+        return solicitadaEn.isBefore(inicioDelCicloAnterior(ahora, minutos));
+    }
 }

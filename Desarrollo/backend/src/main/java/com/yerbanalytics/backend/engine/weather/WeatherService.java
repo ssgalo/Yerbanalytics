@@ -4,6 +4,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -139,6 +141,16 @@ public class WeatherService {
             refrescarAparte();
         }
         return cached != null && cached.isFresh(FACTOR_USABLE_VENCIDO * cacheTtlMs, ahora) ? cached : null;
+    }
+
+    /**
+     * Pide el pronóstico en un hilo aparte apenas arranca la aplicación. Sin esto el primer mensaje del nodo no
+     * encuentra pronóstico cacheado ({@link #getForecastSinEspera()} devuelve {@code null} en frío), R-03 queda sin dato
+     * y R-01 puede encolar una ronda que la lluvia habría pospuesto. No bloquea el arranque ni lo rompe si falla.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void precalentar() {
+        refrescarAparte();
     }
 
     private void refrescarAparte() {

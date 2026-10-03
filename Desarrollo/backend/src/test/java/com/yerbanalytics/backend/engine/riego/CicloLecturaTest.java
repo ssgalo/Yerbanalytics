@@ -60,4 +60,45 @@ class CicloLecturaTest {
         assertThat(CicloLectura.inicio(local("2026-10-03T10:59:59"), 60)).isEqualTo(local("2026-10-03T10:00:00"));
         assertThat(CicloLectura.inicio(local("2026-10-03T11:00:00"), 60)).isEqualTo(local("2026-10-03T11:00:00"));
     }
+
+    // ------------------------------------------------------------------ vencimiento de una solicitud encolada
+
+    @Test
+    void unaSolicitudEsValidaEnSuCicloYEnElSiguiente_y_VenceAlEmpezarElTercero() {
+        Instant pedida = local("2026-10-03T10:05:00");                       // ciclo 10:00-14:00
+
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T10:06:00"), 240)).isFalse();
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T13:59:59"), 240)).isFalse();   // su ciclo
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T14:00:00"), 240)).isFalse();   // el siguiente (gracia)
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T17:59:59"), 240)).isFalse();
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T18:00:00"), 240)).isTrue();    // el tercero
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-04T09:00:00"), 240)).isTrue();
+    }
+
+    @Test
+    void unaSolicitudPedidaJustoEnElInicioDelCicloEsValidaTodoEseCicloYElSiguiente() {
+        Instant pedida = local("2026-10-03T10:00:00");
+
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T17:59:59"), 240)).isFalse();
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T18:00:00"), 240)).isTrue();
+    }
+
+    @Test
+    void elVencimientoRespetaElCicloQueSeCortaALas02() {
+        // 300 min: 02, 07, 12, 17, 22 (el de las 22 dura 4 h). Pedida a las 22:30: vale hasta las 02:00 + 5 h = 07:00.
+        Instant pedida = local("2026-10-03T22:30:00");
+
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-04T01:59:59"), 300)).isFalse();
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-04T06:59:59"), 300)).isFalse();
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-04T07:00:00"), 300)).isTrue();
+    }
+
+    @Test
+    void elIntervaloFueraDeRangoSeAcotaTambienParaElVencimiento() {
+        Instant pedida = local("2026-10-03T10:05:00");
+
+        // 5 min se acota a 60: el ciclo es 10:00-11:00, la gracia llega hasta las 12:00.
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T11:59:59"), 5)).isFalse();
+        assertThat(CicloLectura.vencida(pedida, local("2026-10-03T12:00:00"), 5)).isTrue();
+    }
 }

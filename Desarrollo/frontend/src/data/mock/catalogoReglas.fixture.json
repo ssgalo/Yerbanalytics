@@ -17,22 +17,22 @@
       ]
     },
     {
-      "id": "CicloLecturaRiegoRule",
-      "label": "🔁 Un riego por ciclo de lectura",
-      "rama": "RIEGO",
-      "prioridad": 2,
-      "parametros": [
-        "riego.umbral-critico"
-      ]
-    },
-    {
       "id": "SustratoSaturadoRule",
       "label": "💧 Sustrato saturado (R-04)",
       "rama": "RIEGO",
-      "prioridad": 3,
+      "prioridad": 2,
       "parametros": [
         "riego.saturacion-bloqueo",
         "riego.saturacion-alerta"
+      ]
+    },
+    {
+      "id": "CicloLecturaRiegoRule",
+      "label": "🔁 Un riego por ciclo de lectura",
+      "rama": "RIEGO",
+      "prioridad": 3,
+      "parametros": [
+        "riego.umbral-critico"
       ]
     },
     {
@@ -193,7 +193,8 @@
       "refSpec": "reglas_v2 §5 R-03 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "PosponerPorLluviaRule"
+        "PosponerPorLluviaRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -382,7 +383,8 @@
       "refSpec": "reglas_v2 §5 R-03 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "PosponerPorLluviaRule"
+        "PosponerPorLluviaRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -402,7 +404,8 @@
       "refSpec": "reglas_v2 §5 R-03 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "PosponerPorLluviaRule"
+        "PosponerPorLluviaRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -422,7 +425,8 @@
       "refSpec": "reglas_v2 §5 R-06 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "PausaTrasAplicacionRule"
+        "PausaTrasAplicacionRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -442,7 +446,8 @@
       "refSpec": "reglas_v2 §4 y §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "DeficitCriticoRule"
+        "DeficitCriticoRule",
+        "DespachoRiego"
       ],
       "updatedBy": null,
       "updatedTs": null

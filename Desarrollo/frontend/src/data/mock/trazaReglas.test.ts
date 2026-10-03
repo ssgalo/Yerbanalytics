@@ -252,6 +252,15 @@ describe('evaluarMotor · R-04 sustrato saturado', () => {
   it('humedad normal: no bloquea', () => {
     expect(tipos(regla(evaluarMotor(catalogo, base), 'SustratoSaturadoRule'))).toEqual(['NOOP_INFO']);
   });
+
+  it('recién regado (ya regó en el ciclo y hay un riego en curso) con 82 %: R-04 sale igual y la guarda de ciclo queda omitida', () => {
+    const t = evaluarMotor(catalogo, {
+      ...base, humSus: 82, ultimoRiegoMs: ms(TS_DIA) - 30 * 60_000, riegoEnCursoHastaMs: ms(TS_DIA) + 120_000,
+    });
+
+    expect(tipos(regla(t, 'SustratoSaturadoRule'))).toEqual(['ABORT_RIEGO', 'ALERTA']);
+    expect(regla(t, 'CicloLecturaRiegoRule')).toMatchObject({ estado: 'OMITIDA_RAMA_BLOQUEADA', bloqueadaPor: 'SustratoSaturadoRule' });
+  });
 });
 
 describe('evaluarMotor · R-06 pausa tras una aplicación', () => {

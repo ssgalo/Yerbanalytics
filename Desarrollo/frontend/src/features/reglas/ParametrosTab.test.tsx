@@ -72,9 +72,9 @@ describe('ParametrosTab · agrupación (7.2)', () => {
     ]);
     // Colapsadas: ningún campo de regla a la vista (el grupo de ejecución del riego no se colapsa)
     expect(screen.queryAllByRole('spinbutton')).toHaveLength(1);
-    // Orden por prioridad dentro de RIEGO: ciclo → R-04 → R-02 → R-05 → R-06 → R-03 → R-01
+    // Orden por prioridad dentro de RIEGO: R-04 → ciclo → R-02 → R-05 → R-06 → R-03 → R-01
     const botones = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent ?? '');
-    const orden = ['Un riego por ciclo', 'Sustrato saturado', 'Déficit hídrico crítico', 'fuera de ventana', 'Pausa tras', 'Posponer por lluvia', 'Riego por déficit'];
+    const orden = ['Sustrato saturado', 'Un riego por ciclo', 'Déficit hídrico crítico', 'fuera de ventana', 'Pausa tras', 'Posponer por lluvia', 'Riego por déficit'];
     const posiciones = orden.map((t) => botones.findIndex((b) => b.includes(t)));
     expect(posiciones.every((p) => p >= 0)).toBe(true);
     expect(posiciones).toEqual([...posiciones].sort((x, y) => x - y));

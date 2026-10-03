@@ -185,11 +185,11 @@ class ActionExecutorColaTest {
     }
 
     @Test
-    @DisplayName("sensor sin datos o bloqueo manual (alcance total) retiran también la solicitud de R-02")
+    @DisplayName("bloqueo manual o saturación (alcance total) retiran también la solicitud de R-02")
     void seguridadTotal_retiraTambienR02() {
         executor.execute(List.of(riegoCritico(6.0, 720)), ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);
 
-        executor.execute(List.of(cancela("StaleSensorRule", CancelaRiego.TODAS)),
+        executor.execute(List.of(cancela("ManualLockRule", CancelaRiego.TODAS)),
                 ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);
 
         assertThat(cola.contiene("MZ-2-008")).isFalse();

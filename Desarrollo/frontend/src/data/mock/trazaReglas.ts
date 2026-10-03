@@ -7,10 +7,12 @@
    umbrales se leen del catálogo vigente, así que editar un parámetro en la demo cambia
    la traza como lo haría el sistema real.
 
-   Riego (reglas_v2): ciclo de lectura (2) → R-04 saturado (3) → R-02 déficit crítico (4) →
+   Riego (reglas_v2): R-04 saturado (2) → ciclo de lectura (3) → R-02 déficit crítico (4) →
    R-05 ventana (6) → R-06 pausa (7) → R-03 lluvia (8) → R-01 déficit (10). R-02 gana: corre
    antes y el orquestador conserva sus acciones aunque después se corte la rama; R-05/R-06/R-03
-   sólo actúan cuando aplica R-01 (`crítico ≤ humedad < umbral`).
+   sólo actúan cuando aplica R-01 (`crítico ≤ humedad < umbral`). R-04 va ANTES de la guarda de ciclo:
+   recién regado el sector queda "ya regado en este ciclo" y la humedad sube; si el ciclo cortara primero,
+   la saturación (su alerta) nunca se evaluaría.
 
    Es una función pura: la entrada trae todo lo que el motor real leería del contexto.
    ============================================================ */

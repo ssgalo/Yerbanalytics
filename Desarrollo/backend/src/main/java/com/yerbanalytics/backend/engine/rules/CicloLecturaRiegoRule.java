@@ -23,7 +23,7 @@ import java.util.List;
  * nodo real publica cada 30 s, así que sin esta regla R-01 volvería a regar el sector apenas cierra la
  * válvula: la humedad sale de UN nodo testigo que puede estar en un sector que todavía no se regó.
  *
- * <p><b>Prioridad 2</b>, antes de todas las reglas que riegan. Tiene DOS guardas y no valen lo mismo:
+ * <p><b>Prioridad 3</b>, después de R-04 (la saturación se evalúa siempre, también recién regado) y antes de todas las reglas que riegan. Tiene DOS guardas y no valen lo mismo:
  * <ul>
  *   <li><b>Riego en curso:</b> corta a todos, R-02 incluida (no se abre una válvula que ya está abierta).</li>
  *   <li><b>Ya regó en este ciclo:</b> corta sólo a R-01. A R-02 {@code reglas_v2} le da únicamente su tope
@@ -40,7 +40,7 @@ import java.util.List;
 @Component
 public class CicloLecturaRiegoRule implements Rule {
 
-    private static final int PRIORITY = 2;
+    private static final int PRIORITY = 3;
     private static final String NAME = "CicloLecturaRiegoRule";
     private static final double MS_POR_MINUTO = 60_000.0;
 
