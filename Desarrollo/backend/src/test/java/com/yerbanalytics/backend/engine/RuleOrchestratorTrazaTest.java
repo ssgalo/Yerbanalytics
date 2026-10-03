@@ -62,12 +62,6 @@ class RuleOrchestratorTrazaTest {
         @Override public List<DefinicionParametro> parametros() { return parametros; }
 
         @Override
-        public List<RuleAction> evaluate(RuleContext ctx) {
-            llamadas.add("viejo");
-            return cuerpo.apply(ctx, null);
-        }
-
-        @Override
         public List<RuleAction> evaluate(RuleContext ctx, com.yerbanalytics.backend.engine.traza.Evaluacion ev) {
             llamadas.add("nuevo");
             return cuerpo.apply(ctx, ev);
@@ -199,7 +193,7 @@ class RuleOrchestratorTrazaTest {
     @Test
     void siLaZonaEsNulaLaTrazaQuedaSinZona() {
         RuleContext sinZona = new RuleContext(ctx.sector(), null, ctx.specs(), ctx.metrics(), ctx.config(),
-                ctx.finalStatus(), ctx.now(), false, null, false);
+                ctx.finalStatus(), ctx.now(), null, false);
 
         ResultadoEvaluacion r = new RuleOrchestrator(List.of(new ReglaFalsa("Riego", 10, RuleBranch.RIEGO)), parametros, store)
                 .evaluate(sinZona, OrigenEvaluacion.BARRIDO);
@@ -236,70 +230,5 @@ class RuleOrchestratorTrazaTest {
                 (c, ev) -> { ev.numero(ParametrosRiego.UMBRAL_HUMEDAD); return List.of(); });
 
         assertThatThrownBy(() -> evaluar(mala)).isInstanceOf(ParametroNoDeclaradoException.class);
-    }
-
-    @Test
-    void laFirmaPuenteDelegaEnEvaluateViejoParaLasReglasSinMigrar() {
-        // Una regla que sólo implementa evaluate(ctx): el default de evaluate(ctx, ev) la llama.
-        Rule sinMigrar = new Rule() {
-            @Override public int priority() { return 10; }
-            @Override public String name() { return "SinMigrar"; }
-            @Override public List<RuleAction> evaluate(RuleContext c) {
-                return List.of(RuleAction.of(ActionType.NOOP_INFO, "SinMigrar", "ok"));
-            }
-        };
-
-        ResultadoEvaluacion r = evaluar(sinMigrar);
-
-        assertThat(r.acciones()).hasSize(1);
-        assertThat(de(r, "SinMigrar").estado()).isEqualTo(EstadoRegla.EVALUADA);
-        assertThat(de(r, "SinMigrar").comparaciones()).isEmpty();
-    }
-
-    @Test
-    void bloqueadaPor_quedaLaPrimeraReglaQueCortoLaRama() {
-        // Dos reglas GLOBAL (no las omite el corte de rama) que cortan RIEGO una detrás de otra.
-        Rule primera = new ReglaFalsa("Primera", 1, RuleBranch.GLOBAL, ActionType.ABORT_RIEGO);
-        Rule segunda = new ReglaFalsa("Segunda", 2, RuleBranch.GLOBAL, ActionType.POSTPONE_RIEGO);
-        Rule riego = new ReglaFalsa("Riego", 10, RuleBranch.RIEGO, ActionType.ACTIVAR_VALVULA);
-        Rule insumoA = new ReglaFalsa("InsumoA", 3, RuleBranch.GLOBAL, ActionType.ABORT_INSUMO);
-        Rule insumoB = new ReglaFalsa("InsumoB", 4, RuleBranch.GLOBAL, ActionType.ABORT_INSUMO);
-        Rule abasto = new ReglaFalsa("Abasto", 12, RuleBranch.INSUMO, ActionType.ACTIVAR_BOMBA);
-
-        ResultadoEvaluacion r = evaluar(primera, segunda, insumoA, insumoB, riego, abasto);
-
-        assertThat(de(r, "Riego").bloqueadaPor()).isEqualTo("Primera");
-        assertThat(de(r, "Abasto").bloqueadaPor()).isEqualTo("InsumoA");
-    }
-
-    @Test
-    void unaReglaQueLanza_dejaLaTrazaParcialEnElStoreYRelanzaLaMismaExcepcion() {
-        Rule antes = new ReglaFalsa("Antes", 1, RuleBranch.GLOBAL, ActionType.NOOP_INFO);
-        Rule mala = new ReglaFalsa("Mala", 10, RuleBranch.RIEGO, List.of(ParametrosRiego.UMBRAL_HUMEDAD),
-                (c, ev) -> {
-                    ev.comparar("Humedad", 38.0, Operador.LT, ParametrosRiego.UMBRAL_HUMEDAD);
-                    throw new IllegalStateException("explotó");
-                });
-        Rule despues = new ReglaFalsa("Despues", 20, RuleBranch.MEDIASOMBRA, ActionType.MOVER_MEDIASOMBRA);
-        // Una traza vieja y sana que no debe seguir siendo "la última".
-        store.guardar(new com.yerbanalytics.backend.engine.traza.TrazaEvaluacion("MZ-2-006", "MZ-2",
-                OrigenEvaluacion.TELEMETRIA, java.time.Instant.EPOCH, "viejo", List.of()));
-
-        assertThatThrownBy(() -> evaluar(antes, mala, despues))
-                .isInstanceOf(IllegalStateException.class).hasMessage("explotó");
-
-        var traza = store.ultima("MZ-2-006", OrigenEvaluacion.TELEMETRIA).orElseThrow();
-        assertThat(traza.parametrosHash()).isNotEqualTo("viejo");
-        assertThat(traza.reglas()).extracting(TrazaRegla::ruleId).containsExactly("Antes", "Mala", "Despues");
-        assertThat(de(traza, "Antes").estado()).isEqualTo(EstadoRegla.EVALUADA);
-        assertThat(de(traza, "Mala").estado()).isEqualTo(EstadoRegla.ERROR);
-        assertThat(de(traza, "Mala").error()).contains("IllegalStateException").contains("explotó");
-        assertThat(de(traza, "Mala").comparaciones()).hasSize(1);
-        assertThat(de(traza, "Despues").estado()).isEqualTo(EstadoRegla.NO_ALCANZADA);
-        assertThat(de(traza, "Despues").bloqueadaPor()).isEqualTo("Mala");
-    }
-
-    private static TrazaRegla de(com.yerbanalytics.backend.engine.traza.TrazaEvaluacion t, String regla) {
-        return t.reglas().stream().filter(x -> x.ruleId().equals(regla)).findFirst().orElseThrow();
     }
 }

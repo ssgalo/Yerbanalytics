@@ -85,28 +85,28 @@ Una regla por tarea. En cada una: el test nuevo verifica **acciones iguales a la
 comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx, ev)`, declara sus
 `parametros()` y deja de leer `@Value`/literales/`configuracion_operativa`.
 
-- [ ] 4.1 `ManualLockRule`: sin parámetros; traza con la condición fija "bloqueo manual activo".
-- [ ] 4.2 `StaleSensorRule`: calcula la antigüedad con `ctx.zona().getLastReadingTime()` y
+- [x] 4.1 `ManualLockRule`: sin parámetros; traza con la condición fija "bloqueo manual activo".
+- [x] 4.2 `StaleSensorRule`: calcula la antigüedad con `ctx.zona().getLastReadingTime()` y
       `ctx.now()` contra `seguridad.antiguedad-max-lectura`; sin lectura → `SIN_DATO` y bloquea
       (igual que hoy). Quitar `sensorStale` de `RuleContext` y de `RuleContextTestFactory`;
       `NurseryService` (vista, `:95-121` y `:531-533`) y `NurseryWatchdog` leen el umbral del
       catálogo. Quitar `stale-threshold-ms` de `application.properties`.
-- [ ] 4.3 `WeatherOverrideRule` → `riego.lluvia-probabilidad`; sin pronóstico → `SIN_DATO` y sigue.
+- [x] 4.3 `WeatherOverrideRule` → `riego.lluvia-probabilidad`; sin pronóstico → `SIN_DATO` y sigue.
       Quitar `rain-threshold-pct`.
-- [ ] 4.4 `DailyVolumeLimitRule` → `riego.max-riegos-24h`.
-- [ ] 4.5 `DailyDoseLimitRule` → `insumo.max-dosis-24h`.
-- [ ] 4.6 `IrrigationRule` → `riego.umbral-humedad`, `riego.max-riegos-24h-sector`,
+- [x] 4.4 `DailyVolumeLimitRule` → `riego.max-riegos-24h`.
+- [x] 4.5 `DailyDoseLimitRule` → `insumo.max-dosis-24h`.
+- [x] 4.6 `IrrigationRule` → `riego.umbral-humedad`, `riego.max-riegos-24h-sector`,
       `riego.tiempo-max-apertura`. Test extra: cambiar `idealMin` de `humSus` **no** cambia la
       decisión. Borrar `ConfiguracionService.getRiegoHumSusUmbral()` y el fallback 40
       (`IrrigationRule.java:41`). Primer test de esta regla en el repo.
-- [ ] 4.7 `SupplyRule` → `diagnostico.confianza-minima` + condición fija `estado == critical`.
+- [x] 4.7 `SupplyRule` → `diagnostico.confianza-minima` + condición fija `estado == critical`.
       `DiagnosticoService.esConcluyente` lee el mismo parámetro; quitar `confianzaMinima` de
       `CapturaProperties` y `capturas.confianza-minima` de `application.properties`. Primer test
       de esta regla en el repo.
-- [ ] 4.8 `ShadingRule` → `mediasombra.uv-umbral`, `mediasombra.apertura-proteccion-uv`,
+- [x] 4.8 `ShadingRule` → `mediasombra.uv-umbral`, `mediasombra.apertura-proteccion-uv`,
       `mediasombra.apertura-maxima`. Conserva el `@Value` de `sowing-date-iso` (excepción de D7).
-- [ ] 4.9 `FollowUpRule`: sin parámetros ni comparaciones; la traza registra sólo su acción.
-- [ ] 4.10 Test de arquitectura: ninguna clase en `engine/rules/` tiene `@Value` salvo
+- [x] 4.9 `FollowUpRule`: sin parámetros ni comparaciones; la traza registra sólo su acción.
+- [x] 4.10 Test de arquitectura: ninguna clase en `engine/rules/` tiene `@Value` salvo
       `ShadingRule.sowingDateIso`, y toda regla registrada implementa `evaluate(ctx, ev)`. Borrar
       la firma vieja `evaluate(ctx)` de `Rule`.
 

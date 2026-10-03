@@ -18,7 +18,6 @@ import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Service;
@@ -58,7 +57,6 @@ public class NurseryWatchdog implements SchedulingConfigurer {
     private final WeatherService weatherService;
     private final ManualLockRepository manualLockRepository;
     private final TrazaEvaluacionStore trazaStore;
-    private final long staleThresholdMs;
 
     public NurseryWatchdog(ZonaRepository zonaRepository,
                            SectorRepository sectorRepository,
@@ -67,8 +65,7 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                            ConfiguracionService configuracionService,
                            WeatherService weatherService,
                            ManualLockRepository manualLockRepository,
-                           TrazaEvaluacionStore trazaStore,
-                           @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs) {
+                           TrazaEvaluacionStore trazaStore) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.ruleOrchestrator = ruleOrchestrator;
@@ -77,7 +74,6 @@ public class NurseryWatchdog implements SchedulingConfigurer {
         this.weatherService = weatherService;
         this.manualLockRepository = manualLockRepository;
         this.trazaStore = trazaStore;
-        this.staleThresholdMs = staleThresholdMs;
     }
 
     @Override
@@ -136,15 +132,13 @@ public class NurseryWatchdog implements SchedulingConfigurer {
         int totalSectores = 0;
 
         for (ZonaEntity zona : zonas) {
-            boolean sensorStale = zona.getLastReadingTime() == null
-                    || (ahoraMs - zona.getLastReadingTime() > staleThresholdMs);
             boolean zonaBloqueada = zonasBloqueadas.contains(zona.getId());
 
             for (SectorEntity sector : zona.getSectors()) {
                 boolean bloqueoActivo = zonaBloqueada || sectoresBloqueados.contains(sector.getId());
 
                 // En el ciclo proactivo usamos las métricas derivadas del último estado conocido.
-                // Si el sensor está stale, las métricas serán nulas y StaleSensorRule actuará.
+                // Si el sensor está stale (StaleSensorRule lo calcula con zona.lastReadingTime), actúa ella.
                 RuleContext ctx = new RuleContext(
                         sector,
                         zona,
@@ -153,7 +147,6 @@ public class NurseryWatchdog implements SchedulingConfigurer {
                         operativa,
                         sector.getStatus(),
                         ahora,
-                        sensorStale,
                         forecast,
                         bloqueoActivo
                 );

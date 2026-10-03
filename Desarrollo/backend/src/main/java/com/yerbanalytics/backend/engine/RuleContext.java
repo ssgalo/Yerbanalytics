@@ -29,13 +29,6 @@ public record RuleContext(
         // --- Campos incorporados en fases R1/R2/R3 ---
 
         /**
-         * {@code true} si el nodo testigo de la macro-zona no reportó telemetría
-         * dentro del umbral configurado ({@code yerbanalytics.nursery.stale-threshold-ms}).
-         * Evaluado por {@code StaleSensorRule}.
-         */
-        boolean sensorStale,
-
-        /**
          * Pronóstico climático obtenido por {@code WeatherService} (R2/HU-09).
          * Puede ser {@code null} si la API externa no respondió — el motor opera
          * en modo degradado sin cancelar la evaluación.

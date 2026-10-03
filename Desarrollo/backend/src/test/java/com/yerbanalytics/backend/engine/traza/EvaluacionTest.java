@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.traza;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
@@ -32,7 +33,7 @@ class EvaluacionTest {
             @Override public int priority() { return 10; }
             @Override public String name() { return "ReglaFalsa"; }
             @Override public List<DefinicionParametro> parametros() { return List.of(UMBRAL); }
-            @Override public List<RuleAction> evaluate(RuleContext ctx) { return List.of(); }
+            @Override public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) { return List.of(); }
         };
     }
 

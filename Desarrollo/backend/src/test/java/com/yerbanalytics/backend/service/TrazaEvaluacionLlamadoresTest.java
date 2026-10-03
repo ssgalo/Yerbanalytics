@@ -7,6 +7,7 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.when;
 class TrazaEvaluacionLlamadoresTest {
 
     private TrazaEvaluacionStore store;
+    private CatalogoParametrosService parametros;
     private ActionExecutor actionExecutor;
     private HistorialService historialService;
     private ConfiguracionService configuracionService;
@@ -68,13 +70,13 @@ class TrazaEvaluacionLlamadoresTest {
         weatherService = mock(WeatherService.class);
         manualLockRepository = mock(ManualLockRepository.class);
 
-        CatalogoParametrosService parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(ParametrosVigentes.de(Map.of()));
+        parametros = mock(CatalogoParametrosService.class);
+        when(parametros.vigentes()).thenReturn(com.yerbanalytics.backend.engine.ReglaTestSupport.fabrica());
         Rule regla = new Rule() {
             @Override public int priority() { return 10; }
             @Override public String name() { return "ReglaFalsa"; }
             @Override public RuleBranch branch() { return RuleBranch.RIEGO; }
-            @Override public List<RuleAction> evaluate(RuleContext ctx) {
+            @Override public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
                 return List.of(RuleAction.noopInfo("ReglaFalsa", "nada que hacer"));
             }
         };
@@ -95,7 +97,7 @@ class TrazaEvaluacionLlamadoresTest {
         NurseryService service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 historialService, configuracionService, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
-                manualLockRepository, mock(DiagnosticoService.class), store, 30_000L, 20);
+                manualLockRepository, mock(DiagnosticoService.class), store, parametros, 20);
 
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, System.currentTimeMillis(),
                 new MqttTelemetryPayload.MetricsPayload(38.0, 70.0, 22.0, 20.0, 40.0, null, null, null, null, null)));
@@ -135,7 +137,7 @@ class TrazaEvaluacionLlamadoresTest {
                 RuleContextTestFactory.basico(s1, zona), OrigenEvaluacion.TELEMETRIA).traza());
         when(zonaRepository.findAllWithSectors()).thenReturn(List.of(zona));
         NurseryWatchdog watchdog = new NurseryWatchdog(zonaRepository, sectorRepository, orchestrator,
-                actionExecutor, configuracionService, weatherService, manualLockRepository, store, 30_000L);
+                actionExecutor, configuracionService, weatherService, manualLockRepository, store);
 
         watchdog.evaluarTodos();
 

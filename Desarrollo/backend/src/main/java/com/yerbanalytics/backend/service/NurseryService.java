@@ -7,6 +7,8 @@ import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
@@ -46,7 +48,7 @@ public class NurseryService {
     private final ManualLockRepository manualLockRepository;
     private final DiagnosticoService diagnosticoService;
     private final TrazaEvaluacionStore trazaStore;
-    private final long staleThresholdMs;
+    private final CatalogoParametrosService parametros;
     private final int bateriaMinPct;
 
     public NurseryService(NurseryProperties properties,
@@ -62,7 +64,7 @@ public class NurseryService {
                           ManualLockRepository manualLockRepository,
                           DiagnosticoService diagnosticoService,
                           TrazaEvaluacionStore trazaStore,
-                          @Value("${yerbanalytics.nursery.stale-threshold-ms}") long staleThresholdMs,
+                          CatalogoParametrosService parametros,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
@@ -76,7 +78,7 @@ public class NurseryService {
         this.manualLockRepository = manualLockRepository;
         this.diagnosticoService = diagnosticoService;
         this.trazaStore = trazaStore;
-        this.staleThresholdMs = staleThresholdMs;
+        this.parametros = parametros;
         this.bateriaMinPct = bateriaMinPct;
     }
 
@@ -99,7 +101,7 @@ public class NurseryService {
             // La lectura es de la zona: un solo nodo testigo la produce y sus 100 sectores
             // la comparten. Si el nodo dejó de reportar, toda la zona queda fuera de servicio.
             boolean isStale = ze.getLastReadingTime() == null
-                    || (System.currentTimeMillis() - ze.getLastReadingTime() > staleThresholdMs);
+                    || (System.currentTimeMillis() - ze.getLastReadingTime() > umbralAntiguedadMs());
             List<Metric> zoneMetrics = isStale ? buildOfflineMetricsList() : buildMetricsList(ze);
             String zoneAgo = ze.getLastReadingTime() == null ? "hace —" : formatAgo(ze.getLastReadingTime());
             agoPorZona.put(ze.getId(), zoneAgo);
@@ -530,17 +532,12 @@ public class NurseryService {
      *
      * <p>Puebla todos los campos del snapshot:
      * <ul>
-     *   <li>{@code sensorStale} — derivado del {@code lastReadingTime} de la zona.</li>
-     *   <li>{@code forecast} — obtenido de {@link WeatherService} (puede ser null en modo degradado).</li>
+         *   <li>{@code forecast} — obtenido de {@link WeatherService} (puede ser null en modo degradado).</li>
      *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
      * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus) {
         ZonaEntity zona = s.getZona();
-        boolean sensorStale = zona == null
-                || zona.getLastReadingTime() == null
-                || (System.currentTimeMillis() - zona.getLastReadingTime() > staleThresholdMs);
-
         WeatherForecast forecast = weatherService.getForecast();
 
         boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
@@ -554,10 +551,18 @@ public class NurseryService {
                 configuracionService.getConfiguracionOperativa(),
                 finalStatus,
                 Instant.now(),
-                sensorStale,
                 forecast,
                 bloqueoActivo
         );
+    }
+
+    /**
+     * Antigüedad máxima de la lectura de una zona, en ms, según el catálogo de parámetros
+     * ({@code seguridad.antiguedad-max-lectura}, en segundos): el mismo valor que usa
+     * {@code StaleSensorRule}, así la vista y el motor no pueden discrepar.
+     */
+    private long umbralAntiguedadMs() {
+        return (long) (parametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA) * 1000);
     }
 
     /** Evalúa la lectura de la macro-zona contra los umbrales vigentes. */

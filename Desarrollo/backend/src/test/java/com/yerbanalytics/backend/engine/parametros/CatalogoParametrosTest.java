@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine.parametros;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ class CatalogoParametrosTest {
             @Override public int priority() { return 1; }
             @Override public String name() { return nombre; }
             @Override public List<DefinicionParametro> parametros() { return List.of(params); }
-            @Override public List<RuleAction> evaluate(RuleContext ctx) { return List.of(); }
+            @Override public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) { return List.of(); }
         };
     }
 

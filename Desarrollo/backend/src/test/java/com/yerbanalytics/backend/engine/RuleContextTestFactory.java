@@ -28,28 +28,21 @@ public final class RuleContextTestFactory {
                 defaultConfig(),
                 "ok",
                 Instant.now(),
-                false,       // sensorStale
                 null,        // forecast
                 false        // bloqueoManualActivo
         );
     }
 
-    public static RuleContext conSensorStale(SectorEntity sector, ZonaEntity zona, boolean stale) {
-        return new RuleContext(
-                sector, zona, List.of(), List.of(), defaultConfig(),
-                "ok", Instant.now(), stale, null, false);
-    }
-
     public static RuleContext conForecast(SectorEntity sector, ZonaEntity zona, WeatherForecast forecast) {
         return new RuleContext(
                 sector, zona, List.of(), List.of(), defaultConfig(),
-                "ok", Instant.now(), false, forecast, false);
+                "ok", Instant.now(), forecast, false);
     }
 
     public static RuleContext conBloqueo(SectorEntity sector, ZonaEntity zona, boolean bloqueo) {
         return new RuleContext(
                 sector, zona, List.of(), List.of(), defaultConfig(),
-                "ok", Instant.now(), false, null, bloqueo);
+                "ok", Instant.now(), null, bloqueo);
     }
 
     public static ConfiguracionOperativaEntity defaultConfig() {

@@ -54,22 +54,13 @@ public interface Rule {
     }
 
     /**
-     * Evalúa la regla contra el snapshot inmutable del sector.
+     * Evalúa la regla contra el snapshot inmutable del sector. Los umbrales se leen y se comparan
+     * a través de la {@link Evaluacion}, que sólo deja leer los {@link #parametros()} declarados y
+     * registra cada comparación en la traza: decidir y registrar son el mismo gesto.
      *
      * @param ctx snapshot del sector en el ciclo de evaluación actual (nunca null)
+     * @param ev  lectura de parámetros y registro de comparaciones de esta regla en este ciclo
      * @return lista de acciones a ejecutar; nunca null, puede ser vacía
      */
-    List<RuleAction> evaluate(RuleContext ctx);
-
-    /**
-     * Evalúa la regla leyendo sus parámetros y comparando a través de la {@link Evaluacion}, que
-     * registra cada comparación en la traza. Es lo que invoca el orquestador.
-     *
-     * <p>Firma puente de la migración al catálogo: por defecto delega en {@link #evaluate(RuleContext)},
-     * así una regla sin migrar sigue funcionando (con traza sin comparaciones). Cada regla migrada
-     * sobreescribe esta; la última tanda borra la firma vieja.
-     */
-    default List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
-        return evaluate(ctx);
-    }
+    List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev);
 }

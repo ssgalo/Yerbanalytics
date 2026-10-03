@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,7 +67,7 @@ class CatalogoParametrosServiceTest {
             @Override public String label() { return "Etiqueta " + nombre; }
             @Override public RuleBranch branch() { return rama; }
             @Override public List<DefinicionParametro> parametros() { return List.of(params); }
-            @Override public List<RuleAction> evaluate(RuleContext ctx) { return List.of(); }
+            @Override public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) { return List.of(); }
         };
     }
 

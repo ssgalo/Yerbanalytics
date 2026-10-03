@@ -296,16 +296,6 @@ public class ConfiguracionService {
         return out;
     }
 
-    /** Umbral mínimo de humedad de sustrato (idealMin) que dispara el riego. */
-    public double getRiegoHumSusUmbral() {
-        for (MetricSpec sp : getEffectiveSpecs()) {
-            if ("humSus".equals(sp.key())) {
-                return sp.ideal()[0];
-            }
-        }
-        return 42.0; // fallback de fábrica
-    }
-
     /**
      * Devuelve la entidad de configuración operativa para uso del motor de reglas.
      * Las reglas consumen esta entidad como input de solo lectura a través del {@link com.yerbanalytics.backend.engine.RuleContext}.

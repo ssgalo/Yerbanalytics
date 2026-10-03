@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +67,7 @@ public class FollowUpRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
         try {
             historialService.evaluarSeguimiento();
             log.debug("FollowUpRule: follow-up evaluation completed for sector {}.", ctx.sector().getId());

@@ -5,8 +5,11 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
-import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.RustificacionEtapaEntity;
 import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import org.slf4j.Logger;
@@ -29,7 +32,7 @@ import java.util.List;
  * emits {@code MOVER_MEDIASOMBRA} with the target percentage.
  *
  * <p><b>Secondary condition — UV peak (overrides plan):</b> if the forecast UV index exceeds
- * the configured threshold ({@code yerbanalytics.engine.uv-umbral}), the opening is reduced
+ * the threshold {@code mediasombra.uv-umbral} of the parameter catalog, the opening is reduced
  * to the protective maximum, overriding the plan if necessary.
  *
  * <p><b>Action when no change needed:</b> {@code NOOP_INFO}.
@@ -46,15 +49,13 @@ public class ShadingRule implements Rule {
     private static final String NAME = "ShadingRule";
 
     private final RustificacionEtapaRepository hardeningStageRepository;
-    private final double uvThreshold;
+    /** Dato del lote, no umbral: única excepción que conserva su {@code @Value} (design D7). */
     private final String sowingDateIso;
 
     public ShadingRule(
             RustificacionEtapaRepository hardeningStageRepository,
-            @Value("${yerbanalytics.engine.uv-threshold:7.0}") double uvThreshold,
             @Value("${yerbanalytics.nursery.sowing-date-iso:}") String sowingDateIso) {
         this.hardeningStageRepository = hardeningStageRepository;
-        this.uvThreshold = uvThreshold;
         this.sowingDateIso = sowingDateIso;
     }
 
@@ -79,15 +80,24 @@ public class ShadingRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
-        ConfiguracionOperativaEntity config = ctx.config();
-        double maxOpening = config != null ? config.getMediasombraAperturaMaxPct() : 100.0;
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosMediasombra.UV_UMBRAL,
+                ParametrosMediasombra.APERTURA_PROTECCION_UV,
+                ParametrosMediasombra.APERTURA_MAXIMA);
+    }
+
+    @Override
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
+        double maxOpening = ev.numero(ParametrosMediasombra.APERTURA_MAXIMA);
         int currentOpening = ctx.sector().getActuadorShade();
 
         // --- Secondary condition: UV peak overrides the plan ---
         WeatherForecast forecast = ctx.forecast();
-        if (forecast != null && forecast.uvIndex() >= uvThreshold) {
-            int protectiveOpening = (int) Math.min(30.0, maxOpening);
+        boolean picoUv = ev.comparar("Índice UV pronosticado", forecast != null ? forecast.uvIndex() : null,
+                Operador.GE, ParametrosMediasombra.UV_UMBRAL);
+        if (picoUv) {
+            double uvThreshold = ev.numero(ParametrosMediasombra.UV_UMBRAL);
+            int protectiveOpening = (int) Math.min(ev.numero(ParametrosMediasombra.APERTURA_PROTECCION_UV), maxOpening);
             if (currentOpening != protectiveOpening) {
                 String reason = String.format(
                         "Pico de radiación UV detectado (índice %.1f ≥ umbral %.1f). " +

@@ -4,6 +4,10 @@ import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -13,9 +17,9 @@ import java.util.List;
  *
  * <p><b>Prioridad:</b> 1 (segunda en correr, después de {@link ManualLockRule}).
  *
- * <p><b>Condición:</b> {@link RuleContext#sensorStale()} es {@code true}, es decir,
- * el nodo testigo de la macro-zona no reportó dentro del umbral configurado en
- * {@code yerbanalytics.nursery.stale-threshold-ms}.
+ * <p><b>Condición:</b> la última lectura de la macro-zona ({@code zona.lastReadingTime}) es más
+ * vieja que {@code seguridad.antiguedad-max-lectura} (catálogo de parámetros), o no hay lectura
+ * (queda como {@code SIN_DATO} en la traza y bloquea igual).
  *
  * <p><b>Acción si se cumple:</b> {@code ABORT_RIEGO} — el motor detiene toda actuación
  * de riego para el sector. Regar sin lectura válida puede causar encharcamiento o
@@ -46,8 +50,17 @@ public class StaleSensorRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
-        if (ctx.sensorStale()) {
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
+    }
+
+    @Override
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
+        Double antiguedad = antiguedadSegundos(ctx);
+        boolean vieja = ev.comparar("Antigüedad de la última lectura", antiguedad, Operador.GT,
+                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
+        // Sin lectura no hay nada que comparar, pero tampoco se puede regar a ciegas.
+        if (antiguedad == null || vieja) {
             String zonaId = ctx.zona() != null ? ctx.zona().getId() : "desconocida";
             String motivo = String.format(
                     "El nodo testigo de la macro-zona %s no reportó dentro del umbral " +
@@ -58,5 +71,13 @@ public class StaleSensorRule implements Rule {
 
         return List.of(RuleAction.noopInfo(NAME,
                 "Telemetría fresca: el nodo reportó dentro del umbral configurado."));
+    }
+
+    /** Segundos desde la última lectura de la zona, o {@code null} si no hay zona o nunca reportó. */
+    private static Double antiguedadSegundos(RuleContext ctx) {
+        if (ctx.zona() == null || ctx.zona().getLastReadingTime() == null) {
+            return null;
+        }
+        return (ctx.now().toEpochMilli() - ctx.zona().getLastReadingTime()) / 1000.0;
     }
 }

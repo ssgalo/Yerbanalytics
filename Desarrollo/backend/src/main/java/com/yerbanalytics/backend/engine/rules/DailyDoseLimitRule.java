@@ -5,6 +5,10 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosInsumo;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import org.springframework.stereotype.Component;
@@ -18,8 +22,8 @@ import java.util.List;
  * the security and weather rules.
  *
  * <p><b>Condition:</b> the sector has already received a supply dose in the last 24 hours
- * and the number of doses exceeds the maximum configured in
- * {@link ConfiguracionOperativaEntity#getInsumoDosisMax24hMl()}.
+ * and the number of doses reaches the maximum of the parameter catalog
+ * ({@code insumo.max-dosis-24h}).
  *
  * <p><b>Simplified implementation:</b> the {@code insumoDosisMax24hMl} field represents
  * the maximum daily supply volume. Since the system does not yet track exact volume per dose,
@@ -65,7 +69,12 @@ public class DailyDoseLimitRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosInsumo.MAX_DOSIS_24H);
+    }
+
+    @Override
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
         ConfiguracionOperativaEntity config = ctx.config();
 
         if (config == null) {
@@ -77,7 +86,8 @@ public class DailyDoseLimitRule implements Rule {
         long dosesIn24h = historialRepository.countByTipoAndSectorAndPeriod(
                 ctx.sector().getId(), "Insumo", since);
 
-        if (dosesIn24h > 0) {
+        if (ev.comparar("Dosificaciones en las últimas 24 h", (double) dosesIn24h, Operador.GE,
+                ParametrosInsumo.MAX_DOSIS_24H)) {
             String reason = String.format(
                     "El sector %s ya recibió %d dosificación(es) de insumo en las últimas 24 h. " +
                     "Límite diario alcanzado (máx. configurado: %.0f ml). " +

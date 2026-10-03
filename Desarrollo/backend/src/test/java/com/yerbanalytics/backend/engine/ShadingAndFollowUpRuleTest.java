@@ -1,6 +1,10 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
 import com.yerbanalytics.backend.engine.rules.ShadingRule;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
+import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
 import com.yerbanalytics.backend.engine.rules.FollowUpRule;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.RustificacionEtapaEntity;
@@ -20,6 +24,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.ev;
+import static com.yerbanalytics.backend.engine.ReglaTestSupport.evaluar;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -51,10 +57,10 @@ class ShadingAndFollowUpRuleTest {
     @Test
     @DisplayName("ShadingRule: sin fecha de siembra → NOOP_INFO")
     void sinFechaSiembra_noopInfo() {
-        ShadingRule rule = new ShadingRule(rustificacionRepository, 7.0, "");
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
         RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
@@ -63,11 +69,11 @@ class ShadingAndFollowUpRuleTest {
     @Test
     @DisplayName("ShadingRule: pico UV sobre umbral → MOVER_MEDIASOMBRA protector")
     void picoUV_moverMediasombraProtector() {
-        ShadingRule rule = new ShadingRule(rustificacionRepository, 7.0, "");
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
         WeatherForecast forecast = new WeatherForecast(10.0, 9.5, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of()); // UV > 7
         RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.MOVER_MEDIASOMBRA);
@@ -78,14 +84,14 @@ class ShadingAndFollowUpRuleTest {
     @DisplayName("ShadingRule: apertura ya correcta según plan → NOOP_INFO")
     void aperturaYaCorrecta_noopInfo() {
         String hoy = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
-        ShadingRule rule = new ShadingRule(rustificacionRepository, 7.0, hoy);
+        ShadingRule rule = new ShadingRule(rustificacionRepository, hoy);
         // sector tiene apertura 50%, plan dice 50%
         sector.setActuadorShade(50);
         when(rustificacionRepository.findAllByOrderByOrdenAsc())
                 .thenReturn(List.of(new RustificacionEtapaEntity(1, 1, 365, 50)));
 
         RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
@@ -95,17 +101,64 @@ class ShadingAndFollowUpRuleTest {
     @DisplayName("ShadingRule: apertura diferente al plan → MOVER_MEDIASOMBRA")
     void aperturaDiferenteAlPlan_moverMediasombra() {
         String hoy = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
-        ShadingRule rule = new ShadingRule(rustificacionRepository, 7.0, hoy);
+        ShadingRule rule = new ShadingRule(rustificacionRepository, hoy);
         sector.setActuadorShade(30); // actual 30%, plan dice 60%
         when(rustificacionRepository.findAllByOrderByOrdenAsc())
                 .thenReturn(List.of(new RustificacionEtapaEntity(1, 1, 365, 60)));
 
         RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.MOVER_MEDIASOMBRA);
         assertThat(acciones.get(0).motivo()).contains("[apertura=60]");
+    }
+
+    @Test
+    @DisplayName("ShadingRule: declara sus tres parámetros y registra el UV contra el umbral")
+    void declaraLosParametrosYRegistraElUv() {
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
+        WeatherForecast forecast = new WeatherForecast(10.0, 9.5, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of());
+        Evaluacion ev = ev(rule);
+
+        rule.evaluate(RuleContextTestFactory.conForecast(sector, zona, forecast), ev);
+
+        assertThat(rule.parametros()).containsExactly(ParametrosMediasombra.UV_UMBRAL,
+                ParametrosMediasombra.APERTURA_PROTECCION_UV, ParametrosMediasombra.APERTURA_MAXIMA);
+        assertThat(ev.comparaciones()).hasSize(1);
+        assertThat(ev.comparaciones().get(0).recibido()).isEqualTo(9.5);
+        assertThat(ev.comparaciones().get(0).operador()).isEqualTo(Operador.GE);
+        assertThat(ev.comparaciones().get(0).umbral()).isEqualTo(7.0);
+        assertThat(ev.comparaciones().get(0).resultado()).isEqualTo(ResultadoComparacion.CUMPLE);
+    }
+
+    @Test
+    @DisplayName("ShadingRule: sin pronóstico el UV queda SIN_DATO")
+    void sinPronosticoElUvQuedaSinDato() {
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
+        Evaluacion ev = ev(rule);
+
+        rule.evaluate(RuleContextTestFactory.basico(sector, zona), ev);
+
+        assertThat(ev.comparaciones().get(0).resultado()).isEqualTo(ResultadoComparacion.SIN_DATO);
+    }
+
+    @Test
+    @DisplayName("ShadingRule: umbral UV, apertura protectora y apertura máxima salen del catálogo")
+    void losParametrosSalenDelCatalogo() {
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
+        WeatherForecast forecast = new WeatherForecast(10.0, 8.0, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of());
+        RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
+
+        // UV 8 < umbral 9: no es pico.
+        assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.UV_UMBRAL, "9"))).get(0).type())
+                .isEqualTo(ActionType.NOOP_INFO);
+        // Apertura protectora 40 %.
+        assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.APERTURA_PROTECCION_UV, "40"))).get(0).motivo())
+                .contains("[apertura=40]");
+        // El tope de apertura (20 %) manda sobre la protectora (30 %).
+        assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.APERTURA_MAXIMA, "20"))).get(0).motivo())
+                .contains("[apertura=20]");
     }
 
     // ===== FollowUpRule =====
@@ -116,10 +169,22 @@ class ShadingAndFollowUpRuleTest {
         FollowUpRule rule = new FollowUpRule(historialService);
         RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
 
-        List<RuleAction> acciones = rule.evaluate(ctx);
+        List<RuleAction> acciones = evaluar(rule, ctx);
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
+    }
+
+    @Test
+    @DisplayName("FollowUpRule: sin parámetros ni comparaciones")
+    void seguimientoRule_sinParametrosNiComparaciones() {
+        FollowUpRule rule = new FollowUpRule(historialService);
+        Evaluacion ev = ev(rule);
+
+        rule.evaluate(RuleContextTestFactory.basico(sector, zona), ev);
+
+        assertThat(rule.parametros()).isEmpty();
+        assertThat(ev.comparaciones()).isEmpty();
     }
 
     @Test

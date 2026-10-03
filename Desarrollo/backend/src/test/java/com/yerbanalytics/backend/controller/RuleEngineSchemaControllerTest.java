@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
@@ -41,7 +42,7 @@ class RuleEngineSchemaControllerTest {
             @Override public String name() { return nombre; }
             @Override public RuleBranch branch() { return rama; }
             @Override public List<DefinicionParametro> parametros() { return List.of(params); }
-            @Override public List<RuleAction> evaluate(RuleContext ctx) { return List.of(); }
+            @Override public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) { return List.of(); }
         };
     }
 

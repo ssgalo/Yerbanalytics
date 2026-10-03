@@ -5,8 +5,11 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,7 +21,7 @@ import java.util.List;
  * before the irrigation and supply execution rules.
  *
  * <p><b>Condition:</b> the weather forecast ({@link RuleContext#forecast()}) is not
- * {@code null} and the rain probability exceeds the configured threshold.
+ * {@code null} and the rain probability reaches the threshold ({@code riego.lluvia-probabilidad}).
  *
  * <p><b>Action when rain is imminent:</b> {@code POSTPONE_RIEGO} (blocking) — autonomous
  * irrigation is postponed to avoid combining artificial watering with natural rainfall.
@@ -34,13 +37,6 @@ public class WeatherOverrideRule implements Rule {
 
     private static final int PRIORITY = 2;
     private static final String NAME = "WeatherOverrideRule";
-
-    private final double rainThresholdPct;
-
-    public WeatherOverrideRule(
-            @Value("${yerbanalytics.engine.rain-threshold-pct:60.0}") double rainThresholdPct) {
-        this.rainThresholdPct = rainThresholdPct;
-    }
 
     @Override
     public int priority() {
@@ -63,8 +59,17 @@ public class WeatherOverrideRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosRiego.LLUVIA_PROBABILIDAD);
+    }
+
+    @Override
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
         WeatherForecast forecast = ctx.forecast();
+        // Sin pronóstico la comparación queda como SIN_DATO y la cadena sigue (modo degradado).
+        boolean lluviaProbable = ev.comparar("Probabilidad de lluvia",
+                forecast != null ? forecast.probLluviaPct() : null, Operador.GE, ParametrosRiego.LLUVIA_PROBABILIDAD);
+        double rainThresholdPct = ev.numero(ParametrosRiego.LLUVIA_PROBABILIDAD);
 
         if (forecast == null) {
             return List.of(RuleAction.noopInfo(NAME,
@@ -72,7 +77,7 @@ public class WeatherOverrideRule implements Rule {
                     "el motor evalúa solo con sensores."));
         }
 
-        if (forecast.probLluviaPct() >= rainThresholdPct) {
+        if (lluviaProbable) {
             String reason = String.format(
                     "Lluvia inminente probable (%.0f%% ≥ umbral %.0f%%). " +
                     "Riego autónomo pospuesto para evitar combinación con lluvia natural.",

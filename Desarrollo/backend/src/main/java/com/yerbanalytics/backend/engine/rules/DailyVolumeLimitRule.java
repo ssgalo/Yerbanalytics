@@ -5,6 +5,10 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
+import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import org.springframework.stereotype.Component;
@@ -45,7 +49,12 @@ public class DailyVolumeLimitRule implements Rule {
     }
 
     @Override
-    public List<RuleAction> evaluate(RuleContext ctx) {
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosRiego.MAX_RIEGOS_24H);
+    }
+
+    @Override
+    public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
         ConfiguracionOperativaEntity config = ctx.config();
 
         if (config == null) {
@@ -58,7 +67,8 @@ public class DailyVolumeLimitRule implements Rule {
                 ctx.sector().getId(), "Riego", since);
 
         // Fallback logic until real volume integration
-        if (irrigationsIn24h >= 2) { 
+        if (ev.comparar("Riegos en las últimas 24 h", (double) irrigationsIn24h, Operador.GE,
+                ParametrosRiego.MAX_RIEGOS_24H)) {
             String reason = String.format(
                     "El sector %s ya recibió %d riegos en las últimas 24 h. " +
                     "Límite de volumen diario alcanzado. " +
