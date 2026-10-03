@@ -102,22 +102,22 @@ probadas sin registrarlas.
 
 ## 8. Cola y despacho (D4) — sin conectar a las reglas
 
-- [ ] 8.1 Test de `ColaRiego`: `solicitar` reemplaza la solicitud del sector; `retirar` la saca;
+- [x] 8.1 Test de `ColaRiego`: `solicitar` reemplaza la solicitud del sector; `retirar` la saca;
       `pendientes(zona)` sale ordenada por `sector.n`; acceso concurrente desde dos hilos no pierde
       solicitudes.
-- [ ] 8.2 Test de `ComandoActuadorPublisher`: arma el payload del contrato
+- [x] 8.2 Test de `ComandoActuadorPublisher`: arma el payload del contrato
       (`commandId`, `actuador`, `accion`, `parametros`) y propaga la falla del gateway como resultado
       (no la traga). Mover `publishCommand` de `ActionExecutor` (`ActionExecutor.java:148-169`);
       bomba y mediasombra siguen igual.
-- [ ] 8.3 Test de `DespachoRiego.tick()` (reloj fijo, repositorios falsos): 100 pendientes en MZ-2 →
+- [x] 8.3 Test de `DespachoRiego.tick()` (reloj fijo, repositorios falsos): 100 pendientes en MZ-2 →
       publica 10 (MZ-2-001…010), registra 10 "Riego" con volumen, duración, humedad y regla;
       siguiente tick sin vencimientos → 0; vence MZ-2-003 (+5 s) → abre MZ-2-011; dos zonas no se
       bloquean entre sí; `sectores-simultaneos` = 3 → nunca más de 3.
-- [ ] 8.4 Test: bloqueo manual activo del sector o de la MZ → la solicitud se descarta sin comando;
+- [x] 8.4 Test: bloqueo manual activo del sector o de la MZ → la solicitud se descarta sin comando;
       gateway que falla → no se registra el riego y la solicitud sigue.
-- [ ] 8.5 Test: tras "reiniciar" (despacho nuevo con el mismo historial) cuenta como en curso los
+- [x] 8.5 Test: tras "reiniciar" (despacho nuevo con el mismo historial) cuenta como en curso los
       riegos con `ts + duracionSeg + 5 s > ahora`.
-- [ ] 8.6 Test: `estadoValvula(sectorId)` → `Regando` / `En cola` / `Cerrada`; `HistorialService.registrarRiego(sector, detalle, regla, ts)`
+- [x] 8.6 Test: `estadoValvula(sectorId)` → `Regando` / `En cola` / `Cerrada`; `HistorialService.registrarRiego(sector, detalle, regla, ts)`
       guarda los campos nuevos y mantiene el seguimiento (`withSeguimiento`). Implementar.
 
 ## 9. Reglas nuevas (D1, D9.2, D10) — clases sin `@Component` todavía

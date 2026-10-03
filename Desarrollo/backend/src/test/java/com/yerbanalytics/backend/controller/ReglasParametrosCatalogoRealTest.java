@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
+import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,10 @@ class ReglasParametrosCatalogoRealTest {
 
     @Autowired
     private List<Rule> reglasRegistradas;
+
+    /** Quien lee parámetros: las reglas y también lo que ejecuta sin serlo (el despacho de riego). */
+    @Autowired
+    private List<ConsumidorParametros> consumidores;
 
     @Autowired
     private CatalogoParametros catalogo;
@@ -76,13 +81,16 @@ class ReglasParametrosCatalogoRealTest {
         assertThat(enJson).containsOnlyKeys(declarado.keySet().toArray(String[]::new));
         declarado.forEach((regla, ps) -> assertThat(enJson.get(regla)).as(regla).containsExactlyElementsOf(ps));
 
-        // Todo usadoPor nombra reglas que existen y que de verdad declaran ese parámetro.
+        // Todo usadoPor nombra consumidores (reglas o no) que existen y que de verdad declaran ese parámetro.
+        Map<String, List<String>> declaradoPorConsumidores = new LinkedHashMap<>();
+        consumidores.forEach(c -> declaradoPorConsumidores.put(c.name(),
+                c.parametros().stream().map(DefinicionParametro::clave).toList()));
         json.get("parametros").forEach(p -> {
             String clave = p.get("clave").asText();
             List<String> usadoPor = new ArrayList<>();
             p.get("usadoPor").forEach(x -> usadoPor.add(x.asText()));
             assertThat(usadoPor).as(clave).doesNotHaveDuplicates()
-                    .containsExactlyInAnyOrderElementsOf(declarado.entrySet().stream()
+                    .containsExactlyInAnyOrderElementsOf(declaradoPorConsumidores.entrySet().stream()
                             .filter(e -> e.getValue().contains(clave)).map(Map.Entry::getKey).toList());
         });
     }

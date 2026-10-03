@@ -1,17 +1,12 @@
 package com.yerbanalytics.backend.engine;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yerbanalytics.backend.mqtt.MqttCommandGateway;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,19 +40,12 @@ public class ActionExecutor {
     /** Extrae el tiempo máximo de riego del motivo de RiegoRule: {@code [tiempo-max-seg=N]}. */
     private static final Pattern TIEMPO_MAX_PATTERN = Pattern.compile("\\[tiempo-max-seg=(\\d+(?:\\.\\d+)?)\\]");
 
-    /** Tópico de comando por sector. Alineado con {@code contrato.h :: contratoTopicComando}. */
-    private static final String TOPIC_COMMAND = "nursery/zone/%s/sector/%s/command";
-
     private final HistorialService historialService;
-    private final MqttCommandGateway mqttCommandGateway;
-    private final ObjectMapper objectMapper;
+    private final ComandoActuadorPublisher publisher;
 
-    public ActionExecutor(HistorialService historialService,
-                          MqttCommandGateway mqttCommandGateway,
-                          ObjectMapper objectMapper) {
+    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher) {
         this.historialService = historialService;
-        this.mqttCommandGateway = mqttCommandGateway;
-        this.objectMapper = objectMapper;
+        this.publisher = publisher;
     }
 
     /**
@@ -127,44 +115,18 @@ public class ActionExecutor {
     // -------------------------------------------------------------------------
 
     /**
-     * Construye el JSON del comando según el contrato del embebido y lo publica
-     * al tópico del sector a través del {@link MqttCommandGateway}.
+     * Publica el comando al tópico del sector a través del {@link ComandoActuadorPublisher}.
      *
-     * <p>Formato del payload (alineado con {@code contrato.h}):
-     * <pre>
-     * {
-     *   "commandId": "uuid-v4",
-     *   "actuador":  "valve" | "pump" | "shade",
-     *   "accion":    "ON" | "OFF" | "SET",
-     *   "parametros": { ... }
-     * }
-     * </pre>
-     *
-     * <p>Si el gateway lanza una excepción (broker caído, canal lleno, etc.), se
-     * registra el error pero NO se frena la ejecución: el estado en base de datos
-     * ya fue actualizado y el historial ya fue escrito. El nodo actuará cuando
-     * recupere la conexión y el Watchdog proactivo reenvíe la orden.
+     * <p>Si la publicación falla (broker caído, canal lleno, etc.) se registra y NO se frena la
+     * ejecución: el estado en base de datos ya fue actualizado y el historial ya fue escrito.
      */
     private void publishCommand(RuleContext ctx, String actuador, String accion, Map<String, Object> parametros) {
         String zonaId   = ctx.zona() != null ? ctx.zona().getId() : "unknown";
         String sectorId = ctx.sector().getId();
-        String topic    = String.format(TOPIC_COMMAND, zonaId, sectorId);
-
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("commandId",  UUID.randomUUID().toString());
-        payload.put("actuador",   actuador);
-        payload.put("accion",     accion);
-        payload.put("parametros", parametros);
-
-        try {
-            String json = objectMapper.writeValueAsString(payload);
-            mqttCommandGateway.send(topic, json);
-            log.info("Sector {}: comando MQTT publicado → topic={} payload={}", sectorId, topic, json);
-        } catch (JsonProcessingException e) {
-            log.error("Sector {}: error serializando comando MQTT — {}", sectorId, e.getMessage());
-        } catch (Exception e) {
+        ComandoActuadorPublisher.Resultado r = publisher.publicar(zonaId, sectorId, actuador, accion, parametros);
+        if (!r.publicado()) {
             // No propagamos: el comando físico se reintentará cuando el motor vuelva a evaluar.
-            log.warn("Sector {}: no se pudo publicar el comando MQTT ({}) — {}", sectorId, topic, e.getMessage());
+            log.warn("Sector {}: el comando {} {} no se publicó — {}", sectorId, actuador, accion, r.error());
         }
     }
 

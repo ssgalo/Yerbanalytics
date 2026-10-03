@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
 import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
+import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
@@ -71,6 +72,26 @@ public class HistorialService {
         e.setDecision("El motor de reglas ordena abrir la electroválvula del sector.");
         e.setAccion("Microaspersor abierto · riego autónomo en curso.");
         withSeguimiento(e, hum);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra el riego que el despacho acaba de ordenar al nodo: sector, volumen, duración, humedad
+     * de sustrato y regla (HU-06 CA-05), con seguimiento de la humedad. {@code ts} es el instante de la
+     * orden (el del reloj del vivero), no el de la escritura.
+     */
+    public void registrarRiego(SectorEntity s, DetalleRiego detalle, String regla, long ts) {
+        HistorialEventoEntity e = base(s, "Riego", "Efectiva");
+        e.setTs(ts);
+        e.setRegla(regla);
+        e.setVolumenL(detalle.volumenL());
+        e.setDuracionSeg(detalle.duracionSeg());
+        e.setLectura("Humedad de sustrato " + fmt0(detalle.humedad()) + "% (regla " + regla + ").");
+        e.setDecision("El motor de reglas ordena regar " + fmtLitros(detalle.volumenL()) + " L durante "
+                + detalle.duracionSeg() + " s"
+                + (detalle.recortado() ? " (duración recortada al máximo de la válvula)." : "."));
+        e.setAccion("Electroválvula abierta · riego autónomo en curso.");
+        withSeguimiento(e, detalle.humedad());
         historialRepository.save(e);
     }
 
@@ -369,6 +390,11 @@ public class HistorialService {
 
     private static String blank(String v) {
         return (v == null || v.isBlank()) ? null : v;
+    }
+
+    /** Litros con coma decimal y sin ceros de más: 4,2 · 6 · 4,02. */
+    private static String fmtLitros(double v) {
+        return java.math.BigDecimal.valueOf(v).stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
     private static String fmt0(double v) {

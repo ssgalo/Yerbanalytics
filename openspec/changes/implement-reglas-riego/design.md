@@ -454,3 +454,40 @@ opcional `historial_evento(zona_id, tipo, ts)`. Las columnas nuevas son nulas y 
 **Rollback:** revertir el código. Las columnas nuevas quedan sin uso. `actuador_valve` vuelve a
 usarse con los valores que tenía (posiblemente "Regando" viejos: el script de rollback comentado las
 pone en "Cerrada").
+
+## Desvíos de implementación
+
+Anotados al implementar los bloques 0–8 (los bloques siguientes parten de esto, no del texto original):
+
+- **Fábricas 45 / 70 (D8, DA-11).** `riego.umbral-humedad` y `riego.lluvia-probabilidad` quedan en
+  **42 y 60** hasta la conmutación: `IrrigationRule` y `WeatherOverrideRule` las leen y el
+  comportamiento no puede cambiar antes del bloque 10. Se pasan a 45 / 70 en **10.5**, junto con las
+  reglas nuevas (hay que ajustar `ParametrosRealesTest` y `ReglasParametrosCatalogoRealTest`, que hoy
+  esperan 42).
+- **Frescura de la humedad (D9.1).** `StaleSensorRule` lee `zona.humSusTs` de la entidad, no
+  `ContextoRiego.humSusTs`: así funciona igual en el barrido (que usa `ContextoRiego.vacio()`). El campo
+  `ContextoRiego.humSusTs` existe pero nadie lo completa ni lo lee; el bloque 10 puede completarlo o
+  borrarlo. Efecto visible al desplegar: una zona sin `hum_sus_ts` (todas, hasta la primera telemetría con
+  `humSus`) bloquea el riego con `SIN_DATO`; con el nodo a 30 s se normaliza en el primer mensaje. La
+  traza de `StaleSensorRule` ahora tiene siempre **dos** comparaciones.
+- **`ultimosPorSector` (D11).** Devuelve filas `(sectorId, tipo, regla, MAX(ts))` (proyección
+  `HistorialRepository.UltimoEvento`); el último riego de un sector es el mayor `ts` de sus filas
+  "Riego" y el de R-02 el de la fila con `regla = DeficitCriticoRule`. Armar `ContextoRiego` con eso es
+  trabajo del bloque 10.2.
+- **Cola y despacho (D4).** `ColaRiego.retirar(zonaId, sectorId)` (hace falta la zona) y
+  `SolicitudRiego` con datos planos (`zonaId, sectorId, numero, detalle, regla, solicitadaEn`), no la
+  entidad: la crea el hilo MQTT y la consume el scheduler. El despacho vuelve a cargar el `SectorEntity`
+  con `findById` dentro del tick (transaccional) para `registrarRiego(sector, detalle, regla, ts)`.
+  Orden de las escrituras: publicar → marcar "en curso" y sacar de la cola → registrar en el historial
+  (si la base falla después de abrir la válvula, el sector no puede volver a pedirse). El despacho además
+  **descarta** una solicitud de un sector que ya está regando (defensa contra la ventana entre el
+  despacho y la lectura siguiente), y descarta por bloqueo manual aunque no haya cupo.
+- **`CatalogoParametros` (D8).** Su constructor de Spring recibe `List<ConsumidorParametros>`;
+  `DespachoRiego` inyecta el `CatalogoParametrosService` con `@Lazy` para cortar el ciclo.
+- **Pronóstico (D6).** La hora actual se busca por marca completa (`yyyy-MM-ddTHH:00`), no sólo por la
+  hora del día; `precipitation` ausente en la respuesta es modo degradado (`null`). Las marcas `horas`
+  incluyen la hora actual como primera (desde ahí hasta +24 h) y `lluviaProxima` la excluye.
+- **Intervalo de sensado (D5).** El rango 60–360 reemplaza al chequeo "positivo" (`requirePositive`) de
+  ese campo en `ConfiguracionService`.
+- **`tasks.md` 7.1.** El ejemplo "caudal 10 y volumen 6 → 1200 s" era inconsistente (6 L a 10 L/h son
+  2160 s y se recortan): se testea 10 L a 30 L/h y 6 L a 18 L/h.
