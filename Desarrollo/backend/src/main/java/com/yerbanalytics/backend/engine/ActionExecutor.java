@@ -25,9 +25,10 @@ import java.util.regex.Pattern;
  *       {@code riego.sectores-simultaneos} válvulas por zona, que publica el comando y registra el riego.
  *       Es la excepción explícita a "el executor materializa todo": el cupo por zona no se puede decidir
  *       sector por sector.</li>
- *   <li>En una evaluación de <b>telemetría</b> la última decisión manda: sin {@code ACTIVAR_VALVULA} la
- *       solicitud del sector sale de la cola (R-04, bloqueo manual, la ventana cerró). El <b>barrido</b> del
- *       watchdog evalúa sin lectura fresca y no toca la cola.</li>
+ *   <li>En una evaluación de <b>telemetría</b> una solicitud en cola pertenece a la ronda decidida y se completa:
+ *       sólo la retira una <b>cancelación explícita de seguridad</b> ({@link CancelaRiego}: sustrato saturado,
+ *       bloqueo manual, sensor sin datos y, para R-01, ventana cerrada o pausa por aplicación). "La humedad se
+ *       recuperó" no cancela. El <b>barrido</b> del watchdog evalúa sin lectura fresca y no toca la cola.</li>
  *   <li>{@code ACTIVAR_BOMBA}: actualiza el campo del sector, registra en historial y publica
  *       {@code pump ON}.</li>
  *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} con el porcentaje del motivo
@@ -132,8 +133,19 @@ public class ActionExecutor {
     // -------------------------------------------------------------------------
 
     /**
-     * La última decisión de la telemetría manda: con una orden de riego válida se encola (o reemplaza) la
-     * solicitud del sector; sin ella se retira.
+     * Una solicitud en cola pertenece a la ronda que se decidió y se completa: que la regla ya no pida riego
+     * porque la humedad se recuperó NO la cancela (el nodo testigo mide un solo sector; cuando el despacho lo
+     * riega la humedad sube y, si eso retirara lo pendiente, los demás sectores de la zona quedarían sin agua).
+     *
+     * <p>Lo que cambia la cola en una evaluación de telemetría:
+     * <ul>
+     *   <li>un {@code ACTIVAR_VALVULA} encola o actualiza la solicitud del sector (nunca la duplica) y una
+     *       decisión de R-01 NO degrada una de R-02 ya encolada;</li>
+     *   <li>una cancelación explícita de seguridad ({@link CancelaRiego} en el {@code ABORT_RIEGO} o
+     *       {@code ABORT_ALL}) la retira, si le alcanza.</li>
+     * </ul>
+     * Todo lo demás (NOOP, el corte de la regla de ciclo, el tope de R-02, R-03) la deja como está. Aun así el
+     * despacho revalida los datos vigentes antes de abrir cada válvula.
      */
     private void actualizarCola(List<RuleAction> actions, RuleContext ctx) {
         if (ctx.zona() == null) {
@@ -144,18 +156,35 @@ public class ActionExecutor {
         RuleAction orden = actions.stream()
                 .filter(a -> a.type() == ActionType.ACTIVAR_VALVULA)
                 .findFirst().orElse(null);
-        if (orden == null) {
-            cola.retirar(zonaId, sectorId);
+        SolicitudRiego vigente = cola.solicitudDe(zonaId, sectorId);
+
+        if (orden != null) {
+            if (!(orden.detalle() instanceof DetalleRiego detalle)) {
+                log.error("Sector {}: ACTIVAR_VALVULA de {} sin detalle de riego: no se encola.", sectorId, orden.ruleName());
+                cola.retirar(zonaId, sectorId);
+                return;
+            }
+            if (vigente != null && vigente.esDeficitCritico() && !SolicitudRiego.REGLA_DEFICIT_CRITICO.equals(orden.ruleName())) {
+                log.debug("Sector {}: ya tiene un riego de déficit crítico en cola; {} no lo degrada.", sectorId, orden.ruleName());
+                return;
+            }
+            Integer numero = ctx.sector().getN();
+            cola.solicitar(new SolicitudRiego(zonaId, sectorId, numero != null ? numero : 0, detalle,
+                    orden.ruleName(), ctx.now()));
             return;
         }
-        if (!(orden.detalle() instanceof DetalleRiego detalle)) {
-            log.error("Sector {}: ACTIVAR_VALVULA de {} sin detalle de riego: no se encola.", sectorId, orden.ruleName());
-            cola.retirar(zonaId, sectorId);
+
+        if (vigente == null) {
             return;
         }
-        Integer numero = ctx.sector().getN();
-        cola.solicitar(new SolicitudRiego(zonaId, sectorId, numero != null ? numero : 0, detalle,
-                orden.ruleName(), ctx.now()));
+        for (RuleAction a : actions) {
+            if (a.detalle() instanceof CancelaRiego cancelacion && cancelacion.alcanza(vigente)) {
+                if (cola.retirarSiCoincide(vigente)) {
+                    log.info("Sector {}: riego pendiente cancelado por {} — {}", sectorId, a.ruleName(), a.motivo());
+                }
+                return;
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

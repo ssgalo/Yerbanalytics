@@ -69,6 +69,12 @@ class ReglasParametrosCatalogoRealTest {
         assertThat(usadoPor(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
         assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactly("PosponerPorLluviaRule");
         assertThat(usadoPor(json, "riego.exceptuado-bloqueo")).containsExactly("DeficitCriticoRule");
+        // Lo que el despacho revalida antes de abrir cada válvula, junto a las reglas que ya lo decidieron.
+        assertThat(usadoPor(json, "seguridad.antiguedad-max-lectura")).contains("StaleSensorRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.saturacion-bloqueo")).containsExactlyInAnyOrder("SustratoSaturadoRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.ventana-normal")).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "DespachoRiego");
+        // La regla de ciclo lee el umbral crítico para dejar pasar a R-02.
+        assertThat(usadoPor(json, "riego.umbral-critico")).contains("CicloLecturaRiegoRule");
     }
 
     @Test
@@ -116,7 +122,7 @@ class ReglasParametrosCatalogoRealTest {
         }
         // Cada regla de la cadena figura una sola vez y con sus claves.
         assertThat(nodos.get("DeficitCriticoRule").get("parametros").toString()).contains("riego.exceptuado-bloqueo");
-        assertThat(nodos.get("CicloLecturaRiegoRule").get("parametros")).isEmpty();
+        assertThat(nodos.get("CicloLecturaRiegoRule").get("parametros").toString()).contains("riego.umbral-critico");
         assertThat(nodos).doesNotContainKeys("IrrigationRule", "WeatherOverrideRule", "DailyVolumeLimitRule");
     }
 

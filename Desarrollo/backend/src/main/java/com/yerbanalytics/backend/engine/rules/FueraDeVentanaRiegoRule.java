@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
+import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -64,7 +65,8 @@ public class FueraDeVentanaRiegoRule implements Rule {
             return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, String.format(
                     "Fuera de la ventana de riego (%s): el riego por déficit espera a la próxima lectura dentro de ella. "
                             + "Sólo el déficit crítico riega de noche.",
-                    ev.ventana(ParametrosRiego.VENTANA_NORMAL).canonico())));
+                    ev.ventana(ParametrosRiego.VENTANA_NORMAL).canonico()),
+                    CancelaRiego.SOLO_DEFICIT_COMUN));
         }
         return List.of(RuleAction.noopInfo(NAME, "Dentro de la ventana de riego."));
     }

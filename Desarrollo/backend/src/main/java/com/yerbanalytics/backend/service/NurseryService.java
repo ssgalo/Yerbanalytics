@@ -633,7 +633,8 @@ public class NurseryService {
      * Arma el {@link ContextoRiego} de cada sector de la zona con UNA consulta agrupada. El último riego de
      * un sector es el mayor {@code ts} de sus filas "Riego"; el último ordenado por R-02, el de la fila cuya
      * regla es {@code DeficitCriticoRule}; la última aplicación, la de sus filas "Insumo". El riego en curso
-     * lo da el despacho (memoria), que además cubre la ventana antes de que el riego llegue al historial.
+     * lo da el despacho (memoria), que además cubre la ventana antes de que el riego llegue al historial y, si el
+     * registro falla, recuerda el último riego (y el último crítico) para que el ciclo y el tope de R-02 no lo olviden.
      */
     private Map<String, ContextoRiego> contextosDeRiego(String zonaId, ZonaEntity zona, List<SectorEntity> sectores,
                                                         Instant inicioCiclo, Instant ahora) {
@@ -653,10 +654,18 @@ public class NurseryService {
         }
         Map<String, ContextoRiego> out = new HashMap<>();
         for (SectorEntity s : sectores) {
-            out.put(s.getId(), new ContextoRiego(inicioCiclo, riego.get(s.getId()), riegoCritico.get(s.getId()),
+            // Lo que dice el historial y lo que recuerda el despacho en memoria (el riego que se abrió pero cuyo
+            // registro falló): el ciclo y el tope de R-02 miran el más reciente de los dos.
+            out.put(s.getId(), new ContextoRiego(inicioCiclo,
+                    masReciente(riego.get(s.getId()), despacho.ultimoRiegoMs(s.getId())),
+                    masReciente(riegoCritico.get(s.getId()), despacho.ultimoRiegoCriticoMs(s.getId())),
                     aplicacion.get(s.getId()), despacho.finRiegoEnCurso(s.getId()), zona.getHumSusTs()));
         }
         return out;
+    }
+
+    private static Long masReciente(Long a, Long b) {
+        return a == null ? b : (b == null ? a : Long.valueOf(Math.max(a, b)));
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
+import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
@@ -63,7 +64,7 @@ public class ManualLockRule implements Rule {
                     "Manual override lock active on sector %s or its zone. " +
                     "All autonomous actuation suspended until the operator deactivates it.",
                     ctx.sector().getId());
-            return List.of(RuleAction.of(ActionType.ABORT_ALL, NAME, reason));
+            return List.of(RuleAction.of(ActionType.ABORT_ALL, NAME, reason, CancelaRiego.TODAS));
         }
 
         return List.of(RuleAction.noopInfo(NAME,

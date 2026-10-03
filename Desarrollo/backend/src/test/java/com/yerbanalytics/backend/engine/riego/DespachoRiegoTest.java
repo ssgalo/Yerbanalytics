@@ -10,6 +10,12 @@ import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.ZonaEntity;
+import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.engine.DetalleAlerta;
+import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import java.util.HashMap;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
@@ -62,6 +68,10 @@ class DespachoRiegoTest {
     private HistorialService historial;
     private HistorialRepository historialRepository;
     private SectorRepository sectorRepository;
+    private ZonaRepository zonaRepository;
+    private final Map<String, ZonaEntity> zonas = new HashMap<>();
+    /** Zonas cuya lectura NO se refresca sola con el reloj (nodo muerto o sonda caída). */
+    private final Set<String> zonasSinLecturaNueva = new HashSet<>();
     private ManualLockRepository bloqueos;
     private CatalogoParametrosService parametros;
     private DespachoRiego despacho;
@@ -83,6 +93,21 @@ class DespachoRiegoTest {
         when(historialRepository.riegosDesde(anyLong())).thenReturn(List.of());
         sectorRepository = mock(SectorRepository.class);
         when(sectorRepository.findById(anyString())).thenAnswer(i -> Optional.of(sector(i.getArgument(0))));
+        // Por defecto el nodo "publica" a cada instante: la lectura de la zona siempre es de ahora y la humedad 40.
+        zonaRepository = mock(ZonaRepository.class);
+        when(zonaRepository.findById(anyString())).thenAnswer(i -> {
+            String zonaId = i.getArgument(0);
+            ZonaEntity z = zonas.computeIfAbsent(zonaId, k -> {
+                ZonaEntity nueva = RuleContextTestFactory.zonaBasica(k);
+                nueva.setHumSusRaw(40.0);
+                return nueva;
+            });
+            if (!zonasSinLecturaNueva.contains(zonaId)) {
+                z.setLastReadingTime(reloj.millis());
+                z.setHumSusTs(reloj.millis());
+            }
+            return Optional.of(z);
+        });
         bloqueos = mock(ManualLockRepository.class);
         when(bloqueos.findByActiveTrue()).thenReturn(List.of());
         parametros = mock(CatalogoParametrosService.class);
@@ -91,8 +116,8 @@ class DespachoRiegoTest {
     }
 
     private DespachoRiego nuevoDespacho() {
-        return new DespachoRiego(cola, publisher, historial, historialRepository, sectorRepository, bloqueos,
-                parametros, reloj, new TxFalso(eventos));
+        return new DespachoRiego(cola, publisher, historial, historialRepository, sectorRepository, zonaRepository,
+                bloqueos, parametros, reloj, new TxFalso(eventos));
     }
 
     private static String zonaDe(String sectorId) {
@@ -555,7 +580,10 @@ class DespachoRiegoTest {
     @Test
     void declaraSuParametroParaQueElCatalogoLoMuestreEnUsadoPor() {
         assertThat(despacho.name()).isEqualTo("DespachoRiego");
-        assertThat(despacho.parametros()).containsExactly(ParametrosRiego.SECTORES_SIMULTANEOS);
+        assertThat(despacho.parametros()).containsExactlyInAnyOrder(ParametrosRiego.SECTORES_SIMULTANEOS,
+                // los que revalida antes de abrir cada válvula
+                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, ParametrosRiego.SATURACION_BLOQUEO,
+                ParametrosRiego.VENTANA_NORMAL);
     }
 
     @Test
@@ -602,5 +630,210 @@ class DespachoRiegoTest {
         despacho.tick();
 
         verify(publisher).publicar("MZ-3", "MZ-3-001", "valve", "ON", Map.of("durationSec", 120));
+    }
+
+    // ------------------------------------------------------------------ revalidación con datos actuales (S-02, R-05, R-04)
+
+    private void pedirCritico(String zona, int n, int duracionSeg) {
+        cola.solicitar(new SolicitudRiego(zona, id(zona, n), n,
+                new DetalleRiego(6.0, duracionSeg, 30.0, false), "DeficitCriticoRule", reloj.instant()));
+    }
+
+    private void nodoMuere(String zonaId) {
+        zonaRepository.findById(zonaId);            // crea la zona con la lectura de ahora...
+        zonasSinLecturaNueva.add(zonaId);           // ...y a partir de acá no llega nada más
+    }
+
+    @Test
+    void conLaLecturaDeLaZonaVieja_noSeAbreNingunaValvulaYLosPendientesSeDescartan() {
+        pedirZona("MZ-2", 30, 600);
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofSeconds(91));                       // umbral de fábrica: 90 s
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.nivel() == NivelAlerta.WARNING && a.texto().contains("30 solicitudes")), anyLong());
+    }
+
+    @Test
+    void conLaLecturaJustoEnElUmbralTodaviaSeRiega() {
+        pedir("MZ-2", 1, 600);
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofSeconds(90));
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void siSeAcabaLaLecturaDespuesDeUnaTandaNoSigueConLasDemas() {
+        pedirZona("MZ-2", 100, 600);
+        despacho.tick();                                              // abre 1-10 con el nodo vivo
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofSeconds(606));                       // cierran, hay cupo, pero los datos son viejos
+
+        despacho.tick();
+
+        verify(publisher, times(10)).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void conLaHumedadDeSustratoCongelada_aunqueLaLecturaSeaFresca_noSeRiega() {
+        pedir("MZ-2", 1, 600);
+        zonaRepository.findById("MZ-2");
+        zonas.get("MZ-2").setLastReadingTime(reloj.millis());        // el nodo publica...
+        zonas.get("MZ-2").setHumSusTs(reloj.millis() - 300_000L);   // ...pero la sonda de humedad calló hace 5 min
+        zonasSinLecturaNueva.add("MZ-2");
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void sinHumedadDeSustrato_noSeRiega() {
+        pedir("MZ-2", 1, 600);
+        zonaRepository.findById("MZ-2");
+        zonas.get("MZ-2").setHumSusRaw(null);
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void conLaHumedadActualEnElBloqueoDeSaturacion_noSeRiegaNiR01NiR02() {
+        pedir("MZ-2", 1, 600);
+        pedirCritico("MZ-2", 2, 720);
+        zonaRepository.findById("MZ-2");
+        zonas.get("MZ-2").setHumSusRaw(75.0);                        // riego.saturacion-bloqueo = 75
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void conLaHumedadJustoBajoElBloqueoSeRiega() {
+        pedir("MZ-2", 1, 600);
+        zonaRepository.findById("MZ-2");
+        zonas.get("MZ-2").setHumSusRaw(74.0);
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void unaSolicitudDeR01FueraDeLaVentanaSeDescartaAunSinCupo() {
+        pedirZona("MZ-2", 30, 600);
+        despacho.tick();                                              // 10:05: abre 1-10, quedan 20
+        reloj.avanzar(Duration.ofHours(8));                           // 18:05: la ventana cerró
+
+        despacho.tick();
+
+        verify(publisher, times(10)).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+        verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
+                argThat(a -> a.texto().contains("ventana")), anyLong());
+    }
+
+    @Test
+    void laVentanaIncluyeElMinutoDeSuHoraDeFin_18_00_59_adentro_18_01_00_afuera() {
+        reloj.avanzar(Duration.ofHours(7).plusMinutes(55).plusSeconds(59));   // 18:00:59
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+        verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
+
+        reloj.avanzar(Duration.ofSeconds(1));                                 // 18:01:00
+        pedir("MZ-2", 2, 600);
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-2-002")).isFalse();
+    }
+
+    @Test
+    void unaSolicitudDeR02NoDependeDeLaVentana() {
+        reloj.avanzar(Duration.ofHours(13).plusMinutes(25));          // 23:30
+        pedirCritico("MZ-2", 1, 720);
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(eq("MZ-2"), eq("MZ-2-001"), eq("valve"), eq("ON"), eq(Map.of("durationSec", 720)));
+    }
+
+    @Test
+    void siNoSePuedeLeerLaZonaNoSeAbreNadaPeroLaSolicitudSigue() {
+        pedir("MZ-2", 1, 600);
+        when(zonaRepository.findById("MZ-2")).thenThrow(new IllegalStateException("base caída"));
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-2-001")).isTrue();
+    }
+
+    @Test
+    void siLaZonaYaNoExisteSeDescartaLaSolicitud() {
+        pedir("MZ-9", 1, 600);
+        when(zonaRepository.findById("MZ-9")).thenReturn(Optional.empty());
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void siFallaElRegistroDeLaAlertaElTickSigue() {
+        pedirZona("MZ-2", 5, 600);
+        nodoMuere("MZ-2");
+        reloj.avanzar(Duration.ofSeconds(120));
+        doThrow(new IllegalStateException("base caída")).when(historial).registrarAlerta(any(), any(), any(), any(), anyLong());
+        pedir("MZ-3", 1, 600);
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(eq("MZ-3"), any(), any(), any(), any());   // la otra zona se despacha igual
+    }
+
+    // ------------------------------------------------------------------ el último riego en memoria
+
+    @Test
+    void recuerdaElUltimoRiegoYElCriticoEnMemoriaAunSiElHistorialFalla() {
+        doThrow(new IllegalStateException("base caída")).when(historial).registrarRiego(any(), any(), any(), anyLong());
+        pedir("MZ-2", 1, 600);
+        pedirCritico("MZ-2", 2, 720);
+
+        despacho.tick();
+
+        assertThat(despacho.ultimoRiegoMs("MZ-2-001")).isEqualTo(T0.toEpochMilli());
+        assertThat(despacho.ultimoRiegoCriticoMs("MZ-2-001")).isNull();
+        assertThat(despacho.ultimoRiegoMs("MZ-2-002")).isEqualTo(T0.toEpochMilli());
+        assertThat(despacho.ultimoRiegoCriticoMs("MZ-2-002")).isEqualTo(T0.toEpochMilli());
+        assertThat(despacho.ultimoRiegoMs("MZ-2-003")).isNull();
+
+        despacho.reiniciarEstado();
+        assertThat(despacho.ultimoRiegoMs("MZ-2-001")).isNull();
+        assertThat(despacho.ultimoRiegoCriticoMs("MZ-2-002")).isNull();
+    }
+
+    @Test
+    void siNoSePublicaNoQuedaComoRegado() {
+        when(publisher.publicar(any(), any(), any(), any(), any()))
+                .thenReturn(new ComandoActuadorPublisher.Resultado(false, null, "sin broker"));
+        pedir("MZ-2", 1, 600);
+
+        despacho.tick();
+
+        assertThat(despacho.ultimoRiegoMs("MZ-2-001")).isNull();
     }
 }

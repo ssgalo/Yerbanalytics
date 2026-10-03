@@ -73,6 +73,8 @@ class NurseryServiceRiegoTest {
         historialRepository = mock(HistorialRepository.class);
         despacho = mock(DespachoRiego.class);
         when(despacho.finRiegoEnCurso(any())).thenReturn(null);   // Mockito devolvería 0L para un Long
+        when(despacho.ultimoRiegoMs(any())).thenReturn(null);
+        when(despacho.ultimoRiegoCriticoMs(any())).thenReturn(null);
         CatalogoParametrosService parametros = mock(CatalogoParametrosService.class);
         when(parametros.vigentes()).thenReturn(ReglaTestSupport.fabrica());
         Rule regla = new Rule() {
@@ -148,6 +150,28 @@ class NurseryServiceRiegoTest {
         assertThat(contextosEvaluados()).allSatisfy(ctx ->
                 assertThat(ctx.riego().inicioCiclo()).isEqualTo(CicloLectura.inicio(AHORA, 240))
                         .isEqualTo(Instant.parse("2026-10-05T13:00:00Z")));
+    }
+
+    @Test
+    @DisplayName("el último riego que recuerda el despacho en memoria gana si es más reciente que el del historial")
+    void ultimoRiegoEnMemoriaGanaSiEsMasReciente() {
+        long hace3h = AHORA.toEpochMilli() - 3 * 3_600_000L;
+        long hace10min = AHORA.toEpochMilli() - 600_000L;
+        when(historialRepository.ultimosPorSector(eq("MZ-1"), anyLong())).thenReturn(List.of(
+                fila("MZ-1-001", "Riego", "RiegoPorDeficitRule", hace3h)));
+        when(despacho.ultimoRiegoMs("MZ-1-001")).thenReturn(hace10min);          // el registro del último falló
+        when(despacho.ultimoRiegoMs("MZ-1-002")).thenReturn(hace10min);          // el historial ni lo vio
+        when(despacho.ultimoRiegoCriticoMs("MZ-1-002")).thenReturn(hace10min);
+
+        telemetria();
+
+        var ctxs = contextosEvaluados();
+        var s1 = ctxs.stream().filter(c -> c.sector().getId().equals("MZ-1-001")).findFirst().orElseThrow().riego();
+        assertThat(s1.ultimoRiegoMs()).isEqualTo(hace10min);
+        assertThat(s1.ultimoRiegoCriticoMs()).isNull();
+        var s2 = ctxs.stream().filter(c -> c.sector().getId().equals("MZ-1-002")).findFirst().orElseThrow().riego();
+        assertThat(s2.ultimoRiegoMs()).isEqualTo(hace10min);
+        assertThat(s2.ultimoRiegoCriticoMs()).isEqualTo(hace10min);
     }
 
     @Test

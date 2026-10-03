@@ -8,6 +8,7 @@ import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.riego.CalculoRiego;
+import com.yerbanalytics.backend.engine.riego.SolicitudRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 
 import org.springframework.stereotype.Component;
@@ -28,7 +29,7 @@ import java.util.List;
 public class RiegoPorDeficitRule implements Rule {
 
     private static final int PRIORITY = 10;
-    private static final String NAME = "RiegoPorDeficitRule";
+    private static final String NAME = SolicitudRiego.REGLA_DEFICIT_COMUN;
 
     @Override
     public int priority() {

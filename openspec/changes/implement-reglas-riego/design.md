@@ -129,17 +129,18 @@ Las reglas **deciden**; el `DespachoRiego` (`be/engine/riego/`) **ejecuta**.
 Telemetría (hilo MQTT)                         DespachoRiego.tick() cada 10 s
   regla → ACTIVAR_VALVULA(DetalleRiego)          1. enCurso = eventos "Riego" con ts + duracionSeg + 5 s > ahora
   ActionExecutor → cola.solicitar(sector, d)     2. por MZ: libres = sectores-simultaneos − enCurso(MZ)
-  sin ACTIVAR_VALVULA (sólo TELEMETRIA)          3. pendientes de la MZ ordenados por sector.n
-     → cola.retirar(sector)                      4. por cada uno (hasta libres): si hay bloqueo manual
-                                                    activo del sector o la MZ → se descarta; si no,
-                                                    publica valve ON {durationSec}, registra "Riego"
-                                                    (volumen, duración, regla) y lo saca de la cola
+  cancelación explícita de seguridad             3. pendientes de la MZ ordenados por sector.n
+     (sólo TELEMETRIA) → cola.retirar(sector)     4. por cada uno (hasta libres): REVALIDA con datos
+                                                    actuales (bloqueo manual, lectura vigente, saturación,
+                                                    ventana para R-01) y si pasa publica valve ON
+                                                    {durationSec}, registra "Riego" (volumen, duración,
+                                                    regla) y lo saca de la cola
 ```
 
 - **La cola** es un mapa en memoria `zonaId → (sectorId → Solicitud)`, sincronizado por zona. La
-  última decisión de telemetría manda: una evaluación con `ACTIVAR_VALVULA` reemplaza la solicitud
-  (nuevo volumen); una sin él la retira (R-04 nuevo, bloqueo manual, ventana que cerró). El barrido
-  no la toca (evalúa sin métricas).
+  evaluación con `ACTIVAR_VALVULA` reemplaza la solicitud (nuevo volumen); una evaluación sin él **no** la
+  retira: la ronda decidida se completa, y sólo la retira una cancelación explícita de seguridad (ver
+  *Correcciones de la revisión de la conmutación*, C1). El barrido no la toca (evalúa sin métricas).
 - **Cierre del ciclo de la válvula.** "Regando" deja de ser un estado guardado: es
   `ts + duracionSeg·1000 + 5 s > ahora` sobre el evento "Riego" que se escribe **al despachar**.
   Coincide con el principio 6 (el ESP32 corta solo) y no necesita el ACK. El margen de 5 s cubre la
@@ -190,8 +191,8 @@ guardado fuera de rango se acota y se loguea; el guardado nuevo valida 60–360
 
 `CicloLecturaRiegoRule` corta la rama si el sector **ya tuvo un riego despachado desde el inicio del
 ciclo** o **tiene uno en curso**. Es una condición fija (`compararFijo`, no configurable): su único
-"umbral" es el inicio del ciclo, que viaja en el contexto. Vale también para R-02: con lecturas de
-4 h v2 tampoco podría regar dos veces en un ciclo.
+"umbral" es el inicio del ciclo, que viaja en el contexto. **No** vale para R-02 (corrección C3): la guarda de "ya regó en este ciclo" corta
+sólo a R-01; "hay un riego en curso" corta a las dos.
 
 **Se elimina** (Anexo A, "Límites diarios… eliminados"; "sin intervalo mínimo"):
 `DailyVolumeLimitRule`, la guarda de 24 h de `IrrigationRule` y las claves `riego.max-riegos-24h`,
@@ -582,3 +583,67 @@ Anotados al implementar los bloques 0–8 (los bloques siguientes parten de esto
   alertas (`sectorId` "—") no se atribuyen a ningún nodo ni ofrecen "razonamiento del motor"; se agrupan como "Alertas de
   la macro-zona" y llevan un ícono propio (el backend les cae en el de riego por no definir uno para "Alerta").
 
+### Correcciones de la revisión de la conmutación (commits `fix(backend)` sobre `c5de65c`)
+
+Una revisión independiente del commit `c5de65c` encontró problemas de seguridad operativa en cómo se EJECUTA el
+riego (válvulas reales). Criterio de desempate: ante dos implementaciones, la que nunca riega con datos inválidos
+y nunca deja sin regar un déficit crítico.
+
+**C1 · La ronda se completa; sólo la cancela una cancelación explícita (cambia D4).** El nodo testigo mide UN
+sector. Cuando el despacho lo riega la humedad sube, R-01 y R-02 dejan de aplicar y, con el nodo publicando cada
+30 s, la regla "sin `ACTIVAR_VALVULA` se retira de la cola" vaciaba la ronda: los otros 90 sectores quedaban sin
+agua (y en el ciclo siguiente la humedad seguía alta). La spec decide con la lectura y riega "cada sector de la
+MZ". Ahora una solicitud en cola **pertenece a la ronda decidida y se completa**. Una nueva decisión de riego
+para un sector ya encolado la actualiza (R-01 → R-02 si empeoró), nunca la duplica, y **no se degrada** (una
+solicitud de R-02 no pasa a R-01 aunque la humedad mejore un poco: perdería el volumen máximo y la
+independencia de la ventana).
+
+*Cómo se distingue "cancelación de seguridad" de "no aplica":* una marca explícita en la acción, no el texto ni el
+nombre de la regla en el executor. `ABORT_RIEGO`/`ABORT_ALL` pueden llevar `DetalleAccion = CancelaRiego`
+(`TODAS` | `SOLO_DEFICIT_COMUN`) y el `ActionExecutor` retira la solicitud sólo si le alcanza. Cada regla declara
+si cancela:
+
+| Motivo (regla) | ¿Retira de la cola? | Alcance | ¿Quién lo decide? |
+|---|---|---|---|
+| Humedad se recuperó (R-01/R-02 "no aplica") | **No** | — | telemetría (no hace nada) |
+| Sustrato saturado, R-04 | Sí | toda solicitud | telemetría (explícita) **y** despacho (revalida `humedad < saturacion-bloqueo`) |
+| Bloqueo manual (`ManualLockRule`, `ABORT_ALL`) | Sí | toda solicitud | telemetría (explícita) **y** despacho (revalida) |
+| Sensor sin datos / humedad congelada (`StaleSensorRule`, S-02) | Sí | toda solicitud | telemetría (explícita) **y** despacho (revalida la antigüedad) |
+| Ventana cerrada, R-05 | Sí | sólo las de R-01 | telemetría (explícita) **y** despacho (revalida la hora, al minuto) |
+| Pausa por aplicación, R-06 | Sí | sólo las de R-01 (de ESE sector) | telemetría (explícita) |
+| Regla de ciclo (ya regó / riego en curso) | No | — | despacho (ya regando → descarta la repetida) |
+| Tope de 12 h de R-02 | No | — | — (corta la evaluación, no la ronda) |
+| R-03 (lluvia) | No | — | — (**riesgo residual**, ver abajo) |
+
+**C2 · El despacho revalida con datos actuales antes de abrir CADA válvula (cierra S-02 y R-05 en la ejecución).**
+Una ronda tarda ~80 min en despacharse y el despacho sólo miraba el bloqueo manual: (A) con el nodo muerto y 90
+sectores en cola seguía abriendo válvulas; (B) una solicitud de R-01 de las 17:58 se despachaba de noche si no
+llegaba telemetría. Ahora, por zona y por tick, antes del cupo (lo vencido no espera lugar): zona leída de la base
+(sin poder leerla no se abre nada y la solicitud sigue); lectura y humedad vigentes con la misma definición que
+`StaleSensorRule` (`FrescuraLectura`, compartida, mismo `seguridad.antiguedad-max-lectura`); humedad actual `<
+riego.saturacion-bloqueo`; y, para las de R-01, hora dentro de `riego.ventana-normal` (cerrada al minuto). R-02 no
+depende de la ventana. Lo que falla se retira de la cola, se loguea y deja UNA alerta `WARNING` ("Riego descartado
+al despachar") por zona y motivo (regla `DespachoRiego`; se descarta de una vez, así que no se repite). El despacho
+declara en `parametros()` los cuatro que consume (`sectores-simultaneos`, `antiguedad-max-lectura`,
+`saturacion-bloqueo`, `ventana-normal`) y el catálogo los muestra en `usadoPor`.
+
+**C3 · La guarda de ciclo ya no frena a R-02 (cambia D5).** `CicloLecturaRiegoRule` mantiene su prioridad y su
+nombre, pero sus dos guardas valen distinto: *riego en curso* corta a todos; *ya regó en este ciclo* corta sólo a
+R-01. Con humedad `< riego.umbral-critico` (parámetro que ahora declara) no corta por el ciclo, así R-02 queda
+sólo con su tope de 12 h; sin lectura de humedad corta (sin dato no se arriesga). Se descartó una regla nueva o
+mover el chequeo a R-01: R-03/R-05/R-06 se evaluarían antes y la traza diría "pospuesto por lluvia" para un sector
+que ya regó. Costo conocido: tras un riego de R-01, una caída posterior bajo el umbral crítico dentro del mismo
+ciclo puede volver a regar el sector con R-02 (es lo que dice la spec: sólo su tope).
+
+**C4 · Último riego en memoria.** Si el registro en historial falla después de abrir la válvula, pasada la duración
++ 5 s el ciclo ya no veía ese riego. El despacho guarda en memoria el último riego (y el último de R-02) por
+sector; `NurseryService` toma el más reciente entre eso y el historial para la guarda de ciclo y el tope de R-02.
+
+**Sin corregir (documentado):**
+- R-06 depende de eventos "Insumo" y la bomba conserva el enganche "Dosificando" (rama de insumos, fuera de alcance).
+- "Publicado" = entregado al cliente MQTT, sin ACK: el despacho da la válvula por abierta cuando el cliente la
+  aceptó, no cuando el nodo confirmó.
+- El cupo se llena por número de sector, no por urgencia ni por humedad.
+- R-03 no cancela lo ya encolado (la lluvia pronosticada después de decidir no retira la ronda): la lista de
+  cancelaciones de seguridad es la confirmada y R-03 no está. Además, en el primer mensaje tras arrancar (sin
+  pronóstico cacheado) R-03 no tiene dato; ver C5.

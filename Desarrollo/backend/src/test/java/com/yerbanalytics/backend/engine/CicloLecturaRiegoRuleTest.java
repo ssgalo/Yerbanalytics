@@ -46,6 +46,32 @@ class CicloLecturaRiegoRuleTest {
     }
 
     @Test
+    @DisplayName("ya regó en el ciclo pero hay déficit crítico (h 30): NO corta, R-02 sólo tiene su tope")
+    void yaRegadoConDeficitCritico_noAborta() {
+        RuleContext ctx = RiegoCtx.a("13:30").humedad(30.0).inicioCiclo("10:00").ultimoRiego("10:12").build();
+        Evaluacion ev = ev(rule);
+
+        assertThat(tipos(rule.evaluate(ctx, ev))).containsExactly(ActionType.NOOP_INFO);
+        assertThat(ev.comparaciones()).extracting(Comparacion::resultado).contains(ResultadoComparacion.CUMPLE);
+    }
+
+    @Test
+    @DisplayName("ya regó en el ciclo y no hay lectura de humedad: corta (sin dato no se arriesga)")
+    void yaRegadoSinHumedad_aborta() {
+        RuleContext ctx = RiegoCtx.a("13:59").inicioCiclo("10:00").ultimoRiego("10:12").build();
+
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).containsExactly(ActionType.ABORT_RIEGO);
+    }
+
+    @Test
+    @DisplayName("riego en curso con déficit crítico (h 30): corta igual, nadie abre una válvula abierta")
+    void riegoEnCursoConDeficitCritico_aborta() {
+        RuleContext ctx = RiegoCtx.a("13:30").humedad(30.0).inicioCiclo("10:00").riegoEnCursoHasta("13:40").build();
+
+        assertThat(tipos(rule.evaluate(ctx, ev(rule)))).containsExactly(ActionType.ABORT_RIEGO);
+    }
+
+    @Test
     @DisplayName("riego despachado justo en el inicio del ciclo cuenta como de este ciclo")
     void riegoEnElInstanteDeInicio_cuenta() {
         RuleContext ctx = RiegoCtx.a("10:30").humedad(40.0).inicioCiclo("10:00").ultimoRiego("10:00").build();
@@ -93,11 +119,11 @@ class CicloLecturaRiegoRuleTest {
     }
 
     @Test
-    @DisplayName("es una regla de la rama RIEGO, sin parámetros del catálogo")
+    @DisplayName("es una regla de la rama RIEGO; sólo lee el umbral crítico del catálogo (para dejar pasar a R-02)")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
         assertThat(rule.priority()).isEqualTo(2);
-        assertThat(rule.parametros()).isEmpty();
+        assertThat(rule.parametros()).containsExactly(com.yerbanalytics.backend.engine.parametros.ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.name()).isEqualTo("CicloLecturaRiegoRule");
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());
     }

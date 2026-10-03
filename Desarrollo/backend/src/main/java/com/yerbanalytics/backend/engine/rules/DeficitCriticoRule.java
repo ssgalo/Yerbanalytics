@@ -10,6 +10,7 @@ import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.riego.CalculoRiego;
+import com.yerbanalytics.backend.engine.riego.SolicitudRiego;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 
@@ -39,7 +40,7 @@ public class DeficitCriticoRule implements Rule {
 
     private static final int PRIORITY = 4;
     /** Nombre de la regla: también es la {@code regla} que queda en los eventos "Riego" que ordenó R-02. */
-    public static final String NAME = "DeficitCriticoRule";
+    public static final String NAME = SolicitudRiego.REGLA_DEFICIT_CRITICO;
     static final String TEXTO_ALERTA = "Déficit hídrico crítico";
 
     @Override

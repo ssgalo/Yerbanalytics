@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
+import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.Rule;
@@ -75,7 +76,8 @@ public class SustratoSaturadoRule implements Rule {
 
         RuleAction aborta = RuleAction.of(ActionType.ABORT_RIEGO, NAME, String.format(
                 "Humedad de sustrato %s%% en o sobre el umbral de saturación (%s%%): riego autónomo bloqueado.",
-                RiegoRuleSupport.num(humedad), RiegoRuleSupport.num(ev.numero(ParametrosRiego.SATURACION_BLOQUEO))));
+                RiegoRuleSupport.num(humedad), RiegoRuleSupport.num(ev.numero(ParametrosRiego.SATURACION_BLOQUEO))),
+                CancelaRiego.TODAS);
 
         boolean conAlerta = ev.comparar("Humedad de sustrato", humedad, Operador.GE, ParametrosRiego.SATURACION_ALERTA);
         if (!conAlerta) {

@@ -23,8 +23,9 @@ import java.util.Set;
  * a lo sumo seiscientas entradas y operaciones de microsegundos, un único candado es lo más simple
  * y no tiene ventanas de carrera entre el mapa por zona y el índice por sector.
  *
- * <p>La última decisión de la telemetría manda: pedir de nuevo reemplaza la solicitud del sector
- * (otro volumen), y retirar la cancela (R-04, bloqueo manual, la ventana cerró).
+ * <p>Pedir de nuevo reemplaza la solicitud del sector (otro volumen o una regla más grave), y retirar la cancela.
+ * Quién retira y cuándo lo decide el {@code ActionExecutor} (cancelaciones explícitas de seguridad) y el
+ * {@code DespachoRiego} (revalidación al abrir); acá sólo está el mecanismo.
  */
 @Component
 public class ColaRiego {
@@ -61,6 +62,14 @@ public class ColaRiego {
         return d != null
                 && Double.isFinite(d.volumenL()) && d.volumenL() > 0
                 && d.duracionSeg() >= 1 && d.duracionSeg() <= ContratoNodo.DURACION_VALVULA_MAX_SEG;
+    }
+
+    /** La solicitud pendiente del sector, o {@code null} si no tiene. */
+    public SolicitudRiego solicitudDe(String zonaId, String sectorId) {
+        synchronized (candado) {
+            Map<String, SolicitudRiego> zona = porZona.get(zonaId);
+            return zona == null ? null : zona.get(sectorId);
+        }
     }
 
     /** {@code true} si {@code s} (la MISMA instancia, no una igual por valor) sigue siendo la solicitud del sector. */

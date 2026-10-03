@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.riego.ColaRiego;
 import com.yerbanalytics.backend.engine.riego.SolicitudRiego;
+import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -104,28 +105,118 @@ class ActionExecutorColaTest {
         assertThat(cola.pendientes("MZ-2").get(0).detalle().duracionSeg()).isEqualTo(720);
     }
 
-    @Test
-    @DisplayName("una evaluación de telemetría sin ACTIVAR_VALVULA retira la solicitud del sector")
-    void sinActivar_retira() {
-        executor.execute(List.of(riego(5.0, 600)), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
-        executor.execute(List.of(riego(5.0, 600)), ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);
+    private static RuleAction cancela(String regla, CancelaRiego alcance) {
+        return RuleAction.of(ActionType.ABORT_RIEGO, regla, "motivo", alcance);
+    }
 
-        executor.execute(List.of(RuleAction.of(ActionType.ABORT_RIEGO, "SustratoSaturadoRule", "saturado")),
+    private static RuleAction riegoCritico(double litros, int seg) {
+        return RuleAction.of(ActionType.ACTIVAR_VALVULA, DeficitCriticoRule.NAME, "Crítico",
+                new DetalleRiego(litros, seg, 30.0, false));
+    }
+
+    private void encolar(int n) {
+        executor.execute(List.of(riego(5.0, 600)), ctx("MZ-2", n, "10:00"), OrigenEvaluacion.TELEMETRIA);
+    }
+
+    @Test
+    @DisplayName("una cancelación explícita de seguridad (R-04) retira la solicitud del sector, y sólo la de ese sector")
+    void cancelacionExplicita_retira() {
+        encolar(7);
+        encolar(8);
+
+        executor.execute(List.of(cancela("SustratoSaturadoRule", CancelaRiego.TODAS)),
                 ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
 
         assertThat(cola.pendientes("MZ-2")).extracting(SolicitudRiego::sectorId).containsExactly("MZ-2-008");
         // y el motivo sigue quedando en el historial como inacción
-        verify(historial).registrarInaccion(any(), eq(ActionType.ABORT_RIEGO), eq("SustratoSaturadoRule"), eq("saturado"));
+        verify(historial).registrarInaccion(any(), eq(ActionType.ABORT_RIEGO), eq("SustratoSaturadoRule"), eq("motivo"));
     }
 
     @Test
-    @DisplayName("una evaluación sin ninguna acción de riego también retira")
-    void sinAcciones_retira() {
-        executor.execute(List.of(riego(5.0, 600)), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
+    @DisplayName("la humedad se recuperó (R-01 y R-02 ya no piden riego): la solicitud de la ronda NO se retira")
+    void sinActivar_noRetira() {
+        encolar(7);
+
+        executor.execute(List.of(RuleAction.noopInfo("RiegoPorDeficitRule", "no aplica"),
+                RuleAction.noopInfo("DeficitCriticoRule", "sin déficit crítico")),
+                ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
+
+        assertThat(cola.contiene("MZ-2-007")).isTrue();
+    }
+
+    @Test
+    @DisplayName("una evaluación sin ninguna acción tampoco retira")
+    void sinAcciones_noRetira() {
+        encolar(7);
 
         executor.execute(List.of(), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
 
+        assertThat(cola.contiene("MZ-2-007")).isTrue();
+    }
+
+    @Test
+    @DisplayName("un ABORT_RIEGO sin marca de cancelación (regla de ciclo, tope de R-02, R-03) no retira")
+    void abortSinMarca_noRetira() {
+        encolar(7);
+
+        executor.execute(List.of(RuleAction.of(ActionType.ABORT_RIEGO, "CicloLecturaRiegoRule", "riego en curso")),
+                ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
+        executor.execute(List.of(RuleAction.of(ActionType.POSTPONE_RIEGO, "PosponerPorLluviaRule", "lluvia")),
+                ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
+
+        assertThat(cola.contiene("MZ-2-007")).isTrue();
+    }
+
+    @Test
+    @DisplayName("ventana cerrada (R-05) y pausa (R-06) retiran las solicitudes de R-01 pero no las de R-02")
+    void ventanaYPausa_soloRetiranR01() {
+        encolar(7);                                                       // R-01
+        executor.execute(List.of(riegoCritico(6.0, 720)), ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);   // R-02
+
+        for (String regla : List.of("FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule")) {
+            executor.execute(List.of(cancela(regla, CancelaRiego.SOLO_DEFICIT_COMUN)),
+                    ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);
+        }
+        assertThat(cola.contiene("MZ-2-008")).as("la de R-02 no depende de la ventana ni de la pausa").isTrue();
+
+        executor.execute(List.of(cancela("FueraDeVentanaRiegoRule", CancelaRiego.SOLO_DEFICIT_COMUN)),
+                ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
         assertThat(cola.contiene("MZ-2-007")).isFalse();
+    }
+
+    @Test
+    @DisplayName("sensor sin datos o bloqueo manual (alcance total) retiran también la solicitud de R-02")
+    void seguridadTotal_retiraTambienR02() {
+        executor.execute(List.of(riegoCritico(6.0, 720)), ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);
+
+        executor.execute(List.of(cancela("StaleSensorRule", CancelaRiego.TODAS)),
+                ctx("MZ-2", 8, "10:00"), OrigenEvaluacion.TELEMETRIA);
+
+        assertThat(cola.contiene("MZ-2-008")).isFalse();
+    }
+
+    @Test
+    @DisplayName("una decisión más grave actualiza la solicitud encolada (R-01 → R-02) sin duplicarla")
+    void r01ASiR02_actualiza() {
+        encolar(7);
+
+        executor.execute(List.of(riegoCritico(6.0, 720)), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
+
+        assertThat(cola.pendientes("MZ-2")).hasSize(1);
+        assertThat(cola.pendientes("MZ-2").get(0).regla()).isEqualTo(DeficitCriticoRule.NAME);
+        assertThat(cola.pendientes("MZ-2").get(0).detalle().duracionSeg()).isEqualTo(720);
+    }
+
+    @Test
+    @DisplayName("una decisión menos grave NO degrada la solicitud encolada (R-02 → R-01 si la humedad mejoró un poco)")
+    void r02AR01_noDegrada() {
+        executor.execute(List.of(riegoCritico(6.0, 720)), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
+
+        encolar(7);
+
+        assertThat(cola.pendientes("MZ-2")).hasSize(1);
+        assertThat(cola.pendientes("MZ-2").get(0).regla()).isEqualTo(DeficitCriticoRule.NAME);
+        assertThat(cola.pendientes("MZ-2").get(0).detalle().duracionSeg()).isEqualTo(720);
     }
 
     @Test

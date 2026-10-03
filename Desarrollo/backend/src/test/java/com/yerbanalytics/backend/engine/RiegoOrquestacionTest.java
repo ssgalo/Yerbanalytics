@@ -155,15 +155,45 @@ class RiegoOrquestacionTest {
     }
 
     @Test
-    @DisplayName("ya regó en el ciclo: ni R-01 ni R-02 vuelven a regar")
-    void unRiegoPorCiclo() {
+    @DisplayName("ya regó en el ciclo con déficit común (h 40): la regla de ciclo corta a R-01")
+    void unRiegoPorCicloParaR01() {
+        ResultadoEvaluacion r = evaluar(RiegoCtx.a("13:59").humedad(40.0).inicioCiclo("10:00").ultimoRiego("10:12"));
+
+        assertThat(de(r, ActionType.ABORT_RIEGO)).extracting(RuleAction::ruleName).containsExactly("CicloLecturaRiegoRule");
+        assertThat(de(r, ActionType.ACTIVAR_VALVULA)).isEmpty();
+        assertThat(de(r, ActionType.ALERTA)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R-01 regó a las 10:12 y a las 13:30 la humedad es 30: R-02 riega (la regla de ciclo no la frena)")
+    void r02RiegaAunqueR01YaRegoEnElCiclo() {
+        ResultadoEvaluacion r = evaluar(RiegoCtx.a("13:30").humedad(30.0).inicioCiclo("10:00").ultimoRiego("10:12"));
+
+        assertThat(de(r, ActionType.ABORT_RIEGO)).isEmpty();
+        assertThat(de(r, ActionType.ACTIVAR_VALVULA)).extracting(RuleAction::ruleName).containsExactly("DeficitCriticoRule");
+        assertThat(de(r, ActionType.ALERTA)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("con un riego en curso nadie riega: ni R-01 (h 40) ni R-02 (h 20)")
+    void riegoEnCursoBloqueaATodos() {
         for (double h : new double[]{40.0, 20.0}) {
-            ResultadoEvaluacion r = evaluar(RiegoCtx.a("13:59").humedad(h).inicioCiclo("10:00").ultimoRiego("10:12"));
+            ResultadoEvaluacion r = evaluar(RiegoCtx.a("10:05").humedad(h).inicioCiclo("10:00").riegoEnCursoHasta("10:10"));
 
             assertThat(de(r, ActionType.ABORT_RIEGO)).extracting(RuleAction::ruleName).containsExactly("CicloLecturaRiegoRule");
             assertThat(de(r, ActionType.ACTIVAR_VALVULA)).isEmpty();
             assertThat(de(r, ActionType.ALERTA)).isEmpty();
         }
+    }
+
+    @Test
+    @DisplayName("el tope de 12 h de R-02 se sigue respetando aunque el ciclo ya no la frene")
+    void topeDeR02ConRiegoPrevioEnElCiclo() {
+        ResultadoEvaluacion r = evaluar(RiegoCtx.a("13:30").humedad(30.0).inicioCiclo("10:00").ultimoRiego("10:12")
+                .ultimoRiegoCriticoHace(3, 18));
+
+        assertThat(de(r, ActionType.ABORT_RIEGO)).extracting(RuleAction::ruleName).containsExactly("DeficitCriticoRule");
+        assertThat(de(r, ActionType.ACTIVAR_VALVULA)).isEmpty();
     }
 
     @Test

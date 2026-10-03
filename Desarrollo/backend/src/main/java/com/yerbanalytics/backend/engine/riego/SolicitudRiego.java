@@ -25,4 +25,15 @@ public record SolicitudRiego(
         String regla,
         Instant solicitadaEn
 ) {
+
+    /** Nombre de R-02 (déficit crítico): lo que se despacha de noche y no depende de la ventana ni de la pausa. */
+    public static final String REGLA_DEFICIT_CRITICO = "DeficitCriticoRule";
+
+    /** Nombre de R-01 (déficit común). */
+    public static final String REGLA_DEFICIT_COMUN = "RiegoPorDeficitRule";
+
+    /** {@code true} si la ordenó R-02. Toda otra regla se trata como riego común (la más restringida). */
+    public boolean esDeficitCritico() {
+        return REGLA_DEFICIT_CRITICO.equals(regla);
+    }
 }

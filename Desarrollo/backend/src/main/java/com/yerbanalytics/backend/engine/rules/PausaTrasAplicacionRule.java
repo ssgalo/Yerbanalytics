@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
+import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -68,7 +69,8 @@ public class PausaTrasAplicacionRule implements Rule {
                 ParametrosRiego.PAUSA_TRAS_APLICACION)) {
             return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, String.format(
                     "Al sector se le aplicó un insumo a las %s (hace menos de %s h): no se riega para no lavar el producto.",
-                    RiegoRuleSupport.hora(aplicacion), RiegoRuleSupport.num(ev.numero(ParametrosRiego.PAUSA_TRAS_APLICACION)))));
+                    RiegoRuleSupport.hora(aplicacion), RiegoRuleSupport.num(ev.numero(ParametrosRiego.PAUSA_TRAS_APLICACION))),
+                    CancelaRiego.SOLO_DEFICIT_COMUN));
         }
         return List.of(RuleAction.noopInfo(NAME, "La pausa tras la última aplicación de insumo ya se cumplió."));
     }
