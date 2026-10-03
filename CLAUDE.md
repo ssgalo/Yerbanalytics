@@ -27,8 +27,10 @@ Yerbanalytics/
 │   ├── simulador/     Simulador de hardware — proyecto propio y borrable (ver §6.2)
 │   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
 │   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
+│   ├── embebido/      Firmware ESP32 (nodo testigo y actuadores); fuente del contrato MQTT
 │   └── Modelo_IA/     Modelo de visión: datasets, notebooks, resultados (ver §5)
 ├── Documentacion/     Documentos de negocio, alcance, arquitectura, entregas
+├── docs-motor-reglas-e-integracion/  Reglas agronómicas v2, su comparación con el motor, circuito de sensado, guía del ESP32 (ver §6)
 ├── openspec/          Spec-driven development (ver §3)
 ├── .claude/           Skills y comandos de OpenSpec para Claude Code
 └── README.md
@@ -131,7 +133,9 @@ npm run dev          # http://localhost:5173
   Sparkline, Icon.
 - **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown.
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
-  diagnostics, placeholder.
+  diagnostics, reglas, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
+  *Parámetros* (edita el catálogo de umbrales) e *Inspector* (el grafo de reglas con la última
+  evaluación de un sector).
 - **Routing**: react-router (`src/router.tsx`).
 
 ### Convenciones de estilo
@@ -176,8 +180,12 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay dos scripts para correr a mano:
+> ni borra lo obsoleto, así que hay cuatro scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
+> - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
+>   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
+> - `resources/migracion-reglas-riego.sql` — limpia lo que dejaron las reglas de riego v2 y baja
+>   `riego_vol_max_diario_ml`.
 > - `resources/migracion-quitar-simulador.sql` — baja de `modo_operacion` y `sensor_simulado`,
 >   que eran estado de una herramienta de prueba dentro de la base de producción (ver §6.2).
 >
@@ -192,6 +200,8 @@ cd Desarrollo/backend
 ### Endpoints principales
 - `GET /api/nursery` → snapshot del vivero (`NurseryData` en `frontend/src/types/domain.ts`).
   Cada zona trae `lectura` (las 10 métricas evaluadas) y `nodo` (batería/señal del testigo).
+- `GET/PUT /api/rules/parametros`, `GET /api/rules/evaluaciones/{sectorId}`, `GET /api/rules/schema`
+  → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
 - `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa una carga manual
   hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de origen y sin
   ningún estado global que lo condicione (ver §6.1).
@@ -203,8 +213,16 @@ cd Desarrollo/backend
 - **`spring.jpa.open-in-view=false`.** No revertir sin leer el porqué en el README del
   backend: con el stream SSE de órdenes, cada dispositivo conectado retendría una conexión
   JDBC permanente.
-- **El backend sólo *consume* MQTT.** No tiene publicador ni debería tenerlo: quien publica es
-  el hardware, o el simulador que lo reemplaza (§6.2).
+- **El backend consume la telemetría por MQTT y sólo publica comandos a los actuadores.** No
+  publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
+  (§6.2). No escucha el ACK de los comandos.
+- **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
+  editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
+  los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
+- **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
+  zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
+  operar sin E-01/S-06: README del backend y
+  `docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md`.
 - **El backend no tiene modos de operación.** Ningún endpoint, tabla ni propiedad depende de
   que el sistema esté "en simulación": se comporta siempre como en producción.
 
@@ -282,6 +300,8 @@ Invariantes a respetar al tocar esta área:
   dispositivo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
+  Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
+  anterior del firmware no compila a propósito.
 
 No confundir el simulador con el **modo estático** del dashboard: ése es
 `VITE_DATA_SOURCE=mock` (§4), una demo ilustrativa sin backend. El simulador es lo contrario —
@@ -315,3 +335,5 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Cómo generar la APK de cámara | `Desarrollo/camara-android/README.md` |
 | Curación de datasets | `Desarrollo/Modelo_IA/informe-curacion-datasets.md` |
 | Negocio / alcance | `Documentacion/` |
+| Reglas agronómicas y su estado en el motor | `docs-motor-reglas-e-integracion/` (`reglas_v2.md`, `diferencias-motor-reglas-vs-reglas-v2.md`) |
+| Del sensor al motor / conectar el ESP32 | `docs-motor-reglas-e-integracion/circuito-sensado-a-motor.md`, `conectar-esp32.md` |

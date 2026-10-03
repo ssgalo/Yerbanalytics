@@ -2,7 +2,8 @@
 
 - Último commit válido: ver `git log` (rama `feat/implementar-nuevas-reglas`).
 - §0-§13 completos; §11.2 (compilar el firmware) queda sin tildar: no hay toolchain.
-- Falta: §14 (documentación), §15 (verificación manual con simulador y broker) y compilar el firmware (11.2).
+- §14 (documentación) hecho: `diferencias-motor-reglas-vs-reglas-v2.md`, `circuito-sensado-a-motor.md`, `conectar-esp32.md`, README del backend y `CLAUDE.md`.
+- Falta: §15 (verificación manual con simulador y broker) y compilar el firmware (11.2).
 - Correcciones de la revisión de la conmutación (ver `design.md`, "Correcciones de la revisión de la conmutación"):
   C1 la ronda se completa (cancelación explícita), C2 el despacho revalida al abrir, C3 R-02 sin guarda de ciclo,
   C4 último riego en memoria — hechas (commit `fix(backend): completar la ronda de riego y revalidar al despachar`).

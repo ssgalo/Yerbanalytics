@@ -208,15 +208,15 @@ Cada test usa `ReglaTestSupport` y verifica acciones **y** comparaciones de la t
 
 ## 14. Documentación
 
-- [ ] 14.1 Actualizar `docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md`:
+- [x] 14.1 Actualizar `docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md`:
       §2 (disparadores, orden, acciones tipadas, estado de la válvula, origen de parámetros, zona
       horaria), §3 (R-01…R-06 implementadas, con las desviaciones: ciclo de lectura, tope de R-02
       sin S-06, ventana cerrada a minuto), §4.2, §4.9 (principios 3, 6, 8 y 9), §5 (puntos 1, 2 y
       13 resueltos; nuevo: pronóstico consultado sin `timezone` hasta este cambio), §6.1 y §6.3.
-- [ ] 14.2 `circuito-sensado-a-motor.md`: comando con duración calculada, despacho por tandas,
+- [x] 14.2 `circuito-sensado-a-motor.md`: comando con duración calculada, despacho por tandas,
       columnas nuevas, límite de válvula 1200 s; §5.4 (ACK) sigue abierto pero ya no deja la válvula
       enganchada.
-- [ ] 14.3 README del backend: script `migracion-reglas-riego.sql`, despacho y su property, DA-5
+- [x] 14.3 README del backend: script `migracion-reglas-riego.sql`, despacho y su property, DA-5
       (no operar con plantines reales sin E-01/S-06). README del firmware: límite y flag del
       caudalímetro, actualizar el `config.h` local. `CLAUDE.md` §6/§6.2: el contrato MQTT suma la
       duración máxima de la válvula.
