@@ -112,19 +112,19 @@ comparaciones esperadas en la traza; después se mueve la regla a `evaluate(ctx,
 
 ## 5. Mudanza de `configuracion_operativa` (PR 3)
 
-- [ ] 5.1 Test: `GET /api/configuracion` ya no trae `riegoTiempoMaxSeg` ni
+- [x] 5.1 Test: `GET /api/configuracion` ya no trae `riegoTiempoMaxSeg` ni
       `mediasombraAperturaMaxPct`; `PUT` sin esos campos → 200. Quitar los campos de entidad, DTO,
       `defaultOperativa()` y validación.
-- [ ] 5.2 Test: `validarRustificacion` rechaza una etapa con apertura mayor al valor vigente de
+- [x] 5.2 Test: `validarRustificacion` rechaza una etapa con apertura mayor al valor vigente de
       `mediasombra.apertura-maxima` del catálogo. Adaptar `ConfiguracionService:175-176,228-251`.
-- [ ] 5.3 Escribir `res/migracion-catalogo-parametros.sql`: copia a `parametro_regla` los dos
+- [ ] 5.3 (escrito; falta verificarlo a mano contra una base sembrada con valores no de fábrica) Escribir `res/migracion-catalogo-parametros.sql`: copia a `parametro_regla` los dos
       valores sólo si difieren de fábrica, baja las columnas, y trae comentado el bloque inverso
       (`ADD COLUMN … DEFAULT`). Encabezado con el mismo formato que `migracion-quitar-simulador.sql`.
       Verificarlo a mano contra una base sembrada con valores no de fábrica.
-- [ ] 5.4 README del backend: sumar el script a la sección de migraciones manuales y documentar
+- [ ] 5.4 (README hecho; falta CLAUDE.md §6, fuera del alcance del backend) README del backend: sumar el script a la sección de migraciones manuales y documentar
       `/api/rules/parametros` y `/api/rules/evaluaciones`. Actualizar `CLAUDE.md` §6 (migraciones
       pendientes).
-- [ ] 5.5 Test que genera `fe/data/mock/catalogoReglas.fixture.json` desde el catálogo de fábrica y
+- [ ] 5.5 (pendiente: escribe en el frontend, va con el bloque 6) Test que genera `fe/data/mock/catalogoReglas.fixture.json` desde el catálogo de fábrica y
       falla si el archivo commiteado difiere (D8 / *Risks*).
 
 ## 6. Frontend: capa de datos (PR 4)

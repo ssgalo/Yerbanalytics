@@ -1,11 +1,13 @@
 package com.yerbanalytics.backend.dto;
 
-/** Límites operativos de actuadores y parámetros de seguimiento (HU-15). */
+/**
+ * Límites operativos que NO son umbrales de reglas y parámetros de seguimiento (HU-15). El tiempo
+ * máximo de apertura de riego y la apertura máxima de la mediasombra se mudaron al catálogo de
+ * parámetros de reglas ({@code GET/PUT /api/rules/parametros}).
+ */
 public record ConfiguracionOperativa(
-        double riegoTiempoMaxSeg,
         double riegoVolMaxDiarioMl,
         double insumoDosisMax24hMl,
-        double mediasombraAperturaMaxPct,
         int seguimientoLatenciaMin,
         double seguimientoDeltaMin,
         int intervaloSensadoMinutos,

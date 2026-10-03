@@ -5,6 +5,8 @@ import com.yerbanalytics.backend.dto.ConfiguracionOperativa;
 import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.dto.RustificacionEtapa;
 import com.yerbanalytics.backend.dto.UmbralMetrica;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.RustificacionEtapaEntity;
 import com.yerbanalytics.backend.model.UmbralMetricaEntity;
@@ -40,6 +42,7 @@ public class ConfiguracionService {
     private final ConfiguracionOperativaRepository operativaRepository;
     private final RustificacionEtapaRepository rustificacionRepository;
     private final HistorialService historialService;
+    private final CatalogoParametrosService catalogoParametros;
 
     /** Metadatos de fábrica por clave de métrica (label, unit, dec, base, envelope). */
     private final Map<String, MetricSpec> factory;
@@ -52,11 +55,13 @@ public class ConfiguracionService {
     public ConfiguracionService(UmbralMetricaRepository umbralRepository,
                                 ConfiguracionOperativaRepository operativaRepository,
                                 RustificacionEtapaRepository rustificacionRepository,
-                                @Lazy HistorialService historialService) {
+                                @Lazy HistorialService historialService,
+                                CatalogoParametrosService catalogoParametros) {
         this.umbralRepository = umbralRepository;
         this.operativaRepository = operativaRepository;
         this.rustificacionRepository = rustificacionRepository;
         this.historialService = historialService;
+        this.catalogoParametros = catalogoParametros;
 
         Map<String, MetricSpec> map = new LinkedHashMap<>();
         for (MetricSpec sp : SPECS) {
@@ -97,8 +102,8 @@ public class ConfiguracionService {
 
     private ConfiguracionOperativa buildOperativaDto(ConfiguracionOperativaEntity e) {
         return new ConfiguracionOperativa(
-                e.getRiegoTiempoMaxSeg(), e.getRiegoVolMaxDiarioMl(), e.getInsumoDosisMax24hMl(),
-                e.getMediasombraAperturaMaxPct(), e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
+                e.getRiegoVolMaxDiarioMl(), e.getInsumoDosisMax24hMl(),
+                e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
                 e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : 240,
                 e.getIntervaloEvaluacionMinutos() != null ? e.getIntervaloEvaluacionMinutos() : 5,
                 e.getUpdatedBy(), e.getUpdatedTs());
@@ -136,10 +141,8 @@ public class ConfiguracionService {
         ConfiguracionOperativaEntity oe = operativaRepository.findById(OPERATIVA_ID)
                 .orElseGet(ConfiguracionOperativaEntity::new);
         oe.setId(OPERATIVA_ID);
-        oe.setRiegoTiempoMaxSeg(op.riegoTiempoMaxSeg());
         oe.setRiegoVolMaxDiarioMl(op.riegoVolMaxDiarioMl());
         oe.setInsumoDosisMax24hMl(op.insumoDosisMax24hMl());
-        oe.setMediasombraAperturaMaxPct(op.mediasombraAperturaMaxPct());
         oe.setSeguimientoLatenciaMin(op.seguimientoLatenciaMin());
         oe.setSeguimientoDeltaMin(op.seguimientoDeltaMin());
         oe.setIntervaloSensadoMinutos(op.intervaloSensadoMinutos());
@@ -172,8 +175,9 @@ public class ConfiguracionService {
         }
         validarUmbrales(cfg.umbrales());
         validarOperativa(cfg.operativa());
+        // La apertura máxima es un parámetro del catálogo de reglas: se valida contra su valor vigente.
         validarRustificacion(cfg.rustificacion(),
-                cfg.operativa() != null ? cfg.operativa().mediasombraAperturaMaxPct() : 100);
+                catalogoParametros.vigentes().numero(ParametrosMediasombra.APERTURA_MAXIMA));
     }
 
     private void validarUmbrales(List<UmbralMetrica> umbrales) {
@@ -212,17 +216,12 @@ public class ConfiguracionService {
         if (op == null) {
             throw new InvalidConfigurationException("Faltan los límites operativos.");
         }
-        requirePositive(op.riegoTiempoMaxSeg(), "el tiempo máximo de apertura de riego");
         requirePositive(op.riegoVolMaxDiarioMl(), "el volumen máximo diario de riego");
         requirePositive(op.insumoDosisMax24hMl(), "la dosis máxima de insumo por 24 h");
         requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
         requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
         requirePositive(op.intervaloSensadoMinutos(), "el intervalo de sensado");
         requirePositive(op.intervaloEvaluacionMinutos(), "el intervalo de evaluación");
-        if (op.mediasombraAperturaMaxPct() <= 0 || op.mediasombraAperturaMaxPct() > 100) {
-            throw new InvalidConfigurationException(
-                    "La apertura máxima de mediasombra debe estar entre 0 y 100 %.");
-        }
     }
 
     private void validarRustificacion(List<RustificacionEtapa> etapas, double aperturaMax) {
@@ -339,10 +338,8 @@ public class ConfiguracionService {
     private ConfiguracionOperativaEntity defaultOperativa() {
         ConfiguracionOperativaEntity e = new ConfiguracionOperativaEntity();
         e.setId(OPERATIVA_ID);
-        e.setRiegoTiempoMaxSeg(120);
         e.setRiegoVolMaxDiarioMl(2000);
         e.setInsumoDosisMax24hMl(15);
-        e.setMediasombraAperturaMaxPct(100);
         e.setSeguimientoLatenciaMin(2);
         e.setSeguimientoDeltaMin(5);
         e.setIntervaloSensadoMinutos(240);

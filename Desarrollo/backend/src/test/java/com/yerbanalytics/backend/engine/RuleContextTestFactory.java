@@ -48,10 +48,8 @@ public final class RuleContextTestFactory {
     public static ConfiguracionOperativaEntity defaultConfig() {
         return new ConfiguracionOperativaEntity(
                 1,
-                120.0,  // riegoTiempoMaxSeg
                 500.0,  // riegoVolMaxDiarioMl
                 50.0,   // insumoDosisMax24hMl
-                70.0,   // mediasombraAperturaMaxPct
                 5,      // seguimientoLatenciaMin
                 5.0,    // seguimientoDeltaMin
                 240,    // intervaloSensadoMinutos

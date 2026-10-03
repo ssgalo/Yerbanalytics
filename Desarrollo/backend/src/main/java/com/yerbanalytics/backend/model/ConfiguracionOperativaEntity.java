@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Límites operativos de actuadores y parámetros de seguimiento post-acción (HU-15).
+ * Límites operativos que no son umbrales de reglas y parámetros de seguimiento post-acción (HU-15).
+ * La apertura máxima de la mediasombra y el tiempo máx. de riego se mudaron al catálogo de reglas.
  * Fila única ({@code id = 1}); la calibración del vivero es global.
  */
 @Entity
@@ -24,20 +25,13 @@ public class ConfiguracionOperativaEntity {
     @Id
     private Integer id;
 
-    // --- Riego / electroválvula (HU-15 CA-04) ---
-    @Column(name = "riego_tiempo_max_seg", nullable = false)
-    private double riegoTiempoMaxSeg;
-
+    // --- Riego (HU-15 CA-04). El tiempo máx. de apertura vive en el catálogo de parámetros de reglas. ---
     @Column(name = "riego_vol_max_diario_ml", nullable = false)
     private double riegoVolMaxDiarioMl;
 
     // --- Insumos / bomba peristáltica (HU-15 CA-05) ---
     @Column(name = "insumo_dosis_max_24h_ml", nullable = false)
     private double insumoDosisMax24hMl;
-
-    // --- Mediasombra (HU-15 CA-06) ---
-    @Column(name = "mediasombra_apertura_max_pct", nullable = false)
-    private double mediasombraAperturaMaxPct;
 
     // --- Seguimiento post-acción (HU-15 CA-07) ---
     @Column(name = "seguimiento_latencia_min", nullable = false)

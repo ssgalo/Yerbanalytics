@@ -48,6 +48,26 @@ El script traslada las lecturas, recupera el estado de los nodos desde el regist
 hardware, convierte `ce` a dS/m y re-escala los umbrales de `uv`. Los `DROP COLUMN` quedan
 comentados a propósito: descomentalos recién después de verificar el resultado.
 
+### Migración manual pendiente · catálogo de parámetros de reglas
+
+El tiempo máximo de apertura de riego y la apertura máxima de la mediasombra se mudaron de
+`configuracion_operativa` al **catálogo de parámetros de reglas** (`riego.tiempo-max-apertura` y
+`mediasombra.apertura-maxima`), junto con el resto de los umbrales que comparan las reglas.
+`ddl-auto=update` **nunca baja columnas**: las dos quedan en la tabla como `NOT NULL` sin default y
+el primer `INSERT` de una fila operativa nueva falla. El backend arranca igual (la fila existente
+sólo se lee y los valores de fábrica son los mismos del seed).
+
+Corré `src/main/resources/migracion-catalogo-parametros.sql`:
+
+1. Arrancar la app una vez con el código nuevo → crea la tabla `parametro_regla`.
+2. Detener la app.
+3. Ejecutar el script.
+4. Volver a arrancar.
+
+Copia cada valor a `parametro_regla` **sólo si difiere de fábrica** (120 s y 100 %) y baja las
+columnas. Es idempotente y trae, comentado, el bloque inverso (`ADD COLUMN … DEFAULT …`) para un
+rollback del código.
+
 ### Migración manual pendiente · baja del estado del simulador
 
 El simulador se extrajo a `Desarrollo/simulador/`, un proyecto independiente, y con él salieron
@@ -90,6 +110,24 @@ El proyecto sigue el patrón multicapa clásico de Spring Boot:
 ## Endpoints
 
 - `GET /api/nursery`: Devuelve el snapshot completo del vivero (`NurseryData`). Hoy usa un generador determinístico con semilla configurable (`yerbanalytics.mock.seed`, default `20260613`).
+
+### Motor de reglas: catálogo de parámetros y traza de evaluación
+
+Los umbrales que comparan las reglas (antigüedad de la lectura, humedad de riego, lluvia, UV,
+confianza mínima del diagnóstico, límites de riegos y dosis en 24 h, aperturas de mediasombra…)
+viven en **un catálogo** (`engine/parametros/`), no en `application.properties`. Definiciones y
+valores de fábrica están en código; en la base (`parametro_regla`) sólo hay los overrides.
+Cada regla declara los parámetros que usa (`Rule.parametros()`) y sólo puede leer esos.
+
+- `GET /api/rules/parametros`: catálogo normalizado (`reglas` y `parametros`, cada parámetro una
+  vez con su `usadoPor`).
+- `PUT /api/rules/parametros`: edición en lote, todo o nada (`{"cambios":[{"clave","valor"}]}`;
+  `valor: null` restablece la fábrica). Valida tipo, rango y restricciones cruzadas; si algo falla
+  responde `400 {"errores":[{"clave","mensaje"}]}` y no persiste nada. Audita con `X-Usuario`.
+- `GET /api/rules/evaluaciones/{sectorId}?origen=TELEMETRIA|BARRIDO`: última traza de evaluación
+  del sector (qué recibió cada regla contra qué umbral). Vive en memoria: `204` si todavía no se
+  evaluó desde el arranque, `404` si el sector no existe.
+- `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros`.
 
 ## Captura de imágenes cenitales (HU-04 CA-01)
 
@@ -200,12 +238,14 @@ yerbanalytics.https.keystore=../certs/servidor.p12
 yerbanalytics.capturas.dir=./capturas
 yerbanalytics.capturas.timeout-orden-seg=60      # plazo antes de vencer una orden
 yerbanalytics.capturas.max-intentos=3            # antes de mandarla a ERROR
-yerbanalytics.capturas.confianza-minima=85       # umbral de concluyente (HU-04 CA-03)
 yerbanalytics.capturas.jwt-secret=...            # SOBRESCRIBIR EN PRODUCCIÓN
 yerbanalytics.capturas.ancho-max=1920            # la resolución la fija el backend,
 yerbanalytics.capturas.calidad-jpeg=0.85         # no el cliente
 yerbanalytics.cors.origins=...                   # agregar el origen de la app de cámara
 ```
+
+La confianza mínima de un diagnóstico concluyente (HU-04 CA-03) ya no es una propiedad: es el
+parámetro `diagnostico.confianza-minima` del catálogo de reglas, compartido con `SupplyRule`.
 
 `yerbanalytics.cors.origins` importa: el iPhone carga la app desde la IP de la máquina en la
 LAN y por HTTPS, no desde `localhost`. Acepta patrones (`https://192.168.0.*:5190`).
