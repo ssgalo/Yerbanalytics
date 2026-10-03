@@ -353,7 +353,11 @@ public class HistorialService {
                 meta.tint(),
                 meta.ink(),
                 meta.path(),
-                evo
+                evo,
+                e.getRegla(),
+                e.getAlerta(),
+                e.getVolumenL(),
+                e.getDuracionSeg()
         );
     }
 

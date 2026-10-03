@@ -50,7 +50,13 @@ public enum ActionType {
      * (Registro de Inacción). Permite que el usuario sepa por qué el sistema
      * decidió deliberadamente no actuar.
      */
-    NOOP_INFO;
+    NOOP_INFO,
+
+    /**
+     * Alerta del motor para el operador (nivel y texto en {@link DetalleAlerta}). No bloquea ni
+     * actúa sobre un actuador; el {@code ActionExecutor} la persiste como evento "Alerta".
+     */
+    ALERTA;
 
     /** @return true si esta acción debe detener la cadena de evaluación. */
     public boolean isBlocking() {

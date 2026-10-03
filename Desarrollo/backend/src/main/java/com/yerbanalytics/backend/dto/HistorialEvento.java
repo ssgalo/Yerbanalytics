@@ -23,5 +23,13 @@ public record HistorialEvento(
         String tint,
         String ink,
         String path,
-        Evolution evo
+        Evolution evo,
+        /** Regla que ordenó la acción; nulo si no aplica. */
+        String regla,
+        /** Nivel de la alerta (INFO | WARNING | CRITICAL); nulo si el evento no es una alerta. */
+        String alerta,
+        /** Volumen de riego ordenado, en litros; nulo si no es un riego. */
+        Double volumenL,
+        /** Duración de apertura ordenada, en segundos; nulo si no es un riego. */
+        Integer duracionSeg
 ) {}

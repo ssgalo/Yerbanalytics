@@ -81,4 +81,46 @@ public interface HistorialRepository extends JpaRepository<HistorialEventoEntity
     long countByTipoSinceTs(
             @Param("tipo") String tipo,
             @Param("desde") long desde);
+
+    /**
+     * Fila de {@link #ultimosPorSector}: el último evento de un sector por tipo y regla.
+     * {@code regla} es {@code null} en los eventos sin regla (p. ej. las aplicaciones de insumo).
+     */
+    interface UltimoEvento {
+        String getSectorId();
+
+        String getTipo();
+
+        String getRegla();
+
+        Long getTs();
+    }
+
+    /**
+     * Lo último que le pasó a cada sector de una zona (riegos e insumos desde {@code desde}), en
+     * UNA consulta: el contexto de riego se arma por zona, no por sector. El último riego de un
+     * sector es el mayor {@code ts} de sus filas "Riego"; el último ordenado por R-02, el de la fila
+     * con {@code regla = DeficitCriticoRule}.
+     */
+    @Query("""
+            SELECT h.sectorId AS sectorId, h.tipo AS tipo, h.regla AS regla, MAX(h.ts) AS ts
+            FROM HistorialEventoEntity h
+            WHERE h.zonaId = :zonaId
+              AND h.tipo IN ('Riego', 'Insumo')
+              AND h.ts >= :desde
+            GROUP BY h.sectorId, h.tipo, h.regla
+            """)
+    List<UltimoEvento> ultimosPorSector(@Param("zonaId") String zonaId, @Param("desde") long desde);
+
+    /**
+     * Riegos despachados con duración registrada desde {@code desde}: con ellos el despacho
+     * reconstruye, tras un reinicio, qué válvulas siguen abiertas.
+     */
+    @Query("""
+            SELECT h FROM HistorialEventoEntity h
+            WHERE h.tipo = 'Riego'
+              AND h.duracionSeg IS NOT NULL
+              AND h.ts >= :desde
+            """)
+    List<HistorialEventoEntity> riegosDesde(@Param("desde") long desde);
 }

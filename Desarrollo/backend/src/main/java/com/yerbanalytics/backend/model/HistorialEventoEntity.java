@@ -31,7 +31,7 @@ public class HistorialEventoEntity {
     @Column(name = "zona_name", nullable = false)
     private String zonaName;
 
-    /** Riego | Insumo | Mediasombra */
+    /** Riego | Insumo | Mediasombra | Info | Configuración | Alerta */
     @Column(nullable = false)
     private String tipo;
 
@@ -102,4 +102,22 @@ public class HistorialEventoEntity {
     /** Bloqueo de repetición autónoma ante "Sin efectividad" (HU-12 CA-03). */
     @Column(name = "bloqueo_repeticion", nullable = false)
     private boolean bloqueoRepeticion;
+
+    // --- Riego y alertas del motor (nulos en los eventos que no los usan) ---
+
+    /** Regla que ordenó la acción (p. ej. {@code RiegoPorDeficitRule}). */
+    @Column(name = "regla")
+    private String regla;
+
+    /** Nivel de una alerta: INFO | WARNING | CRITICAL. Nulo si el evento no es una alerta. */
+    @Column(name = "alerta")
+    private String alerta;
+
+    /** Volumen de riego ordenado, en litros. */
+    @Column(name = "volumen_l")
+    private Double volumenL;
+
+    /** Duración de apertura de la válvula ordenada, en segundos. */
+    @Column(name = "duracion_seg")
+    private Integer duracionSeg;
 }
