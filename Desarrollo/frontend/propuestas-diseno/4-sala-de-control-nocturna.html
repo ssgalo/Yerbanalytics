@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yerbanalytics: Sala de control</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;700;800&family=Chivo+Mono:wght@400;500;600&display=swap">
+<style>
+body{margin:0;background:#0F1714}
+a{color:#8FD9EA}a:hover{color:#E3EBE6}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #8FD9EA;outline-offset:2px}
+@media (max-width:760px){.nc-nav{flex-direction:row !important;overflow-x:auto}.nc-nav a{white-space:nowrap}.nc-side-foot{display:none !important}.nc-pad{padding:14px 16px 32px !important}}
+</style>
+</head>
+<body>
+<div style="background:#0F1714;color:#E3EBE6;font-family:'Chivo',sans-serif;font-size:14px;line-height:1.45">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<defs>
+<pattern id="nc-obs" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#F0B43C"></rect><circle cx="5" cy="5" r="1.8" fill="#3A2805"></circle></pattern>
+<pattern id="nc-crit" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#FF6E6E"></rect><path d="M3 3l4 4M7 3l-4 4" stroke="#3B0C0C" stroke-width="1.4"></path></pattern>
+<pattern id="nc-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#16211D"></rect><path d="M0 10L10 0" stroke="#8E9A95" stroke-width="1.4"></path></pattern>
+<pattern id="nc-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0V10H0" fill="none" stroke="#16211D" stroke-width="1.6"></path></pattern>
+</defs>
+</svg>
+
+<div style="display:flex;flex-wrap:wrap;align-items:stretch">
+
+<aside style="flex:1 1 196px;background:#0B110F;border-right:1px solid #26332E;padding:18px 12px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;gap:10px;padding:0 6px">
+<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#4FC58D" stroke-width="1.8" aria-hidden="true"><path d="M13 2c6 4 8 10 6 17-1 3-3 5-6 5s-5-2-6-5C5 12 7 6 13 2z"></path><path d="M13 6v17"></path></svg>
+<div style="font-weight:800;font-size:16px">Yerbanalytics</div>
+</div>
+<nav aria-label="Secciones" class="nc-nav" style="display:flex;flex-direction:column;gap:2px">
+<a href="#" aria-current="page" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:4px;background:#1E2B26;color:#E3EBE6;text-decoration:none;font-weight:700">Panel</a>
+<a href="#" style="display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:4px;color:#C4D1CB;text-decoration:none">Diagnósticos de IA<span style="font-family:'Chivo Mono',monospace;color:#F0B43C">23</span></a>
+<a href="#" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:4px;color:#C4D1CB;text-decoration:none">Historial</a>
+<a href="#" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:4px;color:#C4D1CB;text-decoration:none">Motor de reglas</a>
+<a href="#" style="display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:4px;color:#C4D1CB;text-decoration:none">Hardware<span style="font-family:'Chivo Mono',monospace;color:#FF6E6E">1</span></a>
+<a href="#" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:4px;color:#C4D1CB;text-decoration:none">Topología</a>
+<a href="#" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:4px;color:#C4D1CB;text-decoration:none">Configuración</a>
+</nav>
+<div class="nc-side-foot" style="margin-top:auto;font-family:'Chivo Mono',monospace;font-size:12px;color:#9DB0A7;padding:0 6px;line-height:1.7">
+<div>broker mqtt conectado</div>
+<div>último mensaje 10:42:18</div>
+<div>turno: M. Duarte</div>
+</div>
+</aside>
+
+<main class="nc-pad" style="flex:999 1 560px;min-width:0;padding:16px 24px 32px;display:flex;flex-direction:column;gap:16px">
+
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;border-bottom:1px solid #26332E;padding-bottom:14px">
+<h1 style="margin:0;font-size:20px;font-weight:800;flex:0 0 auto">Panel general</h1>
+<div style="display:flex;flex-wrap:wrap;gap:6px 18px;font-family:'Chivo Mono',monospace;font-size:13px;flex:1 1 380px">
+<span style="color:#4FC58D">datos de hace 12 s</span>
+<span>nodos <b>5</b>/6</span>
+<span>sectores con atención <b style="color:#F0B43C">164</b>/600</span>
+<span>acciones hoy <b>41</b></span>
+<span>IA sin validar <b style="color:#F0B43C">23</b></span>
+</div>
+<form role="search" style="display:flex;align-items:center;gap:8px">
+<label for="nc-buscar" style="font-size:13px;color:#9DB0A7">Ir a sector</label>
+<input id="nc-buscar" type="text" placeholder="MZ-2-014" style="width:130px;font-family:'Chivo Mono',monospace;font-size:14px;padding:7px 10px;border:1px solid #3A4A44;border-radius:4px;background:#16211D;color:#E3EBE6">
+</form>
+</header>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;align-items:start">
+
+<section aria-labelledby="nc-cola" style="background:#16211D;border:1px solid #26332E;border-radius:6px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-bottom:1px solid #26332E"><h2 id="nc-cola" style="margin:0;font-size:15px;font-weight:700">Cola de trabajo por causa</h2><a href="#" style="font-size:13px">ver 164</a></div>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+<thead><tr style="color:#9DB0A7;text-align:left"><th scope="col" style="padding:6px 14px;font-weight:500">Causa</th><th scope="col" style="padding:6px 8px;font-weight:500;text-align:right">Sect.</th><th scope="col" style="padding:6px 8px;font-weight:500">Dónde</th><th scope="col" style="padding:6px 14px;font-weight:500">Estado</th></tr></thead>
+<tbody>
+<tr style="border-top:1px solid #26332E"><td style="padding:8px 14px"><span style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 14 14" aria-label="Crítico" role="img"><path d="M7 0.8L13.2 7 7 13.2 0.8 7Z" fill="#FF6E6E"></path></svg>Daño biótico</span></td><td style="padding:8px;text-align:right;font-family:'Chivo Mono',monospace;color:#FF6E6E">6</td><td style="padding:8px;font-family:'Chivo Mono',monospace">MZ-4, MZ-2</td><td style="padding:8px 14px">requiere persona</td></tr>
+<tr style="border-top:1px solid #26332E"><td style="padding:8px 14px"><span style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 14 14" aria-label="Crítico" role="img"><path d="M7 0.8L13.2 7 7 13.2 0.8 7Z" fill="#FF6E6E"></path></svg>Sustrato seco</span></td><td style="padding:8px;text-align:right;font-family:'Chivo Mono',monospace;color:#FF6E6E">19</td><td style="padding:8px;font-family:'Chivo Mono',monospace">MZ-4</td><td style="padding:8px 14px;color:#8FD9EA">riego 2/3</td></tr>
+<tr style="border-top:1px solid #26332E"><td style="padding:8px 14px"><span style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 14 14" aria-label="Fuera de servicio" role="img"><circle cx="7" cy="7" r="5.4" fill="none" stroke="#8E9A95" stroke-width="1.6"></circle><path d="M3.3 10.7L10.7 3.3" stroke="#8E9A95" stroke-width="1.6"></path></svg>Nodo sin señal</span></td><td style="padding:8px;text-align:right;font-family:'Chivo Mono',monospace">100</td><td style="padding:8px;font-family:'Chivo Mono',monospace">MZ-6</td><td style="padding:8px 14px">2 h 14 min</td></tr>
+<tr style="border-top:1px solid #26332E"><td style="padding:8px 14px"><span style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 14 14" aria-label="En observación" role="img"><path d="M7 1.5L13 12.5H1Z" fill="#F0B43C"></path></svg>Clorosis</span></td><td style="padding:8px;text-align:right;font-family:'Chivo Mono',monospace;color:#F0B43C">14</td><td style="padding:8px;font-family:'Chivo Mono',monospace">MZ-4, MZ-2</td><td style="padding:8px 14px">insumo en espera</td></tr>
+<tr style="border-top:1px solid #26332E"><td style="padding:8px 14px"><span style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 14 14" aria-label="En observación" role="img"><path d="M7 1.5L13 12.5H1Z" fill="#F0B43C"></path></svg>Estrés solar</span></td><td style="padding:8px;text-align:right;font-family:'Chivo Mono',monospace;color:#F0B43C">9</td><td style="padding:8px;font-family:'Chivo Mono',monospace">MZ-4, MZ-6</td><td style="padding:8px 14px;color:#8FD9EA">sombra 50 %</td></tr>
+<tr style="border-top:1px solid #26332E"><td style="padding:8px 14px"><span style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 14 14" aria-label="En observación" role="img"><path d="M7 1.5L13 12.5H1Z" fill="#F0B43C"></path></svg>No concluyente</span></td><td style="padding:8px;text-align:right;font-family:'Chivo Mono',monospace;color:#F0B43C">7</td><td style="padding:8px;font-family:'Chivo Mono',monospace">varias</td><td style="padding:8px 14px">repetir foto</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section aria-labelledby="nc-ia" style="background:#16211D;border:1px solid #26332E;border-radius:6px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-bottom:1px solid #26332E"><h2 id="nc-ia" style="margin:0;font-size:15px;font-weight:700">Diagnósticos de IA recientes</h2><a href="#" style="font-size:13px">ver 23 sin validar</a></div>
+<ul style="list-style:none;margin:0;padding:0">
+<li style="display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid #26332E">
+<svg width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="Captura de MZ-4-037"><rect width="44" height="44" rx="3" fill="#3A281C"></rect><path d="M22 5c9 5 11 14 8 24-2 5-5 8-8 8s-6-3-8-8C11 19 13 10 22 5z" fill="#3F6E33"></path><circle cx="19" cy="18" r="2" fill="#B07A34"></circle><circle cx="25" cy="25" r="1.6" fill="#B07A34"></circle></svg>
+<div><div style="font-family:'Chivo Mono',monospace">MZ-4-037 <span style="color:#9DB0A7">10:36</span></div><div style="color:#FF6E6E;font-weight:700">Daño biótico 91 %</div></div>
+<div style="display:flex;gap:6px"><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #4FC58D;background:transparent;color:#4FC58D;cursor:pointer">Confirmar</button><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #3A4A44;background:transparent;color:#E3EBE6;cursor:pointer">Corregir</button></div>
+</li>
+<li style="display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid #26332E">
+<svg width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="Captura de MZ-2-014"><rect width="44" height="44" rx="3" fill="#3A281C"></rect><path d="M22 5c9 5 11 14 8 24-2 5-5 8-8 8s-6-3-8-8C11 19 13 10 22 5z" fill="#B9B649"></path></svg>
+<div><div style="font-family:'Chivo Mono',monospace">MZ-2-014 <span style="color:#9DB0A7">10:31</span></div><div style="color:#F0B43C;font-weight:700">Clorosis 87 %</div></div>
+<div style="display:flex;gap:6px"><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #4FC58D;background:transparent;color:#4FC58D;cursor:pointer">Confirmar</button><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #3A4A44;background:transparent;color:#E3EBE6;cursor:pointer">Corregir</button></div>
+</li>
+<li style="display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid #26332E">
+<svg width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="Captura de MZ-4-052"><rect width="44" height="44" rx="3" fill="#3A281C"></rect><path d="M22 5c9 5 11 14 8 24-2 5-5 8-8 8s-6-3-8-8C11 19 13 10 22 5z" fill="#3F6E33"></path><path d="M22 5c9 5 11 14 8 24" fill="none" stroke="#C9A24A" stroke-width="3"></path></svg>
+<div><div style="font-family:'Chivo Mono',monospace">MZ-4-052 <span style="color:#9DB0A7">10:22</span></div><div style="color:#F0B43C;font-weight:700">Estrés solar 93 %</div></div>
+<div style="display:flex;gap:6px"><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #4FC58D;background:transparent;color:#4FC58D;cursor:pointer">Confirmar</button><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #3A4A44;background:transparent;color:#E3EBE6;cursor:pointer">Corregir</button></div>
+</li>
+<li style="display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:8px 14px">
+<svg width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="Captura de MZ-1-008"><rect width="44" height="44" rx="3" fill="#3A281C"></rect><path d="M22 5c9 5 11 14 8 24-2 5-5 8-8 8s-6-3-8-8C11 19 13 10 22 5z" fill="#4E8A3A"></path></svg>
+<div><div style="font-family:'Chivo Mono',monospace">MZ-1-008 <span style="color:#9DB0A7">10:14</span></div><div style="color:#4FC58D;font-weight:700">Sano 97 %</div></div>
+<div style="display:flex;gap:6px"><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #4FC58D;background:transparent;color:#4FC58D;cursor:pointer">Confirmar</button><button type="button" style="font:inherit;font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #3A4A44;background:transparent;color:#E3EBE6;cursor:pointer">Corregir</button></div>
+</li>
+</ul>
+</section>
+</div>
+
+<section aria-labelledby="nc-matriz" style="background:#16211D;border:1px solid #26332E;border-radius:6px">
+<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 14px;border-bottom:1px solid #26332E">
+<h2 id="nc-matriz" style="margin:0;font-size:15px;font-weight:700">Macro-zonas: proporción de estados y lectura del nodo testigo</h2>
+<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:#C4D1CB">
+<span style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="#4FC58D"></circle></svg>Saludable</span>
+<span style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5L13 12.5H1Z" fill="#F0B43C"></path></svg>En observación</span>
+<span style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 0.8L13.2 7 7 13.2 0.8 7Z" fill="#FF6E6E"></path></svg>Crítico</span>
+<span style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.4" fill="none" stroke="#8E9A95" stroke-width="1.6"></circle><path d="M3.3 10.7L10.7 3.3" stroke="#8E9A95" stroke-width="1.6"></path></svg>Fuera de servicio</span>
+<span>suelo* = informativa, no cambia el estado</span>
+</div>
+</div>
+<div style="overflow-x:auto">
+<table style="width:100%;min-width:1060px;border-collapse:collapse;font-size:13px;font-family:'Chivo Mono',monospace;font-variant-numeric:tabular-nums">
+<thead style="font-family:'Chivo',sans-serif;color:#9DB0A7;text-align:right">
+<tr><th scope="col" style="text-align:left;padding:8px 14px;font-weight:500">Zona</th><th scope="col" style="text-align:left;padding:8px;font-weight:500">100 sectores</th><th scope="col" style="padding:8px;font-weight:500">Sano/Obs/Crít/FS</th><th scope="col" style="padding:8px;font-weight:500">Sustrato %</th><th scope="col" style="padding:8px;font-weight:500">Amb. %</th><th scope="col" style="padding:8px;font-weight:500">Aire °C</th><th scope="col" style="padding:8px;font-weight:500">Luz rel. %</th><th scope="col" style="padding:8px;font-weight:500">T sust. °C</th><th scope="col" style="padding:8px;font-weight:500">CE* dS/m</th><th scope="col" style="padding:8px;font-weight:500">pH*</th><th scope="col" style="padding:8px;font-weight:500">N*</th><th scope="col" style="padding:8px;font-weight:500">P*</th><th scope="col" style="padding:8px;font-weight:500">K*</th><th scope="col" style="padding:8px;font-weight:500">Nodo</th><th scope="col" style="padding:8px 14px;font-weight:500">Dato</th></tr>
+</thead>
+<tbody style="text-align:right">
+<tr style="border-top:1px solid #26332E"><th scope="row" style="text-align:left;padding:8px 14px;font-weight:600"><a href="#">MZ-1</a></th><td style="padding:6px 8px;text-align:left"><svg width="44" height="44" viewBox="0 0 100 100" role="img" aria-label="MZ-1: 91, 7, 2, 0"><rect x="0" y="0" width="100" height="90" fill="#4FC58D"></rect><rect x="0" y="90" width="10" height="10" fill="#4FC58D"></rect><rect x="10" y="90" width="70" height="10" fill="url(#nc-obs)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#nc-crit)"></rect><rect width="100" height="100" fill="url(#nc-grid)"></rect></svg></td><td style="padding:8px">91/7/2/0</td><td style="padding:8px">41</td><td style="padding:8px">68</td><td style="padding:8px">28,2</td><td style="padding:8px">71</td><td style="padding:8px">24,6</td><td style="padding:8px">1,1</td><td style="padding:8px">5,6</td><td style="padding:8px">128</td><td style="padding:8px">42</td><td style="padding:8px">171</td><td style="padding:8px">78 % −61</td><td style="padding:8px 14px;color:#4FC58D">8 s</td></tr>
+<tr style="border-top:1px solid #26332E"><th scope="row" style="text-align:left;padding:8px 14px;font-weight:600"><a href="#">MZ-2</a></th><td style="padding:6px 8px;text-align:left"><svg width="44" height="44" viewBox="0 0 100 100" role="img" aria-label="MZ-2: 74, 18, 6, 2"><rect x="0" y="0" width="100" height="70" fill="#4FC58D"></rect><rect x="0" y="70" width="40" height="10" fill="#4FC58D"></rect><rect x="40" y="70" width="60" height="10" fill="url(#nc-obs)"></rect><rect x="0" y="80" width="100" height="10" fill="url(#nc-obs)"></rect><rect x="0" y="90" width="20" height="10" fill="url(#nc-obs)"></rect><rect x="20" y="90" width="60" height="10" fill="url(#nc-crit)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#nc-off)"></rect><rect width="100" height="100" fill="url(#nc-grid)"></rect></svg></td><td style="padding:8px">74/18/6/2</td><td style="padding:8px">36</td><td style="padding:8px">64</td><td style="padding:8px">29,0</td><td style="padding:8px">76</td><td style="padding:8px">25,3</td><td style="padding:8px">1,4</td><td style="padding:8px">5,4</td><td style="padding:8px;color:#F0B43C">▲ 96</td><td style="padding:8px">39</td><td style="padding:8px">158</td><td style="padding:8px">64 % −67</td><td style="padding:8px 14px;color:#4FC58D">12 s</td></tr>
+<tr style="border-top:1px solid #26332E"><th scope="row" style="text-align:left;padding:8px 14px;font-weight:600"><a href="#">MZ-3</a></th><td style="padding:6px 8px;text-align:left"><svg width="44" height="44" viewBox="0 0 100 100" role="img" aria-label="MZ-3: 80, 14, 4, 2"><rect x="0" y="0" width="100" height="80" fill="#4FC58D"></rect><rect x="0" y="80" width="100" height="10" fill="url(#nc-obs)"></rect><rect x="0" y="90" width="40" height="10" fill="url(#nc-obs)"></rect><rect x="40" y="90" width="40" height="10" fill="url(#nc-crit)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#nc-off)"></rect><rect width="100" height="100" fill="url(#nc-grid)"></rect></svg></td><td style="padding:8px">80/14/4/2</td><td style="padding:8px">39</td><td style="padding:8px">66</td><td style="padding:8px">28,9</td><td style="padding:8px">74</td><td style="padding:8px">25,0</td><td style="padding:8px">1,2</td><td style="padding:8px">5,5</td><td style="padding:8px">121</td><td style="padding:8px">44</td><td style="padding:8px">166</td><td style="padding:8px">82 % −58</td><td style="padding:8px 14px;color:#4FC58D">5 s</td></tr>
+<tr style="border-top:1px solid #26332E;background:#1E2B26"><th scope="row" style="text-align:left;padding:8px 14px;font-weight:600"><a href="#">MZ-4</a></th><td style="padding:6px 8px;text-align:left"><svg width="44" height="44" viewBox="0 0 100 100" role="img" aria-label="MZ-4: 38, 36, 24, 2"><rect x="0" y="0" width="100" height="30" fill="#4FC58D"></rect><rect x="0" y="30" width="80" height="10" fill="#4FC58D"></rect><rect x="80" y="30" width="20" height="10" fill="url(#nc-obs)"></rect><rect x="0" y="40" width="100" height="30" fill="url(#nc-obs)"></rect><rect x="0" y="70" width="40" height="10" fill="url(#nc-obs)"></rect><rect x="40" y="70" width="60" height="10" fill="url(#nc-crit)"></rect><rect x="0" y="80" width="100" height="10" fill="url(#nc-crit)"></rect><rect x="0" y="90" width="80" height="10" fill="url(#nc-crit)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#nc-off)"></rect><rect width="100" height="100" fill="url(#nc-grid)"></rect></svg></td><td style="padding:8px">38/36/<span style="color:#FF6E6E">24</span>/2</td><td style="padding:8px;color:#FF6E6E;font-weight:600">◆ 22</td><td style="padding:8px;color:#F0B43C">▲ 48</td><td style="padding:8px;color:#F0B43C">▲ 31,4</td><td style="padding:8px">88</td><td style="padding:8px">27,1</td><td style="padding:8px;color:#F0B43C">▲ 1,9</td><td style="padding:8px">5,2</td><td style="padding:8px">112</td><td style="padding:8px">38</td><td style="padding:8px">164</td><td style="padding:8px">55 % −72</td><td style="padding:8px 14px;color:#4FC58D">12 s</td></tr>
+<tr style="border-top:1px solid #26332E"><th scope="row" style="text-align:left;padding:8px 14px;font-weight:600"><a href="#">MZ-5</a></th><td style="padding:6px 8px;text-align:left"><svg width="44" height="44" viewBox="0 0 100 100" role="img" aria-label="MZ-5: 83, 13, 3, 1"><rect x="0" y="0" width="100" height="80" fill="#4FC58D"></rect><rect x="0" y="80" width="30" height="10" fill="#4FC58D"></rect><rect x="30" y="80" width="70" height="10" fill="url(#nc-obs)"></rect><rect x="0" y="90" width="60" height="10" fill="url(#nc-obs)"></rect><rect x="60" y="90" width="30" height="10" fill="url(#nc-crit)"></rect><rect x="90" y="90" width="10" height="10" fill="url(#nc-off)"></rect><rect width="100" height="100" fill="url(#nc-grid)"></rect></svg></td><td style="padding:8px">83/13/3/1</td><td style="padding:8px">44</td><td style="padding:8px">70</td><td style="padding:8px">28,4</td><td style="padding:8px">69</td><td style="padding:8px">24,8</td><td style="padding:8px">1,2</td><td style="padding:8px">5,7</td><td style="padding:8px">132</td><td style="padding:8px">45</td><td style="padding:8px">175</td><td style="padding:8px">90 % −55</td><td style="padding:8px 14px;color:#4FC58D">9 s</td></tr>
+<tr style="border-top:1px solid #26332E;color:#9DB0A7"><th scope="row" style="text-align:left;padding:8px 14px;font-weight:600"><a href="#">MZ-6</a></th><td style="padding:6px 8px;text-align:left"><svg width="44" height="44" viewBox="0 0 100 100" role="img" aria-label="MZ-6: 46, 30, 7, 17"><rect x="0" y="0" width="100" height="40" fill="#4FC58D"></rect><rect x="0" y="40" width="60" height="10" fill="#4FC58D"></rect><rect x="60" y="40" width="40" height="10" fill="url(#nc-obs)"></rect><rect x="0" y="50" width="100" height="20" fill="url(#nc-obs)"></rect><rect x="0" y="70" width="60" height="10" fill="url(#nc-obs)"></rect><rect x="60" y="70" width="40" height="10" fill="url(#nc-crit)"></rect><rect x="0" y="80" width="30" height="10" fill="url(#nc-crit)"></rect><rect x="30" y="80" width="70" height="10" fill="url(#nc-off)"></rect><rect x="0" y="90" width="100" height="10" fill="url(#nc-off)"></rect><rect width="100" height="100" fill="url(#nc-grid)"></rect></svg></td><td style="padding:8px;color:#E3EBE6">46/30/7/17</td><td style="padding:8px"><s>33</s></td><td style="padding:8px"><s>59</s></td><td style="padding:8px"><s>30,2</s></td><td style="padding:8px"><s>81</s></td><td style="padding:8px"><s>26,0</s></td><td style="padding:8px"><s>1,3</s></td><td style="padding:8px"><s>5,5</s></td><td style="padding:8px"><s>118</s></td><td style="padding:8px"><s>41</s></td><td style="padding:8px"><s>162</s></td><td style="padding:8px;color:#FF6E6E">11 % sin señal</td><td style="padding:8px 14px;color:#FF6E6E">2 h 14 min</td></tr>
+</tbody>
+</table>
+</div>
+<p style="margin:0;padding:8px 14px 12px;font-size:12px;color:#9DB0A7">Valores tachados: última lectura conocida, no vigente. Rangos: sustrato 35 a 55 %, aire 18 a 30 °C, CE 0,8 a 1,6 dS/m. N, P y K en mg/kg.</p>
+</section>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;align-items:start">
+<section aria-labelledby="nc-acc" style="background:#16211D;border:1px solid #26332E;border-radius:6px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-bottom:1px solid #26332E"><h2 id="nc-acc" style="margin:0;font-size:15px;font-weight:700">Acciones autónomas, hoy</h2><span style="font-family:'Chivo Mono',monospace;font-size:13px;color:#C4D1CB">riego 28 · insumo 7 · sombra 6</span></div>
+<ol style="list-style:none;margin:0;padding:6px 0;font-family:'Chivo Mono',monospace;font-size:13px">
+<li style="display:grid;grid-template-columns:52px 70px 1fr;gap:8px;padding:5px 14px"><span style="color:#9DB0A7">10:48</span><span style="color:#8FD9EA">riego</span><span>MZ-4 tanda 2/3, 10 válv. × 240 s</span></li>
+<li style="display:grid;grid-template-columns:52px 70px 1fr;gap:8px;padding:5px 14px"><span style="color:#9DB0A7">10:21</span><span style="color:#8FD9EA">riego</span><span>MZ-4 tanda 1/3, revalidada, ok</span></li>
+<li style="display:grid;grid-template-columns:52px 70px 1fr;gap:8px;padding:5px 14px"><span style="color:#9DB0A7">10:05</span><span style="color:#E3C77A">sombra</span><span>MZ-4 al 50 %, luz rel. 88 %</span></li>
+<li style="display:grid;grid-template-columns:52px 70px 1fr;gap:8px;padding:5px 14px"><span style="color:#9DB0A7">09:31</span><span style="color:#C3B4F2">insumo</span><span>MZ-2-031 N 12 ml</span></li>
+<li style="display:grid;grid-template-columns:52px 70px 1fr;gap:8px;padding:5px 14px"><span style="color:#9DB0A7">08:12</span><span style="color:#8FD9EA">riego</span><span>MZ-1, MZ-3: 14 sect., 31 a 42 %</span></li>
+</ol>
+</section>
+<section aria-labelledby="nc-clima" style="background:#16211D;border:1px solid #26332E;border-radius:6px;padding:10px 14px 14px">
+<h2 id="nc-clima" style="margin:0 0 8px;font-size:15px;font-weight:700">Pronóstico externo</h2>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-family:'Chivo Mono',monospace;font-size:13px;text-align:center">
+<div style="border:1px solid #26332E;border-radius:4px;padding:8px"><div style="color:#9DB0A7">12 h</div><div style="font-size:18px">29°</div><div>UV 8</div></div>
+<div style="border:1px solid #26332E;border-radius:4px;padding:8px"><div style="color:#9DB0A7">15 h</div><div style="font-size:18px">31°</div><div>UV 6</div></div>
+<div style="border:1px solid #26332E;border-radius:4px;padding:8px"><div style="color:#9DB0A7">18 h</div><div style="font-size:18px">24°</div><div style="color:#8FD9EA">70 % lluvia</div></div>
+<div style="border:1px solid #26332E;border-radius:4px;padding:8px"><div style="color:#9DB0A7">21 h</div><div style="font-size:18px">21°</div><div style="color:#8FD9EA">85 % lluvia</div></div>
+</div>
+<p style="margin:10px 0 0;font-size:12px;color:#9DB0A7">UV pronóstico del servicio meteorológico. La luz relativa de la tabla la mide el LDR de cada nodo y no es radiación UV.</p>
+</section>
+</div>
+
+</main>
+</div>
+</div>
+</body>
+</html>

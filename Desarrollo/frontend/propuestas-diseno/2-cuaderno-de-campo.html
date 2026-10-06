@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yerbanalytics: Cuaderno de campo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;500;600;700&family=Courier+Prime:wght@400;700&display=swap">
+<style>
+body{margin:0;background:#F3F4EE}
+a{color:#1F3A5F}a:hover{color:#B3261E}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px dashed #B3261E;outline-offset:3px}
+@media (max-width:760px){.pl-pad{padding:16px 16px 40px !important}.pl-cell{border-right:0 !important}}
+</style>
+</head>
+<body>
+<div style="background-color:#F3F4EE;background-image:linear-gradient(#E1E6E0 1px,transparent 1px),linear-gradient(90deg,#E1E6E0 1px,transparent 1px);background-size:24px 24px;color:#14243A;font-family:'Archivo Narrow',sans-serif;font-size:16px;line-height:1.45">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<defs>
+<pattern id="pl-obs" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#F6E3B0"></rect><path d="M0 8L8 0M-2 2L2 -2M6 10L10 6" stroke="#8A6100" stroke-width="1.3"></path></pattern>
+<pattern id="pl-crit" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#B3261E"></rect><path d="M0 8L8 0M0 0L8 8" stroke="#F3F4EE" stroke-width="0.9"></path></pattern>
+<pattern id="pl-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#FBFBF7"></rect><circle cx="5" cy="5" r="1.3" fill="#6B7177"></circle></pattern>
+<pattern id="pl-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0V10H0" fill="none" stroke="#FBFBF7" stroke-width="1.3"></path></pattern>
+</defs>
+</svg>
+
+<div class="pl-pad" style="max-width:1280px;margin:0 auto;padding:28px 36px 56px;display:flex;flex-direction:column;gap:26px">
+
+<header style="border:2px solid #1F3A5F;background:#FBFBF7;display:flex;flex-wrap:wrap">
+<div class="pl-cell" style="flex:2 1 260px;padding:14px 18px;border-right:1px solid #1F3A5F;display:flex;align-items:center;gap:14px">
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#1F3A5F" stroke-width="1.4" aria-hidden="true"><path d="M20 4c8 6 11 14 8 24-2 5-5 8-8 8s-6-3-8-8C9 18 12 10 20 4z"></path><path d="M20 9v26M20 15l-5-3M20 15l5-3M20 22l-6-3M20 22l6-3M20 29l-4-2M20 29l4-2"></path></svg>
+<div><div style="font-weight:700;font-size:22px;letter-spacing:0.01em">Yerbanalytics</div><div style="font-size:14px;color:#3D4F66">Vivero San Ignacio, Misiones. Plano general de estado.</div></div>
+</div>
+<div class="pl-cell" style="flex:1 1 150px;padding:10px 16px;border-right:1px solid #1F3A5F"><div style="font-size:13px;color:#3D4F66">Hoja</div><div style="font-weight:600">Panel general</div></div>
+<div class="pl-cell" style="flex:1 1 170px;padding:10px 16px;border-right:1px solid #1F3A5F"><div style="font-size:13px;color:#3D4F66">Relevado</div><div style="font-family:'Courier Prime',monospace">06/10/2026 10:42:18</div></div>
+<div class="pl-cell" style="flex:1 1 150px;padding:10px 16px;border-right:1px solid #1F3A5F"><div style="font-size:13px;color:#3D4F66">Frescura</div><div style="font-weight:600;color:#2E6B47">Datos de hace 12 s</div></div>
+<form role="search" style="flex:1 1 220px;padding:10px 16px;display:flex;flex-direction:column;gap:2px">
+<label for="pl-buscar" style="font-size:13px;color:#3D4F66">Ir a sector</label>
+<input id="pl-buscar" type="text" placeholder="MZ-2-014" style="font-family:'Courier Prime',monospace;font-size:16px;border:0;border-bottom:1.5px solid #1F3A5F;background:transparent;padding:2px 0;color:#14243A;min-width:0">
+</form>
+</header>
+
+<nav aria-label="Secciones" style="display:flex;flex-wrap:wrap;gap:0;border-bottom:2px solid #1F3A5F">
+<a href="#" aria-current="page" style="padding:9px 16px;background:#1F3A5F;color:#FBFBF7;text-decoration:none;font-weight:600">Panel</a>
+<a href="#" style="padding:9px 16px;text-decoration:none;font-weight:500">Diagnósticos de IA <span style="font-family:'Courier Prime',monospace;color:#B3261E">(23)</span></a>
+<a href="#" style="padding:9px 16px;text-decoration:none;font-weight:500">Historial</a>
+<a href="#" style="padding:9px 16px;text-decoration:none;font-weight:500">Motor de reglas</a>
+<a href="#" style="padding:9px 16px;text-decoration:none;font-weight:500">Hardware</a>
+<a href="#" style="padding:9px 16px;text-decoration:none;font-weight:500">Topología</a>
+<a href="#" style="padding:9px 16px;text-decoration:none;font-weight:500">Configuración</a>
+</nav>
+
+<section aria-labelledby="pl-plano" style="border:1.5px solid #1F3A5F;background:#FBFBF7;padding:18px 18px 10px">
+<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 20px">
+<h1 id="pl-plano" style="margin:0;font-size:30px;font-weight:700;letter-spacing:-0.005em">Hoy hay que pasar por MZ-4 antes que por ningún otro lado.</h1>
+<p style="margin:0;font-size:15px;color:#3D4F66">Los números en círculo marcan el orden de recorrido sugerido.</p>
+</div>
+<svg viewBox="0 0 900 520" width="100%" style="display:block;margin-top:10px" role="img" aria-label="Plano del vivero con las seis macro-zonas y el riel">
+<g font-family="Archivo Narrow, sans-serif" fill="#14243A">
+<path d="M40 40H860M40 34v12M860 34v12" stroke="#1F3A5F" stroke-width="1"></path>
+<text x="450" y="30" text-anchor="middle" font-size="13">frente del vivero, 6 macro-zonas de 100 sectores</text>
+
+<rect x="60" y="60" width="240" height="170" fill="none" stroke="#1F3A5F" stroke-width="1.5"></rect>
+<text x="74" y="86" font-size="22" font-weight="700">MZ-1</text>
+<svg x="74" y="100" width="110" height="110" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="90" fill="#2E6B47"></rect><rect x="0" y="90" width="10" height="10" fill="#2E6B47"></rect><rect x="10" y="90" width="70" height="10" fill="url(#pl-obs)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#pl-crit)"></rect><rect width="100" height="100" fill="url(#pl-grid)"></rect></svg>
+<g font-family="Courier Prime, monospace" font-size="14"><text x="198" y="118">91 sanos</text><text x="198" y="138">7 obs.</text><text x="198" y="158">2 crít.</text><text x="198" y="178">0 f/s</text></g>
+<text x="198" y="206" font-size="12" fill="#3D4F66">hace 8 s</text>
+
+<rect x="330" y="60" width="240" height="170" fill="none" stroke="#1F3A5F" stroke-width="1.5"></rect>
+<text x="344" y="86" font-size="22" font-weight="700">MZ-2</text>
+<svg x="344" y="100" width="110" height="110" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="70" fill="#2E6B47"></rect><rect x="0" y="70" width="40" height="10" fill="#2E6B47"></rect><rect x="40" y="70" width="60" height="10" fill="url(#pl-obs)"></rect><rect x="0" y="80" width="100" height="10" fill="url(#pl-obs)"></rect><rect x="0" y="90" width="20" height="10" fill="url(#pl-obs)"></rect><rect x="20" y="90" width="60" height="10" fill="url(#pl-crit)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#pl-off)"></rect><rect width="100" height="100" fill="url(#pl-grid)"></rect></svg>
+<g font-family="Courier Prime, monospace" font-size="14"><text x="468" y="118">74 sanos</text><text x="468" y="138">18 obs.</text><text x="468" y="158">6 crít.</text><text x="468" y="178">2 f/s</text></g>
+<text x="468" y="206" font-size="12" fill="#3D4F66">hace 12 s</text>
+<circle cx="552" cy="80" r="12" fill="#FBFBF7" stroke="#B3261E" stroke-width="1.6"></circle><text x="552" y="85" text-anchor="middle" font-size="14" font-weight="700" fill="#B3261E">4</text>
+
+<rect x="600" y="60" width="240" height="170" fill="none" stroke="#1F3A5F" stroke-width="1.5"></rect>
+<text x="614" y="86" font-size="22" font-weight="700">MZ-3</text>
+<svg x="614" y="100" width="110" height="110" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="80" fill="#2E6B47"></rect><rect x="0" y="80" width="100" height="10" fill="url(#pl-obs)"></rect><rect x="0" y="90" width="40" height="10" fill="url(#pl-obs)"></rect><rect x="40" y="90" width="40" height="10" fill="url(#pl-crit)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#pl-off)"></rect><rect width="100" height="100" fill="url(#pl-grid)"></rect></svg>
+<g font-family="Courier Prime, monospace" font-size="14"><text x="738" y="118">80 sanos</text><text x="738" y="138">14 obs.</text><text x="738" y="158">4 crít.</text><text x="738" y="178">2 f/s</text></g>
+<text x="738" y="206" font-size="12" fill="#3D4F66">hace 5 s</text>
+
+<line x1="40" y1="258" x2="860" y2="258" stroke="#1F3A5F" stroke-width="1.5"></line>
+<line x1="40" y1="266" x2="860" y2="266" stroke="#1F3A5F" stroke-width="1.5"></line>
+<path d="M40 262h820" stroke="#1F3A5F" stroke-width="0.8" stroke-dasharray="2 6"></path>
+<rect x="44" y="250" width="26" height="24" fill="#FBFBF7" stroke="#1F3A5F" stroke-width="1.5"></rect><circle cx="57" cy="262" r="5" fill="none" stroke="#1F3A5F" stroke-width="1.5"></circle>
+<text x="80" y="252" font-size="12" fill="#3D4F66">riel con cámara, en home. Última pasada 09:40, 2 sectores fotografiados</text>
+
+<rect x="60" y="300" width="240" height="170" fill="none" stroke="#B3261E" stroke-width="2.5"></rect>
+<text x="74" y="326" font-size="22" font-weight="700">MZ-4</text>
+<svg x="74" y="340" width="110" height="110" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="30" fill="#2E6B47"></rect><rect x="0" y="30" width="80" height="10" fill="#2E6B47"></rect><rect x="80" y="30" width="20" height="10" fill="url(#pl-obs)"></rect><rect x="0" y="40" width="100" height="30" fill="url(#pl-obs)"></rect><rect x="0" y="70" width="40" height="10" fill="url(#pl-obs)"></rect><rect x="40" y="70" width="60" height="10" fill="url(#pl-crit)"></rect><rect x="0" y="80" width="100" height="10" fill="url(#pl-crit)"></rect><rect x="0" y="90" width="80" height="10" fill="url(#pl-crit)"></rect><rect x="80" y="90" width="20" height="10" fill="url(#pl-off)"></rect><rect width="100" height="100" fill="url(#pl-grid)"></rect></svg>
+<g font-family="Courier Prime, monospace" font-size="14"><text x="198" y="358">38 sanos</text><text x="198" y="378">36 obs.</text><text x="198" y="398" fill="#B3261E" font-weight="700">24 crít.</text><text x="198" y="418">2 f/s</text></g>
+<text x="198" y="446" font-size="12" fill="#3D4F66">hace 12 s</text>
+<circle cx="258" cy="320" r="12" fill="#B3261E"></circle><text x="258" y="325" text-anchor="middle" font-size="14" font-weight="700" fill="#FBFBF7">1</text>
+<circle cx="284" cy="320" r="12" fill="#FBFBF7" stroke="#B3261E" stroke-width="1.6"></circle><text x="284" y="325" text-anchor="middle" font-size="14" font-weight="700" fill="#B3261E">2</text>
+
+<rect x="330" y="300" width="240" height="170" fill="none" stroke="#1F3A5F" stroke-width="1.5"></rect>
+<text x="344" y="326" font-size="22" font-weight="700">MZ-5</text>
+<svg x="344" y="340" width="110" height="110" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="80" fill="#2E6B47"></rect><rect x="0" y="80" width="30" height="10" fill="#2E6B47"></rect><rect x="30" y="80" width="70" height="10" fill="url(#pl-obs)"></rect><rect x="0" y="90" width="60" height="10" fill="url(#pl-obs)"></rect><rect x="60" y="90" width="30" height="10" fill="url(#pl-crit)"></rect><rect x="90" y="90" width="10" height="10" fill="url(#pl-off)"></rect><rect width="100" height="100" fill="url(#pl-grid)"></rect></svg>
+<g font-family="Courier Prime, monospace" font-size="14"><text x="468" y="358">83 sanos</text><text x="468" y="378">13 obs.</text><text x="468" y="398">3 crít.</text><text x="468" y="418">1 f/s</text></g>
+<text x="468" y="446" font-size="12" fill="#3D4F66">hace 9 s</text>
+
+<rect x="600" y="300" width="240" height="170" fill="none" stroke="#1F3A5F" stroke-width="1.5" stroke-dasharray="8 5"></rect>
+<text x="614" y="326" font-size="22" font-weight="700">MZ-6</text>
+<svg x="614" y="340" width="110" height="110" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="40" fill="#2E6B47"></rect><rect x="0" y="40" width="60" height="10" fill="#2E6B47"></rect><rect x="60" y="40" width="40" height="10" fill="url(#pl-obs)"></rect><rect x="0" y="50" width="100" height="20" fill="url(#pl-obs)"></rect><rect x="0" y="70" width="60" height="10" fill="url(#pl-obs)"></rect><rect x="60" y="70" width="40" height="10" fill="url(#pl-crit)"></rect><rect x="0" y="80" width="30" height="10" fill="url(#pl-crit)"></rect><rect x="30" y="80" width="70" height="10" fill="url(#pl-off)"></rect><rect x="0" y="90" width="100" height="10" fill="url(#pl-off)"></rect><rect width="100" height="100" fill="url(#pl-grid)"></rect></svg>
+<g font-family="Courier Prime, monospace" font-size="14"><text x="738" y="358">46 sanos</text><text x="738" y="378">30 obs.</text><text x="738" y="398">7 crít.</text><text x="738" y="418">17 f/s</text></g>
+<text x="738" y="446" font-size="12" fill="#B3261E" font-weight="700">nodo mudo 2 h 14 min</text>
+<circle cx="822" cy="320" r="12" fill="#FBFBF7" stroke="#B3261E" stroke-width="1.6"></circle><text x="822" y="325" text-anchor="middle" font-size="14" font-weight="700" fill="#B3261E">3</text>
+
+<g transform="translate(866 470)" stroke="#1F3A5F" fill="none" stroke-width="1.2"><path d="M0 -26L7 0L0 -6L-7 0Z" fill="#1F3A5F"></path></g>
+<text x="866" y="492" text-anchor="middle" font-size="12">N</text>
+<path d="M60 496H300M60 490v12M300 490v12" stroke="#1F3A5F" stroke-width="1"></path>
+<text x="180" y="512" text-anchor="middle" font-size="12" fill="#3D4F66">una macro-zona, 10 por 10 sectores</text>
+</g>
+</svg>
+<div style="display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px;padding:8px 0 6px;border-top:1px solid #C9D2CF;margin-top:6px">
+<span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" fill="#2E6B47"></rect></svg>Saludable, lleno</span>
+<span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" fill="url(#pl-obs)" stroke="#8A6100"></rect></svg>En observación, rayado simple</span>
+<span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16" fill="url(#pl-crit)"></rect></svg>Crítico, rayado cruzado</span>
+<span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="0.5" y="0.5" width="15" height="15" fill="url(#pl-off)" stroke="#6B7177"></rect></svg>Fuera de servicio, punteado</span>
+</div>
+</section>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:26px;align-items:start">
+<section aria-labelledby="pl-notas" style="border:1.5px solid #1F3A5F;background:#FBFBF7">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px;border-bottom:1.5px solid #1F3A5F"><h2 id="pl-notas" style="margin:0;font-size:22px;font-weight:700">Orden de recorrido</h2><a href="#" style="font-weight:600">Ver los 164 sectores</a></div>
+<ol style="list-style:none;margin:0;padding:0">
+<li style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 16px;border-bottom:1px solid #C9D2CF"><span style="width:26px;height:26px;border-radius:50%;background:#B3261E;color:#FBFBF7;display:flex;align-items:center;justify-content:center;font-weight:700">1</span><div><div style="font-weight:700;font-size:17px">Daño biótico, 6 sectores</div><div style="font-family:'Courier Prime',monospace;font-size:14px;color:#3D4F66">MZ-4-037, 041, 058, 066; MZ-2-014, 019</div><div style="font-size:14px">Mirar envés de hojas, posible ácaro. La IA no dispara acción sola.</div></div><span style="font-family:'Courier Prime',monospace;font-weight:700;color:#B3261E">crít.</span></li>
+<li style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 16px;border-bottom:1px solid #C9D2CF"><span style="width:26px;height:26px;border-radius:50%;border:1.6px solid #B3261E;color:#B3261E;display:flex;align-items:center;justify-content:center;font-weight:700;box-sizing:border-box">2</span><div><div style="font-weight:700;font-size:17px">Sustrato seco, 19 sectores de MZ-4</div><div style="font-size:14px">Humedad 22 % (rango 35 a 55 %). Riego en tanda 2 de 3, fin 11:20.</div></div><span style="font-family:'Courier Prime',monospace;font-weight:700;color:#B3261E">crít.</span></li>
+<li style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 16px;border-bottom:1px solid #C9D2CF"><span style="width:26px;height:26px;border-radius:50%;border:1.6px solid #B3261E;color:#B3261E;display:flex;align-items:center;justify-content:center;font-weight:700;box-sizing:border-box">3</span><div><div style="font-weight:700;font-size:17px">Nodo testigo de MZ-6 sin señal</div><div style="font-size:14px">Batería 11 % en la última lectura. Llevar repuesto; 100 sectores sin métricas al día.</div></div><span style="font-family:'Courier Prime',monospace;font-weight:700;color:#4A5158">f/s</span></li>
+<li style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 16px;border-bottom:1px solid #C9D2CF"><span style="width:26px;height:26px;border-radius:50%;border:1.6px solid #B3261E;color:#B3261E;display:flex;align-items:center;justify-content:center;font-weight:700;box-sizing:border-box">4</span><div><div style="font-weight:700;font-size:17px">Clorosis para confirmar, 14 sectores</div><div style="font-size:14px">MZ-2 y MZ-4. El insumo espera tu confirmación.</div></div><span style="font-family:'Courier Prime',monospace;font-weight:700;color:#8A6100">obs.</span></li>
+<li style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:14px 16px"><span style="width:26px;height:26px;border-radius:50%;border:1.6px solid #3D4F66;color:#3D4F66;display:flex;align-items:center;justify-content:center;font-weight:700;box-sizing:border-box">5</span><div><div style="font-weight:700;font-size:17px">Estrés solar, 9 sectores</div><div style="font-size:14px">Mediasombra al 50 % desde 10:05. Sólo controlar.</div></div><span style="font-family:'Courier Prime',monospace;font-weight:700;color:#8A6100">obs.</span></li>
+</ol>
+</section>
+
+<section aria-labelledby="pl-ref" style="border:1.5px solid #1F3A5F;background:#FBFBF7">
+<h2 id="pl-ref" style="margin:0;font-size:22px;font-weight:700;padding:12px 16px;border-bottom:1.5px solid #1F3A5F">Cuadro de referencias</h2>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-size:16px">
+<tbody>
+<tr style="border-bottom:1px solid #C9D2CF"><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">Sectores saludables</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700">412 de 600</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">En observación</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700;color:#8A6100">118</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">Críticos</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700;color:#B3261E">46</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">Sectores sin datos recientes</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700">24</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">Nodos testigo transmitiendo</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700">5 de 6</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">Acciones autónomas hoy</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700">41 (28 riego, 7 insumo, 6 sombra)</td></tr>
+<tr><th scope="row" style="text-align:left;font-weight:500;padding:10px 16px">Diagnósticos sin validar</th><td style="padding:10px 16px;text-align:right;font-family:'Courier Prime',monospace;font-weight:700">23 de 64</td></tr>
+</tbody>
+</table>
+</div>
+<div style="border-top:1.5px solid #1F3A5F;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+<div><div style="font-size:13px;color:#3D4F66">Pronóstico, no medido</div><div style="font-weight:700">29 °C, UV pronóstico 8</div><div style="font-size:14px">Lluvia 70 % desde 18 h</div></div>
+<div><div style="font-size:13px;color:#3D4F66">Sensor de MZ-4</div><div style="font-weight:700">Luz relativa 88 %</div><div style="font-size:14px">LDR, no es radiación UV</div></div>
+</div>
+</section>
+</div>
+
+<section aria-labelledby="pl-fichas">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;flex-wrap:wrap;gap:6px"><h2 id="pl-fichas" style="margin:0;font-size:22px;font-weight:700">Fichas de diagnóstico, últimas capturas</h2><a href="#" style="font-weight:600">Ver las 23 sin validar</a></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px">
+
+<article style="background:#FFFFFC;border:1px solid #B9C3C0;padding:16px;position:relative;font-family:'Courier Prime',monospace;font-size:14px">
+<svg viewBox="0 0 200 130" width="100%" role="img" aria-label="Dibujo del plantín de MZ-4-037 con manchas"><path d="M100 10c32 18 42 52 28 92-6 16-16 22-28 22s-22-6-28-22C58 62 68 28 100 10z" fill="none" stroke="#2E6B47" stroke-width="1.6"></path><path d="M100 18v104M100 40l-18-10M100 40l18-10M100 66l-22-12M100 66l22-12M100 92l-16-8M100 92l16-8" stroke="#2E6B47" stroke-width="1"></path><circle cx="86" cy="52" r="4" fill="#B3261E"></circle><circle cx="114" cy="74" r="3" fill="#B3261E"></circle><circle cx="92" cy="96" r="2.5" fill="#B3261E"></circle></svg>
+<div style="border-top:1px dashed #6B7177;margin-top:8px;padding-top:8px;line-height:1.55">
+<div>Sector: <b>MZ-4-037</b></div><div>Captura: 06/10 10:36</div><div>Determinación: <b style="color:#B3261E">Daño biótico</b></div><div>Confianza: 91 %</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px;font-family:'Archivo Narrow',sans-serif"><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:#1F3A5F;color:#FBFBF7;cursor:pointer">Confirmar</button><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:transparent;color:#1F3A5F;cursor:pointer">Corregir</button></div>
+</article>
+
+<article style="background:#FFFFFC;border:1px solid #B9C3C0;padding:16px;font-family:'Courier Prime',monospace;font-size:14px">
+<svg viewBox="0 0 200 130" width="100%" role="img" aria-label="Dibujo del plantín de MZ-2-014 con hoja amarillenta"><path d="M100 10c32 18 42 52 28 92-6 16-16 22-28 22s-22-6-28-22C58 62 68 28 100 10z" fill="#F6E3B0" stroke="#8A6100" stroke-width="1.6"></path><path d="M100 18v104M100 40l-18-10M100 40l18-10M100 66l-22-12M100 66l22-12M100 92l-16-8M100 92l16-8" stroke="#2E6B47" stroke-width="1.2"></path></svg>
+<div style="border-top:1px dashed #6B7177;margin-top:8px;padding-top:8px;line-height:1.55">
+<div>Sector: <b>MZ-2-014</b></div><div>Captura: 06/10 10:31</div><div>Determinación: <b style="color:#8A6100">Clorosis</b></div><div>Confianza: 87 %</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px;font-family:'Archivo Narrow',sans-serif"><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:#1F3A5F;color:#FBFBF7;cursor:pointer">Confirmar</button><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:transparent;color:#1F3A5F;cursor:pointer">Corregir</button></div>
+</article>
+
+<article style="background:#FFFFFC;border:1px solid #B9C3C0;padding:16px;font-family:'Courier Prime',monospace;font-size:14px">
+<svg viewBox="0 0 200 130" width="100%" role="img" aria-label="Dibujo del plantín de MZ-4-052 con bordes quemados"><path d="M100 10c32 18 42 52 28 92-6 16-16 22-28 22s-22-6-28-22C58 62 68 28 100 10z" fill="none" stroke="#2E6B47" stroke-width="1.6"></path><path d="M100 10c32 18 42 52 28 92" fill="none" stroke="#8A6100" stroke-width="5" stroke-dasharray="3 3"></path><path d="M100 18v104M100 40l-18-10M100 40l18-10M100 66l-22-12M100 66l22-12" stroke="#2E6B47" stroke-width="1"></path></svg>
+<div style="border-top:1px dashed #6B7177;margin-top:8px;padding-top:8px;line-height:1.55">
+<div>Sector: <b>MZ-4-052</b></div><div>Captura: 06/10 10:22</div><div>Determinación: <b style="color:#8A6100">Estrés solar</b></div><div>Confianza: 93 %</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px;font-family:'Archivo Narrow',sans-serif"><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:#1F3A5F;color:#FBFBF7;cursor:pointer">Confirmar</button><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:transparent;color:#1F3A5F;cursor:pointer">Corregir</button></div>
+</article>
+
+<article style="background:#FFFFFC;border:1px solid #B9C3C0;padding:16px;font-family:'Courier Prime',monospace;font-size:14px">
+<svg viewBox="0 0 200 130" width="100%" role="img" aria-label="Captura borrosa de MZ-3-071"><path d="M100 10c32 18 42 52 28 92-6 16-16 22-28 22s-22-6-28-22C58 62 68 28 100 10z" fill="none" stroke="#6B7177" stroke-width="1.6" stroke-dasharray="4 4"></path><text x="100" y="72" text-anchor="middle" font-family="Courier Prime, monospace" font-size="14" fill="#4A5158">fuera de foco</text></svg>
+<div style="border-top:1px dashed #6B7177;margin-top:8px;padding-top:8px;line-height:1.55">
+<div>Sector: <b>MZ-3-071</b></div><div>Captura: 06/10 10:18</div><div>Determinación: <b>No concluyente</b></div><div>Confianza: 54 %</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px;font-family:'Archivo Narrow',sans-serif"><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:#1F3A5F;color:#FBFBF7;cursor:pointer">Pedir otra foto</button><button type="button" style="flex:1;font:inherit;font-weight:700;font-size:15px;padding:8px;border:1.5px solid #1F3A5F;background:transparent;color:#1F3A5F;cursor:pointer">Corregir</button></div>
+</article>
+</div>
+</section>
+
+<section aria-labelledby="pl-bitacora" style="border:1.5px solid #1F3A5F;background:#FBFBF7">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px;border-bottom:1.5px solid #1F3A5F;flex-wrap:wrap;gap:6px"><h2 id="pl-bitacora" style="margin:0;font-size:22px;font-weight:700">Bitácora de acciones autónomas, hoy</h2><a href="#" style="font-weight:600">Abrir historial</a></div>
+<div style="overflow-x:auto">
+<table style="width:100%;min-width:640px;border-collapse:collapse;font-size:15px">
+<thead><tr style="border-bottom:1px solid #1F3A5F;text-align:left"><th scope="col" style="padding:8px 16px;font-weight:600">Hora</th><th scope="col" style="padding:8px 16px;font-weight:600">Acción</th><th scope="col" style="padding:8px 16px;font-weight:600">Dónde</th><th scope="col" style="padding:8px 16px;font-weight:600">Por qué</th><th scope="col" style="padding:8px 16px;font-weight:600">Efecto</th></tr></thead>
+<tbody style="font-family:'Courier Prime',monospace">
+<tr style="border-bottom:1px solid #C9D2CF"><td style="padding:8px 16px">10:48</td><td style="padding:8px 16px">Riego, tanda 2/3</td><td style="padding:8px 16px">MZ-4, 10 válvulas</td><td style="padding:8px 16px">Sustrato 22 %</td><td style="padding:8px 16px">en curso</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><td style="padding:8px 16px">10:05</td><td style="padding:8px 16px">Mediasombra 50 %</td><td style="padding:8px 16px">MZ-4</td><td style="padding:8px 16px">Luz rel. 88 %</td><td style="padding:8px 16px">aire 31,4 a 30,1 °C</td></tr>
+<tr style="border-bottom:1px solid #C9D2CF"><td style="padding:8px 16px">09:31</td><td style="padding:8px 16px">Insumo N, 12 ml</td><td style="padding:8px 16px">MZ-2-031</td><td style="padding:8px 16px">Clorosis confirmada</td><td style="padding:8px 16px">control 15:30</td></tr>
+<tr><td style="padding:8px 16px">08:12</td><td style="padding:8px 16px">Riego</td><td style="padding:8px 16px">MZ-1, MZ-3; 14 sect.</td><td style="padding:8px 16px">Sustrato 31 %</td><td style="padding:8px 16px">volvió a 42 %</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+</div>
+</div>
+</body>
+</html>
