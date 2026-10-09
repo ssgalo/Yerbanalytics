@@ -9,17 +9,11 @@ import { Badge } from '@/components/ui/Badge';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useDemoExpo } from '@/hooks/DemoExpoContext';
 import { usePasada } from '@/hooks/usePasada';
-import type { EstadoPasada } from '@/types/domain';
 import { PasoItem } from './components/PasoItem';
+import { COLOR_ESTADO } from './components/colorPaso';
+import { SecuenciasPanel } from './components/SecuenciasPanel';
 import { ETIQUETA_ESTADO, titularPasada } from './pasadaPresentacion';
 import styles from './DemoExpoPage.module.css';
-
-const COLOR_ESTADO: Record<EstadoPasada, { soft: string; ink: string }> = {
-  EN_CURSO: { soft: 'var(--info-soft)', ink: 'var(--info-ink)' },
-  COMPLETADA: { soft: 'var(--ok-soft)', ink: 'var(--ok-ink)' },
-  FALLIDA: { soft: 'var(--crit-soft)', ink: 'var(--crit-ink)' },
-  CANCELADA: { soft: 'var(--off-soft)', ink: 'var(--muted)' },
-};
 
 function Desactivada() {
   return (
@@ -107,13 +101,15 @@ function PasadaView() {
           ))}
         </ol>
       )}
+
+      <SecuenciasPanel pasadaEnCurso={enCurso} />
     </div>
   );
 }
 
 export function DemoExpoPage() {
   const { visible, cargando } = useDemoExpo();
-  usePageTitle('Demo Expo', 'Pasada del riel: del dashboard al ESP32, al celular y a la IA');
+  usePageTitle('Demo Expo', 'Pasada del riel y secuencias de actuadores en vivo');
 
   if (cargando) return <div className={styles.cargando}>Cargando…</div>;
   // La ruta existe siempre; con el interruptor apagado no se arma la vista (ni su polling).

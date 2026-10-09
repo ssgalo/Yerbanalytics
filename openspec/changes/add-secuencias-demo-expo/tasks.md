@@ -48,17 +48,28 @@ Unidad A3 — secuencias
 
 Unidad B1 — capa de datos
 
-- [ ] B.1 Tipos de design §3.1 en `types/domain.ts`; `SecuenciaRechazadaError` en `data/secuenciaError.ts` exportado desde `data/index.ts`; 3 métodos nuevos en `DataRepository`
-- [ ] B.2 `httpRepository.test.ts` (rutas, método y body `{tipo, parametros}`; 204 → `null`; 400 y 409 → `SecuenciaRechazadaError` con el `error` del body) → `HttpRepository`
-- [ ] B.3 `secuenciaMock.test.ts` (`simularSecuencia` de cada tipo en t=0, a mitad de la espera, terminada; cancelada en la espera → paso seguro → `CANCELADA`; lectura con métricas) → `data/mock/secuenciaMock.ts` + `MockRepository` (secuencia con pasada mock en curso, y al revés → rechazo con el mensaje del backend)
+- [x] B.1 Tipos de design §3.1 en `types/domain.ts`; `SecuenciaRechazadaError` en `data/secuenciaError.ts` exportado desde `data/index.ts`; 3 métodos nuevos en `DataRepository`
+- [x] B.2 `httpRepository.test.ts` (rutas, método y body `{tipo, parametros}`; 204 → `null`; 400 y 409 → `SecuenciaRechazadaError` con el `error` del body) → `HttpRepository`
+- [x] B.3 `secuenciaMock.test.ts` (`simularSecuencia` de cada tipo en t=0, a mitad de la espera, terminada; cancelada en la espera → paso seguro → `CANCELADA`; lectura con métricas) → `data/mock/secuenciaMock.ts` + `MockRepository` (secuencia con pasada mock en curso, y al revés → rechazo con el mensaje del backend)
 
 Unidad B2 — hook y vista
 
-- [ ] B.4 `useSecuencia.test.tsx` con fake timers (carga inicial; polling 1 s sólo en curso; se detiene al terminar; limpia al desmontar; rechazo → mensaje del backend; otro error → "No se pudo contactar al backend"). Mockear con `vi.spyOn(data, 'getRepository')` → `hooks/useSecuencia.ts`
-- [ ] B.5 `secuenciaPresentacion.test.ts` (texto por tipo de paso; etiquetas y unidades de métricas: `uv` "Luz (%)", `ce` dS/m; cuenta regresiva desde `esperaHasta`) → `features/demo-expo/secuenciaPresentacion.ts`
-- [ ] B.6 `SecuenciasPanel.test.tsx` (tres tarjetas; envía `duracionSeg`/`esperaSeg`; botones deshabilitados con secuencia o pasada en curso; Cancelar sólo en curso y no cancelando; `detalle` de error visible; lectura → tabla + link a `/reglas`) → `components/SecuenciasPanel.tsx` + `components/SecuenciaProgreso.tsx` + CSS Modules, reusando `PasoItem`
-- [ ] B.7 Extender `DemoExpoPage.test.tsx` (la sección "Secuencias" aparece debajo de la pasada; la pasada sigue igual) → `DemoExpoPage.tsx` y subtítulo de `usePageTitle`
-- [ ] B.8 Verificación manual en `npm run dev:demo`: las tres secuencias, cancelar cada una y el rechazo cruzado con la pasada. **Dejar constancia** acá (en `add-pasada-riel` faltó)
+- [x] B.4 `useSecuencia.test.tsx` con fake timers (carga inicial; polling 1 s sólo en curso; se detiene al terminar; limpia al desmontar; rechazo → mensaje del backend; otro error → "No se pudo contactar al backend"). Mockear con `vi.spyOn(data, 'getRepository')` → `hooks/useSecuencia.ts`
+- [x] B.5 `secuenciaPresentacion.test.ts` (texto por tipo de paso; etiquetas y unidades de métricas: `uv` "Luz (%)", `ce` dS/m; cuenta regresiva desde `esperaHasta`) → `features/demo-expo/secuenciaPresentacion.ts`
+- [x] B.6 `SecuenciasPanel.test.tsx` (tres tarjetas; envía `duracionSeg`/`esperaSeg`; botones deshabilitados con secuencia o pasada en curso; Cancelar sólo en curso y no cancelando; `detalle` de error visible; lectura → tabla + link a `/reglas`) → `components/SecuenciasPanel.tsx` + `components/SecuenciaProgreso.tsx` + CSS Modules, reusando `PasoItem`
+- [x] B.7 Extender `DemoExpoPage.test.tsx` (la sección "Secuencias" aparece debajo de la pasada; la pasada sigue igual) → `DemoExpoPage.tsx` y subtítulo de `usePageTitle`
+- [x] B.8 Verificación manual en `npm run dev:demo`: las tres secuencias, cancelar cada una y el rechazo cruzado con la pasada. **Dejar constancia** acá (en `add-pasada-riel` faltó)
+  - **Verificado** (sin navegador, por tests): `SecuenciasPanel.mock.test.tsx` recorre con el panel, `useSecuencia` y `MockRepository` reales y reloj simulado: riego completo (abrir, cuenta regresiva, cerrar, completada), mediasombra cancelada a mitad (espera omitida, enrolla, cancelada), lectura (tabla de la zona y link a `/reglas`), rechazo cruzado en los dos sentidos con el mensaje del backend.
+  - **No verificado a mano**: nadie abrió `npm run dev:demo` en un navegador. Pendiente de mirar a ojo: aspecto de las tres tarjetas y de la tabla de lectura, el spinner del paso en curso, y que la cuenta regresiva se vea fluida (hoy se actualiza con el polling de 1 s).
+
+Desvíos menores de B respecto de `design.md` §3 (ninguno toca el contrato REST):
+
+- `simularSecuencia` suma un sexto parámetro opcional `lecturaDemo`: el `MockRepository` le pasa la lectura real de la primera zona del mock (el diseño pedía "tomada de la zona del mock"; así la función sigue pura).
+- `COLOR_ESTADO` (badge de estado) y el mapa de colores por paso se movieron a `components/colorPaso.ts`, y `IconoEstado` de `PasoItem.tsx` se exporta, para reusarlos desde `SecuenciaProgreso` sin duplicar. Comportamiento de la pasada sin cambios.
+- El botón de cada tarjeta también se deshabilita si el valor tipeado está fuera de rango (1–120 s riego, 0–600 s mediasombra) o vacío.
+- La tabla de lectura usa "Conductividad (CE)" como etiqueta de `ce` (el diseño sólo fijaba la unidad dS/m).
+- `cancelarSecuencia` del mock rechaza una segunda cancelación ("La secuencia ya se está cancelando."), como el 409 de doble cancelación del backend (A.8).
+- D.2 (README del frontend) no se tocó: queda para la pista D.
 
 ## C. Firmware + contrato
 

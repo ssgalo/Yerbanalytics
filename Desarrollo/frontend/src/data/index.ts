@@ -9,6 +9,7 @@ import { MockRepository } from './mock/mockRepository';
 export type { DataRepository } from './repository';
 export { ParametrosInvalidosError } from './parametrosError';
 export { PasadaRechazadaError } from './pasadaError';
+export { SecuenciaRechazadaError } from './secuenciaError';
 export { selectSectorDetail, selectSensadoTiles, selectSerieMetrica } from './selectors';
 
 let instancia: DataRepository | null = null;
