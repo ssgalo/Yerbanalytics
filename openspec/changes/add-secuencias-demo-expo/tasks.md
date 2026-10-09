@@ -48,9 +48,9 @@ Unidad A3 — secuencias
 
 Unidad B1 — capa de datos
 
-- [ ] B.1 Tipos de design §3.1 en `types/domain.ts`; `SecuenciaRechazadaError` en `data/secuenciaError.ts` exportado desde `data/index.ts`; 3 métodos nuevos en `DataRepository`
-- [ ] B.2 `httpRepository.test.ts` (rutas, método y body `{tipo, parametros}`; 204 → `null`; 400 y 409 → `SecuenciaRechazadaError` con el `error` del body) → `HttpRepository`
-- [ ] B.3 `secuenciaMock.test.ts` (`simularSecuencia` de cada tipo en t=0, a mitad de la espera, terminada; cancelada en la espera → paso seguro → `CANCELADA`; lectura con métricas) → `data/mock/secuenciaMock.ts` + `MockRepository` (secuencia con pasada mock en curso, y al revés → rechazo con el mensaje del backend)
+- [x] B.1 Tipos de design §3.1 en `types/domain.ts`; `SecuenciaRechazadaError` en `data/secuenciaError.ts` exportado desde `data/index.ts`; 3 métodos nuevos en `DataRepository`
+- [x] B.2 `httpRepository.test.ts` (rutas, método y body `{tipo, parametros}`; 204 → `null`; 400 y 409 → `SecuenciaRechazadaError` con el `error` del body) → `HttpRepository`
+- [x] B.3 `secuenciaMock.test.ts` (`simularSecuencia` de cada tipo en t=0, a mitad de la espera, terminada; cancelada en la espera → paso seguro → `CANCELADA`; lectura con métricas) → `data/mock/secuenciaMock.ts` + `MockRepository` (secuencia con pasada mock en curso, y al revés → rechazo con el mensaje del backend)
 
 Unidad B2 — hook y vista
 
