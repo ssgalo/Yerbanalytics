@@ -18,31 +18,48 @@ E es la puesta en marcha con hardware, **no antes del sábado 10/10**.
 
 Unidad A1 — entrada y salida MQTT
 
-- [ ] A.1 `ContratoNodo`: `TOPIC_COMANDO_ZONA`, `ACCION_LEER_AHORA`, `TOPIC_ACK`, `STATUS_SUCCESS`/`STATUS_ERROR` (Javadoc → `contrato.h`) + `ComandoZonaPublisherTest` (tópico `nursery/zone/MZ-1/command`, JSON exacto, `commandId` UUID, falla del gateway → `Resultado(false, …)`; espejar `ComandoRielPublisherTest`) → `mqtt/ComandoZonaPublisher`
-- [ ] A.2 `AckActuadorReceiverTest` (JSON válido → `registrarAck` con `commandId`, `status`, `detalle` como árbol, zona y sector sacados del tópico; claves desconocidas toleradas; JSON roto → no lanza ni llama) → `AckActuador` + `AckActuadorReceiver`
-- [ ] A.3 `LecturaZonaReceiverTest` (zona del tópico; payload → `registrarTelemetria` con `recibidaEn` del reloj; JSON roto → no lanza; **nunca** llama a `NurseryService`) → `LecturaZonaReceiver`
-- [ ] A.4 `MqttConfig`: adaptadores `-ack` y `-lectura` con sus canales y flujos (design §2.2). Los de telemetría y riel quedan idénticos (diff de esas líneas vacío)
+- [x] A.1 `ContratoNodo`: `TOPIC_COMANDO_ZONA`, `ACCION_LEER_AHORA`, `TOPIC_ACK`, `STATUS_SUCCESS`/`STATUS_ERROR` (Javadoc → `contrato.h`) + `ComandoZonaPublisherTest` (tópico `nursery/zone/MZ-1/command`, JSON exacto, `commandId` UUID, falla del gateway → `Resultado(false, …)`; espejar `ComandoRielPublisherTest`) → `mqtt/ComandoZonaPublisher`
+- [x] A.2 `AckActuadorReceiverTest` (JSON válido → `registrarAck` con `commandId`, `status`, `detalle` como árbol, zona y sector sacados del tópico; claves desconocidas toleradas; JSON roto → no lanza ni llama) → `AckActuador` + `AckActuadorReceiver`
+- [x] A.3 `LecturaZonaReceiverTest` (zona del tópico; payload → `registrarTelemetria` con `recibidaEn` del reloj; JSON roto → no lanza; **nunca** llama a `NurseryService`) → `LecturaZonaReceiver`
+- [x] A.4 `MqttConfig`: adaptadores `-ack` y `-lectura` con sus canales y flujos (design §2.2). Los de telemetría y riel quedan idénticos (diff de esas líneas vacío)
 
 Unidad A2 — guardia compartido con la pasada
 
-- [ ] A.5 `GuardiaHardwareTest` (libre → ejecuta; otro uso ocupado → lanza el rechazo con su motivo sin ejecutar; el solicitante no se bloquea a sí mismo; dos hilos simultáneos → a lo sumo uno ejecuta) → `UsoDelHardware` + `GuardiaHardware`
-- [ ] A.6 Extender `PasadaRielServiceTest`: con una secuencia en curso, `iniciar()` → `PasadaRechazadaException` con el motivo y sin publicar; `ocupadoPor()` sólo con la pasada `EN_CURSO` → `PasadaRielService` implementa `UsoDelHardware` e inicia vía guardia. El resto de sus tests, sin cambios y en verde
+- [x] A.5 `GuardiaHardwareTest` (libre → ejecuta; otro uso ocupado → lanza el rechazo con su motivo sin ejecutar; el solicitante no se bloquea a sí mismo; dos hilos simultáneos → a lo sumo uno ejecuta) → `UsoDelHardware` + `GuardiaHardware`
+- [x] A.6 Extender `PasadaRielServiceTest`: con una secuencia en curso, `iniciar()` → `PasadaRechazadaException` con el motivo y sin publicar; `ocupadoPor()` sólo con la pasada `EN_CURSO` → `PasadaRielService` implementa `UsoDelHardware` e inicia vía guardia. El resto de sus tests, sin cambios y en verde
 
 Unidad A3 — secuencias
 
-- [ ] A.7 `SecuenciaProperties` (+ registro en `@EnableConfigurationProperties` y las 4 propiedades en `application.properties`); `SchedulersConfig.secuenciaScheduler`; extender `SchedulersConfigTest`
-- [ ] A.8 `SecuenciaServiceTest` — **riego** (Mockito + `RelojDePrueba`; `ComandoActuadorPublisher`, `ComandoZonaPublisher`, `ZonaRepository`, guardia mockeados) → `SecuenciaService` + DTOs `Secuencia`/`PasoSecuencia`/`LecturaSecuencia`:
-  - [ ] destino: zona de menor número (orden numérico) y su primer sector; sin topología → 409
-  - [ ] `ON` con `durationSec = N + timeout-ack-valvula-seg`; ACK `SUCCESS` → ESPERAR con `esperaHasta`; a los N s `OFF`; ACK → `COMPLETADA`
-  - [ ] ACK con `commandId` ajeno → ignorado
-  - [ ] ABRIR sin ACK a 10 s → `ACTUADOR_SIN_RESPUESTA`, ESPERAR `OMITIDO`, `OFF` publicado igual, `FALLIDA`
-  - [ ] CERRAR sin ACK → `FALLIDA` con el aviso de `durationSec`; publicación fallida → `PUBLICACION_FALLIDA`
-  - [ ] cancelar en ESPERAR → `OMITIDO` + `OFF` → `CANCELADA`; cancelar sin secuencia → 409; doble cancelación → 409
-  - [ ] 400: `tipo` desconocido, `duracionSeg` < 1 o > tope; 409: secuencia en curso (no publica)
-- [ ] A.9 `SecuenciaServiceTest` — **mediasombra**: `SET 0` → ESPERAR → `SET 100`; ACK `ERROR falla_mecanica` en DESPLEGAR → `FALLA_MECANICA`, ENROLLAR igual, `FALLIDA`; timeout 45 s; cancelar en DESPLEGAR → ENROLLAR → `CANCELADA`; `esperaSeg` fuera de `0..600` → 400
-- [ ] A.10 `SecuenciaServiceTest` — **lectura**: publica `LEER_AHORA` a la zona; telemetría de otra zona → ignorada; con `recibidaEn < pedidoEn` → ignorada; la primera posterior → `lectura` con `ce` en dS/m, MOSTRAR `OK`, `COMPLETADA`; sin lectura a 20 s → `SIN_LECTURA`, `FALLIDA`; cancelar → `CANCELADA` al instante
-- [ ] A.11 `SecuenciaControllerTest` (`@WebMvcTest`): `POST /api/secuencias` 202/400/409 `{"error"}`, `GET /api/secuencias/actual` 200/204, `POST /api/secuencias/actual/cancelar` 200/409; JSON con todas las claves de design §2.7 → `SecuenciaController` + `IniciarSecuencia`
-- [ ] A.12 Garantía del motor: `git diff --stat main -- Desarrollo/backend/src/main/java/com/yerbanalytics/backend/engine` vacío, `NurseryService` sin cambios; `./mvnw test` completo en verde
+- [x] A.7 `SecuenciaProperties` (+ registro en `@EnableConfigurationProperties` y las 4 propiedades en `application.properties`); `SchedulersConfig.secuenciaScheduler`; extender `SchedulersConfigTest`
+- [x] A.8 `SecuenciaServiceTest` — **riego** (Mockito + `RelojDePrueba`; `ComandoActuadorPublisher`, `ComandoZonaPublisher`, `ZonaRepository`, guardia mockeados) → `SecuenciaService` + DTOs `Secuencia`/`PasoSecuencia`/`LecturaSecuencia`:
+  - [x] destino: zona de menor número (orden numérico) y su primer sector; sin topología → 409
+  - [x] `ON` con `durationSec = N + timeout-ack-valvula-seg`; ACK `SUCCESS` → ESPERAR con `esperaHasta`; a los N s `OFF`; ACK → `COMPLETADA`
+  - [x] ACK con `commandId` ajeno → ignorado
+  - [x] ABRIR sin ACK a 10 s → `ACTUADOR_SIN_RESPUESTA`, ESPERAR `OMITIDO`, `OFF` publicado igual, `FALLIDA`
+  - [x] CERRAR sin ACK → `FALLIDA` con el aviso de `durationSec`; publicación fallida → `PUBLICACION_FALLIDA`
+  - [x] cancelar en ESPERAR → `OMITIDO` + `OFF` → `CANCELADA`; cancelar sin secuencia → 409; doble cancelación → 409
+  - [x] 400: `tipo` desconocido, `duracionSeg` < 1 o > tope; 409: secuencia en curso (no publica)
+- [x] A.9 `SecuenciaServiceTest` — **mediasombra**: `SET 0` → ESPERAR → `SET 100`; ACK `ERROR falla_mecanica` en DESPLEGAR → `FALLA_MECANICA`, ENROLLAR igual, `FALLIDA`; timeout 45 s; cancelar en DESPLEGAR → ENROLLAR → `CANCELADA`; `esperaSeg` fuera de `0..600` → 400
+- [x] A.10 `SecuenciaServiceTest` — **lectura**: publica `LEER_AHORA` a la zona; telemetría de otra zona → ignorada; con `recibidaEn < pedidoEn` → ignorada; la primera posterior → `lectura` con `ce` en dS/m, MOSTRAR `OK`, `COMPLETADA`; sin lectura a 20 s → `SIN_LECTURA`, `FALLIDA`; cancelar → `CANCELADA` al instante
+- [x] A.11 `SecuenciaControllerTest` (`@WebMvcTest`): `POST /api/secuencias` 202/400/409 `{"error"}`, `GET /api/secuencias/actual` 200/204, `POST /api/secuencias/actual/cancelar` 200/409; JSON con todas las claves de design §2.7 → `SecuenciaController` + `IniciarSecuencia`
+- [x] A.12 Garantía del motor: `git diff --stat main -- Desarrollo/backend/src/main/java/com/yerbanalytics/backend/engine` vacío, `NurseryService` sin cambios; `./mvnw test` completo en verde
+
+> **Desvíos y constancias de la pista A (hechos al implementar):**
+> - **A.6**: el constructor de `PasadaRielService` suma `GuardiaHardware` como último parámetro, así que las
+>   tres líneas de `PasadaRielServiceTest` que lo construyen cambiaron (se les pasa un guardia real armado con
+>   `GuardiaHardwareTest.guardiaCon(...)`). El resto de sus tests, sin tocar y en verde.
+> - **A.8**: `ParametrosSecuencia` es un DTO propio (`duracionSeg`, `esperaSeg`), compartido entre el pedido
+>   (`IniciarSecuencia`) y la respuesta (`Secuencia.parametros`). `SecuenciaService.iniciar` recibe el
+>   `IniciarSecuencia` entero. Los timeouts se comparan con `>=` (a los 10 s exactos vence, no a los 10 s + 1 tick).
+> - **A.8**: el aviso "El nodo apaga la bomba solo a los N s." se agrega a todo error de CERRAR (sin ACK, ACK ERROR
+>   y publicación fallida), no sólo al timeout.
+> - **A.4**: el test de `MqttConfig` (`MqttConfigSecuenciasTest`) arma los adaptadores sin arrancarlos; no hay
+>   test con broker real.
+> - **A.12**: verificado contra `origin/feat/implementar-nuevas-reglas` (no `main`, que está muy atrás):
+>   `git diff --stat` de `engine/` y de `NurseryService` vacío. La suite completa tiene **15 fallas previas** (7
+>   failures + 8 errors: `NurseryControllerTest`, `NurseryServiceRiegoTest`, `DiagnosticoControllerTest`) que
+>   ocurren idénticas **antes** de tocar nada (base `feat/secuencias-demo-expo`: 711 tests, mismas 15) y no tienen
+>   relación con las secuencias; con este cambio son 786 tests y las mismas 15. Ver el informe de la pista.
 
 ## B. Frontend (TDD: `cd Desarrollo/frontend && npm test`; además `npm run lint` con 0 warnings)
 
