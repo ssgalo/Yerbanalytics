@@ -402,6 +402,49 @@ La forma de `Pasada` y sus pasos está en `openspec/changes/add-pasada-riel/desi
 el dashboard muestra la pestaña. Se guarda en `preferencia_dashboard` (fila única), que crea
 Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de pasada no dependen de él.
 
+## Secuencias de la Demo Expo
+
+Una **secuencia** es un guion corto contra el actuador de un sector, con cada paso visible: **riego**
+(abre la válvula, espera, cierra), **mediasombra** (despliega, espera, enrolla) y **lectura** (pide una
+lectura al nodo testigo y la muestra). No pasan por el motor de reglas: son una prueba directa del
+hardware. Una sola a la vez, y ninguna mientras corre una pasada del riel (ni al revés).
+
+| Método y ruta | Respuesta |
+|---|---|
+| `POST /api/secuencias` | `202` + `Secuencia` · `400 {"error"}` (tipo desconocido, `duracionSeg` o `esperaSeg` fuera de rango) · `409 {"error"}` (hay una secuencia o una pasada en curso; sin topología) |
+| `GET /api/secuencias/actual` | `200` + `Secuencia` (la en curso o la última) · `204` si no hubo ninguna desde el arranque |
+| `POST /api/secuencias/actual/cancelar` | `200` + `Secuencia` · `409` si no hay una en curso o ya se está cancelando |
+
+Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
+`duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200 menos `timeout-ack-valvula-seg`, o sea 1190);
+`esperaSeg` sólo a `MEDIASOMBRA` (default 10, de 0 a 600). La forma de `Secuencia` y sus pasos:
+`openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.
+
+- **Destino.** La zona de menor número (orden numérico) y su primer sector. Sin topología, `409`.
+- **MQTT que ahora sí se usa.** Publica `ON`/`OFF` de la válvula y `SET` de la mediasombra en
+  `nursery/zone/{zona}/sector/{sector}/command`, y `LEER_AHORA` en `nursery/zone/{zona}/command` (QoS 1,
+  sin ACK). **Escucha el ACK de los actuadores** (`nursery/zone/+/sector/+/ack`) con un adaptador propio
+  (`-ack`) y la telemetría con otro (`-lectura`); el de telemetría que alimenta al motor queda idéntico, a
+  costa de que el broker entregue cada lectura dos veces. Sólo cuentan los ACK que citan el `commandId`
+  del paso en curso. Contrato: `mqtt/ContratoNodo.java`, espejo de `Desarrollo/embebido/comun/contrato.h`.
+- **Tiempos** (`yerbanalytics.secuencia.*`): ACK de la válvula `timeout-ack-valvula-seg` (10), ACK de la
+  mediasombra `timeout-ack-mediasombra-seg` (45; el firmware se rinde a los 30 s), lectura
+  `timeout-lectura-seg` (20), cadencia del orquestador `tick-ms` (1000, carril propio `secuenciaScheduler`).
+- **Guardia compartido.** Hay un único ESP32: `GuardiaHardware` arbitra entre secuencia y pasada
+  (`UsoDelHardware`), y quien pierde recibe el `409` con el motivo del otro.
+- **Paso seguro.** El `ON` de la válvula lleva `durationSec = N + timeout-ack-valvula-seg`, así que el
+  nodo la apaga solo aunque el backend desaparezca. Ante cualquier falla o cancelación se publica el `OFF`
+  (riego) o el `SET 100` (mediasombra) igual, se marcan `OMITIDO` los pasos de espera y la secuencia
+  termina `FALLIDA` o `CANCELADA`. Si falla el propio CERRAR, el error avisa que el nodo apaga la bomba
+  solo a los N s.
+- **Fallas con código propio.** `ACTUADOR_SIN_RESPUESTA` (sin ACK a tiempo), `FALLA_MECANICA` (ACK `ERROR`
+  de la mediasombra), `PUBLICACION_FALLIDA`, `SIN_LECTURA` (no llegó telemetría de la zona a tiempo).
+- **Lectura.** Cuenta la primera telemetría de la zona recibida *después* del pedido; `ce` se muestra en
+  dS/m. Sin sensores cableados en el nodo, termina `FALLIDA` con `SIN_LECTURA`: es lo esperado hoy.
+- **El estado vive en memoria.** Un reinicio a mitad pierde la secuencia (`GET` → `204`). No hay tablas
+  nuevas ni migración manual.
+- **Garantía.** `engine/` y `NurseryService` no cambiaron: las secuencias no tocan el motor.
+
 ## Integración con el frontend
 
 | `VITE_DATA_SOURCE` | Origen de datos |
