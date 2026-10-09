@@ -49,6 +49,31 @@ public final class ContratoNodo {
      */
     public static final int DURACION_VALVULA_MAX_SEG = 1200;
 
+    /**
+     * Comando de zona (backend → nodo testigo), con el id de la zona. Espeja la sección "Comando de
+     * zona" de {@code contrato.h} ({@code contratoTopicComandoZona}). QoS 1, sin retain. A nivel zona
+     * y no sector porque el sensado es por macro-zona.
+     */
+    public static final String TOPIC_COMANDO_ZONA = "nursery/zone/%s/command";
+
+    /**
+     * {@code accion} del comando de zona: el nodo lee sus sensores y publica la telemetría de siempre
+     * (sin {@code commandId}, sin ACK). Espeja {@code ACCION_LEER_AHORA} de {@code contrato.h}.
+     */
+    public static final String ACCION_LEER_AHORA = "LEER_AHORA";
+
+    /**
+     * ACK de actuador (nodo → backend), con comodines de zona y sector. El payload es
+     * {@code {"commandId","status","detalle":{"tipo":…}}}; un único ACK por comando, al terminar de
+     * cumplirlo. Espeja {@code contratoTopicAck} de {@code contrato.h}.
+     */
+    public static final String TOPIC_ACK = "nursery/zone/+/sector/+/ack";
+
+    /** {@code status} del ACK: el actuador cumplió el comando. */
+    public static final String STATUS_SUCCESS = "SUCCESS";
+    /** {@code status} del ACK: no lo cumplió; {@code detalle.tipo} dice por qué. */
+    public static final String STATUS_ERROR = "ERROR";
+
     private ContratoNodo() {
     }
 
