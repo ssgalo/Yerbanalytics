@@ -81,7 +81,7 @@ src/
 │   ├── http/              HttpRepository (cliente del backend)
 │   ├── selectors.ts       derivaciones puras (detalle de sector)
 │   └── index.ts           getRepository() — factory por entorno
-├── hooks/         NurseryContext (provider + useNurseryData), PageMeta, DemoExpoContext, usePasada, useSectorDetail
+├── hooks/         NurseryContext (provider + useNurseryData), PageMeta, DemoExpoContext, usePasada, useSecuencia, useSectorDetail
 ├── components/
 │   ├── ui/        átomos: Card, Badge, StatusDot, ProgressBar, Sparkline, Icon
 │   └── layout/    AppLayout, Sidebar, Topbar, AlertsDropdown
@@ -90,7 +90,7 @@ src/
 │   ├── map/            Mapa de producción
 │   ├── sector/         Detalle de sector
 │   ├── diagnostics/    Diagnósticos de IA
-│   ├── demo-expo/      Demo Expo: pasada del riel en vivo (pestaña oculta; se enciende en Configuración → "Mostrar Demo Expo")
+│   ├── demo-expo/      Demo Expo: pasada del riel y secuencias de riego, mediasombra y lectura en vivo (pestaña oculta; se enciende en Configuración → "Mostrar Demo Expo")
 │   └── placeholder/    Módulos no incluidos en la demo
 ├── router.tsx     rutas (react-router)
 ├── App.tsx        NurseryProvider + RouterProvider
