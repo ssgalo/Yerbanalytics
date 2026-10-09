@@ -4,7 +4,7 @@
    hay una secuencia o una pasada en curso; es una ayuda visual: el que decide es el 409 del
    backend (un solo ESP32 para las dos cosas).
    ============================================================ */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Card } from '@/components/ui/Card';
 import { useSecuencia } from '@/hooks/useSecuencia';
 import { SecuenciaProgreso } from './SecuenciaProgreso';
@@ -39,9 +39,15 @@ function Tarjeta({
 }
 
 export function SecuenciasPanel({ pasadaEnCurso }: { pasadaEnCurso: boolean }) {
-  const { secuencia, error, iniciando, iniciar, cancelar } = useSecuencia();
+  const { secuencia, error, iniciando, iniciar, cancelar, descartarError } = useSecuencia();
   const [riegoTxt, setRiegoTxt] = useState(String(RIEGO.defecto));
   const [esperaTxt, setEsperaTxt] = useState(String(ESPERA.defecto));
+
+  // El rechazo de un intento (p. ej. "Hay una pasada del riel en curso.") deja de valer cuando
+  // cambia lo que lo causó: la secuencia mostrada o la pasada.
+  useEffect(() => {
+    descartarError();
+  }, [secuencia, pasadaEnCurso, descartarError]);
 
   const ocupado = secuencia?.estado === 'EN_CURSO' || pasadaEnCurso || iniciando;
   const duracion = enRango(riegoTxt, RIEGO);

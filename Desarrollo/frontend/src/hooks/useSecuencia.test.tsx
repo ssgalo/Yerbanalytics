@@ -202,4 +202,50 @@ describe('useSecuencia', () => {
     expect(result.current.error).toBe('No se pudo contactar al backend');
     expect(result.current.cargando).toBe(false);
   });
+
+  it('descartarError limpia el error de un intento', async () => {
+    repoCon({
+      getSecuenciaActual: vi.fn().mockResolvedValue(null),
+      iniciarSecuencia: vi.fn().mockRejectedValue(new SecuenciaRechazadaError('Hay una pasada del riel en curso.')),
+    });
+    const { result } = await montar();
+    await act(async () => result.current.iniciar('RIEGO'));
+    expect(result.current.error).toBe('Hay una pasada del riel en curso.');
+
+    act(() => result.current.descartarError());
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('cancelar rechazada porque la secuencia ya terminó: re-consulta y no muestra el error', async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(secuencia('EN_CURSO'))
+      .mockResolvedValue(secuencia('COMPLETADA'));
+    repoCon({
+      getSecuenciaActual: get,
+      cancelarSecuencia: vi.fn().mockRejectedValue(new SecuenciaRechazadaError('No hay una secuencia en curso.')),
+    });
+    const { result } = await montar();
+
+    await act(async () => result.current.cancelar());
+    await avanzar(0);
+
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(result.current.secuencia?.estado).toBe('COMPLETADA');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('cancelar rechazada con la secuencia todavía en curso sí muestra el error', async () => {
+    repoCon({
+      getSecuenciaActual: vi.fn().mockResolvedValue(secuencia('EN_CURSO')),
+      cancelarSecuencia: vi.fn().mockRejectedValue(new SecuenciaRechazadaError('La secuencia ya se está cancelando.')),
+    });
+    const { result } = await montar();
+
+    await act(async () => result.current.cancelar());
+    await avanzar(0);
+
+    expect(result.current.error).toBe('La secuencia ya se está cancelando.');
+  });
 });

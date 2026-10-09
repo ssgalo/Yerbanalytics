@@ -18,16 +18,17 @@ vi.mock('@/hooks/DemoExpoContext', () => ({
 vi.mock('@/hooks/usePasada', () => ({
   usePasada: () => estado.hook,
 }));
-vi.mock('@/hooks/useSecuencia', () => ({
-  useSecuencia: () => ({
-    secuencia: null,
-    cargando: false,
-    error: null,
-    iniciando: false,
-    iniciar: vi.fn(),
-    cancelar: vi.fn(),
-  }),
+// Un solo objeto: el panel depende de la identidad de `descartarError` en un efecto.
+const secuenciaMock = vi.hoisted(() => ({
+  secuencia: null,
+  cargando: false,
+  error: null,
+  iniciando: false,
+  iniciar: () => Promise.resolve(),
+  cancelar: () => Promise.resolve(),
+  descartarError: () => undefined,
 }));
+vi.mock('@/hooks/useSecuencia', () => ({ useSecuencia: () => secuenciaMock }));
 
 afterEach(cleanup);
 

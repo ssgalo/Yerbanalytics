@@ -70,17 +70,22 @@ const hook = (s: Secuencia | null, over: Record<string, unknown> = {}) => {
     iniciando: false,
     iniciar: vi.fn(),
     cancelar: vi.fn(),
+    descartarError: vi.fn(),
     ...over,
   };
-  return estado.hook as { iniciar: ReturnType<typeof vi.fn>; cancelar: ReturnType<typeof vi.fn> };
+  return estado.hook as {
+    iniciar: ReturnType<typeof vi.fn>;
+    cancelar: ReturnType<typeof vi.fn>;
+    descartarError: ReturnType<typeof vi.fn>;
+  };
 };
 
-const montar = (pasadaEnCurso = false) =>
-  render(
-    <MemoryRouter>
-      <SecuenciasPanel pasadaEnCurso={pasadaEnCurso} />
-    </MemoryRouter>,
-  );
+const tree = (pasadaEnCurso: boolean) => (
+  <MemoryRouter>
+    <SecuenciasPanel pasadaEnCurso={pasadaEnCurso} />
+  </MemoryRouter>
+);
+const montar = (pasadaEnCurso = false) => render(tree(pasadaEnCurso));
 
 const btn = (nombre: RegExp) =>
   screen.queryByRole('button', { name: nombre }) as HTMLButtonElement | null;
@@ -267,5 +272,25 @@ describe('SecuenciasPanel', () => {
     expect(screen.queryByRole('link', { name: /Inspector/ })).toBeNull();
     expect(screen.getByText('Pedir lectura a MZ-1')).toBeTruthy();
     expect(screen.getByText('Esperando la telemetría…')).toBeTruthy();
+  });
+
+  it('descarta el error de un intento cuando la pasada deja de bloquear', () => {
+    const h = hook(null, { error: 'Hay una pasada del riel en curso.' });
+    const { rerender } = montar(true);
+    h.descartarError.mockClear();
+
+    rerender(tree(false));
+
+    expect(h.descartarError).toHaveBeenCalled();
+  });
+
+  it('no descarta el error mientras nada cambie', () => {
+    const h = hook(null, { error: 'Hay una pasada del riel en curso.' });
+    const { rerender } = montar(false);
+    h.descartarError.mockClear();
+
+    rerender(tree(false));
+
+    expect(h.descartarError).not.toHaveBeenCalled();
   });
 });

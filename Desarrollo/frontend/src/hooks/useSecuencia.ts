@@ -19,6 +19,8 @@ interface UseSecuenciaResult {
   iniciando: boolean;
   iniciar: (tipo: TipoSecuencia, parametros?: ParametrosSecuencia) => Promise<void>;
   cancelar: () => Promise<void>;
+  /** Borra el error de un intento (lo usa la vista cuando deja de existir la causa del rechazo). */
+  descartarError: () => void;
 }
 
 const mensajeDe = (e: unknown) => (e instanceof SecuenciaRechazadaError ? e.message : SIN_BACKEND);
@@ -87,9 +89,26 @@ export function useSecuencia(): UseSecuenciaResult {
       pedido.current++;
       setSecuencia(cancelada);
     } catch (e) {
-      setErrorAccion(mensajeDe(e));
+      if (!(e instanceof SecuenciaRechazadaError)) {
+        setErrorAccion(mensajeDe(e));
+        return;
+      }
+      // Pudo haber terminado entre dos consultas: se vuelve a mirar y, si ya no está en curso,
+      // el rechazo no le dice nada útil al operador.
+      const mio = ++pedido.current;
+      try {
+        const actual = await getRepository().getSecuenciaActual();
+        if (mio !== pedido.current) return;
+        setSecuencia(actual);
+        setErrorConsulta(null);
+        if (actual?.estado === 'EN_CURSO') setErrorAccion(e.message);
+      } catch {
+        if (mio === pedido.current) setErrorAccion(e.message);
+      }
     }
   }, []);
 
-  return { secuencia, cargando, error: errorAccion ?? errorConsulta, iniciando, iniciar, cancelar };
+  const descartarError = useCallback(() => setErrorAccion(null), []);
+
+  return { secuencia, cargando, error: errorAccion ?? errorConsulta, iniciando, iniciar, cancelar, descartarError };
 }
