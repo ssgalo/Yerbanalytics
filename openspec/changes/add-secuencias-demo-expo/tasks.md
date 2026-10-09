@@ -68,18 +68,34 @@ Unidad B2 — hook y vista
 
 Unidad C1 — contrato
 
-- [ ] C.1 `contrato.h`: sección "Comando de zona" (`contratoTopicComandoZona`, `ACCION_LEER_AHORA`, QoS, respuesta = telemetría sin `commandId`, regla de correlación) y en "Ack" los valores de `detalle.tipo` con `reemplazado`; lista de espejos
-- [ ] C.2 `simulador/server/contract.ts`: `zoneCommandTopic`, `READ_NOW_ACTION`, tipos `ZoneCommand` y `ActuatorAck`, en inglés como el resto del archivo. **Sin comportamiento**: nada más del simulador cambia
+- [x] C.1 `contrato.h`: sección "Comando de zona" (`contratoTopicComandoZona`, `ACCION_LEER_AHORA`, QoS, respuesta = telemetría sin `commandId`, regla de correlación) y en "Ack" los valores de `detalle.tipo` con `reemplazado`; lista de espejos
+- [x] C.2 `simulador/server/contract.ts`: `zoneCommandTopic`, `READ_NOW_ACTION`, tipos `ZoneCommand` y `ActuatorAck`, en inglés como el resto del archivo. **Sin comportamiento**: nada más del simulador cambia
 
 Unidad C2 — sketch `vivero_esp32_red`
 
-- [ ] C.3 `config.example.h`: `NODO_ZONA_ID`, `NODO_SECTOR_ID`, `BOMBA_CAUDAL_PWM`, `LECTURA_SENSORES_HABILITADA`; `#error` si falta `NODO_ZONA_ID` en `config.h`
-- [ ] C.4 Red: tópicos armados en `red_iniciar()`, dos suscripciones nuevas QoS 1 al conectar, callback que despacha por tópico a `act_entrante` / `leer_hay` (el slot del riel, sin cambios)
-- [ ] C.5 Válvula sobre el driver de bomba: `ON` con validación y plazo, `OFF`, `valvula_vigilar()` que apaga al vencer; `pump` → `actuador_desconocido`
-- [ ] C.6 Mediasombra: `mediasombra_enrollar/desenrollar` devuelven `int` (`MS_OK`, `MS_TIMEOUT`, `MS_INTERRUMPIDO`), cortan si `act_entrante` trae otro `commandId`; `targetPct` sólo 0 o 100; `sin_cambio` si ya está en el final pedido. Los comandos por serie siguen funcionando
-- [ ] C.7 ACK: armado en `char[256]` fuera del callback, pendiente al reconectar, ring de 4 `commandId` propio de actuadores (repetido del último → republica su ACK)
-- [ ] C.8 "Leer ahora" con el **hueco marcado** (`leer_sensores()` vacía + comentario de design §4.5): con `LECTURA_SENSORES_HABILITADA 0` sólo loguea; con 1 publica la telemetría del contrato (`signal` = RSSI, `timestamp` en segundos)
-- [ ] C.9 Checklist antes de entregar: compila con `arduino-cli`; firmas sólo con tipos primitivos; ningún `publish` dentro del callback; ningún `connect()` alcanzable desde `red_atender()`; `commandId` con `strlcpy`; ArduinoJson sin `StaticJsonDocument`; el flujo del riel sin cambios de comportamiento
+- [x] C.3 `config.example.h`: `NODO_ZONA_ID`, `NODO_SECTOR_ID`, `BOMBA_CAUDAL_PWM`, `LECTURA_SENSORES_HABILITADA`; `#error` si falta `NODO_ZONA_ID` en `config.h`
+- [x] C.4 Red: tópicos armados en `red_iniciar()`, dos suscripciones nuevas QoS 1 al conectar, callback que despacha por tópico a `act_entrante` / `leer_hay` (el slot del riel, sin cambios)
+- [x] C.5 Válvula sobre el driver de bomba: `ON` con validación y plazo, `OFF`, `valvula_vigilar()` que apaga al vencer; `pump` → `actuador_desconocido`
+- [x] C.6 Mediasombra: `mediasombra_enrollar/desenrollar` devuelven `int` (`MS_OK`, `MS_TIMEOUT`, `MS_INTERRUMPIDO`), cortan si `act_entrante` trae otro `commandId`; `targetPct` sólo 0 o 100; `sin_cambio` si ya está en el final pedido. Los comandos por serie siguen funcionando
+- [x] C.7 ACK: armado en `char[256]` fuera del callback, pendiente al reconectar, ring de 4 `commandId` propio de actuadores (repetido del último → republica su ACK)
+- [x] C.8 "Leer ahora" con el **hueco marcado** (`leer_sensores()` vacía + comentario de design §4.5): con `LECTURA_SENSORES_HABILITADA 0` sólo loguea; con 1 publica la telemetría del contrato (`signal` = RSSI, `timestamp` en segundos)
+- [x] C.9 Checklist antes de entregar: compila con `arduino-cli`; firmas sólo con tipos primitivos; ningún `publish` dentro del callback; ningún `connect()` alcanzable desde `red_atender()`; `commandId` con `strlcpy`; ArduinoJson sin `StaticJsonDocument`; el flujo del riel sin cambios de comportamiento
+
+> **Notas de la pista C (verificado sólo por compilación, sin hardware):**
+> `arduino-cli` 1.5.2, `esp32:esp32` 3.3.12, ArduinoJson 7.4.3, PubSubClient 2.8, FQBN `esp32:esp32:esp32`:
+> compila sin warnings propios con `LECTURA_SENSORES_HABILITADA` en 0 y en 1, y un `config.h` sin
+> `NODO_ZONA_ID`/`NODO_SECTOR_ID` falla con el `#error`. Simulador: `npm run typecheck` y `npm test` en verde.
+> Desvíos menores respecto del design:
+> - `contrato.h` suma constantes `DETALLE_*` (tipos del ACK) y `QOS_COMANDO_ZONA`, además de lo pedido.
+> - `valvula_vigilar()` se llama también desde `red_atender()` (no sólo `loop()`), para que la red de
+>   seguridad de la bomba valga durante los movimientos largos del riel. No publica ni reconecta.
+> - La interrupción por "último gana" de la mediasombra sólo aplica a movimientos comandados por MQTT
+>   (`act_actual_id` no vacío): los comandos por serie se comportan igual que antes.
+> - `bomba_apagar()` limpia `valvula_abierta`; `valve OFF` siempre apaga y responde `sin_cambio` sólo si
+>   la válvula no figuraba abierta. Un `commandId` ausente o de más de 39 caracteres en un comando de
+>   actuador se descarta con log (no hay a quién responder).
+> - `leer_sensores(JsonObject)` usa un tipo de ArduinoJson (de librería, no propio) en la firma; el
+>   prototipo está declarado a mano.
 
 ## D. Documentación
 
