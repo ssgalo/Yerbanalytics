@@ -222,8 +222,8 @@ cd Desarrollo/backend
   JDBC permanente.
 - **El backend consume la telemetría por MQTT y publica comandos a los actuadores y al riel.** No
   publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
-  (§6.2). Escucha además los eventos del riel (`nursery/rail/event`) y, desde las secuencias, el ACK de
-  los actuadores (`nursery/zone/+/sector/+/ack`) (lo consumen las secuencias).
+  (§6.2). Escucha además los eventos del riel (`nursery/rail/event`) y el ACK de los actuadores
+  (`nursery/zone/+/sector/+/ack`), que sólo consumen las secuencias.
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
