@@ -6,7 +6,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
- * Cuatro carriles de tareas programadas, a propósito separados.
+ * Cinco carriles de tareas programadas, a propósito separados.
  *
  * <p>El default de Spring Boot es <strong>un solo hilo</strong> para todos los {@code @Scheduled}
  * de la aplicación, y acá conviven dos familias de tareas con exigencias incompatibles:
@@ -88,6 +88,21 @@ public class SchedulersConfig {
         ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
         s.setPoolSize(1);
         s.setThreadNamePrefix("pasada-sched-");
+        s.setWaitForTasksToCompleteOnShutdown(true);
+        s.setAwaitTerminationSeconds(10);
+        return s;
+    }
+
+    /**
+     * Carril del orquestador de las secuencias guionadas: un hilo, un tick por segundo. Aparte del
+     * motor por la misma razón que la pasada: el cierre de una válvula no puede esperar detrás del
+     * barrido de 600 sectores.
+     */
+    @Bean
+    public TaskScheduler secuenciaScheduler() {
+        ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
+        s.setPoolSize(1);
+        s.setThreadNamePrefix("secuencia-sched-");
         s.setWaitForTasksToCompleteOnShutdown(true);
         s.setAwaitTerminationSeconds(10);
         return s;
