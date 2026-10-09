@@ -7,6 +7,7 @@
 //    Ingesta   : nursery/zone/{zona}/sector/{sector}/telemetry   (o zona)
 //    Comando   : nursery/zone/{zona}/sector/{sector}/command     (QoS 2)
 //    Ack       : nursery/zone/{zona}/sector/{sector}/ack
+//    Zona      : nursery/zone/{zona}/command                     (LEER_AHORA, QoS 1)
 //
 //  Ningún otro módulo debe hardcodear nombres de topic o claves JSON.
 // ============================================================================
@@ -82,6 +83,47 @@ static const char* KEY_DETALLE    = "detalle";
 static const char* KEY_TIPO       = "tipo";
 static const char* STATUS_SUCCESS = "SUCCESS";
 static const char* STATUS_ERROR   = "ERROR";
+
+//  Ack de actuador (add-secuencias-demo-expo, design §1.2)
+//    Topic: nursery/zone/{zona}/sector/{sector}/ack. Un único ack por comando, publicado al
+//    TERMINAR de cumplirlo (válvula abierta/cerrada; mediasombra al tocar el final de carrera).
+//    El ESP32 de vivero_esp32_red publica QoS 0 (PubSubClient); el backend suscribe QoS 1. Sin retain.
+//      {"commandId":"<uuid>","status":"SUCCESS","detalle":{"tipo":"ok","durationSec":20}}
+//      {"commandId":"<uuid>","status":"ERROR","detalle":{"tipo":"falla_mecanica"}}
+//    "detalle" es un OBJETO (en el evento del riel es un string).
+//    Valores de detalle.tipo:
+//      ok                    SUCCESS  comando cumplido
+//      sin_cambio            SUCCESS  el actuador ya estaba en el estado pedido
+//      comando_invalido      ERROR    JSON ilegible, accion desconocida o targetPct fuera de {0,100}
+//      duracion_invalida     ERROR    durationSec fuera de 1..CONTRATO_VALVULA_DURACION_MAX_SEG
+//      actuador_desconocido  ERROR    actuador que este nodo no tiene (p. ej. pump en la expo)
+//      falla_mecanica        ERROR    la mediasombra no tocó el final de carrera a tiempo
+//      reemplazado           ERROR    otro commandId interrumpió el movimiento; éste se abortó
+static const char* DETALLE_OK                   = "ok";
+static const char* DETALLE_SIN_CAMBIO           = "sin_cambio";
+static const char* DETALLE_COMANDO_INVALIDO     = "comando_invalido";
+static const char* DETALLE_DURACION_INVALIDA    = "duracion_invalida";
+static const char* DETALLE_ACTUADOR_DESCONOCIDO = "actuador_desconocido";
+static const char* DETALLE_FALLA_MECANICA       = "falla_mecanica";
+static const char* DETALLE_REEMPLAZADO          = "reemplazado";
+
+// ----------------------------------------------------------------------------
+//  Comando de zona "leer ahora" (add-secuencias-demo-expo, design §1.3)
+// ----------------------------------------------------------------------------
+//  Topic nursery/zone/{zona}/command · backend → nodo testigo de la zona (el sensado es por
+//  macro-zona). Backend publica QoS 1, el nodo suscribe QoS 1. Sin retain.
+//    {"commandId":"<uuid>","accion":"LEER_AHORA","parametros":{}}
+//  Sin "actuador": no es un actuador. commandId va igual (log del nodo y dedupe).
+//  Respuesta: la telemetría de siempre por nursery/zone/{zona}/telemetry, SIN commandId y SIN ack.
+//  Un nodo que no puede leer no publica nada; el backend lo ve como timeout.
+//  Correlación: el backend toma la PRIMERA telemetría de esa zona recibida después del pedido,
+//  por hora de recepción (no por el "timestamp" del payload: sin NTP son segundos desde el arranque).
+//  Espejos que deben decir lo mismo:
+//    - backend:   mqtt/ContratoNodo.java (TOPIC_COMANDO_ZONA, ACCION_LEER_AHORA)
+//    - simulador: simulador/server/contract.ts (zoneCommandTopic, READ_NOW_ACTION; sin comportamiento)
+//    - firmware:  prototipo_hardware/vivero_esp32_red/vivero_esp32_red.ino (ZONA_*)
+static const char* ACCION_LEER_AHORA = "LEER_AHORA";
+static const uint8_t QOS_COMANDO_ZONA = 1;
 
 // ----------------------------------------------------------------------------
 //  Riel de la cámara (add-pasada-riel, design.md §1)
@@ -164,6 +206,11 @@ inline void contratoTopicComando(char* buf, size_t n) {
 // Ack (siempre a nivel sector): el nodo publica el resultado del comando.
 inline void contratoTopicAck(char* buf, size_t n) {
   snprintf(buf, n, "nursery/zone/%s/sector/%s/ack", NODO_ZONA_ID, NODO_SECTOR_ID);
+}
+
+// Comando de zona "leer ahora": el nodo testigo de la zona se suscribe a este topic.
+inline void contratoTopicComandoZona(char* buf, size_t n) {
+  snprintf(buf, n, "nursery/zone/%s/command", NODO_ZONA_ID);
 }
 
 #endif  // CONTRATO_H
