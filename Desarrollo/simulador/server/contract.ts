@@ -183,3 +183,56 @@ export interface RailEvent {
   /** Only on ERROR; free ASCII text for the log. */
   detalle?: string;
 }
+
+/* ============================================================
+   Zone "read now" command and actuator ACK (add-secuencias-demo-expo, design §1.2 and §1.3).
+
+   SOURCE OF TRUTH: the "Ack" and "Comando de zona" sections of
+   `Desarrollo/embebido/comun/contrato.h`; also mirrored by `ContratoNodo.java` (backend) and
+   the sketch `vivero_esp32_red.ino`.
+
+   Constants and types only: the simulator does NOT react to the zone command. They live here
+   so a future change speaks the same vocabulary as the firmware.
+
+   - Zone command (backend → zone's witness node): QoS 1 both ways, no retain. The node answers
+     with the usual telemetry on the zone telemetry topic, without a commandId and without ACK.
+   - ACK (node → backend): one per actuator command, published when it finishes. The ESP32
+     publishes QoS 0; the backend subscribes QoS 1.
+   ============================================================ */
+
+/** Topic the backend publishes the zone command to. */
+export function zoneCommandTopic(zonaId: string): string {
+  return `nursery/zone/${zonaId}/command`;
+}
+
+export const READ_NOW_ACTION = 'LEER_AHORA';
+
+/** Zone command payload, exactly as the backend publishes it. No `actuador`: it is not an actuator. */
+export interface ZoneCommand {
+  /** UUID v4. */
+  commandId: string;
+  accion: typeof READ_NOW_ACTION;
+  parametros: Record<string, never>;
+}
+
+export const ACK_STATUSES = ['SUCCESS', 'ERROR'] as const;
+export type AckStatus = (typeof ACK_STATUSES)[number];
+
+export const ACK_DETAIL_TYPES = [
+  'ok',
+  'sin_cambio',
+  'comando_invalido',
+  'duracion_invalida',
+  'actuador_desconocido',
+  'falla_mecanica',
+  'reemplazado',
+] as const;
+export type AckDetailType = (typeof ACK_DETAIL_TYPES)[number];
+
+/** Actuator ACK payload on `nursery/zone/{zonaId}/sector/{sectorId}/ack`. */
+export interface ActuatorAck {
+  commandId: string;
+  status: AckStatus;
+  /** An object (in the rail event it is a string). Extra keys, e.g. `durationSec`, may come along. */
+  detalle: { tipo: AckDetailType } & Record<string, unknown>;
+}

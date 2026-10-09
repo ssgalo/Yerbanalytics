@@ -9,10 +9,14 @@
 //
 //  Es una copia de vivero_esp32.ino (que no se toca) con red:
 //    - Todos los comandos por monitor serie de siempre, más "red".
-//    - Por MQTT SOLO maneja el riel: se suscribe a nursery/rail/command
-//      y publica en nursery/rail/event. Bomba y mediasombra, sólo por serie.
-//    - Contrato: openspec/changes/add-pasada-riel/design.md §1 y
-//      Desarrollo/embebido/comun/contrato.h (sección "Riel").
+//    - Por MQTT maneja el riel: se suscribe a nursery/rail/command
+//      y publica en nursery/rail/event.
+//    - Además (add-secuencias-demo-expo) atiende por MQTT la válvula (sobre el driver
+//      de la bomba) y la mediasombra del sector NODO_SECTOR_ID, con un ACK por comando,
+//      y el comando de zona "leer ahora" (la lectura de sensores es un HUECO marcado).
+//    - Contrato: openspec/changes/add-pasada-riel/design.md §1,
+//      openspec/changes/add-secuencias-demo-expo/design.md §1 y §4, y
+//      Desarrollo/embebido/comun/contrato.h (secciones "Riel", "Ack" y "Comando de zona").
 //
 //  Librerías (Library Manager de Arduino IDE):
 //    - PubSubClient (Nick O'Leary) 2.8.x
@@ -38,6 +42,17 @@
 #endif
 #if __has_include("config.h") && (!defined(WIFI_SSID) || !defined(WIFI_PASSWORD) || !defined(MQTT_HOST))
   #error "config.h incompleto: tiene que definir WIFI_SSID, WIFI_PASSWORD y MQTT_HOST (ver config.example.h)"
+#endif
+// Un config.h anterior a add-secuencias-demo-expo no compila a propósito: sin zona y sector
+// el nodo no sabría a qué tópicos suscribirse.
+#if __has_include("config.h") && (!defined(NODO_ZONA_ID) || !defined(NODO_SECTOR_ID))
+  #error "config.h desactualizado: falta NODO_ZONA_ID y/o NODO_SECTOR_ID (ver config.example.h)"
+#endif
+#ifndef BOMBA_CAUDAL_PWM
+  #define BOMBA_CAUDAL_PWM 200
+#endif
+#ifndef LECTURA_SENSORES_HABILITADA
+  #define LECTURA_SENSORES_HABILITADA 0
 #endif
 #ifndef MQTT_PORT
   #define MQTT_PORT 1883
@@ -181,6 +196,62 @@ long pasos_actuales = 0;  // posición actual en pasos desde home
 #define CANT_RECIENTES           4
 
 // =============================================================
+//  CONTRATO MQTT DE ACTUADORES Y DE ZONA (add-secuencias-demo-expo)
+//  Espejo de Desarrollo/embebido/comun/contrato.h (secciones "Ack" y
+//  "Comando de zona"), que es la fuente de verdad. Si cambia allá, cambia acá.
+//  Los tópicos se arman en red_iniciar() con NODO_ZONA_ID y NODO_SECTOR_ID.
+// =============================================================
+#define ACK_STATUS_SUCCESS   "SUCCESS"
+#define ACK_STATUS_ERROR     "ERROR"
+#define ACK_KEY_TIPO         "tipo"
+#define ACK_KEY_DURATION     "durationSec"
+#define ACK_KEY_TARGET_PCT   "targetPct"
+
+#define ACT_NOMBRE_VALVE     "valve"
+#define ACT_NOMBRE_PUMP      "pump"
+#define ACT_NOMBRE_SHADE     "shade"
+#define ACT_ACCION_ON        "ON"
+#define ACT_ACCION_OFF       "OFF"
+#define ACT_ACCION_SET       "SET"
+
+// detalle.tipo del ACK
+#define ACK_TIPO_OK                   "ok"
+#define ACK_TIPO_SIN_CAMBIO           "sin_cambio"
+#define ACK_TIPO_COMANDO_INVALIDO     "comando_invalido"
+#define ACK_TIPO_DURACION_INVALIDA    "duracion_invalida"
+#define ACK_TIPO_ACTUADOR_DESCONOCIDO "actuador_desconocido"
+#define ACK_TIPO_FALLA_MECANICA       "falla_mecanica"
+#define ACK_TIPO_REEMPLAZADO          "reemplazado"
+
+// Duración máxima de apertura de la válvula (s). Espejo de CONTRATO_VALVULA_DURACION_MAX_SEG.
+#define VALVULA_DURACION_MAX_SEG 1200
+
+// Comando de zona "leer ahora"
+#define ZONA_ACCION_LEER_AHORA "LEER_AHORA"
+#define ZONA_KEY_MAC           "mac"
+#define ZONA_KEY_SIGNAL        "signal"
+#define ZONA_KEY_TIMESTAMP     "timestamp"
+#define ZONA_KEY_METRICS       "metrics"
+
+// ── Código interno del comando de actuador (int, no enum: ver nota de prototipos) ──
+#define ACTR_NINGUNO     0
+#define ACTR_VALVULA     1
+#define ACTR_MEDIASOMBRA 2
+#define ACTR_ON          1
+#define ACTR_OFF         2
+#define ACTR_SET         3
+
+// ── Resultado de mover la mediasombra ─────────────────────────
+#define MS_OK            0   // tocó el final de carrera pedido
+#define MS_TIMEOUT       1   // 30 s sin tocarlo
+#define MS_INTERRUMPIDO  2   // llegó otro comando por MQTT (el último gana)
+#define MS_TIMEOUT_MS    30000
+
+#define LARGO_ACK        256
+#define LARGO_TOPIC      96
+#define LARGO_TELEMETRIA 384
+
+// =============================================================
 //  PROTOTIPOS
 //  Declarados a mano para no depender del generador de Arduino IDE.
 //  Sólo tipos primitivos en las firmas (nada de enum/struct propios).
@@ -194,8 +265,8 @@ void nema_rutina_captura();
 void motorDC_parar();
 void motorDC_adelante(int velocidad);
 void motorDC_atras(int velocidad);
-void mediasombra_enrollar();
-void mediasombra_desenrollar();
+int  mediasombra_enrollar();
+int  mediasombra_desenrollar();
 void bomba_encender(int caudal);
 void bomba_apagar();
 void serial_atender();
@@ -217,6 +288,21 @@ void evento_armar(char* buf, size_t n, const char* commandId, const char* status
                   int posicion, const char* codigo, const char* detalle);
 bool id_es_reciente(const char* id);
 void id_recordar(const char* id);
+// Actuadores y "leer ahora" (add-secuencias-demo-expo)
+void procesar_actuador();
+void procesar_lectura();
+void valvula_vigilar();
+bool act_hay_reemplazo();
+bool act_id_es_reciente(const char* id);
+void act_id_recordar(const char* id);
+void act_terminar(const char* id, const char* status, const char* tipo, int durationSec);
+void ack_armar(char* buf, size_t n, const char* commandId, const char* status,
+               const char* tipo, int durationSec);
+bool act_publicar(const char* payload);
+void act_publicar_pendiente();
+void mqtt_callback_actuador(const char* payload, unsigned int length);
+void mqtt_callback_zona(const char* payload, unsigned int length);
+bool leer_sensores(JsonObject metricas);
 
 // =============================================================
 //  ESTADO DE RED Y DEL RIEL
@@ -257,6 +343,50 @@ int  recientes_proximo = 0;
 
 unsigned long led_ultimo = 0;
 bool led_encendido = false;
+
+// ── Actuadores por MQTT (válvula y mediasombra) ───────────────
+// Tópicos armados una vez en red_iniciar().
+char topic_act_comando[LARGO_TOPIC] = "";
+char topic_act_ack[LARGO_TOPIC] = "";
+char topic_zona_comando[LARGO_TOPIC] = "";
+char topic_zona_telemetria[LARGO_TOPIC] = "";
+
+// Slot "act_entrante": lo llena el callback y lo consume loop() (o el bucle de la
+// mediasombra, para ver si hay que abortar). El callback NO mueve ni publica.
+bool act_hay = false;
+bool act_valido = false;
+int  act_actuador = ACTR_NINGUNO;
+int  act_accion = ACTR_ON;
+int  act_duracion = 0;       // durationSec de valve ON
+int  act_target_pct = -1;    // targetPct de shade SET
+char act_id[LARGO_ID] = "";
+const char* act_tipo_error = ACK_TIPO_COMANDO_INVALIDO;   // sólo si !act_valido (apunta a un literal)
+
+// Comando de actuador en ejecución ("" si está quieto o si el movimiento es por serie).
+char act_actual_id[LARGO_ID] = "";
+
+// Último comando de actuador terminado y su ACK ya serializado.
+char act_ultimo_id[LARGO_ID] = "";
+char act_ultimo_ack[LARGO_ACK] = "";
+bool act_ack_pendiente = false;   // true si el ACK todavía no se pudo publicar
+unsigned long act_pendiente_ultimo_intento = 0;
+
+// Ring propio de commandId de actuadores (aparte del del riel).
+char act_recientes[CANT_RECIENTES][LARGO_ID];
+int  act_recientes_proximo = 0;
+
+// Comandos pisados en el slot antes de atenderse: loop() les responde ERROR reemplazado.
+#define CANT_DESPLAZADOS 2
+char desplazados[CANT_DESPLAZADOS][LARGO_ID];
+int  desplazados_cant = 0;
+
+// Válvula (sobre el driver de la bomba): se cierra sola al vencer el plazo.
+bool valvula_abierta = false;
+unsigned long valvula_cierra_en = 0;
+
+// ── "Leer ahora" ──────────────────────────────────────────────
+bool leer_hay = false;
+char leer_id[LARGO_ID] = "";
 
 // =============================================================
 //  SETUP
@@ -315,6 +445,9 @@ void loop() {
   red_mantener();       // reconexión WiFi/MQTT (sólo acá, nunca a mitad de un movimiento)
   red_atender();        // mqtt.loop() + LED
   procesar_entrante();  // comando del riel recibido por MQTT, si hay
+  procesar_actuador();  // comando de válvula/mediasombra recibido por MQTT, si hay
+  procesar_lectura();   // "leer ahora" recibido por MQTT, si hay
+  valvula_vigilar();    // red de seguridad: cierra la válvula al vencer durationSec
   serial_atender();     // comandos por monitor serie de siempre
 }
 
@@ -582,10 +715,13 @@ void motorDC_atras(int velocidad) {
   ledcWrite(MOTOR_ENA, velocidad);
 }
 
-void mediasombra_enrollar() {
+// Devuelven MS_OK (tocó el final de carrera, o ya estaba ahí), MS_TIMEOUT o
+// MS_INTERRUMPIDO (llegó por MQTT otro comando de actuador: el último gana).
+// Los comandos por serie las llaman igual e ignoran el resultado.
+int mediasombra_enrollar() {
   if (MEDIASOMBRA_ACTIVADO(ENDSTOP_ENROLLADA)) {
     Serial.println("Mediasombra ya enrollada.");
-    return;
+    return MS_OK;
   }
   Serial.println("Enrollando mediasombra...");
   motorDC_atras(200); // 78% velocidad
@@ -593,38 +729,50 @@ void mediasombra_enrollar() {
   // Espera hasta que el endstop se active o timeout
   unsigned long inicio = millis();
   while (!MEDIASOMBRA_ACTIVADO(ENDSTOP_ENROLLADA)) {
-    if (millis() - inicio > 30000) { // 30 segundos máximo
+    if (millis() - inicio > MS_TIMEOUT_MS) { // 30 segundos máximo
       Serial.println("TIMEOUT: Revisá el endstop de enrollado.");
       motorDC_parar();
-      return;
+      return MS_TIMEOUT;
     }
     red_atender();  // mantiene viva la conexión MQTT (30 s > keepalive)
+    if (act_hay_reemplazo()) {
+      motorDC_parar();
+      Serial.println("[act] Enrollado interrumpido por otro comando.");
+      return MS_INTERRUMPIDO;
+    }
     delay(10);
   }
   motorDC_parar();
   Serial.println("Mediasombra enrollada.");
+  return MS_OK;
 }
 
-void mediasombra_desenrollar() {
+int mediasombra_desenrollar() {
   if (MEDIASOMBRA_ACTIVADO(ENDSTOP_DESENROLLADA)) {
     Serial.println("Mediasombra ya desenrollada.");
-    return;
+    return MS_OK;
   }
   Serial.println("Desenrollando mediasombra...");
   motorDC_adelante(200); // 78% velocidad
 
   unsigned long inicio = millis();
   while (!MEDIASOMBRA_ACTIVADO(ENDSTOP_DESENROLLADA)) {
-    if (millis() - inicio > 30000) {
+    if (millis() - inicio > MS_TIMEOUT_MS) {
       Serial.println("TIMEOUT: Revisá el endstop de desenrollado.");
       motorDC_parar();
-      return;
+      return MS_TIMEOUT;
     }
     red_atender();  // mantiene viva la conexión MQTT (30 s > keepalive)
+    if (act_hay_reemplazo()) {
+      motorDC_parar();
+      Serial.println("[act] Desenrollado interrumpido por otro comando.");
+      return MS_INTERRUMPIDO;
+    }
     delay(10);
   }
   motorDC_parar();
   Serial.println("Mediasombra desenrollada.");
+  return MS_OK;
 }
 
 // =============================================================
@@ -645,6 +793,7 @@ void bomba_apagar() {
   digitalWrite(BOMBA_IN3, LOW);
   digitalWrite(BOMBA_IN4, LOW);
   ledcWrite(BOMBA_ENB, 0);
+  valvula_abierta = false;
   Serial.println("Bomba apagada.");
 }
 
@@ -660,6 +809,16 @@ void red_iniciar() {
            MQTT_CLIENT_ID_BASE,
            (unsigned int) ((chip >> 32) & 0xFFFF),
            (unsigned long) (chip & 0xFFFFFFFFUL));
+
+  // Tópicos del sector y de la zona (espejo de contrato.h)
+  snprintf(topic_act_comando, sizeof(topic_act_comando),
+           "nursery/zone/%s/sector/%s/command", NODO_ZONA_ID, NODO_SECTOR_ID);
+  snprintf(topic_act_ack, sizeof(topic_act_ack),
+           "nursery/zone/%s/sector/%s/ack", NODO_ZONA_ID, NODO_SECTOR_ID);
+  snprintf(topic_zona_comando, sizeof(topic_zona_comando),
+           "nursery/zone/%s/command", NODO_ZONA_ID);
+  snprintf(topic_zona_telemetria, sizeof(topic_zona_telemetria),
+           "nursery/zone/%s/telemetry", NODO_ZONA_ID);
 
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -735,12 +894,16 @@ void red_mantener() {
     }
     mqtt_estaba_conectado = true;
     red_publicar_pendiente();   // evento final que quedó sin publicar
+    act_publicar_pendiente();   // ACK de actuador que quedó sin publicar
     return;
   }
 
   // Conectado: si quedó un evento final sin publicar, reintenta cada tanto
   if (ultimo_pendiente && (ahora - pendiente_ultimo_intento >= RED_MQTT_REINTENTO_MS)) {
     red_publicar_pendiente();
+  }
+  if (act_ack_pendiente && (ahora - act_pendiente_ultimo_intento >= RED_MQTT_REINTENTO_MS)) {
+    act_publicar_pendiente();
   }
 }
 
@@ -768,6 +931,19 @@ bool red_conectar_mqtt() {
     return false;
   }
   Serial.println("[mqtt] Suscripto a " RIEL_TOPIC_COMANDO " (QoS 1)");
+
+  // Comando del sector (válvula y mediasombra) y comando de la zona ("leer ahora")
+  if (!mqtt.subscribe(topic_act_comando, RIEL_QOS_SUSCRIPCION) ||
+      !mqtt.subscribe(topic_zona_comando, RIEL_QOS_SUSCRIPCION)) {
+    Serial.println("[mqtt] ERROR: no se pudo suscribir a los comandos del sector/zona; desconecto y reintento");
+    mqtt.disconnect();
+    return false;
+  }
+  Serial.print("[mqtt] Suscripto a ");
+  Serial.print(topic_act_comando);
+  Serial.print(" y ");
+  Serial.print(topic_zona_comando);
+  Serial.println(" (QoS 1)");
   return true;
 }
 
@@ -777,6 +953,7 @@ void red_atender() {
   if (red_iniciada) {
     mqtt.loop();   // keepalive + recepción (si llega algo, corre mqtt_callback)
   }
+  valvula_vigilar();   // la bomba no se queda abierta aunque el riel esté en movimiento
   led_actualizar();
 }
 
@@ -914,6 +1091,15 @@ void led_actualizar() {
 // no mueve el motor y NO publica (PubSubClient reusa su buffer al publicar
 // y corrompería el mensaje que se está leyendo).
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {
+  // Despacha por tópico a slots separados; los tres sólo copian, nunca publican.
+  if (strcmp(topic, topic_act_comando) == 0) {
+    mqtt_callback_actuador((const char*) payload, length);
+    return;
+  }
+  if (strcmp(topic, topic_zona_comando) == 0) {
+    mqtt_callback_zona((const char*) payload, length);
+    return;
+  }
   if (strcmp(topic, RIEL_TOPIC_COMANDO) != 0) return;
 
   // Pisa lo que hubiera en el slot: el último comando gana
@@ -1143,4 +1329,387 @@ void id_recordar(const char* id) {
   if (id == NULL || id[0] == '\0') return;
   strlcpy(recientes[recientes_proximo], id, LARGO_ID);
   recientes_proximo = (recientes_proximo + 1) % CANT_RECIENTES;
+}
+
+// =============================================================
+//  ACTUADORES POR MQTT — válvula (sobre el driver de la bomba) y mediasombra
+//  (add-secuencias-demo-expo, design §4). Mismo esquema que el riel: el callback
+//  copia al slot "act_*", loop() lo consume y publica el ACK fuera del callback.
+// =============================================================
+
+// Parsea y valida un comando de actuador. SOLO copia al slot: no mueve ni publica.
+// El último comando gana: pisa lo que hubiera en el slot.
+void mqtt_callback_actuador(const char* payload, unsigned int length) {
+  // Si el slot todavía tiene un comando sin atender, este lo pisa: se anota el commandId
+  // desplazado para que loop() le responda ERROR reemplazado (el callback no publica).
+  char previo[LARGO_ID];
+  previo[0] = '\0';
+  if (act_hay) strlcpy(previo, act_id, sizeof(previo));
+
+  act_valido = false;
+  act_actuador = ACTR_NINGUNO;
+  act_accion = ACTR_ON;
+  act_duracion = 0;
+  act_target_pct = -1;
+  act_id[0] = '\0';
+  act_tipo_error = ACK_TIPO_COMANDO_INVALIDO;
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, payload, (size_t) length);
+  if (err) {
+    act_hay = true;
+    Serial.print("[act] Recibido comando con JSON ilegible: ");
+    Serial.println(err.c_str());
+    return;
+  }
+
+  const char* id       = doc[RIEL_KEY_COMMAND_ID] | "";
+  const char* actuador = doc[RIEL_KEY_ACTUADOR] | "";
+  const char* accion   = doc[RIEL_KEY_ACCION] | "";
+  int duracion         = doc[RIEL_KEY_PARAMETROS][ACK_KEY_DURATION] | -1;
+  int target           = doc[RIEL_KEY_PARAMETROS][ACK_KEY_TARGET_PCT] | -1;
+
+  size_t largo_id = strlen(id);
+  if (largo_id > 0 && largo_id < LARGO_ID) {
+    strlcpy(act_id, id, sizeof(act_id));
+  }
+
+  // Desplazado (y no es un redelivery del mismo id): queda en una cola chica; si se llena,
+  // el más viejo se pierde sin ACK (limitación aceptada: haría falta una ráfaga de 3+ comandos).
+  if (previo[0] != '\0' && strcmp(previo, act_id) != 0) {
+    if (desplazados_cant < CANT_DESPLAZADOS) {
+      strlcpy(desplazados[desplazados_cant], previo, LARGO_ID);
+      desplazados_cant++;
+    } else {
+      Serial.print("[act] Cola de desplazados llena: se pierde el ACK de ");
+      Serial.println(previo);
+    }
+  }
+
+  if (strcmp(actuador, ACT_NOMBRE_VALVE) == 0) {
+    act_actuador = ACTR_VALVULA;
+    if (strcmp(accion, ACT_ACCION_ON) == 0) {
+      act_accion = ACTR_ON;
+      if (duracion >= 1 && duracion <= VALVULA_DURACION_MAX_SEG) {
+        act_duracion = duracion;
+        act_valido = true;
+      } else {
+        act_tipo_error = ACK_TIPO_DURACION_INVALIDA;
+      }
+    } else if (strcmp(accion, ACT_ACCION_OFF) == 0) {
+      act_accion = ACTR_OFF;
+      act_valido = true;
+    }
+  } else if (strcmp(actuador, ACT_NOMBRE_SHADE) == 0) {
+    act_actuador = ACTR_MEDIASOMBRA;
+    act_accion = ACTR_SET;
+    // Hardware binario: sólo 0 (desplegada) o 100 (enrollada)
+    if (strcmp(accion, ACT_ACCION_SET) == 0 && (target == 0 || target == 100)) {
+      act_target_pct = target;
+      act_valido = true;
+    }
+  } else {
+    // pump (los insumos no están en este nodo), rail u otro
+    act_tipo_error = ACK_TIPO_ACTUADOR_DESCONOCIDO;
+  }
+  act_hay = true;
+
+  Serial.print("[act] Recibido ");
+  Serial.print(act_id[0] != '\0' ? act_id : "(sin commandId)");
+  Serial.print(": ");
+  Serial.print(actuador);
+  Serial.print(" ");
+  Serial.print(accion);
+  Serial.println(act_valido ? "" : " (inválido)");
+}
+
+// ¿Hay que abortar el movimiento de la mediasombra en curso? Mismo criterio que
+// red_hay_reemplazo() del riel: sólo un comando VÁLIDO con un commandId nuevo
+// interrumpe (el último gana). No consume el slot: lo ejecuta loop() al terminar.
+// Sólo aplica a movimientos comandados por MQTT (act_actual_id no vacío): los de serie no se abortan.
+bool act_hay_reemplazo() {
+  if (!act_hay) return false;
+  if (act_actual_id[0] == '\0') return false;
+
+  // El mismo comando que se está ejecutando (redelivery) → se descarta
+  if (act_id[0] != '\0' && strcmp(act_id, act_actual_id) == 0) {
+    Serial.print("[act] ");
+    Serial.print(act_id);
+    Serial.println(" repetido (en ejecución): lo ignoro");
+    act_hay = false;
+    return false;
+  }
+  // Inválido o repetido de antes: no detiene el motor; se responde al terminar
+  if (!act_valido) return false;
+  // Sólo otro comando de mediasombra interrumpe (el último gana, design §4.4). Uno de válvula
+  // (p. ej. del despacho de riego) espera en el slot y se atiende al terminar el movimiento.
+  if (act_actuador != ACTR_MEDIASOMBRA) return false;
+  if (strcmp(act_id, act_ultimo_id) == 0 || act_id_es_reciente(act_id)) return false;
+
+  Serial.print("[act] Llegó ");
+  Serial.print(act_id);
+  Serial.println(" durante el movimiento: aborto el actual (el último gana)");
+  return true;
+}
+
+// Consume el slot "act_*" (desde loop()). Idempotencia:
+//   1. mismo commandId que el en ejecución → se ignora (lo resuelve act_hay_reemplazo)
+//   2. mismo commandId que el último terminado → se republica su ACK
+//   3. commandId entre los últimos 4 → se ignora
+//   4. otro commandId durante un movimiento → el viejo termina en ERROR reemplazado
+//      y este slot se ejecuta en la vuelta siguiente de loop()
+void procesar_actuador() {
+  // Primero, los comandos que el callback pisó antes de que se atendieran: ERROR reemplazado.
+  // Copia local y contador a cero antes de publicar (el callback puede agregar otros).
+  if (desplazados_cant > 0) {
+    char viejos[CANT_DESPLAZADOS][LARGO_ID];
+    int n = desplazados_cant;
+    for (int k = 0; k < n; k++) strlcpy(viejos[k], desplazados[k], LARGO_ID);
+    desplazados_cant = 0;
+    for (int k = 0; k < n; k++) {
+      if (strcmp(viejos[k], act_ultimo_id) == 0 || act_id_es_reciente(viejos[k])) continue;
+      act_terminar(viejos[k], ACK_STATUS_ERROR, ACK_TIPO_REEMPLAZADO, 0);
+    }
+  }
+
+  if (!act_hay) return;
+
+  // Copia local: mientras la mediasombra se mueve, el callback puede pisar el slot
+  char id[LARGO_ID];
+  strlcpy(id, act_id, sizeof(id));
+  bool valido = act_valido;
+  int actuador = act_actuador;
+  int accion = act_accion;
+  int duracion = act_duracion;
+  int target = act_target_pct;
+  const char* tipo_error = act_tipo_error;
+  act_hay = false;
+
+  if (id[0] == '\0') {
+    Serial.println("[act] Comando sin commandId válido: no hay a quién responder, lo descarto");
+    return;
+  }
+
+  // Repetido del último terminado → republica su ACK
+  if (strcmp(id, act_ultimo_id) == 0) {
+    Serial.print("[act] ");
+    Serial.print(id);
+    Serial.println(" repetido (último terminado): republico su ACK, sin moverme");
+    if (act_publicar(act_ultimo_ack)) {
+      act_ack_pendiente = false;
+    }
+    return;
+  }
+
+  // Visto entre los últimos 4 → se ignora
+  if (act_id_es_reciente(id)) {
+    Serial.print("[act] ");
+    Serial.print(id);
+    Serial.println(" ya procesado antes: lo ignoro");
+    return;
+  }
+
+  // Inválido → ACK ERROR con el tipo que corresponda (sin moverse)
+  if (!valido) {
+    act_terminar(id, ACK_STATUS_ERROR, tipo_error, 0);
+    return;
+  }
+
+  // ── Válvula ──────────────────────────────────────────────
+  if (actuador == ACTR_VALVULA) {
+    if (accion == ACTR_ON) {
+      // Si ya estaba abierta, renueva el plazo
+      bomba_encender(BOMBA_CAUDAL_PWM);
+      valvula_abierta = true;
+      valvula_cierra_en = millis() + (unsigned long) duracion * 1000UL;
+      act_terminar(id, ACK_STATUS_SUCCESS, ACK_TIPO_OK, duracion);
+    } else {  // OFF
+      bool estaba_abierta = valvula_abierta;
+      bomba_apagar();   // siempre apaga, por las dudas
+      act_terminar(id, ACK_STATUS_SUCCESS, estaba_abierta ? ACK_TIPO_OK : ACK_TIPO_SIN_CAMBIO, 0);
+    }
+    return;
+  }
+
+  // ── Mediasombra: 0 = desplegada, 100 = enrollada ─────────
+  bool ya_en_el_final = (target == 0) ? MEDIASOMBRA_ACTIVADO(ENDSTOP_DESENROLLADA)
+                                      : MEDIASOMBRA_ACTIVADO(ENDSTOP_ENROLLADA);
+  if (ya_en_el_final) {
+    Serial.println("[act] Mediasombra ya está en el final de carrera pedido");
+    act_terminar(id, ACK_STATUS_SUCCESS, ACK_TIPO_SIN_CAMBIO, 0);
+    return;
+  }
+
+  strlcpy(act_actual_id, id, sizeof(act_actual_id));
+  int r = (target == 0) ? mediasombra_desenrollar() : mediasombra_enrollar();
+  act_actual_id[0] = '\0';
+
+  if (r == MS_OK) {
+    act_terminar(id, ACK_STATUS_SUCCESS, ACK_TIPO_OK, 0);
+  } else if (r == MS_TIMEOUT) {
+    act_terminar(id, ACK_STATUS_ERROR, ACK_TIPO_FALLA_MECANICA, 0);
+  } else {  // MS_INTERRUMPIDO
+    act_terminar(id, ACK_STATUS_ERROR, ACK_TIPO_REEMPLAZADO, 0);
+  }
+}
+
+// Red de seguridad de la válvula: si venció el plazo de durationSec sin que llegara el OFF,
+// cierra sola y no publica nada (el backend ya cierra con su propio OFF). Se llama desde
+// loop() y desde red_atender() para cubrir también los movimientos largos.
+void valvula_vigilar() {
+  if (!valvula_abierta) return;
+  if ((long) (millis() - valvula_cierra_en) < 0) return;
+  Serial.println("[valvula] Venció durationSec: cierro la válvula (red de seguridad)");
+  bomba_apagar();
+}
+
+// Arma el ACK en act_ultimo_ack, lo recuerda como último terminado e intenta publicarlo.
+// Se llama sólo desde loop() (nunca desde el callback). Sin conexión queda pendiente.
+void act_terminar(const char* id, const char* status, const char* tipo, int durationSec) {
+  ack_armar(act_ultimo_ack, sizeof(act_ultimo_ack), id, status, tipo, durationSec);
+  strlcpy(act_ultimo_id, id, sizeof(act_ultimo_id));
+  act_id_recordar(id);
+  act_ack_pendiente = true;
+  act_pendiente_ultimo_intento = millis();
+  if (act_publicar(act_ultimo_ack)) {
+    act_ack_pendiente = false;
+  } else {
+    Serial.println("[mqtt] Sin conexión: el ACK se publica al reconectar");
+  }
+}
+
+// ACK: {"commandId","status","detalle":{"tipo"[,"durationSec"]}}. durationSec <= 0 → se omite.
+void ack_armar(char* buf, size_t n, const char* commandId, const char* status,
+               const char* tipo, int durationSec) {
+  JsonDocument doc;
+  doc[RIEL_KEY_COMMAND_ID] = commandId;
+  doc[RIEL_KEY_STATUS] = status;
+  JsonObject detalle = doc[RIEL_KEY_DETALLE].to<JsonObject>();
+  detalle[ACK_KEY_TIPO] = tipo;
+  if (durationSec > 0) {
+    detalle[ACK_KEY_DURATION] = durationSec;
+  }
+  serializeJson(doc, buf, n);
+}
+
+// Publica en nursery/zone/{zona}/sector/{sector}/ack (QoS 0: PubSubClient no publica con QoS 1).
+// No reconecta: si no hay conexión, devuelve false.
+bool act_publicar(const char* payload) {
+  if (!red_iniciada || !mqtt.connected()) {
+    return false;
+  }
+  bool ok = mqtt.publish(topic_act_ack, payload);
+  if (ok) {
+    Serial.print("[mqtt] ACK publicado: ");
+  } else {
+    Serial.print("[mqtt] ERROR al publicar el ACK: ");
+  }
+  Serial.println(payload);
+  return ok;
+}
+
+// Publica el ACK que quedó pendiente (si hay).
+void act_publicar_pendiente() {
+  if (!act_ack_pendiente) return;
+  act_pendiente_ultimo_intento = millis();
+  Serial.println("[mqtt] Publicando el ACK pendiente...");
+  if (act_publicar(act_ultimo_ack)) {
+    act_ack_pendiente = false;
+  }
+}
+
+bool act_id_es_reciente(const char* id) {
+  if (id == NULL || id[0] == '\0') return false;
+  for (int k = 0; k < CANT_RECIENTES; k++) {
+    if (strcmp(act_recientes[k], id) == 0) return true;
+  }
+  return false;
+}
+
+void act_id_recordar(const char* id) {
+  if (id == NULL || id[0] == '\0') return;
+  strlcpy(act_recientes[act_recientes_proximo], id, LARGO_ID);
+  act_recientes_proximo = (act_recientes_proximo + 1) % CANT_RECIENTES;
+}
+
+// =============================================================
+//  "LEER AHORA" — comando de zona
+//  El backend pide una lectura; el nodo responde con la telemetría de siempre por
+//  nursery/zone/{zona}/telemetry, sin commandId y sin ACK.
+// =============================================================
+
+// Sólo marca el pedido: la lectura y la publicación las hace loop().
+void mqtt_callback_zona(const char* payload, unsigned int length) {
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, payload, (size_t) length);
+  if (err) {
+    Serial.print("[leer] Comando de zona con JSON ilegible: ");
+    Serial.println(err.c_str());
+    return;
+  }
+  const char* accion = doc[RIEL_KEY_ACCION] | "";
+  if (strcmp(accion, ZONA_ACCION_LEER_AHORA) != 0) {
+    Serial.print("[leer] Acción de zona desconocida, la ignoro: ");
+    Serial.println(accion);
+    return;
+  }
+  const char* id = doc[RIEL_KEY_COMMAND_ID] | "";
+  strlcpy(leer_id, id, sizeof(leer_id));
+  leer_hay = true;
+  Serial.print("[leer] Recibido LEER_AHORA ");
+  Serial.println(leer_id[0] != '\0' ? leer_id : "(sin commandId)");
+}
+
+// Consume el pedido (desde loop()). Con LECTURA_SENSORES_HABILITADA en 0, o si
+// leer_sensores() no cargó nada, no publica: el backend lo ve como timeout.
+void procesar_lectura() {
+  if (!leer_hay) return;
+  leer_hay = false;
+
+#if LECTURA_SENSORES_HABILITADA
+  JsonDocument doc;
+  doc[ZONA_KEY_MAC] = WiFi.macAddress();
+  doc[ZONA_KEY_SIGNAL] = WiFi.RSSI();                          // RSSI en dBm
+  doc[ZONA_KEY_TIMESTAMP] = (uint32_t) (millis() / 1000UL);    // segundos desde el arranque (sin NTP)
+  JsonObject metricas = doc[ZONA_KEY_METRICS].to<JsonObject>();
+  if (!leer_sensores(metricas)) {
+    Serial.println("[leer] leer_sensores() no cargó ninguna métrica: no publico");
+    return;
+  }
+  if (!red_iniciada || !mqtt.connected()) {
+    Serial.println("[leer] Sin conexión al broker: no publico");
+    return;
+  }
+  char buf[LARGO_TELEMETRIA];
+  serializeJson(doc, buf, sizeof(buf));
+  if (mqtt.publish(topic_zona_telemetria, buf)) {
+    Serial.print("[leer] Telemetría publicada: ");
+  } else {
+    Serial.print("[leer] ERROR al publicar la telemetría: ");
+  }
+  Serial.println(buf);
+#else
+  Serial.println("[leer] sin sensores configurados (LECTURA_SENSORES_HABILITADA 0): no publico");
+#endif
+}
+
+// ============================================================
+//  HUECO A COMPLETAR: lectura de sensores
+//  No se sabe todavía qué sensores van conectados en el stand
+//  (analisis-demo-expo-vs-vivero.md §9.4).
+//
+//  Para completarlo:
+//    1. Leer cada sensor y cargarlo en "metricas" con las CLAVES y UNIDADES de contrato.h:
+//         metricas["humSus"] = ...;   // %RH
+//         metricas["humAmb"] = ...;   // %RH
+//         metricas["temp"]   = ...;   // °C del aire
+//         metricas["uv"]     = ...;   // % de luz de un LDR (NO es radiación UV)
+//         metricas["ce"]     = ...;   // µS/cm (el backend lo guarda en dS/m)
+//         (y las extendidas: tempSuelo, phSuelo, n, p, k)
+//    2. Devolver true si cargó al menos una métrica; false si no.
+//    3. Poner LECTURA_SENSORES_HABILITADA en 1 en config.h.
+// ============================================================
+bool leer_sensores(JsonObject metricas) {
+  (void) metricas;   // sin sensores todavía
+  return false;
 }
