@@ -61,6 +61,11 @@ Unidad A3 — secuencias
 >   ocurren idénticas **antes** de tocar nada (base `feat/secuencias-demo-expo`: 711 tests, mismas 15) y no tienen
 >   relación con las secuencias; con este cambio son 786 tests y las mismas 15. Ver el informe de la pista.
 
+> **Nota (suite del backend).** `./mvnw test` completo tiene **15 fallas previas** (7 failures + 8 errors) en
+> `NurseryControllerTest`, `NurseryServiceRiegoTest` y `DiagnosticoControllerTest`. Son **idénticas antes y
+> después** de este cambio (base: 711 tests con las mismas 15; con el cambio: 786 tests y las mismas 15) y no
+> tienen relación con las secuencias. Se dejan constancia y no se arreglan acá.
+
 ## B. Frontend (TDD: `cd Desarrollo/frontend && npm test`; además `npm run lint` con 0 warnings)
 
 Unidad B1 — capa de datos
@@ -127,11 +132,11 @@ Unidad C2 — sketch `vivero_esp32_red`
 
 ## D. Documentación
 
-- [ ] D.1 README del backend: sección "Secuencias" (endpoints, tópicos, timeouts, guardia con la pasada, paso seguro, estado en memoria) y el ACK que ahora sí se escucha
-- [ ] D.2 README del frontend: una línea en la tabla de vistas (Demo Expo suma secuencias)
-- [ ] D.3 `prototipo_hardware/README.md` y el de `vivero_esp32_red`: pines de bomba y mediasombra, `config.h` nuevo, el hueco de sensores, prueba con `mosquitto_pub/sub` (E.3)
-- [ ] D.4 `CLAUDE.md`: §6 endpoints de secuencias y corregir "no escucha el ACK de los actuadores"; §6.1/§6.2 el comando de zona en la nota de espejos; referencia rápida al cambio
-- [ ] D.5 `analisis-demo-expo-vs-vivero.md` §9: enlazar este cambio; tildar lo que quede respondido de §9.4
+- [x] D.1 README del backend: sección "Secuencias" (endpoints, tópicos, timeouts, guardia con la pasada, paso seguro, estado en memoria) y el ACK que ahora sí se escucha
+- [x] D.2 README del frontend: una línea en la tabla de vistas (Demo Expo suma secuencias)
+- [x] D.3 `prototipo_hardware/README.md` y el de `vivero_esp32_red`: pines de bomba y mediasombra, `config.h` nuevo, el hueco de sensores, prueba con `mosquitto_pub/sub` (E.3)
+- [x] D.4 `CLAUDE.md`: §6 endpoints de secuencias y corregir "no escucha el ACK de los actuadores"; §6.1/§6.2 el comando de zona en la nota de espejos; referencia rápida al cambio
+- [x] D.5 `analisis-demo-expo-vs-vivero.md` §9: enlazar este cambio; tildar lo que quede respondido de §9.4
 
 ## E. Puesta en marcha (con A, B y C mergeadas; **desde el 10/10**)
 

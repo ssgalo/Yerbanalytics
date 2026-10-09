@@ -205,6 +205,10 @@ cd Desarrollo/backend
   → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
 - `POST /api/pasadas`, `GET /api/pasadas/actual`, `POST /api/pasadas/actual/cancelar` → pasada del
   riel; `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
+- `POST /api/secuencias`, `GET /api/secuencias/actual`, `POST /api/secuencias/actual/cancelar` →
+  secuencias guionadas de Demo Expo (riego, mediasombra, lectura): comandan el actuador directo, sin
+  pasar por el motor, y no corren a la vez que una pasada. Ver README del backend y
+  `openspec/changes/add-secuencias-demo-expo/`.
 - `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa una carga manual
   hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de origen y sin
   ningún estado global que lo condicione (ver §6.1).
@@ -218,8 +222,8 @@ cd Desarrollo/backend
   JDBC permanente.
 - **El backend consume la telemetría por MQTT y publica comandos a los actuadores y al riel.** No
   publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
-  (§6.2). Escucha además los eventos del riel (`nursery/rail/event`); no escucha el ACK de los
-  actuadores.
+  (§6.2). Escucha además los eventos del riel (`nursery/rail/event`) y, desde las secuencias, el ACK de
+  los actuadores (`nursery/zone/+/sector/+/ack`) (lo consumen las secuencias).
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
@@ -309,7 +313,8 @@ Invariantes a respetar al tocar esta área:
   dispositivo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
-  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`.
+  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. El comando de
+  zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.
 
@@ -346,5 +351,6 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Curación de datasets | `Desarrollo/Modelo_IA/informe-curacion-datasets.md` |
 | Negocio / alcance | `Documentacion/` |
 | Reglas agronómicas y su estado en el motor | `docs-motor-reglas-e-integracion/` (`reglas_v2.md`, `diferencias-motor-reglas-vs-reglas-v2.md`) |
+| Secuencias de Demo Expo (riego, mediasombra, lectura) | `openspec/changes/add-secuencias-demo-expo/`, `Desarrollo/backend/README.md` ("Secuencias"), `docs-motor-reglas-e-integracion/analisis-demo-expo-vs-vivero.md` §9 |
 | Pasada del riel (backend) y firmware del riel | `Desarrollo/backend/README.md` ("Planificador de pasadas"), `Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/README.md`, `openspec/changes/add-pasada-riel/` |
 | Del sensor al motor / conectar el ESP32 | `docs-motor-reglas-e-integracion/circuito-sensado-a-motor.md`, `conectar-esp32.md` |
