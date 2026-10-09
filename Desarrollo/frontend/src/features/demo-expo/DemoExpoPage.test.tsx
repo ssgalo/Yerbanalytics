@@ -18,6 +18,16 @@ vi.mock('@/hooks/DemoExpoContext', () => ({
 vi.mock('@/hooks/usePasada', () => ({
   usePasada: () => estado.hook,
 }));
+vi.mock('@/hooks/useSecuencia', () => ({
+  useSecuencia: () => ({
+    secuencia: null,
+    cargando: false,
+    error: null,
+    iniciando: false,
+    iniciar: vi.fn(),
+    cancelar: vi.fn(),
+  }),
+}));
 
 afterEach(cleanup);
 
@@ -258,5 +268,39 @@ describe('DemoExpoPage', () => {
     );
     montar();
     expect(screen.getAllByText('El celular no pudo sacar la foto: CAMARA').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('DemoExpoPage · secuencias', () => {
+  it('muestra la sección Secuencias debajo de la pasada, que sigue igual', () => {
+    estado.visible = true;
+    hook(pasada('COMPLETADA', pasos(['OK', 'OK', 'OK', 'OK', 'OK'])));
+
+    montar();
+
+    const titulo = screen.getByRole('heading', { name: 'Secuencias' });
+    const ultimoPaso = screen.getByText('Riel → home').closest('li') as HTMLElement;
+    expect(ultimoPaso.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(btn(/Iniciar pasada/)).not.toBeNull();
+    expect(btn(/^Regar$/)!.disabled).toBe(false);
+  });
+
+  it('con la pasada en curso, las secuencias quedan deshabilitadas', () => {
+    estado.visible = true;
+    hook(pasada('EN_CURSO', pasos(['EN_CURSO', 'PENDIENTE', 'PENDIENTE', 'PENDIENTE', 'PENDIENTE'], [{ iniciadoEn: 0 }])));
+
+    montar();
+
+    expect(btn(/^Regar$/)!.disabled).toBe(true);
+    expect(btn(/Leer sensores ahora/)!.disabled).toBe(true);
+  });
+
+  it('con el interruptor apagado no se muestra ni la sección', () => {
+    estado.visible = false;
+    hook(null);
+
+    montar();
+
+    expect(screen.queryByRole('heading', { name: 'Secuencias' })).toBeNull();
   });
 });
