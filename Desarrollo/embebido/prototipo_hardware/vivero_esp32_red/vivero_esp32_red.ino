@@ -375,6 +375,11 @@ unsigned long act_pendiente_ultimo_intento = 0;
 char act_recientes[CANT_RECIENTES][LARGO_ID];
 int  act_recientes_proximo = 0;
 
+// Comandos pisados en el slot antes de atenderse: loop() les responde ERROR reemplazado.
+#define CANT_DESPLAZADOS 2
+char desplazados[CANT_DESPLAZADOS][LARGO_ID];
+int  desplazados_cant = 0;
+
 // Válvula (sobre el driver de la bomba): se cierra sola al vencer el plazo.
 bool valvula_abierta = false;
 unsigned long valvula_cierra_en = 0;
@@ -1335,6 +1340,12 @@ void id_recordar(const char* id) {
 // Parsea y valida un comando de actuador. SOLO copia al slot: no mueve ni publica.
 // El último comando gana: pisa lo que hubiera en el slot.
 void mqtt_callback_actuador(const char* payload, unsigned int length) {
+  // Si el slot todavía tiene un comando sin atender, este lo pisa: se anota el commandId
+  // desplazado para que loop() le responda ERROR reemplazado (el callback no publica).
+  char previo[LARGO_ID];
+  previo[0] = '\0';
+  if (act_hay) strlcpy(previo, act_id, sizeof(previo));
+
   act_valido = false;
   act_actuador = ACTR_NINGUNO;
   act_accion = ACTR_ON;
@@ -1361,6 +1372,18 @@ void mqtt_callback_actuador(const char* payload, unsigned int length) {
   size_t largo_id = strlen(id);
   if (largo_id > 0 && largo_id < LARGO_ID) {
     strlcpy(act_id, id, sizeof(act_id));
+  }
+
+  // Desplazado (y no es un redelivery del mismo id): queda en una cola chica; si se llena,
+  // el más viejo se pierde sin ACK (limitación aceptada: haría falta una ráfaga de 3+ comandos).
+  if (previo[0] != '\0' && strcmp(previo, act_id) != 0) {
+    if (desplazados_cant < CANT_DESPLAZADOS) {
+      strlcpy(desplazados[desplazados_cant], previo, LARGO_ID);
+      desplazados_cant++;
+    } else {
+      Serial.print("[act] Cola de desplazados llena: se pierde el ACK de ");
+      Serial.println(previo);
+    }
   }
 
   if (strcmp(actuador, ACT_NOMBRE_VALVE) == 0) {
@@ -1418,6 +1441,9 @@ bool act_hay_reemplazo() {
   }
   // Inválido o repetido de antes: no detiene el motor; se responde al terminar
   if (!act_valido) return false;
+  // Sólo otro comando de mediasombra interrumpe (el último gana, design §4.4). Uno de válvula
+  // (p. ej. del despacho de riego) espera en el slot y se atiende al terminar el movimiento.
+  if (act_actuador != ACTR_MEDIASOMBRA) return false;
   if (strcmp(act_id, act_ultimo_id) == 0 || act_id_es_reciente(act_id)) return false;
 
   Serial.print("[act] Llegó ");
@@ -1433,6 +1459,19 @@ bool act_hay_reemplazo() {
 //   4. otro commandId durante un movimiento → el viejo termina en ERROR reemplazado
 //      y este slot se ejecuta en la vuelta siguiente de loop()
 void procesar_actuador() {
+  // Primero, los comandos que el callback pisó antes de que se atendieran: ERROR reemplazado.
+  // Copia local y contador a cero antes de publicar (el callback puede agregar otros).
+  if (desplazados_cant > 0) {
+    char viejos[CANT_DESPLAZADOS][LARGO_ID];
+    int n = desplazados_cant;
+    for (int k = 0; k < n; k++) strlcpy(viejos[k], desplazados[k], LARGO_ID);
+    desplazados_cant = 0;
+    for (int k = 0; k < n; k++) {
+      if (strcmp(viejos[k], act_ultimo_id) == 0 || act_id_es_reciente(viejos[k])) continue;
+      act_terminar(viejos[k], ACK_STATUS_ERROR, ACK_TIPO_REEMPLAZADO, 0);
+    }
+  }
+
   if (!act_hay) return;
 
   // Copia local: mientras la mediasombra se mueve, el callback puede pisar el slot
