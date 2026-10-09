@@ -76,4 +76,11 @@ class SchedulersConfigTest {
                 "el tick de la pasada no puede esperar detrás del barrido del motor ni de la captura");
         assertNotSame(taskScheduler, config.pasadaScheduler());
     }
+
+    @Test
+    void laSecuenciaTieneSuPropioCarril() {
+        assertNotSame(taskScheduler, config.secuenciaScheduler(),
+                "el tick de las secuencias no puede esperar detrás del barrido del motor");
+        assertNotSame(config.pasadaScheduler(), config.secuenciaScheduler());
+    }
 }
