@@ -1,18 +1,28 @@
 # `vivero_esp32_red` — el riel de la cámara por MQTT
 
 Copia de `../vivero_esp32/` (que no se toca) con WiFi y MQTT. Hace lo mismo que el original por
-monitor serie y, además, mueve el **riel** cuando el backend se lo pide por MQTT. Bomba y mediasombra
-siguen siendo **sólo por serie**.
+monitor serie y, además, responde al backend por MQTT:
 
-- Escucha `nursery/rail/command` y responde en `nursery/rail/event`.
-- Contrato completo: `openspec/changes/add-pasada-riel/design.md` §1 y la sección "Riel" de
+| Tópico | Dirección | Qué |
+|---|---|---|
+| `nursery/rail/command` / `nursery/rail/event` | backend → ESP32 / ESP32 → backend | Riel: `IR_A`, `HOME` |
+| `nursery/zone/{NODO_ZONA_ID}/sector/{NODO_SECTOR_ID}/command` / `.../ack` | backend → ESP32 / ESP32 → backend | Válvula (`valve ON`/`OFF`, la bomba) y mediasombra (`shade SET` 0 o 100) |
+| `nursery/zone/{NODO_ZONA_ID}/command` | backend → ESP32 | `LEER_AHORA`: responde con la telemetría de siempre, sin ACK |
+
+- Contrato completo: `openspec/changes/add-pasada-riel/design.md` §1 (riel),
+  `openspec/changes/add-secuencias-demo-expo/design.md` §1 (actuadores y zona) y
   `Desarrollo/embebido/comun/contrato.h` (fuente de verdad).
+- Los comandos por serie (`bomba on`, `enrollar`…) siguen andando igual.
 
 > **Estado.** Compila y corre en un ESP32 real: se compiló y flasheó con `arduino-cli` 1.5.2, core
 > `esp32:esp32` **3.3.12**, ArduinoJson **7.4.3** y PubSubClient **2.8** (FQBN `esp32:esp32:esp32`, sin
 > errores; 927 KB, 70 % del espacio). Se probó con el riel real y el backend: una pasada completa
 > desde la sección Demo Expo (sector 1 ≈ 21,5 s, foto, sector 2 ≈ 22 s, foto). Hay **dos problemas
 > conocidos de hardware** (§6.1 y §6.2): el final de carrera de home y la fuente del motor.
+>
+> **Bomba, mediasombra y "leer ahora" por MQTT** (cambio `add-secuencias-demo-expo`): compilan sin
+> warnings propios (con `LECTURA_SENSORES_HABILITADA` en 0 y en 1), pero **no se probaron con
+> hardware**. Se prueban a partir del 10/10 con la §5.b.
 
 ---
 
@@ -46,6 +56,10 @@ Con **Arduino IDE 2.x** o con **`arduino-cli`** (ver [3.b](#3-compilar-y-subir))
    | `MQTT_HOST` | **IP en la LAN de la PC donde corre el broker** (la del backend). En Linux: `ip a`. **No** `localhost` |
    | `MQTT_PORT` | `1883` |
    | `MQTT_CLIENT_ID_BASE` | Dejar `riel-esp32` |
+   | `NODO_ZONA_ID` | Zona del stand, igual que en la topología del backend (ej. `"MZ-1"`). **Obligatoria**: sin ella no compila |
+   | `NODO_SECTOR_ID` | Sector cuyos actuadores son la bomba y la mediasombra (ej. `"MZ-1-001"`). **Obligatoria** |
+   | `BOMBA_CAUDAL_PWM` | PWM (0-255) de la bomba con la válvula abierta. Default 200 |
+   | `LECTURA_SENSORES_HABILITADA` | `0` (default): "leer ahora" sólo loguea y no publica. Poner `1` recién al completar `leer_sensores()` |
 
    La PC y el ESP32 tienen que estar en **la misma red**. Detalle de red y broker:
    `docs-motor-reglas-e-integracion/conectar-esp32.md`.
@@ -94,6 +108,7 @@ Sistema listo. Escribí 'red' para ver el estado de la conexión.
 [mqtt] Conectando a 192.168.1.64:1883 como riel-esp32-XXXXXXXXXXXX...
 [mqtt] Conectado al broker
 [mqtt] Suscripto a nursery/rail/command (QoS 1)
+[mqtt] Suscripto a nursery/zone/MZ-1/sector/MZ-1-001/command y nursery/zone/MZ-1/command (QoS 1)
 ```
 
 LED azul de la placa (GPIO 2): parpadeo **rápido** = sin WiFi · **lento** = WiFi sin broker ·
@@ -147,6 +162,43 @@ Usá un `commandId` nuevo para cada prueba nueva: el firmware ignora los que vio
 (y al último terminado le republica el evento). Para cancelar un movimiento, mandá `HOME` con otro
 id mientras se mueve: el viejo termina en `ERROR REEMPLAZADO` y el riel vuelve a home.
 
+### 5.b Bomba, mediasombra y "leer ahora"
+
+Con el ESP32 conectado y **sin backend** (si el backend corre, él también publica en estos tópicos).
+Asumiendo `NODO_ZONA_ID "MZ-1"` y `NODO_SECTOR_ID "MZ-1-001"`.
+
+**Terminal 1 — ver comandos, ACK y telemetría:**
+
+```bash
+docker compose exec mosquitto mosquitto_sub -t 'nursery/#' -v
+```
+
+**Terminal 2:**
+
+```bash
+# Bomba 5 s → ACK SUCCESS {"tipo":"ok","durationSec":5}; se apaga sola a los 5 s
+docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/zone/MZ-1/sector/MZ-1-001/command \
+  -m '{"commandId":"v-1","actuador":"valve","accion":"ON","parametros":{"durationSec":5}}'
+
+# Cerrar antes de tiempo (siempre apaga; ACK ok si estaba abierta, sin_cambio si no)
+docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/zone/MZ-1/sector/MZ-1-001/command \
+  -m '{"commandId":"v-2","actuador":"valve","accion":"OFF","parametros":{}}'
+
+# Mediasombra: 0 = desenrollada, 100 = enrollada; el ACK llega al tocar el final de carrera
+docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/zone/MZ-1/sector/MZ-1-001/command \
+  -m '{"commandId":"s-1","actuador":"shade","accion":"SET","parametros":{"targetPct":0}}'
+docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/zone/MZ-1/sector/MZ-1-001/command \
+  -m '{"commandId":"s-2","actuador":"shade","accion":"SET","parametros":{"targetPct":100}}'
+
+# Leer ahora → sin sensores (LECTURA_SENSORES_HABILITADA 0) sólo se ve el log "[leer] sin sensores..."
+docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/zone/MZ-1/command \
+  -m '{"commandId":"l-1","accion":"LEER_AHORA","parametros":{}}'
+```
+
+Lo mismo que con el riel: un `commandId` nuevo por prueba (el firmware recuerda los últimos 4 y al
+repetido le republica su ACK). Un `targetPct` distinto de 0 o 100, o un `durationSec` fuera de rango,
+da ACK `ERROR` (`comando_invalido` / `duracion_invalida`); `pump` o cualquier otro actuador, `actuador_desconocido`.
+
 **Alternativa sin `mosquitto_pub`** (usa el paquete `mqtt` que ya está en el simulador; si falta,
 `npm install` en `Desarrollo/simulador`). Manda un comando y queda mostrando los eventos (Ctrl+C para salir):
 
@@ -172,6 +224,7 @@ c.on("message", (t, m) => console.log(t, m.toString()));
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | `#error "Falta config.h..."` | No se copió la plantilla | Copiar `config.example.h` → `config.h` en esta carpeta |
+| `#error` por `NODO_ZONA_ID` / `NODO_SECTOR_ID` | `config.h` viejo, de antes de las secuencias | Agregar las constantes nuevas desde `config.example.h` |
 | `#error "Hace falta ArduinoJson 7.x"` o errores con `JsonDocument` | ArduinoJson 6 instalada | Actualizarla a 7.x desde el gestor de librerías |
 | `'ledcAttach' was not declared` | Core ESP32 2.x | Actualizar "esp32 by Espressif Systems" a 3.x |
 | LED parpadeando rápido; `[wifi] Sin conexión (estado 1)` | SSID no encontrado: red de 5 GHz, nombre mal escrito o lejos del AP | Usar una red de 2,4 GHz (hotspot del celular en "2,4 GHz" o "compatibilidad") y revisar mayúsculas |
@@ -227,6 +280,18 @@ Los pines son los del original; no se cambiaron.
   (cada 3 s al broker; el WiFi se reconecta solo y se fuerza cada 15 s) la hace `loop()` con el riel quieto.
 - **El callback MQTT sólo copia** el comando a un slot (`entrante_*`). No mueve ni publica: PubSubClient
   reusa su buffer y publicar adentro del callback corrompe el mensaje.
+- **Actuadores (válvula y mediasombra).** Reusan el mismo patrón: el callback copia a un slot
+  (`act_entrante`), el ACK se arma fuera del callback y, si no hay red, queda pendiente hasta reconectar.
+  La **válvula** es el driver de la bomba (L298N canal B) con PWM `BOMBA_CAUDAL_PWM`; `valvula_vigilar()`
+  la apaga al vencer `durationSec`, también durante los movimientos largos del riel. La **mediasombra**
+  sólo acepta `targetPct` 0 o 100; un comando nuevo la interrumpe (`reemplazado`) y un movimiento que
+  no llega al final de carrera en 30 s termina en `falla_mecanica`. Los ACK recuerdan los últimos 4
+  `commandId` de actuadores (anillo propio, distinto del del riel).
+- **Hueco de sensores.** `leer_sensores(JsonObject)` está vacía a propósito: todavía no se sabe qué
+  sensores lleva el stand (`docs-motor-reglas-e-integracion/analisis-demo-expo-vs-vivero.md` §9.4). Para
+  completarla, cargar las métricas con las claves y unidades de `contrato.h` (`uv` es % de un LDR; `ce` va
+  en µS/cm), devolver `true` y poner `LECTURA_SENSORES_HABILITADA 1`. La telemetría sale con `signal` = RSSI
+  y `timestamp` en segundos.
 - **El último gana.** Si durante un movimiento llega un comando *válido* con otro `commandId`, el
   movimiento se corta, el viejo termina en `ERROR REEMPLAZADO` y se ejecuta el nuevo. Un comando
   inválido o repetido no corta el movimiento: se responde al terminar.
