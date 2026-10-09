@@ -54,8 +54,8 @@ Unidad B1 — capa de datos
 
 Unidad B2 — hook y vista
 
-- [ ] B.4 `useSecuencia.test.tsx` con fake timers (carga inicial; polling 1 s sólo en curso; se detiene al terminar; limpia al desmontar; rechazo → mensaje del backend; otro error → "No se pudo contactar al backend"). Mockear con `vi.spyOn(data, 'getRepository')` → `hooks/useSecuencia.ts`
-- [ ] B.5 `secuenciaPresentacion.test.ts` (texto por tipo de paso; etiquetas y unidades de métricas: `uv` "Luz (%)", `ce` dS/m; cuenta regresiva desde `esperaHasta`) → `features/demo-expo/secuenciaPresentacion.ts`
+- [x] B.4 `useSecuencia.test.tsx` con fake timers (carga inicial; polling 1 s sólo en curso; se detiene al terminar; limpia al desmontar; rechazo → mensaje del backend; otro error → "No se pudo contactar al backend"). Mockear con `vi.spyOn(data, 'getRepository')` → `hooks/useSecuencia.ts`
+- [x] B.5 `secuenciaPresentacion.test.ts` (texto por tipo de paso; etiquetas y unidades de métricas: `uv` "Luz (%)", `ce` dS/m; cuenta regresiva desde `esperaHasta`) → `features/demo-expo/secuenciaPresentacion.ts`
 - [ ] B.6 `SecuenciasPanel.test.tsx` (tres tarjetas; envía `duracionSeg`/`esperaSeg`; botones deshabilitados con secuencia o pasada en curso; Cancelar sólo en curso y no cancelando; `detalle` de error visible; lectura → tabla + link a `/reglas`) → `components/SecuenciasPanel.tsx` + `components/SecuenciaProgreso.tsx` + CSS Modules, reusando `PasoItem`
 - [ ] B.7 Extender `DemoExpoPage.test.tsx` (la sección "Secuencias" aparece debajo de la pasada; la pasada sigue igual) → `DemoExpoPage.tsx` y subtítulo de `usePageTitle`
 - [ ] B.8 Verificación manual en `npm run dev:demo`: las tres secuencias, cancelar cada una y el rechazo cruzado con la pasada. **Dejar constancia** acá (en `add-pasada-riel` faltó)
