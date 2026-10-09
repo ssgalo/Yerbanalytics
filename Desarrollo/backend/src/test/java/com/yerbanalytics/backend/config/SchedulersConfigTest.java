@@ -67,6 +67,16 @@ class SchedulersConfigTest {
     }
 
     @Test
+    void elTickDeLaSecuenciaPideSuPropioCarril() throws NoSuchMethodException {
+        Scheduled anotacion = com.yerbanalytics.backend.service.SecuenciaService.class.getMethod("tick")
+                .getAnnotation(Scheduled.class);
+
+        assertNotNull(anotacion, "tick debe seguir siendo una tarea programada");
+        assertEquals("secuenciaScheduler", anotacion.scheduler(),
+                "el cierre de la válvula no puede esperar detrás del barrido del motor ni de la captura");
+    }
+
+    @Test
     void elTickDeLaPasadaPideSuPropioCarril() throws NoSuchMethodException {
         Scheduled anotacion = com.yerbanalytics.backend.service.PasadaRielService.class.getMethod("tick")
                 .getAnnotation(Scheduled.class);
