@@ -18,17 +18,23 @@ import mqtt, { type MqttClient } from 'mqtt';
 import { config } from './config.ts';
 import {
   ackTopic,
+  isReadNow,
   parseCommandTopic,
+  parseZoneCommandTopic,
   simulatedAck,
   telemetryTopic,
   valveDurationWarning,
   type ActuatorCommand,
   type TelemetryPayload,
 } from './contract.ts';
+import { answerReadNow } from './emission.ts';
 import { listSensors } from './store.ts';
 
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
 const COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/sector/+/command';
+
+/** Wildcard topic for zone-level commands (LEER_AHORA). Mirrors contrato.h :: contratoTopicComandoZona. */
+const ZONE_COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/command';
 
 /** How long to wait for a publish acknowledgement before giving up. */
 const PUBLISH_TIMEOUT_MS = 5000;
@@ -70,6 +76,15 @@ export function connect(): void {
     lastError = null;
     console.log(`[simulator] connected to broker ${config.mqttUrl}`);
 
+    // Zone-level commands: the backend's periodic LEER_AHORA pull.
+    client!.subscribe(ZONE_COMMAND_TOPIC_WILDCARD, { qos: 1 }, (err) => {
+      if (err) {
+        console.error(`[simulator] failed to subscribe to zone commands: ${err.message}`);
+      } else {
+        console.log(`[simulator] subscribed to zone command wildcard: ${ZONE_COMMAND_TOPIC_WILDCARD}`);
+      }
+    });
+
     // Subscribe to all sector command topics to validate the downlink from the rules engine.
     client!.subscribe(COMMAND_TOPIC_WILDCARD, { qos: 1 }, (err) => {
       if (err) {
@@ -83,6 +98,10 @@ export function connect(): void {
   // Log incoming commands from the backend rules engine, and ack the ones for simulated zones.
   // In production this role is played by the ESP32 nodo_actuador / nodo_combinado firmware.
   client.on('message', (topic, message) => {
+    if (parseZoneCommandTopic(topic)) {
+      handleZoneCommand(topic, message);
+      return;
+    }
     try {
       const payload = JSON.parse(message.toString()) as ActuatorCommand;
       const params = payload.parametros
@@ -114,6 +133,25 @@ export function connect(): void {
         ' Retrying in the background; publishing is unavailable meanwhile.',
     );
   });
+}
+
+/** Routes a zone-level command: a LEER_AHORA is answered by the emission; anything else is ignored. */
+function handleZoneCommand(topic: string, message: Buffer): void {
+  const target = parseZoneCommandTopic(topic);
+  if (!target) return;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(message.toString());
+  } catch {
+    console.warn(`[simulator] ← ZONE COMMAND topic=${topic} (unparseable payload, ignored)`);
+    return;
+  }
+  if (!isReadNow(payload)) {
+    console.warn(`[simulator] ← ZONE COMMAND topic=${topic} (unknown accion, ignored)`);
+    return;
+  }
+  console.log(`[simulator] ← LEER_AHORA zone=${target.zonaId}`);
+  void answerReadNow(target.zonaId);
 }
 
 /**

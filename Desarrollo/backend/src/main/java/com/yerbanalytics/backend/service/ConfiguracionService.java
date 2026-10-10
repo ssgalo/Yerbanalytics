@@ -7,6 +7,8 @@ import com.yerbanalytics.backend.dto.RustificacionEtapa;
 import com.yerbanalytics.backend.dto.UmbralMetrica;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.RustificacionEtapaEntity;
 import com.yerbanalytics.backend.model.UmbralMetricaEntity;
@@ -106,7 +108,9 @@ public class ConfiguracionService {
                 e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
                 e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : 240,
                 e.getIntervaloEvaluacionMinutos() != null ? e.getIntervaloEvaluacionMinutos() : 5,
-                e.getUpdatedBy(), e.getUpdatedTs());
+                e.getUpdatedBy(), e.getUpdatedTs(),
+                SensingCadence.pullSeconds(e.getSensingPullIntervalSeconds()),
+                (int) Math.ceil(catalogoParametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)));
     }
 
     private List<RustificacionEtapa> buildRustificacionDto() {
@@ -146,6 +150,9 @@ public class ConfiguracionService {
         oe.setSeguimientoDeltaMin(op.seguimientoDeltaMin());
         oe.setIntervaloSensadoMinutos(op.intervaloSensadoMinutos());
         oe.setIntervaloEvaluacionMinutos(op.intervaloEvaluacionMinutos());
+        if (op.sensingPullIntervalSeconds() != null) {
+            oe.setSensingPullIntervalSeconds(op.sensingPullIntervalSeconds());
+        }
         oe.setUpdatedBy(usuario != null && !usuario.isBlank() ? usuario : "Ingeniero Agrónomo");
         oe.setUpdatedTs(System.currentTimeMillis());
         operativaRepository.save(oe);
@@ -159,6 +166,8 @@ public class ConfiguracionService {
         }
 
         invalidateCache();
+        // The effective stale threshold depends on the pull interval: drop the rules snapshot now and again after commit.
+        catalogoParametros.invalidarAlTerminar();
         // Registro inmutable del cambio en el historial (HU-15 CA-02).
         historialService.registrarConfiguracion(oe.getUpdatedBy());
         return getConfiguracion();
@@ -222,6 +231,11 @@ public class ConfiguracionService {
         // al guardar sólo se exige un valor positivo, para no romper bases viejas ni frenar al simulador.
         requirePositive(op.intervaloSensadoMinutos(), "el intervalo de sensado");
         requirePositive(op.intervaloEvaluacionMinutos(), "el intervalo de evaluación");
+        Integer pull = op.sensingPullIntervalSeconds();
+        if (pull != null && (pull < SensingCadence.MIN_SECONDS || pull > SensingCadence.MAX_SECONDS)) {
+            throw new InvalidConfigurationException("sensingPullIntervalSeconds must be between "
+                    + SensingCadence.MIN_SECONDS + " and " + SensingCadence.MAX_SECONDS + " seconds.");
+        }
     }
 
     private void validarRustificacion(List<RustificacionEtapa> etapas, double aperturaMax) {

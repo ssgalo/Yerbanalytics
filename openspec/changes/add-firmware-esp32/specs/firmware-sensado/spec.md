@@ -12,6 +12,11 @@ expresado como constante nombrada única.
 - **THEN** la tarea lee los sensores, arma el paquete de telemetría y lo entrega a la cola
   de publicación, luego cede el núcleo con `vTaskDelay`.
 
+> **Superseded by backend-driven-sensing:** the periodic interval above no longer exists on the node.
+> The task reads once at boot and then waits without timeout (`ulTaskNotifyTake(pdTRUE, portMAX_DELAY)`)
+> until a `LEER_AHORA` zone command arrives. The backend sends it every `sensingPullIntervalSeconds`
+> (default 60 s). `SENSOR_POLLING_INTERVAL_MS` was removed from `config.example.h`.
+
 ### Requirement: Lectura de los sensores del nodo
 
 El subsistema SHALL leer los tres sensores mediante drivers independientes: sensor de luz

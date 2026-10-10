@@ -18,7 +18,7 @@ Abreviaturas: `be/` = `Desarrollo/backend/src/main/java/com/yerbanalytics/backen
 | Acción de riego | Duración pegada al texto `[tiempo-max-seg=N]` y parseada por regex (`be/engine/ActionExecutor.java:46,83,189-198`) |
 | Estado de la válvula | Enganche `"Regando"`; nada lo cierra (`ActionExecutor.java:78-85`; único otro escritor: alta de sector, `be/service/TopologiaService.java:241`) |
 | Disparo | Telemetría: 100 sectores de la zona por mensaje (`be/service/NurseryService.java:502-551`). Barrido: `metrics = List.of()` (`be/service/NurseryWatchdog.java:146`), nunca riega |
-| Cadencia real | El nodo publica cada **30 s** (`fw/comun/config.example.h:48`); v2 supone que el backend pide la lectura cada 4 h |
+| Cadencia real | El nodo publica cada **30 s** (`fw/comun/config.example.h:48`); v2 supone que el backend pide la lectura cada 4 h *(Update, backend-driven-sensing: "30 s push" is obsolete; the node reads at boot and on `LEER_AHORA`, which the backend sends every `sensingPullIntervalSeconds`, default 60 s)* |
 | Hora | `Instant.now()` en el contexto (`NurseryService.java:582`); `ZoneId.systemDefault()` en Open-Meteo (`be/engine/weather/OpenMeteoWeatherClient.java:343,361`) |
 | Pronóstico | Sólo probabilidad de la hora actual; el pedido no lleva `timezone`, así que Open-Meteo devuelve horas GMT y `currentHourIndex` las compara con la hora local del JVM (`OpenMeteoWeatherClient.java:268-275,341-352`) |
 | Válvula en firmware | Recorta a `LIMITE_VALVULA_SEG_MAX = 120` (`fw/comun/config.example.h:96`, `fw/actuacion/act_valvula.cpp:25-29`); cierra a los 10 s si el caudalímetro no da pulsos (`act_valvula.cpp:42-54`, `TIMEOUT_CAUDAL_MS`) |
@@ -170,6 +170,8 @@ Telemetría (hilo MQTT)                         DespachoRiego.tick() cada 10 s
 - *Que el barrido evalúe con la última lectura*: no agrega nada al riego (la telemetría ya evalúa
   cada 30 s, y con lecturas de 4 h `StaleSensorRule` corta a los 90 s) y cambia el comportamiento de
   mediasombra e insumo, fuera de alcance.
+  *(Update, backend-driven-sensing: the "30 s" cadence above is now the pull interval X, default 60 s,
+  and the stale cut-off is `max(90 s, 3 x X)`.)*
 - *Cola persistida en una tabla*: más estado y migración para algo que la próxima lectura reconstruye.
 - *Escuchar el ACK*: necesitaría suscripción nueva, correlación por `commandId` y qué hacer si no
   llega; el tiempo ya es la fuente de verdad del firmware.

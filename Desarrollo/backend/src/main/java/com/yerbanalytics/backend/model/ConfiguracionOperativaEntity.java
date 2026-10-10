@@ -43,6 +43,10 @@ public class ConfiguracionOperativaEntity {
     @Column(name = "intervalo_evaluacion_minutos")
     private Integer intervaloEvaluacionMinutos = 5;
 
+    /** Backend pull interval in seconds. Nullable: existing rows have no value and read as 60 (see SensingCadence). */
+    @Column(name = "sensing_pull_interval_seconds")
+    private Integer sensingPullIntervalSeconds;
+
     // --- Auditoría (HU-15 CA-02) ---
     @Column(name = "updated_by")
     private String updatedBy;

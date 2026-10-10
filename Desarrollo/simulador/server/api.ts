@@ -61,7 +61,7 @@ api.get(
     res.json({
       backend: { url: config.backendUrl, up: backendUp },
       broker: { url: config.mqttUrl, connected: isConnected() },
-      emission: { active: emission.isActive(), intervalMs: emission.intervalMs() },
+      emission: { active: emission.isActive() },
     });
   }),
 );
@@ -141,5 +141,5 @@ api.put('/emission', (req, res) => {
     throw new InvalidInput('Indicá `active` como booleano.');
   }
   emission.setActive(active);
-  res.json({ active: emission.isActive(), intervalMs: emission.intervalMs() });
+  res.json({ active: emission.isActive() });
 });

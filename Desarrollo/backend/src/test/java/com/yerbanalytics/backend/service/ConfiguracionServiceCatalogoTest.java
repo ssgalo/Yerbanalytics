@@ -66,7 +66,7 @@ class ConfiguracionServiceCatalogoTest {
 
     private static Configuracion cfg(List<RustificacionEtapa> etapas) {
         return new Configuracion(umbralesDeFabrica(),
-                new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "x", 1L), etapas);
+                new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "x", 1L, null, null), etapas);
     }
 
     // ------------------------------------------------------------------ 5.1

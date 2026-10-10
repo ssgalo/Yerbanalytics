@@ -6,7 +6,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
- * Cinco carriles de tareas programadas, a propósito separados.
+ * Seis carriles de tareas programadas, a propósito separados.
  *
  * <p>El default de Spring Boot es <strong>un solo hilo</strong> para todos los {@code @Scheduled}
  * de la aplicación, y acá conviven dos familias de tareas con exigencias incompatibles:
@@ -103,6 +103,20 @@ public class SchedulersConfig {
         ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
         s.setPoolSize(1);
         s.setThreadNamePrefix("secuencia-sched-");
+        s.setWaitForTasksToCompleteOnShutdown(true);
+        s.setAwaitTerminationSeconds(10);
+        return s;
+    }
+
+    /**
+     * Lane of the backend-driven sensing pull ({@code SensingScheduler}): one thread, one tick every X seconds.
+     * Separate from the engine lane so the pull never waits behind the 600-sector sweep.
+     */
+    @Bean
+    public TaskScheduler sensingScheduler() {
+        ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
+        s.setPoolSize(1);
+        s.setThreadNamePrefix("sensing-sched-");
         s.setWaitForTasksToCompleteOnShutdown(true);
         s.setAwaitTerminationSeconds(10);
         return s;

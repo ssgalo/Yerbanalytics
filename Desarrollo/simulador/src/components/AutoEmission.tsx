@@ -1,4 +1,4 @@
-/* Periodic noise to every macro-zone, to give the nursery background activity.
+/* Random readings for every macro-zone, to give the nursery background activity.
 
    Always starts off: once on it overwrites manually entered values, so it has to be asked
    for explicitly. Shutting the simulator down stops it, and the system goes back to waiting
@@ -9,11 +9,10 @@ import { setAutoEmission } from '../api';
 
 interface Props {
   active: boolean;
-  intervalMs: number;
   onChange: (active: boolean) => void;
 }
 
-export function AutoEmission({ active, intervalMs, onChange }: Props) {
+export function AutoEmission({ active, onChange }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +32,7 @@ export function AutoEmission({ active, intervalMs, onChange }: Props) {
   return (
     <Section
       title="Emisión automática"
-      hint={`Publica lecturas al azar a todas las macro-zonas cada ${Math.round(intervalMs / 1000)} s. Pisa los valores cargados a mano.`}
+      hint="Publica una lectura al azar por macro-zona al encender y responde a cada pedido de lectura del backend. Pisa los valores cargados a mano."
     >
       <div className="row">
         <button type="button" className={active ? '' : 'primary'} disabled={busy} onClick={toggle}>

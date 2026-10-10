@@ -53,6 +53,7 @@ public final class RuleContextTestFactory {
                 5.0,    // seguimientoDeltaMin
                 240,    // intervaloSensadoMinutos
                 5,      // intervaloEvaluacionMinutos
+                null,   // sensingPullIntervalSeconds (null reads as 60)
                 "test",
                 System.currentTimeMillis()
         );

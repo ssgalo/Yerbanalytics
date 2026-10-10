@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.ConfiguracionOperativa;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -13,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -34,7 +36,7 @@ class ConfiguracionControllerContratoTest {
     private ConfiguracionService service;
 
     private static Configuracion cfg() {
-        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "Ana", 1L), List.of());
+        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "Ana", 1L, 60, 180), List.of());
     }
 
     @Test
@@ -74,5 +76,47 @@ class ConfiguracionControllerContratoTest {
                                 + "\"seguimientoDeltaMin\":5.0,\"intervaloSensadoMinutos\":240,"
                                 + "\"intervaloEvaluacionMinutos\":5}}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void get_exposesThePullIntervalAndTheReadOnlyEffectiveThreshold() throws Exception {
+        when(service.getConfiguracion()).thenReturn(cfg());
+
+        mockMvc.perform(get("/api/configuracion"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operativa.sensingPullIntervalSeconds").value(60))
+                .andExpect(jsonPath("$.operativa.effectiveStaleThresholdSeconds").value(180))
+                .andExpect(jsonPath("$.operativa.intervaloSensadoMinutos").value(240));
+    }
+
+    @Test
+    void put_acceptsThePullIntervalAndDeserializesIt() throws Exception {
+        when(service.updateConfiguracion(any(), any())).thenReturn(cfg());
+
+        mockMvc.perform(put("/api/configuracion").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
+                                + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
+                                + "\"intervaloSensadoMinutos\":240,\"intervaloEvaluacionMinutos\":5,"
+                                + "\"sensingPullIntervalSeconds\":30}}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Configuracion> sent = ArgumentCaptor.forClass(Configuracion.class);
+        verify(service).updateConfiguracion(sent.capture(), any());
+        assertThat(sent.getValue().operativa().sensingPullIntervalSeconds()).isEqualTo(30);
+    }
+
+    @Test
+    void put_withoutThePullIntervalDeserializesItAsNull() throws Exception {
+        when(service.updateConfiguracion(any(), any())).thenReturn(cfg());
+
+        mockMvc.perform(put("/api/configuracion").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
+                                + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
+                                + "\"intervaloSensadoMinutos\":240,\"intervaloEvaluacionMinutos\":5}}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Configuracion> sent = ArgumentCaptor.forClass(Configuracion.class);
+        verify(service).updateConfiguracion(sent.capture(), any());
+        assertThat(sent.getValue().operativa().sensingPullIntervalSeconds()).isNull();
     }
 }

@@ -70,9 +70,10 @@ void tarea(void* pvParameters) {
       Serial.printf("[sensado] Lectura tomada (ts=%u)\n", (unsigned int) p.timestamp);
     }
 
-    // Cede el núcleo hasta el próximo ciclo (ahorro de energía por scheduling). Es una espera con
-    // notificación: un LEER_AHORA la corta y adelanta la lectura; sin pedido, dura lo mismo que antes.
-    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(SENSOR_POLLING_INTERVAL_MS));
+    // Backend-driven sensing: after the boot read, the node never reads on its own. It blocks
+    // until a LEER_AHORA notification arrives (task_sensado::pedirLecturaAhora). pdTRUE clears the
+    // counter, so requests that pile up while a read is running merge into a single next read.
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
 }
 
