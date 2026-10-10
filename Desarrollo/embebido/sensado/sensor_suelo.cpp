@@ -4,8 +4,8 @@
 
 namespace sensor_suelo {
 
-// UART2 dedicado al transceiver RS-485.
-static HardwareSerial rs485(2);
+// UART dedicado al transceiver RS-485 (RS485_UART en config.h: UART1 en el S3).
+static HardwareSerial rs485(RS485_UART);
 
 // --- Parámetros del protocolo Modbus de la sonda ---
 static const uint8_t  DIRECCION_ESCLAVO = 1;

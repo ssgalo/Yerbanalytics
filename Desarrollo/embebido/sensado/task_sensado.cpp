@@ -5,6 +5,7 @@
 #include "sensor_luz.h"
 #include "sensor_dht.h"
 #include "sensor_suelo.h"
+#include "sensor_tanques.h"
 
 namespace task_sensado {
 
@@ -12,16 +13,24 @@ void iniciarDrivers() {
   sensor_luz::iniciar();
   sensor_dht::iniciar();
   sensor_suelo::iniciar();
+  sensor_tanques::iniciar();
+#if BATERIA_INSTALADA
   pinMode(PIN_BATERIA, INPUT);
+#endif
 }
 
-// Lee el nivel de batería como porcentaje.
+// Lee el nivel de batería como porcentaje. Sin batería (BATERIA_INSTALADA 0)
+// devuelve 0 y util_json no publica el campo.
 // TODO(hardware): calibrar según el divisor resistivo y la química de la batería.
 static int leerBateria() {
+#if BATERIA_INSTALADA
   int crudo = analogRead(PIN_BATERIA);
   // ADC de 12 bits (0-4095) mapeado a 0-100% (placeholder hasta calibrar).
   long pct = map(crudo, 0, 4095, 0, 100);
   return (int) constrain(pct, 0, 100);
+#else
+  return 0;
+#endif
 }
 
 static PaqueteTelemetria armarPaquete() {
@@ -33,11 +42,22 @@ static PaqueteTelemetria armarPaquete() {
   p.luz       = sensor_luz::leer();
   p.ambiente  = sensor_dht::leer();
   p.suelo     = sensor_suelo::leer();
+  p.tanques   = sensor_tanques::leer();
   return p;
+}
+
+static volatile TaskHandle_t handleTarea = nullptr;
+
+void pedirLecturaAhora() {
+  TaskHandle_t h = handleTarea;
+  if (h != nullptr) {
+    xTaskNotifyGive(h);
+  }
 }
 
 void tarea(void* pvParameters) {
   SistemaColas* sys = (SistemaColas*) pvParameters;
+  handleTarea = xTaskGetCurrentTaskHandle();
 
   for (;;) {
     PaqueteTelemetria p = armarPaquete();
@@ -47,11 +67,12 @@ void tarea(void* pvParameters) {
     if (xQueueSend(sys->telemetria, &p, 0) != pdTRUE) {
       Serial.println("[sensado] Cola de telemetría llena; se omite este ciclo");
     } else {
-      Serial.printf("[sensado] Lectura tomada (ts=%u)\n", p.timestamp);
+      Serial.printf("[sensado] Lectura tomada (ts=%u)\n", (unsigned int) p.timestamp);
     }
 
-    // Cede el núcleo hasta el próximo ciclo (ahorro de energía por scheduling).
-    vTaskDelay(pdMS_TO_TICKS(SENSOR_POLLING_INTERVAL_MS));
+    // Cede el núcleo hasta el próximo ciclo (ahorro de energía por scheduling). Es una espera con
+    // notificación: un LEER_AHORA la corta y adelanta la lectura; sin pedido, dura lo mismo que antes.
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(SENSOR_POLLING_INTERVAL_MS));
   }
 }
 

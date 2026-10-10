@@ -67,7 +67,9 @@ export function textoPasoSecuencia(s: PasoSecuencia, ahoraMs: number): string {
       return s.detalle ?? 'Omitido';
     case 'EN_CURSO': {
       const faltan = s.tipo === 'ESPERAR' ? cuentaRegresivaSeg(s.esperaHasta, ahoraMs) : null;
-      return faltan === null ? EN_CURSO[s.tipo] : `Faltan ${faltan} s`;
+      if (faltan === null) return EN_CURSO[s.tipo];
+      // Pasó el plazo: el riego ya terminó y falta el ACK del nodo, que llega al final (con un margen).
+      return faltan === 0 ? 'Esperando la confirmación del nodo…' : `Faltan ${faltan} s`;
     }
     case 'OK':
       return LISTO[s.tipo];

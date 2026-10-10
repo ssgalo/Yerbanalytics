@@ -57,7 +57,7 @@ flowchart TD
     P7 -- "UPDATE sector<br/>INSERT historial_evento" --> DB
     P7 -- "publish bomba y mediasombra<br/>nursery/zone/MZ-2/sector/MZ-2-006/command" --> BROKER
     BROKER -- "entrega" --> ACT
-    ACT -. "publish .../ack<br/>HOY EL BACKEND NO LO ESCUCHA" .-> BROKER
+    ACT -. "publish .../ack<br/>solo alerta si falla o no llega" .-> BROKER
     DB --> DASH
 
     CAMARA["Diagnostico IA del sector<br/>Viene de la camara (diagrama 2)"]
@@ -138,7 +138,7 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 |---|---|---|---|
 | Nodo → backend | `nursery/zone/{zona}/telemetry` | Nodo testigo o simulador | Backend |
 | Backend → nodo | `nursery/zone/{zona}/sector/{sector}/command` | Backend (el riego, el despacho; bomba y mediasombra, el Action Executor) | Nodo actuador del sector |
-| Nodo → backend | `nursery/zone/{zona}/sector/{sector}/ack` | Nodo actuador | **Nadie** (el backend no se suscribe) |
+| Nodo → backend | `nursery/zone/{zona}/sector/{sector}/ack` | Nodo actuador | Backend (`AckActuadorReceiver` → `SeguimientoComandosService`: alerta si es una falla o si no llega a tiempo) |
 | Backend → riel | `nursery/rail/command` | Backend (la pasada: `IR_A` 1 o 2, `HOME`) | ESP32 del riel (`vivero_esp32_red`) |
 | Riel → backend | `nursery/rail/event` | ESP32 del riel (`ACEPTADO`, `LLEGO`, `ERROR`) | Backend (`RielEventoReceiver`) |
 
@@ -330,7 +330,7 @@ Lo resuelto va tachado; lo que sigue abierto, con su cita.
    el umbral de 90 s la zona pasa casi todo el tiempo "sin señal": el riego queda bloqueado
    (`StaleSensorRule`). Para probar el riego con el simulador hay que acortar ese intervalo. Ese
    parámetro no llega al firmware: el nodo real sigue en 30 s.
-4. **El ACK del actuador no lo escucha nadie** (el backend sí escucha `nursery/rail/event`, pero eso es el riel, no los actuadores). El backend da la válvula por abierta cuando el
+4. **El ACK del actuador no confirma el riego**: el backend lo escucha (`SeguimientoComandosService`) sólo para alertar en el historial si el nodo informa una falla o no contesta a tiempo. El backend da la válvula por abierta cuando el
    cliente MQTT aceptó el comando (`DespachoRiego.java:424-442`), no cuando el nodo confirmó. Ya no
    queda una válvula "enganchada" en "Regando": ese estado es `ts + duración + 5 s`
    (`DespachoRiego.java:214-221`) y se reconstruye del historial tras un reinicio. Sigue abierto

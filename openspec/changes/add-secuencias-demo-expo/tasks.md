@@ -141,8 +141,8 @@ Unidad C2 — sketch `vivero_esp32_red`
 ## E. Puesta en marcha (con A, B y C mergeadas; **desde el 10/10**)
 
 - [ ] E.1 Topología 1×2 (`MZ-1-001`, `MZ-1-002`) y `config.h` del ESP32 con `NODO_ZONA_ID "MZ-1"`, `NODO_SECTOR_ID "MZ-1-001"`
-- [ ] E.2 Flashear `vivero_esp32_red`; en el monitor serie, las tres suscripciones
-- [ ] E.3 Sin backend: `mosquitto_sub -t 'nursery/#' -v` y `mosquitto_pub` de `valve ON {durationSec:5}` (la bomba arranca, ACK `SUCCESS`, se apaga sola a los 5 s), `shade SET 0` y `100` (ACK al tocar cada final), `LEER_AHORA` (log de "sin sensores")
+- [ ] E.2 Flashear `nodo_combinado` (`pio run -e nodo_combinado -t upload` o `arduino-cli`); en el monitor serie, las cuatro suscripciones (dos sectores, riel, zona)
+- [ ] E.3 Sin backend: `mosquitto_sub -t 'nursery/#' -v` y `mosquitto_pub` de `valve ON {durationSec:5}` (la bomba arranca, ACK `SUCCESS`, se apaga sola a los 5 s), `shade SET 0` y `100` (ACK al tocar cada final), `LEER_AHORA` (una telemetría nueva al toque)
 - [ ] E.4 Desde Demo Expo: riego 10 s y mediasombra completos; cancelar cada uno a mitad → bomba apagada y mediasombra enrollada
 - [ ] E.5 Fallas: ESP32 desenchufado → `ACTUADOR_SIN_RESPUESTA` y la secuencia termina; iniciar una secuencia durante una pasada → 409 legible (y al revés)
 - [ ] E.6 Lectura: sin sensores → `SIN_LECTURA` legible; si ya hay sensores cableados, completar C.8 y ver los valores y la traza en `/reglas`
@@ -174,3 +174,30 @@ pista (A, B, C) con `size:exception`, como se hizo en `add-pasada-riel`. Con la 
 más rápido; (a) es lo más revisable. Lo decide el equipo antes de aplicar.
 
 Total de tareas: 40 (A 12, B 8, C 9, D 5, E 6), más 7 subtareas de test en A.8.
+
+---
+
+## Adaptación al firmware ESP32-S3 (rama de ezecatania13)
+
+Hecho al integrar `feat/prototipo-esp32-s3-acks` (ver design.md, misma sección):
+
+- [x] Merge con B: `AckActuador` unificado (`commandId`, `status`, `JsonNode detalle`, `zonaId`, `sectorId`,
+  `tipoDetalle()`), `AckActuadorReceiver` entrega a `SeguimientoComandosService` y `SecuenciaService`,
+  `ContratoNodo` con los nombres de B (`TOPIC_ACK_SUSCRIPCION`, `ACK_*`) más el comando de zona.
+- [x] `contrato.h`: lista de `DETALLE_*` = unión de lo que emite el firmware; comando de zona documentado a QoS 1.
+- [x] `SecuenciaService` RIEGO: ABRIR sin ACK con `durationSec = N`; ESPERAR espera el ACK del ON hasta
+  N + `margen-ack-riego-seg`; CERRAR siempre; el `ERROR cancelado` del ON tras cancelar se ignora.
+- [x] Simulador: `ActuatorAck` unificado con el conjunto ampliado de tipos (sin comportamiento nuevo).
+- [x] Frontend: cumplido el plazo, la espera muestra "Esperando la confirmación del nodo...".
+- [x] **Destino de las secuencias: el firmware modular `nodo_combinado`** (ESP32-S3,
+  `Desarrollo/embebido/`), no el sketch `vivero_esp32_red`. Verificado contra el código: `valve ON/OFF`
+  (`durationSec`, ACK al final del riego, `OFF` inmediato, `cancelado`/`reemplazado`) y `shade SET 0/100` (ACK
+  al tocar el final de carrera) coinciden con lo que manda `SecuenciaService`. `LEER_AHORA` implementado en
+  `nodo_combinado` y `nodo_sensor` (suscripción QoS 1 al comando de zona; el callback avisa a `task_sensado`,
+  que lee y publica por el camino normal; sin ACK, sin dedup, una acción desconocida se ignora con log).
+  Compilado con `arduino-cli` para los tres nodos y para `vivero_esp32_red`.
+- Con esto quedan **obsoletos** los ítems de la pista C que apuntaban a `vivero_esp32_red`: C.5 (válvula sobre
+  el driver de bomba L298N), C.6 (mediasombra por serie con `act_entrante`), C.7 (ring de `commandId` propio) y
+  C.8 (el hueco `leer_sensores()`) quedan como historia del sketch, que ahora es un banco de pruebas. E.1–E.6 se
+  hacen con `nodo_combinado` (`config.h` con `NODO_ZONA_ID "MZ-1"` y `NODO_SECTOR_1_ID`/`NODO_SECTOR_2_ID` = los
+  dos sectores de la topología) y E.3 usa también `LEER_AHORA` contra el combinado (devuelve la lectura real).

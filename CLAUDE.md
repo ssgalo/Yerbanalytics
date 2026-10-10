@@ -223,7 +223,10 @@ cd Desarrollo/backend
 - **El backend consume la telemetría por MQTT y publica comandos a los actuadores y al riel.** No
   publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
   (§6.2). Escucha además los eventos del riel (`nursery/rail/event`) y el ACK de los actuadores
-  (`nursery/zone/+/sector/+/ack`), que sólo consumen las secuencias.
+  (`nursery/zone/+/sector/+/ack`). Lo consumen dos: `SeguimientoComandosService` (alerta en el historial
+  si el nodo informa una falla o no contesta a tiempo; no cambia decisiones del motor) y las secuencias de
+  Demo Expo (`SecuenciaService`, que espera el ACK de cada paso). Los comandos de las secuencias salen por
+  el mismo `ComandoActuadorPublisher`, así que el seguimiento también los vigila, a propósito.
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.

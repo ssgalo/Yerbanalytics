@@ -80,7 +80,7 @@ a ms) y el umbral de "sin señal" de 30 s (ahora 90 s, 3 intervalos de publicaci
 | Problema | Efecto | Arreglo |
 |---|---|---|
 | El comando de la bomba sale sin mililitros | El firmware lo rechaza con `dosis_invalida` | Pendiente en el backend |
-| El backend no escucha el ACK | Da el riego por abierto cuando el cliente MQTT aceptó el comando, sin confirmación del hardware (pasada la duración + 5 s lo da por cerrado) | Pendiente en el backend |
+| El ACK no confirma el riego | El backend da el riego por abierto cuando el cliente MQTT aceptó el comando (pasada la duración + 5 s lo da por cerrado). El ACK sólo alerta en el historial si el nodo informa una falla o no contesta en `durationSec` + 90 s (`SeguimientoComandosService`) | Aceptado: el despacho no depende del ACK a propósito |
 | La sonda de suelo no manda `humSus` | A los 90 s el backend considera la humedad vieja y no riega | Revisar la sonda RS485; el resto de la lectura sigue entrando |
 | Mientras la válvula está abierta el nodo no atiende otros comandos | Un comando de bomba o mediasombra al mismo nodo espera hasta 1200 s (`act_valvula.cpp:70-75`) | Aceptado en el prototipo |
 | El nodo toma la hora por NTP | Sin internet en esa red, el `timestamp` es inutilizable y el backend usa la hora de recepción (warn en el log) | Usar una red con salida a internet |

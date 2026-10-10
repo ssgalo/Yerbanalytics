@@ -1,70 +1,80 @@
 #include "task_actuacion.h"
 #include "config.h"
-#include "act_valvula.h"
-#include "act_bomba.h"
+#include "act_riego.h"
 #include "act_mediasombra.h"
+#include "act_riel.h"
 #include "dedup_comandos.h"
 
 namespace task_actuacion {
 
+// Cada cuánto se atienden los actuadores (fin de riego, final de carrera de la mediasombra).
+static const uint32_t CICLO_MS = 50;
+
 void iniciarDrivers() {
-  act_valvula::iniciar();
-  act_bomba::iniciar();
+  act_riego::iniciar();
   act_mediasombra::iniciar();
+  act_riel::iniciar();
 }
 
-static Ack ackVacio(const Comando& cmd) {
-  Ack a = {};
-  strncpy(a.commandId, cmd.commandId, sizeof(a.commandId));
-  a.status = EstadoAck::ERROR;
-  return a;
+// Registra el ack final y lo entrega a la tarea de red.
+static void entregar(SistemaColas* sys, const Ack& ack) {
+  dedup_comandos::registrar(ack.commandId, ack);
+  if (xQueueSend(sys->ack, &ack, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    Serial.println("[actuacion] No se pudo encolar el ack");
+  }
 }
 
-static void ejecutarComando(const Comando& cmd, Ack& ack) {
+// Despacha el comando. true si 'ack' ya tiene la respuesta; false si quedó en curso.
+static bool despachar(const Comando& cmd, Ack& ack) {
   switch (cmd.actuador) {
     case TipoActuador::VALVULA:
-      act_valvula::ejecutar(cmd, ack);
-      break;
     case TipoActuador::BOMBA:
-      act_bomba::ejecutar(cmd, ack);
-      break;
+      return act_riego::comenzar(cmd, ack);
     case TipoActuador::MEDIASOMBRA:
-      act_mediasombra::ejecutar(cmd, ack);
-      break;
+      return act_mediasombra::comenzar(cmd, ack);
     default:
+      ack = {};
+      strlcpy(ack.commandId, cmd.commandId, sizeof(ack.commandId));
+      ack.sector = cmd.sector;
       ack.status = EstadoAck::ERROR;
-      strncpy(ack.tipoDetalle, "actuador_desconocido", sizeof(ack.tipoDetalle));
-      break;
+      ack.targetPct = -1;
+      strlcpy(ack.tipoDetalle, "actuador_desconocido", sizeof(ack.tipoDetalle));
+      return true;
   }
 }
 
 void tarea(void* pvParameters) {
   SistemaColas* sys = (SistemaColas*) pvParameters;
   Comando cmd;
+  Ack ack;
 
   for (;;) {
-    // Bloquea hasta que llegue un comando (cede el núcleo mientras espera).
-    if (xQueueReceive(sys->comandos, &cmd, portMAX_DELAY) != pdTRUE) {
-      continue;
-    }
-
-    Ack ack = ackVacio(cmd);
-
-    // Defensa en profundidad: si ya se ejecutó este commandId, reenviar su ack.
-    if (dedup_comandos::yaEjecutado(cmd.commandId)) {
-      Serial.printf("[actuacion] commandId '%s' duplicado; se reenvía el ack previo\n",
-                    cmd.commandId);
-      if (!dedup_comandos::ackPrevio(cmd.commandId, ack)) {
-        continue;
+    // Espera un comando hasta CICLO_MS (cede el núcleo mientras tanto).
+    if (xQueueReceive(sys->comandos, &cmd, pdMS_TO_TICKS(CICLO_MS)) == pdTRUE) {
+      // Defensa en profundidad: un commandId ya recibido no se vuelve a ejecutar.
+      if (dedup_comandos::yaRecibido(cmd.commandId)) {
+        if (dedup_comandos::ackPrevio(cmd.commandId, ack)) {
+          Serial.printf("[actuacion] commandId '%s' duplicado; se reenvía el ack previo\n", cmd.commandId);
+          if (xQueueSend(sys->ack, &ack, pdMS_TO_TICKS(1000)) != pdTRUE) {
+            Serial.println("[actuacion] No se pudo encolar el ack");
+          }
+        } else {
+          Serial.printf("[actuacion] commandId '%s' repetido (en curso): lo ignoro\n", cmd.commandId);
+        }
+      } else {
+        dedup_comandos::registrarEnCurso(cmd.commandId);
+        if (despachar(cmd, ack)) {
+          entregar(sys, ack);
+        }
       }
-    } else {
-      ejecutarComando(cmd, ack);
-      dedup_comandos::registrar(cmd.commandId, ack);
     }
 
-    // Entregar el ack a la tarea de red para su publicación.
-    if (xQueueSend(sys->ack, &ack, pdMS_TO_TICKS(1000)) != pdTRUE) {
-      Serial.println("[actuacion] No se pudo encolar el ack");
+    // Lo que terminó (o fue reemplazado) desde la última vuelta.
+    while (act_riego::atender(ack)) {
+      entregar(sys, ack);
+    }
+    while (act_mediasombra::atender(ack)) {
+      entregar(sys, ack);
     }
   }
 }

@@ -112,6 +112,12 @@ describe('textoPasoSecuencia', () => {
     expect(textoPasoSecuencia(espera, 12_500)).toBe('Faltan 8 s');
     expect(textoPasoSecuencia(paso('ESPERAR', 'OK'), 0)).toBe('Listo');
   });
+
+  it('cumplido el plazo, la espera dice que aguarda la confirmación del nodo (el ACK llega al final del riego)', () => {
+    const espera = paso('ESPERAR', 'EN_CURSO', { esperaHasta: 20_000 });
+    expect(textoPasoSecuencia(espera, 20_000)).toBe('Esperando la confirmación del nodo…');
+    expect(textoPasoSecuencia(espera, 24_000)).toBe('Esperando la confirmación del nodo…');
+  });
 });
 
 describe('cuentaRegresivaSeg', () => {

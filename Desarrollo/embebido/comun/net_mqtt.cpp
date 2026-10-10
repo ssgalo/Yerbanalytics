@@ -22,12 +22,26 @@ void iniciar(MQTT_CALLBACK_SIGNATURE) {
   cliente.setCallback(callback);
 }
 
+// PubSubClient sólo se suscribe con QoS 0 o 1: con 2 devuelve false y no suscribe.
+static void suscribirAhora(const char* topic, uint8_t qos) {
+  if (qos > 1) {
+    qos = 1;
+  }
+  if (cliente.subscribe(topic, qos)) {
+    Serial.printf("[mqtt] Suscrito a %s (QoS %d)\n", topic, qos);
+  } else {
+    Serial.printf("[mqtt] ERROR: no se pudo suscribir a %s\n", topic);
+  }
+}
+
 void suscribir(const char* topic, uint8_t qos) {
   if (cantSuscripciones < MAX_SUSCRIPCIONES) {
     suscripciones[cantSuscripciones++] = { topic, qos };
     if (cliente.connected()) {
-      cliente.subscribe(topic, qos);
+      suscribirAhora(topic, qos);
     }
+  } else {
+    Serial.printf("[mqtt] ERROR: no entra la suscripción a %s (máximo %d)\n", topic, MAX_SUSCRIPCIONES);
   }
 }
 
@@ -50,14 +64,13 @@ bool reconectarSiNecesario() {
 
   // clientId único para evitar colisiones en el broker.
   char clientId[64];
-  snprintf(clientId, sizeof(clientId), "%s-%08X", MQTT_CLIENT_ID_BASE, (uint32_t) esp_random());
+  snprintf(clientId, sizeof(clientId), "%s-%08X", MQTT_CLIENT_ID_BASE, (unsigned int) esp_random());
 
   Serial.printf("[mqtt] Conectando como %s...\n", clientId);
   if (cliente.connect(clientId)) {
     Serial.println("[mqtt] Conectado");
     for (int i = 0; i < cantSuscripciones; i++) {
-      cliente.subscribe(suscripciones[i].topic, suscripciones[i].qos);
-      Serial.printf("[mqtt] Suscrito a %s (QoS %d)\n", suscripciones[i].topic, suscripciones[i].qos);
+      suscribirAhora(suscripciones[i].topic, suscripciones[i].qos);
     }
     return true;
   }

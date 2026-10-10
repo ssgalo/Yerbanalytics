@@ -14,11 +14,26 @@ namespace util_json {
 // Devuelve la cantidad de bytes escritos.
 size_t serializarTelemetria(const PaqueteTelemetria& p, char* buf, size_t n);
 
-// Parsea un payload de comando. Devuelve true si es válido y completa 'out'.
+// Parsea un payload de comando. Devuelve true si es válido y completa 'out'
+// (salvo out.sector, que lo pone el llamador según el tópico).
 bool parsearComando(const char* payload, unsigned int len, Comando& out);
+
+// Resultado de parsear un comando de zona (nursery/zone/{zona}/command).
+enum class ResultadoComandoZona { LEER_AHORA, ACCION_DESCONOCIDA, INVALIDO };
+
+// Parsea un comando de zona. 'commandId' (>= 40 bytes) recibe el id para el log ("" si no vino).
+// Hoy la única acción válida es LEER_AHORA (sin distinguir mayúsculas).
+ResultadoComandoZona parsearComandoZona(const char* payload, unsigned int len, char* commandId, size_t n);
 
 // Serializa un Ack (status SUCCESS/ERROR + detalle). Escribe en buf.
 size_t serializarAck(const Ack& a, char* buf, size_t n);
+
+// Parsea un comando del riel. Siempre completa 'out': si no es válido,
+// out.valido = false y out.detalle dice por qué.
+void parsearComandoRiel(const char* payload, unsigned int len, ComandoRiel& out);
+
+// Serializa un evento del riel. posicion < 0 → null; codigo/detalle vacíos → se omiten.
+size_t serializarEventoRiel(const EventoRiel& e, char* buf, size_t n);
 
 }  // namespace util_json
 

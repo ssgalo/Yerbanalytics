@@ -99,12 +99,13 @@ public class MqttConfig {
     }
 
     // -------------------------------------------------------------------------
-    // Inbound de las secuencias: ACK de actuadores y lecturas pedidas con "leer ahora"
+    // Inbound de los acks: resultado de cada comando de riego, insumo o mediasombra
+    // (nursery/zone/{zona}/sector/{sector}/ack)
     // -------------------------------------------------------------------------
 
     /**
-     * ACK de los actuadores ({@link ContratoNodo#TOPIC_ACK}). Adaptador <strong>propio</strong>, igual
-     * que el del riel: ni el de telemetría ni el del riel se tocan. ClientId con sufijo {@code -ack}.
+     * Adaptador propio, como el del riel: el camino de la telemetría queda idéntico. Su clientId
+     * lleva sufijo {@code -ack} para no colisionar sesiones en el broker.
      */
     @Bean(name = "mqttAckChannel")
     public MessageChannel mqttAckChannel() {
@@ -114,7 +115,7 @@ public class MqttConfig {
     @Bean
     public MqttPahoMessageDrivenChannelAdapter ackInboundAdapter(MqttPahoClientFactory factory) {
         MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(clientId + "-ack", factory, ContratoNodo.TOPIC_ACK);
+                new MqttPahoMessageDrivenChannelAdapter(clientId + "-ack", factory, ContratoNodo.TOPIC_ACK_SUSCRIPCION);
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);

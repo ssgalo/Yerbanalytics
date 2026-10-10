@@ -145,12 +145,12 @@ class SecuenciaControllerTest {
 
     @Test
     void postInvalidoResponde400ConElMensaje() throws Exception {
-        when(service.iniciar(any())).thenThrow(new SecuenciaInvalidaException("duracionSeg tiene que estar entre 1 y 1190."));
+        when(service.iniciar(any())).thenThrow(new SecuenciaInvalidaException("duracionSeg tiene que estar entre 1 y 1200."));
 
         mockMvc.perform(post("/api/secuencias").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"tipo\":\"RIEGO\",\"parametros\":{\"duracionSeg\":0}}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("duracionSeg tiene que estar entre 1 y 1190."));
+                .andExpect(jsonPath("$.error").value("duracionSeg tiene que estar entre 1 y 1200."));
     }
 
     @Test

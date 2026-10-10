@@ -63,8 +63,8 @@ class ComandoZonaPublisherTest {
     void lasConstantesEspejanElContrato() {
         assertThat(ContratoNodo.TOPIC_COMANDO_ZONA).isEqualTo("nursery/zone/%s/command");
         assertThat(ContratoNodo.ACCION_LEER_AHORA).isEqualTo("LEER_AHORA");
-        assertThat(ContratoNodo.TOPIC_ACK).isEqualTo("nursery/zone/+/sector/+/ack");
-        assertThat(ContratoNodo.STATUS_SUCCESS).isEqualTo("SUCCESS");
-        assertThat(ContratoNodo.STATUS_ERROR).isEqualTo("ERROR");
+        assertThat(ContratoNodo.TOPIC_ACK_SUSCRIPCION).isEqualTo("nursery/zone/+/sector/+/ack");
+        assertThat(ContratoNodo.ACK_SUCCESS).isEqualTo("SUCCESS");
+        assertThat(ContratoNodo.ACK_ERROR).isEqualTo("ERROR");
     }
 }
