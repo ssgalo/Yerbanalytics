@@ -99,6 +99,38 @@ public class MqttConfig {
     }
 
     // -------------------------------------------------------------------------
+    // Inbound de los acks: resultado de cada comando de riego, insumo o mediasombra
+    // (nursery/zone/{zona}/sector/{sector}/ack)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Adaptador propio, como el del riel: el camino de la telemetría queda idéntico. Su clientId
+     * lleva sufijo {@code -ack} para no colisionar sesiones en el broker.
+     */
+    @Bean(name = "mqttAckChannel")
+    public MessageChannel mqttAckChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MqttPahoMessageDrivenChannelAdapter ackInboundAdapter(MqttPahoClientFactory factory) {
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                new MqttPahoMessageDrivenChannelAdapter(clientId + "-ack", factory, ContratoNodo.TOPIC_ACK_SUSCRIPCION);
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        adapter.setOutputChannel(mqttAckChannel());
+        return adapter;
+    }
+
+    @Bean
+    public IntegrationFlow mqttAckFlow() {
+        return IntegrationFlow.from(mqttAckChannel())
+                .handle("ackActuadorReceiver", "processMessage")
+                .get();
+    }
+
+    // -------------------------------------------------------------------------
     // Outbound: publicación de comandos hacia los nodos actuadores (Downlink)
     // -------------------------------------------------------------------------
 

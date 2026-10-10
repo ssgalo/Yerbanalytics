@@ -49,6 +49,24 @@ public final class ContratoNodo {
      */
     public static final int DURACION_VALVULA_MAX_SEG = 1200;
 
+    /**
+     * Suscripción a los acks de todos los sectores. El nodo publica el resultado de cada comando en
+     * {@code nursery/zone/{zona}/sector/{sector}/ack} (espeja {@code contratoTopicAck} de {@code contrato.h}).
+     */
+    public static final String TOPIC_ACK_SUSCRIPCION = "nursery/zone/+/sector/+/ack";
+
+    /** {@code status} de un ack: la acción terminó bien. */
+    public static final String ACK_SUCCESS = "SUCCESS";
+    /** {@code status} de un ack: la acción no se pudo hacer o no terminó; {@code detalle.tipo} dice por qué. */
+    public static final String ACK_ERROR = "ERROR";
+
+    /** {@code detalle.tipo} de un ERROR que no es una falla: llegó otro comando para lo mismo antes de terminar. */
+    public static final String ACK_TIPO_REEMPLAZADO = "reemplazado";
+    /** {@code detalle.tipo} de un ERROR que no es una falla: llegó un OFF. */
+    public static final String ACK_TIPO_CANCELADO = "cancelado";
+    /** {@code detalle.tipo}: la mediasombra no llegó al final de carrera a tiempo. */
+    public static final String ACK_TIPO_FALLA_MECANICA = "falla_mecanica";
+
     private ContratoNodo() {
     }
 
