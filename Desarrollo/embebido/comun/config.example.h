@@ -53,11 +53,6 @@
 #define TELEMETRIA_NIVEL_SECTOR   0
 
 // ----------------------------------------------------------------------------
-//  Intervalo de muestreo (alineado con SENSOR_POLLING_INTERVAL del backend)
-// ----------------------------------------------------------------------------
-#define SENSOR_POLLING_INTERVAL_MS   30000UL   // 30 s (ajustar según ingeniería)
-
-// ----------------------------------------------------------------------------
 //  Payload extendido de métricas de suelo (pH, N, P, K, salinidad, TDS)
 // ----------------------------------------------------------------------------
 //  Flag de compilación (1 = sí, 0 = no). El backend ignora las claves que no

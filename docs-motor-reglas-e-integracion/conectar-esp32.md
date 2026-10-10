@@ -54,6 +54,8 @@ probó con hardware real (03/10/2026) es el **riel de la cámara**, con otro ske
    - Red y broker: desde otra máquina de la red,
      `mosquitto_sub -h <ip-de-la-pc> -t 'nursery/#' -v`. Tiene que aparecer la telemetría del
      nodo cada 30 s.
+     *(Update: sensing is now pull-only. The node publishes once at boot and then only when the
+     backend sends `LEER_AHORA`, every `sensingPullIntervalSeconds`, default 60 s.)*
    - Backend: la zona debe actualizar sus métricas en el dashboard.
    - Actuador: publicar un comando a mano y mirar el ACK (ejemplos en
      `Desarrollo/embebido/README.md`).
@@ -76,6 +78,9 @@ flasheo, prueba con `mosquitto_pub` y esos problemas: su
 Son diferencias entre el firmware y el backend que el simulador no deja ver. Dos ya se
 corrigieron en `fix-integracion-nodo-real`: el `timestamp` en segundos (el backend lo normaliza
 a ms) y el umbral de "sin señal" de 30 s (ahora 90 s, 3 intervalos de publicación).
+
+> **Update (backend-driven-sensing):** the stale threshold is now `max(90 s, 3 x sensingPullIntervalSeconds)`,
+> computed by the backend, so it follows the pull interval (default 60 s gives 180 s).
 
 | Problema | Efecto | Arreglo |
 |---|---|---|

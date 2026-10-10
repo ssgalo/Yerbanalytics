@@ -39,7 +39,7 @@ entorno tome solo sus carpetas.
 | Tarea        | Prioridad | Qué hace                                                                                 |
 | ------------ | :-------: | ---------------------------------------------------------------------------------------- |
 | `actuacion`  | 4         | Recibe comandos, deduplica y despacha. Riego y mediasombra no bloquean: los atiende cada 50 ms |
-| `sensado`    | 3         | Cada `SENSOR_POLLING_INTERVAL_MS` (o antes, ante un `LEER_AHORA`) lee los sensores y arma la telemetría |
+| `sensado`    | 3         | Lee una vez al arrancar y después solo ante un `LEER_AHORA` (el backend lo publica cada X s; sin timer propio) y arma la telemetría |
 | `red`        | 2         | WiFi/MQTT: publica telemetría, acks y eventos del riel, y drena el buffer offline         |
 | `riel`       | 1         | Mueve el carro de la cámara. Genera los pasos con espera activa: va última y las demás la interrumpen. Fija al núcleo 1 |
 
@@ -56,8 +56,10 @@ entrega el paquete por la cola de siempre, y `task_red` lo publica con `publicar
 de telemetría de la zona. Sin `commandId` en la respuesta y **sin ACK**; una acción desconocida o un JSON
 ilegible se ignoran con una línea de log.
 
-- Después de una lectura a pedido, el período normal (`SENSOR_POLLING_INTERVAL_MS`) arranca de nuevo.
-  Pedidos seguidos se funden en una sola lectura.
+- **Sensing is backend-driven (pure pull).** The node reads once at boot, then blocks in
+  `ulTaskNotifyTake(pdTRUE, portMAX_DELAY)` until a `LEER_AHORA` arrives. The backend publishes it to
+  every zone each X seconds (`sensingPullIntervalSeconds`, 10-3600, default 60). `SENSOR_POLLING_INTERVAL_MS`
+  no longer exists. Back-to-back requests merge into a single read.
 - **Sin dedup por `commandId`**: `dedup_comandos` vive en `actuacion/`, que `nodo_sensor` no compila, y
   una reentrega del broker sólo cuesta una telemetría de más.
 - **Sin red**, la lectura a pedido sigue el camino de cualquier otra: va al buffer offline con su
