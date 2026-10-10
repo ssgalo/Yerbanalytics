@@ -12,4 +12,8 @@ public interface ZonaRepository extends JpaRepository<ZonaEntity, String> {
 
     @Query("SELECT DISTINCT z FROM ZonaEntity z LEFT JOIN FETCH z.sectors s ORDER BY z.id ASC")
     List<ZonaEntity> findAllWithSectors();
+
+    /** Zone ids only: enough to address the periodic pull without loading the 600 sectors. */
+    @Query("SELECT z.id FROM ZonaEntity z ORDER BY z.id ASC")
+    List<String> findAllIds();
 }
