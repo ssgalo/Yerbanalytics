@@ -104,3 +104,17 @@
 .btnSecondary:hover {
   border-color: var(--muted);
 }
+
+/* Envuelve cada formulario: `disabled` deshabilita todos sus campos en sólo lectura. */
+.fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.soloLectura {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}

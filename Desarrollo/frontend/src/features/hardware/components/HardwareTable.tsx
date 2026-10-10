@@ -7,7 +7,8 @@ import styles from '../Hardware.module.css';
 
 interface HardwareTableProps {
   dispositivos: Dispositivo[];
-  onRecambiar: (device: Dispositivo) => void;
+  /** Sin esto (rol sin `hardware.gestionar`) no se ofrece el recambio. */
+  onRecambiar?: (device: Dispositivo) => void;
 }
 
 /** Color de la barra de batería según el nivel. */
@@ -81,7 +82,7 @@ export function HardwareTable({ dispositivos, onRecambiar }: HardwareTableProps)
                   </div>
                 </td>
                 <td>
-                  {recambiable && (
+                  {recambiable && onRecambiar && (
                     <button type="button" className={styles.btnLink} onClick={() => onRecambiar(d)}>
                       Recambiar
                     </button>

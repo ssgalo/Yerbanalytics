@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { DemoExpoPage } from './DemoExpoPage';
 import { PageMetaProvider } from '@/hooks/PageMeta';
+import { ConPermisos } from '@/test/sesion';
+import type { Rol } from '@/types/seguridad';
 import type { EstadoPasada, EstadoPaso, Pasada, PasoPasada } from '@/types/domain';
 
 const estado = vi.hoisted(() => ({
@@ -73,12 +75,14 @@ const hook = (p: Pasada | null, over: Record<string, unknown> = {}) => {
   return estado.hook as { iniciar: ReturnType<typeof vi.fn>; cancelar: ReturnType<typeof vi.fn> };
 };
 
-const montar = () =>
+const montar = (rol: Rol = 'PRODUCTOR_VIVERISTA') =>
   render(
     <MemoryRouter>
-      <PageMetaProvider>
-        <DemoExpoPage />
-      </PageMetaProvider>
+      <ConPermisos rol={rol}>
+        <PageMetaProvider>
+          <DemoExpoPage />
+        </PageMetaProvider>
+      </ConPermisos>
     </MemoryRouter>,
   );
 
@@ -258,5 +262,18 @@ describe('DemoExpoPage', () => {
     );
     montar();
     expect(screen.getAllByText('El celular no pudo sacar la foto: CAMARA').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('DemoExpoPage · sin pasadas.operar (7.5)', () => {
+  it('el Operario ve el estado de la pasada sin los botones de iniciar ni cancelar', () => {
+    estado.visible = true;
+    hook(pasada('EN_CURSO', pasos(['OK', 'EN_CURSO', 'PENDIENTE', 'PENDIENTE', 'PENDIENTE'])));
+
+    montar('OPERARIO');
+
+    expect(screen.getByText('En curso')).toBeTruthy();
+    expect(btn(/Iniciar pasada/)).toBeNull();
+    expect(btn(/Cancelar/)).toBeNull();
   });
 });

@@ -16,6 +16,8 @@ interface ReglaCardProps {
   erroresServidor: ReadonlyMap<string, string>;
   abierta: boolean;
   disabled?: boolean;
+  /** Sin permiso de edición: no se ofrece "Restablecer fábrica". */
+  soloLectura?: boolean;
   onToggle: () => void;
   onEditar: (p: ParametroRegla, texto: string) => void;
   onRestablecer: (p: ParametroRegla) => void;
@@ -30,6 +32,7 @@ export function ReglaCard({
   erroresServidor,
   abierta,
   disabled,
+  soloLectura,
   onToggle,
   onEditar,
   onRestablecer,
@@ -97,6 +100,7 @@ export function ReglaCard({
                 nombresReglas={nombresReglas}
                 reglaActual={regla.id}
                 disabled={disabled}
+                soloLectura={soloLectura}
                 onChange={(texto) => onEditar(p, texto)}
                 onRestablecer={() => onRestablecer(p)}
               />

@@ -7,7 +7,12 @@ import { useState } from 'react';
 import { useDemoExpo } from '@/hooks/DemoExpoContext';
 import styles from './DemoExpoSwitch.module.css';
 
-export function DemoExpoSwitch() {
+interface DemoExpoSwitchProps {
+  /** false = el rol no tiene `demo-expo.configurar`: se ve el valor pero no se puede cambiar. */
+  editable?: boolean;
+}
+
+export function DemoExpoSwitch({ editable = true }: DemoExpoSwitchProps) {
   const { visible, cargando, cambiar } = useDemoExpo();
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +38,7 @@ export function DemoExpoSwitch() {
           role="switch"
           className={styles.input}
           checked={visible}
-          disabled={cargando || guardando}
+          disabled={!editable || cargando || guardando}
           onChange={(e) => void onChange(e.target.checked)}
         />
         <span className={styles.track} aria-hidden="true">
@@ -41,7 +46,9 @@ export function DemoExpoSwitch() {
         </span>
         <span className={styles.texts}>
           <span className={styles.label}>Mostrar Demo Expo</span>
-          <span className={styles.hint}>Muestra la pestaña Demo Expo en el menú</span>
+          <span className={styles.hint}>
+            {editable ? 'Muestra la pestaña Demo Expo en el menú' : 'Tu rol no puede cambiar esta preferencia'}
+          </span>
         </span>
       </label>
       {error && (

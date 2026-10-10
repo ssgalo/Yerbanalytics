@@ -5,7 +5,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { ConfiguracionPage } from './ConfiguracionPage';
 import { PageMetaProvider } from '@/hooks/PageMeta';
 import { DemoExpoProvider } from '@/hooks/DemoExpoContext';
-import { getRepository } from '@/data';
+import { getRepository, PermisoDenegadoError } from '@/data';
+import { ConPermisos } from '@/test/sesion';
+import type { Rol } from '@/types/seguridad';
 
 beforeEach(() => vi.stubEnv('VITE_DATA_SOURCE', 'mock'));
 afterEach(() => {
@@ -14,14 +16,16 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const montar = () =>
+const montar = (rol: Rol = 'INGENIERO_AGRONOMO') =>
   render(
     <MemoryRouter>
-      <PageMetaProvider>
-        <DemoExpoProvider>
-          <ConfiguracionPage />
-        </DemoExpoProvider>
-      </PageMetaProvider>
+      <ConPermisos rol={rol}>
+        <PageMetaProvider>
+          <DemoExpoProvider>
+            <ConfiguracionPage />
+          </DemoExpoProvider>
+        </PageMetaProvider>
+      </ConPermisos>
     </MemoryRouter>,
   );
 
@@ -35,7 +39,7 @@ describe('ConfiguracionPage', () => {
   });
 
   it('tiene el interruptor de Demo Expo y usarlo no ensucia el borrador del formulario', async () => {
-    montar();
+    montar('ADMINISTRADOR');
     await waitFor(() => expect(screen.queryByText(/Cargando la apertura máxima/)).toBeNull());
     const sw = (await screen.findByRole('switch', { name: /Mostrar Demo Expo/ })) as HTMLInputElement;
     await waitFor(() => expect(sw.disabled).toBe(false));
@@ -104,5 +108,35 @@ describe('ConfiguracionPage', () => {
     await waitFor(() => expect(screen.queryByText(/No se pudo obtener la apertura máxima/)).toBeNull());
     expect(espia).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(guardar().disabled).toBe(false));
+  });
+  it('sin configuracion.editar: campos deshabilitados y sin botones de guardar (7.5)', async () => {
+    montar('PRODUCTOR_VIVERISTA');
+
+    const campo = await screen.findByLabelText('Latencia de seguimiento');
+    // Lo deshabilita el <fieldset disabled> que lo envuelve: la propiedad del input no cambia.
+    expect(campo.matches(':disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: /Guardar cambios/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Restablecer valores de fábrica/ })).toBeNull();
+    expect(screen.getByText(/Sólo lectura/)).toBeTruthy();
+  });
+
+  it('sin demo-expo.configurar el interruptor de Demo Expo queda deshabilitado con el motivo (7.5)', async () => {
+    montar('INGENIERO_AGRONOMO');
+
+    const sw = (await screen.findByRole('switch', { name: /Mostrar Demo Expo/ })) as HTMLInputElement;
+    expect(screen.getByText('Tu rol no puede cambiar esta preferencia')).toBeTruthy();
+    expect(sw.disabled).toBe(true);
+  });
+
+  it('un 403 al guardar muestra el aviso uniforme y no da el cambio por aplicado (7.5)', async () => {
+    vi.spyOn(getRepository(), 'saveConfig').mockRejectedValue(new PermisoDenegadoError('configuracion.editar'));
+    montar('INGENIERO_AGRONOMO');
+    await waitFor(() => expect(screen.queryByText(/Cargando la apertura máxima/)).toBeNull());
+    await ensuciar();
+
+    fireEvent.click(guardar());
+
+    expect(await screen.findByText('No tenés permiso para esta acción.')).toBeTruthy();
+    expect(screen.queryByText('Configuración guardada correctamente.')).toBeNull();
   });
 });

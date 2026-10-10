@@ -1,35 +1,26 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { NurseryProvider } from '@/hooks/NurseryContext';
-import { routes } from '@/router';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { getRepository } from '@/data';
+import { montarApp } from '@/test/app';
+import { seguridadDemo } from '@/test/sesion';
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubEnv('VITE_DATA_SOURCE', 'mock');
+  // Con sesión de Administrador: puede ver y editar el motor.
+  await seguridadDemo('admin');
   // El DAG del Inspector mide su lienzo con ResizeObserver, que jsdom no trae.
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
 });
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
-/** La app completa (shell + rutas) en memoria, como la monta `App`. */
-function montarEn(ruta: string) {
-  const router = createMemoryRouter(routes, {
-    initialEntries: [ruta],
-    future: { v7_relativeSplatPath: true },
-  });
-  render(
-    <NurseryProvider>
-      <RouterProvider router={router} future={{ v7_startTransition: true }} />
-    </NurseryProvider>,
-  );
-  return router;
-}
+/** La app completa (sesión + shell + rutas) en memoria, como la monta `App`. */
+const montarEn = (ruta: string) => montarApp(ruta);
 
 describe('Ruta /reglas (7.1)', () => {
   it('el Sidebar enlaza a "Motor de reglas"', async () => {
@@ -63,11 +54,11 @@ describe('Ruta /reglas (7.1)', () => {
   });
 
   it('cambiar de pestaña actualiza la URL', async () => {
-    const router = montarEn('/reglas');
+    const ubicacion = montarEn('/reglas');
 
     fireEvent.click(await screen.findByRole('tab', { name: 'Inspector' }));
 
-    await waitFor(() => expect(router.state.location.search).toContain('tab=inspector'));
+    await waitFor(() => expect(ubicacion.actual?.search).toContain('tab=inspector'));
   });
 
   it('?regla= abre esa regla en Parámetros', async () => {
@@ -118,5 +109,17 @@ describe('Borrador de Parámetros entre pestañas (#1)', () => {
     montarEn('/reglas');
     await screen.findByText('💦 Riego por déficit hídrico (R-01)');
     expect(screen.queryByTitle(/sin guardar/)).toBeNull();
+  });
+});
+
+describe('Parámetros sin permiso de edición (7.5)', () => {
+  it('el Productor Viverista ve el catálogo en sólo lectura, sin botón para guardar', async () => {
+    await seguridadDemo('productor');
+    montarEn('/reglas?regla=RiegoPorDeficitRule');
+
+    const campo = (await screen.findByLabelText(/Umbral de riego/)) as HTMLInputElement;
+    expect(campo.disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: /Guardar cambios/ })).toBeNull();
+    expect(screen.getByText(/Sólo lectura/)).toBeTruthy();
   });
 });
