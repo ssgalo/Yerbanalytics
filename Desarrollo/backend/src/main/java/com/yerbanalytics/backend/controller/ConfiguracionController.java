@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.controller;
 
 import com.yerbanalytics.backend.dto.Configuracion;
 import com.yerbanalytics.backend.exception.InvalidConfigurationException;
+import com.yerbanalytics.backend.seguridad.UsuarioSesion;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,7 @@ public class ConfiguracionController {
     public ResponseEntity<Configuracion> updateConfiguracion(
             @RequestBody Configuracion cfg,
             @RequestHeader(value = "X-Usuario", required = false) String usuario) {
-        return ResponseEntity.ok(configuracionService.updateConfiguracion(cfg, usuario));
+        return ResponseEntity.ok(configuracionService.updateConfiguracion(cfg, UsuarioSesion.autorDelCambio(usuario)));
     }
 
     /** Physiological validation failure (HU-15 CA-03) → 400 with the error message. */
