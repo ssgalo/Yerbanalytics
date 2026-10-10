@@ -17,7 +17,7 @@ Para importar en draw.io: *Organizar → Insertar → Avanzado → Mermaid* y pe
 flowchart TD
     subgraph CAMPO["VIVERO (campo)"]
         SENS["Sensores del nodo testigo<br/>LDR: luz %<br/>DHT11: humedad ambiente y temperatura del aire<br/>Sonda de suelo RS485: humedad de sustrato y CE"]
-        NODO["Nodo testigo ESP32 (1 por macro-zona)<br/>Lee y publica cada 30 s por su cuenta<br/>Nadie le pide la lectura"]
+        NODO["Nodo testigo ESP32 (1 por macro-zona)<br/>Lee al arrancar y cuando el backend le pide la lectura (LEER_AHORA, cada X s)<br/>Sin timer propio"]
         BUF[("Buffer offline<br/>hasta 50 lecturas")]
         ACT["Nodo actuador ESP32 (1 por sector)<br/>valvula, bomba, mediasombra"]
     end
@@ -176,10 +176,15 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 
 ## 3. Cada cuánto pasa cada cosa
 
+> **Update (backend-driven-sensing):** sensing is pure pull. `SensingScheduler` publishes `LEER_AHORA` to
+> every zone each X seconds (`sensingPullIntervalSeconds`, default 60, stored in `configuracion_operativa`).
+> The "30 s push" and "simulator 4 h interval" statements elsewhere in this document are historical.
+> The stale threshold is `max(seguridad.antiguedad-max-lectura floor, 3 x X)`.
+
 | Qué | Cada cuánto | Dónde está definido |
 |---|---|---|
-| El nodo testigo lee y publica | 30 s | `SENSOR_POLLING_INTERVAL_MS`, `embebido/comun/config.example.h:49` |
-| El simulador publica | 10 s al encenderlo; a los 5 s adopta `intervaloSensadoMinutos` de la base (**240 min**) | `simulador/server/emission.ts:35-47` |
+| El nodo testigo lee y publica | Una vez al arrancar y luego solo ante `LEER_AHORA`; el backend lo pide cada X s (`sensingPullIntervalSeconds`, 10-3600, default 60). Ya no hay `SENSOR_POLLING_INTERVAL_MS` | `SensingScheduler` (backend), `task_sensado.cpp` |
+| El simulador publica | Una ronda al encenderlo y luego responde cada `LEER_AHORA` del backend (sin timers; ya no lee `intervaloSensadoMinutos`) | `simulador/server/emission.ts` |
 | El backend procesa una lectura | Al instante, por cada mensaje (no hace polling) | `MqttTelemetryReceiver.processMessage` |
 | El motor corre por telemetría | Con cada mensaje, sobre todos los sectores de esa zona | `NurseryService.updateTelemetry`, `NurseryService.java:541-590` |
 | El motor corre por watchdog | 5 min (`intervaloEvaluacionMinutos`), sobre todo el vivero; no riega ni toca la cola | `NurseryWatchdog.java:83-104` |
@@ -330,6 +335,8 @@ Lo resuelto va tachado; lo que sigue abierto, con su cita.
    el umbral de 90 s la zona pasa casi todo el tiempo "sin señal": el riego queda bloqueado
    (`StaleSensorRule`). Para probar el riego con el simulador hay que acortar ese intervalo. Ese
    parámetro no llega al firmware: el nodo real sigue en 30 s.
+   *(Update: obsolete. The simulator no longer has a timer; it answers `LEER_AHORA` like the real node,
+   and the stale threshold scales with `sensingPullIntervalSeconds`.)*
 4. **El ACK del actuador no confirma el riego**: el backend lo escucha (`SeguimientoComandosService`) sólo para alertar en el historial si el nodo informa una falla o no contesta a tiempo. El backend da la válvula por abierta cuando el
    cliente MQTT aceptó el comando (`DespachoRiego.java:424-442`), no cuando el nodo confirmó. Ya no
    queda una válvula "enganchada" en "Regando": ese estado es `ts + duración + 5 s`

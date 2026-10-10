@@ -27,6 +27,8 @@ Contrato vigente y su evolución (fuentes de verdad):
   QoS 2 para comandos, ACK con `{"status":"SUCCESS"|"ERROR"}`, e idempotencia por
   in-flight lock + `ACTION_COOLDOWN_MINUTES`. También nombra `SENSOR_POLLING_INTERVAL`
   como el intervalo con que el ESP32 envía telemetría.
+  *(Update, backend-driven-sensing: superseded. There is no node-side interval; the backend pulls with
+  `LEER_AHORA` every `sensingPullIntervalSeconds`.)*
 
 Mapeo físico de sensores (del boceto): luz por ADC (GPIO39), DHT11 (GPIO18), sonda de
 suelo Modbus RTU por UART2 (RX16/TX17, DE=GPIO4, 4800 8N1) → humedad, temp de suelo, EC,
@@ -67,6 +69,8 @@ Tareas y colas en lugar de `loop()` + `delay()`:
 
 - `task_sensado` (nodos con sensado): cada `SENSOR_POLLING_INTERVAL` lee los sensores,
   arma el `PaqueteTelemetria` y lo empuja a `cola_telemetria`; luego `vTaskDelay`.
+  *(Update, backend-driven-sensing: it now reads once at boot, then blocks on
+  `ulTaskNotifyTake(pdTRUE, portMAX_DELAY)` and reads only on `LEER_AHORA`. `SENSOR_POLLING_INTERVAL_MS` was removed.)*
 - `task_red`: gestiona WiFi + MQTT (`PubSubClient`), mantiene `client.loop()`, reconecta
   ante caídas, drena `cola_telemetria` publicando (o derivando al buffer offline si no hay
   red), y publica los ACK que llegan por `cola_ack`. Cada firmware trae su propia `task_red`

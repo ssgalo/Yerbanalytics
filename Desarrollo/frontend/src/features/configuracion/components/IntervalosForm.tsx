@@ -1,6 +1,7 @@
 /* Parámetros de frecuencia operativa — Intervalo de sensado e inferencia */
 import { useState } from 'react';
 import type { ConfigOperativa } from '@/types/domain';
+import { SENSING_PULL_MAX_SECONDS, SENSING_PULL_MIN_SECONDS } from '@/lib/configValidation';
 import styles from './ConfigForms.module.css';
 
 type Unidad = 'min' | 'hs';
@@ -73,6 +74,53 @@ function IntervalField({
   );
 }
 
+/** Seconds field: how often the backend asks each node for a reading. */
+function PullIntervalField({
+  seconds,
+  staleThresholdSeconds,
+  onChangeSeconds,
+}: {
+  seconds: number;
+  staleThresholdSeconds?: number;
+  onChangeSeconds: (seconds: number) => void;
+}) {
+  const label = 'Frecuencia de pedido de lectura a los nodos (segundos)';
+  const invalid = !(
+    Number.isInteger(seconds) &&
+    seconds >= SENSING_PULL_MIN_SECONDS &&
+    seconds <= SENSING_PULL_MAX_SECONDS
+  );
+  return (
+    <div
+      className={styles.field}
+      title="Cada cuántos segundos el backend le pide una lectura a cada nodo. No es el intervalo de sensado de riego."
+    >
+      <label className={styles.label} htmlFor="sensing-pull-seconds">
+        {label}
+      </label>
+      <div className={styles.inputWrap}>
+        <input
+          id="sensing-pull-seconds"
+          className={invalid ? `${styles.input} ${styles.inputError}` : styles.input}
+          type="number"
+          min={SENSING_PULL_MIN_SECONDS}
+          max={SENSING_PULL_MAX_SECONDS}
+          step={1}
+          style={{ maxWidth: '110px' }}
+          value={Number.isNaN(seconds) ? '' : seconds}
+          aria-invalid={invalid}
+          onChange={(e) => onChangeSeconds(e.target.valueAsNumber)}
+        />
+      </div>
+      <span className={styles.sectionHint}>
+        Rango {SENSING_PULL_MIN_SECONDS} a {SENSING_PULL_MAX_SECONDS} s.
+        {staleThresholdSeconds != null &&
+          ` Umbral de lectura vieja (calculado por el backend): ${staleThresholdSeconds} s.`}
+      </span>
+    </div>
+  );
+}
+
 export function IntervalosForm({ value, onChange }: IntervalosFormProps) {
   return (
     <div className={styles.grid}>
@@ -89,6 +137,11 @@ export function IntervalosForm({ value, onChange }: IntervalosFormProps) {
         valueMinutes={value.intervaloSensadoMinutos}
         invalid={value.intervaloSensadoMinutos <= 0}
         onChangeMinutes={(m) => onChange({ intervaloSensadoMinutos: m })}
+      />
+      <PullIntervalField
+        seconds={value.sensingPullIntervalSeconds}
+        staleThresholdSeconds={value.effectiveStaleThresholdSeconds}
+        onChangeSeconds={(n) => onChange({ sensingPullIntervalSeconds: n })}
       />
     </div>
   );

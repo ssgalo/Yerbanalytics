@@ -7,6 +7,8 @@ import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
+import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
+import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +28,7 @@ import com.yerbanalytics.backend.controller.ReglasParametrosController;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -53,6 +56,8 @@ class CatalogoParametrosServiceTest {
     private HistorialService historialService;
     @Mock
     private PlatformTransactionManager transactionManager;
+    @Mock
+    private ConfiguracionOperativaRepository operativaRepository;
 
     /** Estado de la "tabla" parametro_regla que simulan los stubs del repositorio. */
     private final Map<String, ParametroReglaEntity> tabla = new ConcurrentHashMap<>();
@@ -93,7 +98,8 @@ class CatalogoParametrosServiceTest {
         });
         lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
 
-        service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager);
+        service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
+                operativaRepository);
     }
 
     private void override(String clave, String valor) {
@@ -444,5 +450,100 @@ class CatalogoParametrosServiceTest {
         assertThatThrownBy(() -> b.get(5, TimeUnit.SECONDS))
                 .hasCauseInstanceOf(ParametrosInvalidosException.class);
         assertThat(tabla.get("riego.humedad-objetivo").getValor()).isEqualTo("75");
+    }
+
+    // ------------------------------------------------------------------ backend-driven sensing: effective stale threshold
+
+    private static final String STALE_KEY = ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave();
+
+    private void pullInterval(Integer seconds) {
+        ConfiguracionOperativaEntity op = new ConfiguracionOperativaEntity();
+        op.setId(1);
+        op.setSensingPullIntervalSeconds(seconds);
+        lenient().when(operativaRepository.findById(1)).thenReturn(Optional.of(op));
+    }
+
+    @Test
+    void vigentes_overlaysThreeTimesThePullIntervalWhenLargerThanTheFloor() {
+        pullInterval(120);
+
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(360.0);
+    }
+
+    @Test
+    void vigentes_nullPullIntervalReadsAsSixtyGivingOneHundredEighty() {
+        pullInterval(null);
+
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(180.0);
+    }
+
+    @Test
+    void vigentes_noOperatingConfigRowReadsAsSixty() {
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(180.0);
+    }
+
+    @Test
+    void vigentes_floorDominatesWhenThePullIntervalIsShort() {
+        pullInterval(10);
+
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(90.0);
+    }
+
+    @Test
+    void vigentes_aStoredFloorOverrideIsHonouredWhenLarger() {
+        pullInterval(60);
+        override(STALE_KEY, "200");
+
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(200.0);
+    }
+
+    @Test
+    void vigentes_outOfRangeStoredIntervalIsClamped() {
+        pullInterval(99999);
+
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(10800.0);
+    }
+
+    @Test
+    void catalogo_keepsTheRawFloorForTheEditor() {
+        pullInterval(120);
+
+        ParametroDto dto = service.catalogo().parametros().stream()
+                .filter(p -> p.clave().equals(STALE_KEY)).findFirst().orElseThrow();
+
+        assertThat(dto.valor()).isEqualTo("90");
+        assertThat(dto.modificado()).isFalse();
+    }
+
+    @Test
+    void invalidarAlTerminar_makesTheNextReadSeeTheNewInterval() {
+        pullInterval(60);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(180.0);
+
+        pullInterval(120);
+        assertThat(service.vigentes().numero(STALE_KEY)).as("cached until invalidated").isEqualTo(180.0);
+
+        service.invalidarAlTerminar();
+
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(360.0);
+    }
+
+    @Test
+    void invalidarAlTerminar_invalidatesAgainAfterCompletion() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            pullInterval(60);
+            service.invalidarAlTerminar();
+            service.vigentes();   // repopulates the cache between the save and the commit
+            pullInterval(120);
+
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+            }
+
+            assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(360.0);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }

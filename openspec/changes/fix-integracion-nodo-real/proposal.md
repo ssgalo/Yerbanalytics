@@ -10,6 +10,9 @@ diferencias que el simulador no deja ver y que dejarían la zona **siempre "sin 
    `last_reading_time` y lo comparaba con `System.currentTimeMillis()`.
 2. **Margen de "sin señal".** El nodo publica cada 30 s y el parámetro
    `seguridad.antiguedad-max-lectura` valía 30 s: un mensaje demorado ya la marcaba caída.
+   *(Update, backend-driven-sensing: the node no longer pushes every 30 s. The backend pulls with
+   `LEER_AHORA` every `sensingPullIntervalSeconds` and the effective threshold is
+   `max(90 s, 3 x pull interval)`.)*
 3. **`NODO_SECTOR_ID` de ejemplo** (`S-001`) no existe: los sectores reales son `MZ-1-001`, y el
    backend publica los comandos a ese id.
 4. **Broker.** No había `mosquitto.conf`: que el broker aceptara conexiones de la LAN dependía del default de la imagen de Docker (al probarlo, las aceptaba). Se versiona la configuración para que quede explícita.

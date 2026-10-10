@@ -85,6 +85,7 @@ export class HttpRepository implements DataRepository {
     if (data.operativa) {
       data.operativa.intervaloSensadoMinutos = data.operativa.intervaloSensadoMinutos ?? 240;
       data.operativa.intervaloEvaluacionMinutos = data.operativa.intervaloEvaluacionMinutos ?? 5;
+      data.operativa.sensingPullIntervalSeconds = data.operativa.sensingPullIntervalSeconds ?? 60;
     }
     return data;
   }

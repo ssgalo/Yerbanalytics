@@ -87,3 +87,23 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
     expect(validateConfig(cfg, 100).length).toBeGreaterThan(0);
   });
 });
+
+describe('node read request frequency (sensingPullIntervalSeconds)', () => {
+  const withInterval = (v: number) => {
+    const cfg = buildConfig();
+    cfg.operativa = { ...cfg.operativa, sensingPullIntervalSeconds: v };
+    return validateConfig(cfg, 100);
+  };
+
+  it('factory config defaults to 60 seconds and is valid', () => {
+    expect(buildConfig().operativa.sensingPullIntervalSeconds).toBe(60);
+  });
+
+  it.each([5, 9, 4000, 3601, 10.5])('rejects %s seconds', (v) => {
+    expect(withInterval(v).length).toBeGreaterThan(0);
+  });
+
+  it.each([10, 60, 3600])('accepts %s seconds', (v) => {
+    expect(withInterval(v)).toEqual([]);
+  });
+});

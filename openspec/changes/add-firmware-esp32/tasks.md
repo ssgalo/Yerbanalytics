@@ -7,7 +7,7 @@
   con su `build_src_filter` (su `.ino` + `comun/` + las carpetas de su rol), sin build
   flags de perfil; dependencias: PubSubClient, ArduinoJson, DHT sensor library.
 - [x] 1.2 Crear `comun/config.example.h` con placeholders (SSID, pass, broker, `zonaId`,
-  `sectorId`, pines, `SENSOR_POLLING_INTERVAL`, flag `ENVIAR_METRICAS_EXTENDIDAS`,
+  `sectorId`, pines, `SENSOR_POLLING_INTERVAL` *(removed by backend-driven-sensing)*, flag `ENVIAR_METRICAS_EXTENDIDAS`,
   prioridades/stacks de tareas) y agregar `config.h` real a `.gitignore`.
 - [x] 1.3 Crear `comun/contrato.h` con los topics (telemetry/command/ack, plantillas
   zona y sector) y las claves JSON, como fuente única (sin literales dispersos).
@@ -40,6 +40,7 @@
   configuración y `TODO` de sensor UV real; alimenta el campo `uv`.
 - [x] 3.4 Implementar `task_sensado`: muestreo cada `SENSOR_POLLING_INTERVAL` con
   `vTaskDelay`, ensamblado del `PaqueteTelemetria` y envío a `cola_telemetria`.
+  *(Update, backend-driven-sensing: boot read, then `ulTaskNotifyTake(pdTRUE, portMAX_DELAY)`; reads only on `LEER_AHORA`.)*
 - [x] 3.5 Ensamblado JSON: 5 métricas base siempre; extendidas de suelo bajo el flag
   `ENVIAR_METRICAS_EXTENDIDAS`. Incluir `battery` (ADC) y `signal` (RSSI).
 - [x] 3.6 Implementar `buffer_offline` en NVS: persistir con timestamp original cuando no

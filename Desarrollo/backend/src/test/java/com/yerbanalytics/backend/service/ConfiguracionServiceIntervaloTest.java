@@ -40,13 +40,14 @@ class ConfiguracionServiceIntervaloTest {
 
     private ConfiguracionOperativaRepository operativaRepo;
     private ConfiguracionService service;
+    private CatalogoParametrosService catalogo;
 
     @BeforeEach
     void setUp() {
         UmbralMetricaRepository umbrales = mock(UmbralMetricaRepository.class);
         operativaRepo = mock(ConfiguracionOperativaRepository.class);
         RustificacionEtapaRepository rustificacionRepo = mock(RustificacionEtapaRepository.class);
-        CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
+        catalogo = mock(CatalogoParametrosService.class);
         when(umbrales.findAll()).thenReturn(List.of());
         when(operativaRepo.findById(1)).thenReturn(Optional.empty());
         when(rustificacionRepo.findAllByOrderByOrdenAsc()).thenReturn(List.of());
@@ -57,11 +58,16 @@ class ConfiguracionServiceIntervaloTest {
     }
 
     private static Configuracion cfg(int intervaloSensadoMinutos) {
+        return cfg(intervaloSensadoMinutos, null);
+    }
+
+    private static Configuracion cfg(int intervaloSensadoMinutos, Integer sensingPullSeconds) {
         List<UmbralMetrica> umbrales = NurseryConstants.SPECS.stream().map(sp -> new UmbralMetrica(sp.key(),
                 sp.label(), sp.unit(), sp.dec(), sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1],
                 sp.crit()[0], sp.crit()[1], false)).toList();
         return new Configuracion(umbrales,
-                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, 5, "x", 1L), List.of());
+                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, 5, "x", 1L, sensingPullSeconds, null),
+                List.of());
     }
 
     @ParameterizedTest
@@ -80,5 +86,84 @@ class ConfiguracionServiceIntervaloTest {
         ArgumentCaptor<ConfiguracionOperativaEntity> guardada = ArgumentCaptor.forClass(ConfiguracionOperativaEntity.class);
         verify(operativaRepo).save(guardada.capture());
         assertThat(guardada.getValue().getIntervaloSensadoMinutos()).isEqualTo(minutos);
+    }
+
+    // --- Backend-driven sensing: pull interval in seconds ---
+
+    private ConfiguracionOperativaEntity savedEntity() {
+        ArgumentCaptor<ConfiguracionOperativaEntity> saved = ArgumentCaptor.forClass(ConfiguracionOperativaEntity.class);
+        verify(operativaRepo).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {10, 30, 60, 3600})
+    void acceptsPullIntervalInRange(int seconds) {
+        assertThatCode(() -> service.updateConfiguracion(cfg(240, seconds), "Ana")).doesNotThrowAnyException();
+        assertThat(savedEntity().getSensingPullIntervalSeconds()).isEqualTo(seconds);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 5, 9, 3601, 4000})
+    void rejectsPullIntervalOutOfRangeNamingTheParameter(int seconds) {
+        assertThatThrownBy(() -> service.updateConfiguracion(cfg(240, seconds), "Ana"))
+                .isInstanceOf(InvalidConfigurationException.class)
+                .hasMessageContaining("sensingPullIntervalSeconds");
+        verify(operativaRepo, never()).save(any());
+    }
+
+    @org.junit.jupiter.api.Test
+    void nullPullIntervalKeepsTheStoredValue() {
+        ConfiguracionOperativaEntity stored = new ConfiguracionOperativaEntity();
+        stored.setId(1);
+        stored.setSensingPullIntervalSeconds(45);
+        when(operativaRepo.findById(1)).thenReturn(Optional.of(stored));
+
+        service.updateConfiguracion(cfg(240, null), "Ana");
+
+        assertThat(savedEntity().getSensingPullIntervalSeconds()).isEqualTo(45);
+    }
+
+    @org.junit.jupiter.api.Test
+    void pullIntervalRoundTripsThroughTheDto() {
+        // The repository behaves like a table: what was saved is what findById returns afterwards.
+        java.util.concurrent.atomic.AtomicReference<ConfiguracionOperativaEntity> table =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        when(operativaRepo.save(any())).thenAnswer(i -> {
+            table.set(i.getArgument(0));
+            return i.getArgument(0);
+        });
+        when(operativaRepo.findById(1)).thenAnswer(i -> Optional.ofNullable(table.get()));
+
+        Configuracion returned = service.updateConfiguracion(cfg(240, 30), "Ana");
+
+        assertThat(returned.operativa().sensingPullIntervalSeconds()).isEqualTo(30);
+        assertThat(service.getConfiguracion().operativa().sensingPullIntervalSeconds()).isEqualTo(30);
+    }
+
+    @org.junit.jupiter.api.Test
+    void unsetPullIntervalReadsAsSixtyAndLeavesTheIrrigationCycleUntouched() {
+        ConfiguracionOperativaEntity stored = new ConfiguracionOperativaEntity();
+        stored.setId(1);
+        stored.setIntervaloSensadoMinutos(240);
+        when(operativaRepo.findById(1)).thenReturn(Optional.of(stored));
+
+        ConfiguracionOperativa op = service.getConfiguracion().operativa();
+
+        assertThat(op.sensingPullIntervalSeconds()).isEqualTo(60);
+        assertThat(op.intervaloSensadoMinutos()).isEqualTo(240);
+    }
+
+    @org.junit.jupiter.api.Test
+    void exposesTheEffectiveStaleThresholdFromTheCatalogSnapshot() {
+        // ReglaTestSupport.fabrica() holds the 90 s floor and the mock catalog returns it as-is.
+        assertThat(service.getConfiguracion().operativa().effectiveStaleThresholdSeconds()).isEqualTo(90);
+    }
+
+    @org.junit.jupiter.api.Test
+    void savingInvalidatesTheCatalogSnapshot() {
+        service.updateConfiguracion(cfg(240, 30), "Ana");
+
+        verify(catalogo).invalidarAlTerminar();
     }
 }

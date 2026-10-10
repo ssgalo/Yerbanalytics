@@ -362,6 +362,10 @@ export interface ConfigOperativa {
   seguimientoDeltaMin: number;
   intervaloSensadoMinutos: number;
   intervaloEvaluacionMinutos: number;
+  /** How often the backend asks each node to read (seconds, 10..3600). Null from the server = stored default. */
+  sensingPullIntervalSeconds: number;
+  /** Read-only, computed by the backend from the pull interval; the browser never derives it. */
+  effectiveStaleThresholdSeconds?: number;
   updatedBy: string | null;
   updatedTs: number | null;
 }

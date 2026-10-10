@@ -105,4 +105,39 @@ describe('ConfiguracionPage', () => {
     expect(espia).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(guardar().disabled).toBe(false));
   });
+
+  const pullField = async () =>
+    (await screen.findByLabelText(/frecuencia de pedido de lectura/i)) as HTMLInputElement;
+
+  it('disables Save when the node read request frequency is out of range', async () => {
+    montar();
+    await waitFor(() => expect(screen.queryByText(/Cargando la apertura máxima/)).toBeNull());
+
+    fireEvent.change(await pullField(), { target: { value: '5' } });
+
+    expect(guardar().disabled).toBe(true);
+  });
+
+  it('factory reset brings the read request frequency back to 60', async () => {
+    montar();
+    await waitFor(() => expect(screen.queryByText(/Cargando la apertura máxima/)).toBeNull());
+    const field = await pullField();
+    fireEvent.change(field, { target: { value: '30' } });
+    expect(field.value).toBe('30');
+
+    fireEvent.click(screen.getByRole('button', { name: /Restablecer/ }));
+
+    await waitFor(() => expect(field.value).toBe('60'));
+  });
+
+  it('refreshes the backend-computed threshold hint after saving', async () => {
+    montar();
+    await waitFor(() => expect(screen.queryByText(/Cargando la apertura máxima/)).toBeNull());
+    expect(await screen.findByText(/lectura vieja.*180 s/)).toBeTruthy();
+
+    fireEvent.change(await pullField(), { target: { value: '120' } });
+    fireEvent.click(guardar());
+
+    expect(await screen.findByText(/lectura vieja.*360 s/)).toBeTruthy();
+  });
 });
