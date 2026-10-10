@@ -72,11 +72,23 @@
         </dependency>
 
         <!--
-            JWT para los tokens de acceso de los dispositivos de captura.
-            Se suma sólo la librería de firma, NO spring-boot-starter-security: el backend
-            no tiene autenticación en ningún otro lado, y traer la cadena de filtros
-            completa protegería por defecto endpoints que hoy son abiertos.
-            La autenticación se acota por path en CamaraAuthFilter.
+            Spring Security: dos cadenas (SeguridadConfig). La del contrato de cámara valida el
+            token de dispositivo; la de la API de plataforma exige sesión de usuario y permiso.
+            Trae también el BCryptPasswordEncoder de las contraseñas.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            JWT para los tokens de acceso de los dispositivos de captura (cadena del contrato,
+            CamaraAuthFilter). Las personas usan sesiones opacas, no JWT: ver SesionService.
         -->
         <dependency>
             <groupId>com.auth0</groupId>
