@@ -18,6 +18,22 @@ main.py
 El servicio no conoce la topología de sectores: opera solo con IDs de captura.
 El backend asigna el diagnóstico al sector internamente vía la relación `captura → sector`.
 
+## Cuenta de servicio
+
+El backend exige sesión de usuario en toda `/api/**`, y este servicio entra como cualquier otro
+cliente: con una cuenta de rol **Servicio** (`BACKEND_USUARIO` / `BACKEND_CLAVE`). El backend no
+tiene nada creado para la inferencia; la cuenta la da de alta el Administrador desde el dashboard
+(vista Usuarios), y el rol ya trae lo que hace falta (`capturas.ver`, `diagnosticos.registrar`).
+
+- **Nace con clave temporal.** Hasta que se cambia, el backend responde `403` a todo. Entrá una
+  vez al dashboard con esa cuenta, cambiá la clave y poné la nueva en `BACKEND_CLAVE`.
+- **Login perezoso.** La primera llamada inicia sesión; la cookie `YERBA_SESION` queda en un
+  `requests.Session` del módulo (`src/api.py`).
+- **Sesión vencida.** Entre ciclos (4 h por defecto) la sesión vence por inactividad: la próxima
+  llamada recibe `401`, reinicia sesión y reintenta **una sola vez**.
+- **Sin credenciales** no intenta el login: lo deja en el log como error y el backend rechaza la
+  llamada, que se maneja como cualquier otro fallo del backend (se reintenta el próximo ciclo).
+
 ## Prerrequisitos
 
 | Requisito | Mínimo recomendado |
@@ -47,6 +63,8 @@ cp .env.example .env
 | `MODEL_PATH` | — | **Obligatoria.** Ruta absoluta al archivo `.pt`. |
 | `MODEL_CLASSES` | — | **Obligatoria.** Orden de clases del modelo, separadas por coma. |
 | `BACKEND_URL` | `http://localhost:8080` | URL base del backend. |
+| `BACKEND_USUARIO` | — | Usuario de la cuenta de rol Servicio (ver "Cuenta de servicio"). |
+| `BACKEND_CLAVE` | — | Su clave. Sin ella, el backend rechaza las llamadas. |
 | `CAPTURAS_DIR` | `/capturas` | Directorio raíz del volumen de imágenes. |
 | `POLLING_INTERVAL_SECONDS` | `14400` (4 h) | Segundos entre ciclos de polling. |
 
@@ -96,8 +114,10 @@ Solo necesitás setear las variables de entorno del servicio antes de levantar:
 # En docker-compose.yml, sección servicio-inferencia > environment:
 #   MODEL_PATH: /modelos/tu_modelo.pt
 #   MODEL_CLASSES: Sano,Clorosis,...
+# La cuenta de servicio va por entorno (el usuario por defecto es "inferencia"):
+#   INFERENCIA_BACKEND_USUARIO=inferencia INFERENCIA_BACKEND_CLAVE=...
 
-docker compose up servicio-inferencia
+INFERENCIA_BACKEND_CLAVE=... docker compose up servicio-inferencia
 ```
 
 El volumen `capturas-data` es compartido entre el backend y este servicio.
@@ -108,6 +128,8 @@ El modelo `.pt` debe montarse externamente (ver `volumes` en `docker-compose.yml
 | Escenario | Comportamiento |
 |---|---|
 | Backend no responde al GET | Log error, espera el próximo ciclo |
+| Sesión vencida o revocada (`401`) | Reinicia sesión y reintenta una vez |
+| Credenciales faltantes o rechazadas | Log error, espera el próximo ciclo |
 | Archivo JPEG no existe en disco | Log warning, pasa a la siguiente captura |
 | Error durante la inferencia | Log error, pasa a la siguiente captura |
 | Backend rechaza el POST | Log error, la captura reaparece en el próximo ciclo |
