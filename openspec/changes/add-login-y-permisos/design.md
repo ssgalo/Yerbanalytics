@@ -243,6 +243,12 @@ guarda la cookie en memoria, la adjunta en `proxyBackend` y en el sondeo de esta
 el estado del backend en su UI pasa a "sin credenciales". El backend no cambia por esto: la cuenta
 la da de alta el Administrador con rol Servicio.
 
+*Agregado al implementar:* `Desarrollo/servicio-inferencia/` ya existía y llamaba al backend sin
+sesión. Recibe el mismo trato (`BACKEND_USUARIO`/`BACKEND_CLAVE`, reintento único ante `401`). Lo
+mismo la suite de conformidad del contrato de cámara: sus aserciones no cambian, pero la
+preparación de los casos (códigos de vinculación, órdenes) es API de plataforma y ahora entra con
+una cuenta (`PLATAFORMA_USUARIO`/`PLATAFORMA_CLAVE`).
+
 ## Risks / Trade-offs
 
 - **[Sin bloqueo por intentos fallidos]** → fuerza bruta posible desde la LAN. Mitigación: BCrypt
