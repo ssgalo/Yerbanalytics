@@ -11,8 +11,8 @@
 //    - task_actuacion : consume comandos, acciona -> cola_ack.
 //    - riel           : consume comandos del riel, mueve el carro -> cola_evento_riel.
 //
-//  El callback MQTT solo encola (comandos, comando del riel, ack de comando
-//  inválido): nunca acciona ni publica (PubSubClient reusa su buffer al publicar).
+//  El callback MQTT solo encola o avisa (comandos, comando del riel, ack de comando
+//  inválido, LEER_AHORA -> notificación a task_sensado): nunca acciona ni publica (PubSubClient reusa su buffer al publicar).
 //  Sin deep sleep: el ahorro de energía se logra cediendo el núcleo con
 //  vTaskDelay entre ciclos.
 // ============================================================================
@@ -37,6 +37,7 @@
 static SistemaColas sys;
 
 static char topicTelemetria[96];
+static char topicComandoZona[96];
 static char topicComando[CANT_SECTORES + 1][96];   // índice 1 y 2
 static char topicAck[CANT_SECTORES + 1][96];
 
@@ -50,6 +51,27 @@ static void onMensajeMqtt(char *topic, byte *payload, unsigned int length)
     ComandoRiel cr;
     util_json::parsearComandoRiel((const char *)payload, length, cr);
     xQueueOverwrite(sys.comandoRiel, &cr); // el último gana
+    return;
+  }
+
+  if (strcmp(topic, topicComandoZona) == 0)
+  {
+    // LEER_AHORA: sólo avisa a task_sensado; la lectura y la publicación siguen su camino de siempre.
+    // Sin ack (la respuesta es la telemetría). Acción desconocida o JSON ilegible: se ignora con un log.
+    char commandId[40];
+    switch (util_json::parsearComandoZona((const char *)payload, length, commandId, sizeof(commandId)))
+    {
+    case util_json::ResultadoComandoZona::LEER_AHORA:
+      Serial.printf("[main] LEER_AHORA (commandId '%s'): lectura inmediata\n", commandId);
+      task_sensado::pedirLecturaAhora();
+      break;
+    case util_json::ResultadoComandoZona::ACCION_DESCONOCIDA:
+      Serial.printf("[main] Comando de zona ignorado (commandId '%s'): acción desconocida\n", commandId);
+      break;
+    default:
+      Serial.println("[main] Comando de zona ignorado: JSON inválido");
+      break;
+    }
     return;
   }
 
@@ -204,8 +226,9 @@ void setup()
   pinMode(PIN_LED_ESTADO, OUTPUT);
   digitalWrite(PIN_LED_ESTADO, LOW);
 
-  // Topics: telemetría (zona/sector según config); comando y ack de cada sector.
+  // Topics: telemetría (zona/sector según config); comando de zona; comando y ack de cada sector.
   contratoTopicTelemetria(topicTelemetria, sizeof(topicTelemetria));
+  contratoTopicComandoZona(topicComandoZona, sizeof(topicComandoZona));
   for (int s = 1; s <= CANT_SECTORES; s++)
   {
     contratoTopicComando(topicComando[s], sizeof(topicComando[s]), s);
@@ -229,6 +252,7 @@ void setup()
     net_mqtt::suscribir(topicComando[s], QOS_COMANDO);
   }
   net_mqtt::suscribir(TOPIC_RIEL_COMANDO, QOS_RIEL_COMANDO);
+  net_mqtt::suscribir(topicComandoZona, QOS_COMANDO_ZONA);   // LEER_AHORA (4ª y última: MAX_SUSCRIPCIONES)
 
   // Drivers y tareas de ambos subsistemas.
   task_sensado::iniciarDrivers();

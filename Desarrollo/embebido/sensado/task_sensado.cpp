@@ -46,8 +46,18 @@ static PaqueteTelemetria armarPaquete() {
   return p;
 }
 
+static volatile TaskHandle_t handleTarea = nullptr;
+
+void pedirLecturaAhora() {
+  TaskHandle_t h = handleTarea;
+  if (h != nullptr) {
+    xTaskNotifyGive(h);
+  }
+}
+
 void tarea(void* pvParameters) {
   SistemaColas* sys = (SistemaColas*) pvParameters;
+  handleTarea = xTaskGetCurrentTaskHandle();
 
   for (;;) {
     PaqueteTelemetria p = armarPaquete();
@@ -60,8 +70,9 @@ void tarea(void* pvParameters) {
       Serial.printf("[sensado] Lectura tomada (ts=%u)\n", (unsigned int) p.timestamp);
     }
 
-    // Cede el núcleo hasta el próximo ciclo (ahorro de energía por scheduling).
-    vTaskDelay(pdMS_TO_TICKS(SENSOR_POLLING_INTERVAL_MS));
+    // Cede el núcleo hasta el próximo ciclo (ahorro de energía por scheduling). Es una espera con
+    // notificación: un LEER_AHORA la corta y adelanta la lectura; sin pedido, dura lo mismo que antes.
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(SENSOR_POLLING_INTERVAL_MS));
   }
 }
 

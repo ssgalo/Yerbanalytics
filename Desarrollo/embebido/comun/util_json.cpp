@@ -106,6 +106,27 @@ bool parsearComando(const char* payload, unsigned int len, Comando& out) {
   return true;
 }
 
+ResultadoComandoZona parsearComandoZona(const char* payload, unsigned int len, char* commandId, size_t n) {
+  if (n > 0) {
+    commandId[0] = '\0';
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, payload, len);
+  if (err) {
+    Serial.printf("[json] Comando de zona inválido: %s\n", err.c_str());
+    return ResultadoComandoZona::INVALIDO;
+  }
+  if (n > 0) {
+    strlcpy(commandId, doc[KEY_COMMAND_ID] | "", n);
+  }
+  const char* accion = doc[KEY_ACCION] | "";
+  if (strcasecmp(accion, ACCION_LEER_AHORA) == 0) {
+    return ResultadoComandoZona::LEER_AHORA;
+  }
+  Serial.printf("[json] Comando de zona con acción desconocida: '%s'\n", accion);
+  return ResultadoComandoZona::ACCION_DESCONOCIDA;
+}
+
 size_t serializarAck(const Ack& a, char* buf, size_t n) {
   JsonDocument doc;
   if (a.commandId[0] != '\0') {

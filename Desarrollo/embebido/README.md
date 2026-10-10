@@ -39,12 +39,31 @@ entorno tome solo sus carpetas.
 | Tarea        | Prioridad | Qué hace                                                                                 |
 | ------------ | :-------: | ---------------------------------------------------------------------------------------- |
 | `actuacion`  | 4         | Recibe comandos, deduplica y despacha. Riego y mediasombra no bloquean: los atiende cada 50 ms |
-| `sensado`    | 3         | Cada `SENSOR_POLLING_INTERVAL_MS` lee los sensores y arma la telemetría                   |
+| `sensado`    | 3         | Cada `SENSOR_POLLING_INTERVAL_MS` (o antes, ante un `LEER_AHORA`) lee los sensores y arma la telemetría |
 | `red`        | 2         | WiFi/MQTT: publica telemetría, acks y eventos del riel, y drena el buffer offline         |
 | `riel`       | 1         | Mueve el carro de la cámara. Genera los pasos con espera activa: va última y las demás la interrumpen. Fija al núcleo 1 |
 
-El callback MQTT **solo encola**: nunca acciona ni publica (PubSubClient reusa su buffer al
+El callback MQTT **solo encola o avisa**: nunca acciona, lee ni publica (PubSubClient reusa su buffer al
 publicar y corrompería el mensaje que está leyendo).
+
+### Comando de zona `LEER_AHORA`
+
+`nodo_combinado` y `nodo_sensor` (los que sensan) se suscriben, a QoS 1, a
+`nursery/zone/{NODO_ZONA_ID}/command` (`contratoTopicComandoZona`). Con
+`{"commandId":"<id>","accion":"LEER_AHORA","parametros":{}}` el callback sólo le avisa a `task_sensado`
+(`task_sensado::pedirLecturaAhora()`, una notificación de FreeRTOS): la tarea corta su espera, lee y
+entrega el paquete por la cola de siempre, y `task_red` lo publica con `publicarTelemetria` en el topic
+de telemetría de la zona. Sin `commandId` en la respuesta y **sin ACK**; una acción desconocida o un JSON
+ilegible se ignoran con una línea de log.
+
+- Después de una lectura a pedido, el período normal (`SENSOR_POLLING_INTERVAL_MS`) arranca de nuevo.
+  Pedidos seguidos se funden en una sola lectura.
+- **Sin dedup por `commandId`**: `dedup_comandos` vive en `actuacion/`, que `nodo_sensor` no compila, y
+  una reentrega del broker sólo cuesta una telemetría de más.
+- **Sin red**, la lectura a pedido sigue el camino de cualquier otra: va al buffer offline con su
+  timestamp. Es una lectura real, así que no se pierde; el backend ya habrá dado la secuencia por
+  vencida por timeout, y el motor la procesa como una lectura atrasada más.
+- `MAX_SUSCRIPCIONES` (`net_mqtt.cpp`) es 4: el combinado usa las 4 (2 sectores, riel y zona).
 
 ---
 
@@ -339,6 +358,11 @@ docker compose exec mosquitto mosquitto_pub -q 1 -t 'nursery/zone/MZ-1/sector/MZ
 # Riel a la posición 1
 docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/rail/command \
   -m '{"commandId":"t4","actuador":"rail","accion":"IR_A","parametros":{"posicion":1}}'
+
+# Lectura inmediata (nodo_combinado / nodo_sensor): una telemetría nueva en nursery/zone/MZ-1/telemetry
+# al toque, sin ack. Una acción desconocida solo deja una línea de log en el monitor serie.
+docker compose exec mosquitto mosquitto_pub -q 1 -t 'nursery/zone/MZ-1/command' \
+  -m '{"commandId":"t5","accion":"LEER_AHORA","parametros":{}}'
 ```
 
 Usá un `commandId` nuevo para cada prueba nueva: los repetidos no se vuelven a ejecutar.
