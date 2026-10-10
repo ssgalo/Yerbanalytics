@@ -8,7 +8,9 @@ namespace util_json {
 size_t serializarTelemetria(const PaqueteTelemetria& p, char* buf, size_t n) {
   JsonDocument doc;
   doc[KEY_MAC]       = p.mac;
+#if BATERIA_INSTALADA
   doc[KEY_BATTERY]   = p.battery;
+#endif
   doc[KEY_SIGNAL]    = p.signal;
   doc[KEY_TIMESTAMP] = p.timestamp;
 
@@ -26,7 +28,7 @@ size_t serializarTelemetria(const PaqueteTelemetria& p, char* buf, size_t n) {
     metrics[KEY_UV] = p.luz.valor;
   }
 
-  // --- Métricas extendidas de suelo (solo si el backend las tolera) ---
+  // --- Métricas extendidas de suelo ---
 #if ENVIAR_METRICAS_EXTENDIDAS
   if (p.suelo.estado == EstadoLectura::OK) {
     metrics[KEY_TEMP_SUELO] = p.suelo.temperatura;
@@ -39,6 +41,14 @@ size_t serializarTelemetria(const PaqueteTelemetria& p, char* buf, size_t n) {
   }
 #endif
 
+  // --- Nivel de los tanques (el backend todavía no las modela: las ignora) ---
+  if (p.tanques.estadoAgua == EstadoLectura::OK) {
+    metrics[KEY_NIVEL_AGUA] = p.tanques.nivelAgua;
+  }
+  if (p.tanques.estadoInsumo == EstadoLectura::OK) {
+    metrics[KEY_NIVEL_INSUMO] = p.tanques.nivelInsumo;
+  }
+
   return serializeJson(doc, buf, n);
 }
 
@@ -49,6 +59,20 @@ static TipoActuador parsearActuador(const char* s) {
   return TipoActuador::DESCONOCIDO;
 }
 
+static TipoAccion parsearAccion(const char* s) {
+  if (strcasecmp(s, ACCION_ON) == 0 || strcasecmp(s, ACCION_OPEN) == 0 ||
+      strcasecmp(s, ACCION_INJECT) == 0) {
+    return TipoAccion::ENCENDER;
+  }
+  if (strcasecmp(s, ACCION_OFF) == 0 || strcasecmp(s, ACCION_CLOSE) == 0) {
+    return TipoAccion::APAGAR;
+  }
+  if (strcasecmp(s, ACCION_SET) == 0 || strcasecmp(s, ACCION_MOVE) == 0) {
+    return TipoAccion::POSICIONAR;
+  }
+  return TipoAccion::DESCONOCIDA;
+}
+
 bool parsearComando(const char* payload, unsigned int len, Comando& out) {
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, payload, len);
@@ -57,6 +81,10 @@ bool parsearComando(const char* payload, unsigned int len, Comando& out) {
     return false;
   }
 
+  // El commandId se copia antes de validar: el ack de error lo necesita.
+  const char* cmdId = doc[KEY_COMMAND_ID] | "";
+  strlcpy(out.commandId, cmdId, sizeof(out.commandId));
+
   const char* actuadorStr = doc[KEY_ACTUADOR] | "";
   out.actuador = parsearActuador(actuadorStr);
   if (out.actuador == TipoActuador::DESCONOCIDO) {
@@ -64,19 +92,39 @@ bool parsearComando(const char* payload, unsigned int len, Comando& out) {
     return false;
   }
 
-  const char* cmdId = doc[KEY_COMMAND_ID] | "";
-  strncpy(out.commandId, cmdId, sizeof(out.commandId) - 1);
-  out.commandId[sizeof(out.commandId) - 1] = '\0';
-
   const char* accionStr = doc[KEY_ACCION] | "";
-  strncpy(out.accion, accionStr, sizeof(out.accion) - 1);
-  out.accion[sizeof(out.accion) - 1] = '\0';
+  out.accion = parsearAccion(accionStr);
+  if (out.accion == TipoAccion::DESCONOCIDA) {
+    Serial.printf("[json] Comando con acción desconocida: '%s'\n", accionStr);
+    return false;
+  }
 
   JsonObject params = doc[KEY_PARAMETROS];
-  out.durationSec = params[KEY_DURATION] | 0L;
+  out.durationSec = params[KEY_DURATION]  | 0L;
   out.ml          = params[KEY_ML]        | 0.0f;
-  out.targetPct   = params[KEY_TARGET_PCT]| 0;
+  out.targetPct   = params[KEY_TARGET_PCT] | -1;
   return true;
+}
+
+ResultadoComandoZona parsearComandoZona(const char* payload, unsigned int len, char* commandId, size_t n) {
+  if (n > 0) {
+    commandId[0] = '\0';
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, payload, len);
+  if (err) {
+    Serial.printf("[json] Comando de zona inválido: %s\n", err.c_str());
+    return ResultadoComandoZona::INVALIDO;
+  }
+  if (n > 0) {
+    strlcpy(commandId, doc[KEY_COMMAND_ID] | "", n);
+  }
+  const char* accion = doc[KEY_ACCION] | "";
+  if (strcasecmp(accion, ACCION_LEER_AHORA) == 0) {
+    return ResultadoComandoZona::LEER_AHORA;
+  }
+  Serial.printf("[json] Comando de zona con acción desconocida: '%s'\n", accion);
+  return ResultadoComandoZona::ACCION_DESCONOCIDA;
 }
 
 size_t serializarAck(const Ack& a, char* buf, size_t n) {
@@ -92,8 +140,71 @@ size_t serializarAck(const Ack& a, char* buf, size_t n) {
   }
   if (a.durationSec > 0) detalle[KEY_DURATION]   = a.durationSec;
   if (a.ml > 0)          detalle[KEY_ML]          = a.ml;
-  if (a.targetPct > 0)   detalle[KEY_TARGET_PCT]  = a.targetPct;
+  if (a.targetPct >= 0)  detalle[KEY_TARGET_PCT]  = a.targetPct;
 
+  return serializeJson(doc, buf, n);
+}
+
+void parsearComandoRiel(const char* payload, unsigned int len, ComandoRiel& out) {
+  out.commandId[0] = '\0';
+  out.valido = false;
+  out.accion = AccionRiel::NINGUNA;
+  out.posicion = 0;
+  out.detalle[0] = '\0';
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, payload, len);
+  if (err) {
+    snprintf(out.detalle, sizeof(out.detalle), "JSON ilegible: %s", err.c_str());
+    return;
+  }
+
+  const char* id       = doc[KEY_COMMAND_ID] | "";
+  const char* actuador = doc[KEY_ACTUADOR] | "";
+  const char* accion   = doc[KEY_ACCION] | "";
+  int posicion         = doc[KEY_PARAMETROS][KEY_POSICION] | -1;
+
+  size_t largoId = strlen(id);
+  if (largoId == 0 || largoId >= sizeof(out.commandId)) {
+    strlcpy(out.detalle, "commandId ausente o de mas de 39 caracteres", sizeof(out.detalle));
+    return;
+  }
+  strlcpy(out.commandId, id, sizeof(out.commandId));
+
+  if (strcmp(actuador, ACT_RAIL) != 0) {
+    strlcpy(out.detalle, "actuador distinto de rail", sizeof(out.detalle));
+  } else if (strcmp(accion, ACCION_RIEL_HOME) == 0) {
+    out.accion = AccionRiel::HOME;
+    out.valido = true;
+  } else if (strcmp(accion, ACCION_RIEL_IR_A) == 0) {
+    if (posicion == 1 || posicion == 2) {
+      out.accion = AccionRiel::IR_A;
+      out.posicion = posicion;
+      out.valido = true;
+    } else {
+      strlcpy(out.detalle, "parametros.posicion tiene que ser 1 o 2", sizeof(out.detalle));
+    }
+  } else {
+    strlcpy(out.detalle, "accion desconocida (se espera IR_A o HOME)", sizeof(out.detalle));
+  }
+}
+
+size_t serializarEventoRiel(const EventoRiel& e, char* buf, size_t n) {
+  JsonDocument doc;
+  doc[KEY_COMMAND_ID] = e.commandId;
+  doc[KEY_STATUS] = e.status;
+  if (e.posicion < 0) {
+    doc[KEY_POSICION] = nullptr;
+  } else {
+    doc[KEY_POSICION] = e.posicion;
+  }
+  doc[KEY_PASOS] = e.pasos;
+  if (e.codigo[0] != '\0') {
+    doc[KEY_CODIGO] = e.codigo;
+  }
+  if (e.detalle[0] != '\0') {
+    doc[KEY_DETALLE] = e.detalle;
+  }
   return serializeJson(doc, buf, n);
 }
 

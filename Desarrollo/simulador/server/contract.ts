@@ -58,6 +58,96 @@ export function telemetryTopic(zonaId: string): string {
   return `nursery/zone/${zonaId}/telemetry`;
 }
 
+/* ============================================================
+   Actuator commands and acks (the "Ack" section of contrato.h).
+
+   The backend publishes `valve ON {durationSec}`, `pump ON {}` and `shade SET {targetPct}` to
+   nursery/zone/{zona}/sector/{sector}/command. The node answers on .../ack WHEN THE ACTION ENDS,
+   and the backend raises an alert if no ack arrives in time (SeguimientoComandosService). The
+   simulator answers the same way, so a demo without hardware does not fill the history with
+   "no response" alerts.
+   ============================================================ */
+
+/** How long the firmware runs the input pump on a `pump ON` without parameters (INSUMO_SEG_POR_DEFECTO). */
+export const INPUT_DEFAULT_SEC = 10;
+/** The firmware's longest input pump run per command (LIMITE_INSUMO_SEG_MAX). */
+export const INPUT_MAX_SEC = 60;
+/** The firmware's input pump calibration (BOMBA_INSUMO_MS_POR_ML), in seconds per ml. */
+export const INPUT_SEC_PER_ML = 1;
+/** Opening % from which the shade rolls up (MEDIASOMBRA_UMBRAL_APERTURA_PCT). */
+export const SHADE_OPEN_THRESHOLD_PCT = 50;
+/** How long the simulated shade takes to reach its end stop. */
+export const SHADE_SIMULATED_SEC = 3;
+
+/** Command payload, exactly as the backend publishes it. */
+export interface ActuatorCommand {
+  commandId?: string;
+  actuador?: string;
+  accion?: string;
+  parametros?: Record<string, unknown>;
+}
+
+/** Ack topic of a sector. Mirrors contrato.h :: contratoTopicAck. */
+export function ackTopic(zonaId: string, sectorId: string): string {
+  return `nursery/zone/${zonaId}/sector/${sectorId}/ack`;
+}
+
+/** Zone and sector of a command topic, or `null` if it is not one. */
+export function parseCommandTopic(topic: string): { zonaId: string; sectorId: string } | null {
+  const parts = topic.split('/');
+  if (parts.length !== 6 || parts[0] !== 'nursery' || parts[1] !== 'zone' || parts[3] !== 'sector' || parts[5] !== 'command') {
+    return null;
+  }
+  return { zonaId: parts[2], sectorId: parts[4] };
+}
+
+const positive = (v: unknown): number | null => (typeof v === 'number' && v > 0 ? v : null);
+
+/**
+ * The ack the firmware would send for a command, and after how long. Same rules as the
+ * firmware (`act_riego`, `act_mediasombra`), minus the physical failures.
+ */
+export function simulatedAck(command: ActuatorCommand): { delayMs: number; ack: ActuatorAck } {
+  const commandId = command.commandId;
+  const accion = (command.accion ?? '').toUpperCase();
+  const params = command.parametros ?? {};
+  const now = (status: ActuatorAck['status'], tipo: AckDetailType) => ({ delayMs: 0, ack: { commandId, status, detalle: { tipo } } });
+
+  if (command.actuador !== 'valve' && command.actuador !== 'pump' && command.actuador !== 'shade') {
+    return now('ERROR', 'comando_invalido');
+  }
+  if (accion === 'OFF' || accion === 'CLOSE') {
+    return now('SUCCESS', 'ok');
+  }
+
+  if (command.actuador === 'valve') {
+    if (accion !== 'ON' && accion !== 'OPEN') return now('ERROR', 'accion_invalida');
+    const requested = positive(params.durationSec);
+    if (requested === null) return now('ERROR', 'duracion_invalida');
+    const durationSec = Math.min(requested, VALVE_MAX_DURATION_SEC);
+    const tipo: AckDetailType = requested > VALVE_MAX_DURATION_SEC ? 'limite_excedido' : 'ok';
+    return { delayMs: durationSec * 1000, ack: { commandId, status: 'SUCCESS', detalle: { tipo, durationSec } } };
+  }
+
+  if (command.actuador === 'pump') {
+    if (accion !== 'ON' && accion !== 'INJECT') return now('ERROR', 'accion_invalida');
+    const ml = positive(params.ml);
+    const requested = ml !== null ? ml * INPUT_SEC_PER_ML : (positive(params.durationSec) ?? INPUT_DEFAULT_SEC);
+    const durationSec = Math.ceil(Math.min(requested, INPUT_MAX_SEC));
+    const tipo: AckDetailType = requested > INPUT_MAX_SEC ? 'limite_excedido' : 'ok';
+    const detalle: ActuatorAck['detalle'] = { tipo, durationSec };
+    if (ml !== null) detalle.ml = ml;
+    return { delayMs: durationSec * 1000, ack: { commandId, status: 'SUCCESS', detalle } };
+  }
+
+  // shade
+  if (accion !== 'SET' && accion !== 'MOVE') return now('ERROR', 'accion_invalida');
+  const target = params.targetPct;
+  if (typeof target !== 'number' || target < 0) return now('ERROR', 'parametros_invalidos');
+  const targetPct = target >= SHADE_OPEN_THRESHOLD_PCT ? 100 : 0;
+  return { delayMs: SHADE_SIMULATED_SEC * 1000, ack: { commandId, status: 'SUCCESS', detalle: { tipo: 'ok', targetPct } } };
+}
+
 /** The ten modelled metrics, in contract units. */
 export interface ContractMetrics {
   humSus?: number;
@@ -182,4 +272,66 @@ export interface RailEvent {
   codigo?: RailErrorCode;
   /** Only on ERROR; free ASCII text for the log. */
   detalle?: string;
+}
+
+/* ============================================================
+   Zone "read now" command and actuator ACK (add-secuencias-demo-expo, design §1.2 and §1.3).
+
+   SOURCE OF TRUTH: the "Ack" and "Comando de zona" sections of
+   `Desarrollo/embebido/comun/contrato.h`; also mirrored by `ContratoNodo.java` (backend) and
+   the sketch `vivero_esp32_red.ino`.
+
+   Constants and types only: the simulator does NOT react to the zone command. They live here
+   so a future change speaks the same vocabulary as the firmware.
+
+   - Zone command (backend → zone's witness node): QoS 1 both ways, no retain. The node answers
+     with the usual telemetry on the zone telemetry topic, without a commandId and without ACK.
+   - ACK (node → backend): one per actuator command, published when it finishes. The ESP32
+     publishes QoS 0; the backend subscribes QoS 1.
+   ============================================================ */
+
+/** Topic the backend publishes the zone command to. */
+export function zoneCommandTopic(zonaId: string): string {
+  return `nursery/zone/${zonaId}/command`;
+}
+
+export const READ_NOW_ACTION = 'LEER_AHORA';
+
+/** Zone command payload, exactly as the backend publishes it. No `actuador`: it is not an actuator. */
+export interface ZoneCommand {
+  /** UUID v4. */
+  commandId: string;
+  accion: typeof READ_NOW_ACTION;
+  parametros: Record<string, never>;
+}
+
+export const ACK_STATUSES = ['SUCCESS', 'ERROR'] as const;
+export type AckStatus = (typeof ACK_STATUSES)[number];
+
+/** Union of the `detalle.tipo` values the firmware emits (see the "Ack" section of contrato.h). */
+export const ACK_DETAIL_TYPES = [
+  'ok',
+  'sin_cambio',
+  'limite_excedido',
+  'comando_invalido',
+  'accion_invalida',
+  'sector_invalido',
+  'parametros_invalidos',
+  'duracion_invalida',
+  'actuador_desconocido',
+  'falla_mecanica',
+  'reemplazado',
+  'cancelado',
+] as const;
+export type AckDetailType = (typeof ACK_DETAIL_TYPES)[number];
+
+/**
+ * Actuator ACK payload on `nursery/zone/{zonaId}/sector/{sectorId}/ack`, exactly as the node publishes
+ * it. `commandId` is optional because the simulator may answer an unparseable command without one.
+ * `detalle` is an object (in the rail event it is a string); extra keys may come along.
+ */
+export interface ActuatorAck {
+  commandId?: string;
+  status: AckStatus;
+  detalle: { tipo: AckDetailType; durationSec?: number; ml?: number; targetPct?: number } & Record<string, unknown>;
 }

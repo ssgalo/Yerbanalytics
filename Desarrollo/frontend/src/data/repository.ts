@@ -19,7 +19,10 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  ParametrosSecuencia,
   Pasada,
+  Secuencia,
+  TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
 } from '@/types/domain';
@@ -69,4 +72,10 @@ export interface DataRepository {
   getPasadaActual(): Promise<Pasada | null>;
   /** Rechaza con `PasadaRechazadaError` si no hay una pasada en curso. */
   cancelarPasada(): Promise<Pasada>;
+  /** Rechaza con `SecuenciaRechazadaError` (mensaje del 400/409) si no se puede iniciar. */
+  iniciarSecuencia(tipo: TipoSecuencia, parametros?: ParametrosSecuencia): Promise<Secuencia>;
+  /** La secuencia en curso o la última; `null` si no hubo ninguna desde que arrancó el backend (204). */
+  getSecuenciaActual(): Promise<Secuencia | null>;
+  /** Rechaza con `SecuenciaRechazadaError` si no hay una secuencia en curso. */
+  cancelarSecuencia(): Promise<Secuencia>;
 }

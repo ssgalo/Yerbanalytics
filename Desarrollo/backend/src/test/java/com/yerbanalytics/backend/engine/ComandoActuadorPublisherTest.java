@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.mqtt.MqttCommandGateway;
+import com.yerbanalytics.backend.service.SeguimientoComandosService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -10,9 +11,11 @@ import org.mockito.ArgumentCaptor;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /** Tarea 8.2: el publicador arma el payload del contrato y NO traga la falla del gateway. */
@@ -21,7 +24,8 @@ class ComandoActuadorPublisherTest {
 
     private final MqttCommandGateway gateway = mock(MqttCommandGateway.class);
     private final ObjectMapper mapper = new ObjectMapper();
-    private final ComandoActuadorPublisher publisher = new ComandoActuadorPublisher(gateway, mapper);
+    private final SeguimientoComandosService seguimiento = mock(SeguimientoComandosService.class);
+    private final ComandoActuadorPublisher publisher = new ComandoActuadorPublisher(gateway, mapper, seguimiento);
 
     @Test
     void armaElPayloadDelContratoYLoPublicaEnElTopicoDelSector() throws Exception {
@@ -43,6 +47,14 @@ class ComandoActuadorPublisherTest {
     }
 
     @Test
+    void elComandoPublicadoQuedaEsperandoSuAck() {
+        Map<String, Object> parametros = Map.of("durationSec", 504);
+        ComandoActuadorPublisher.Resultado r = publisher.publicar("MZ-2", "MZ-2-001", "valve", "ON", parametros);
+
+        verify(seguimiento).registrarEnvio(r.commandId(), "MZ-2", "MZ-2-001", "valve", parametros);
+    }
+
+    @Test
     void cadaComandoLlevaUnCommandIdDistinto() {
         String a = publisher.publicar("MZ-1", "MZ-1-001", "pump", "ON", Map.of()).commandId();
         String b = publisher.publicar("MZ-1", "MZ-1-001", "pump", "ON", Map.of()).commandId();
@@ -58,6 +70,7 @@ class ComandoActuadorPublisherTest {
 
         assertThat(r.publicado()).isFalse();
         assertThat(r.error()).contains("broker caído");
+        verify(seguimiento, never()).registrarEnvio(anyString(), anyString(), anyString(), anyString(), any());
     }
 
     @Test

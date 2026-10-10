@@ -685,3 +685,58 @@ export interface Pasada {
   error: string | null;
   pasos: PasoPasada[];
 }
+
+/* ---------- Secuencias de actuadores (Demo Expo) ---------- */
+
+export type TipoSecuencia = 'RIEGO' | 'MEDIASOMBRA' | 'LECTURA';
+export type TipoPasoSecuencia =
+  | 'ABRIR'
+  | 'ESPERAR'
+  | 'CERRAR'
+  | 'DESPLEGAR'
+  | 'ENROLLAR'
+  | 'PEDIR'
+  | 'ESPERAR_TELEMETRIA'
+  | 'MOSTRAR';
+
+/** Parámetros del pedido: `duracionSeg` es del riego y `esperaSeg` de la mediasombra. */
+export interface ParametrosSecuencia {
+  duracionSeg?: number | null;
+  esperaSeg?: number | null;
+}
+
+export interface PasoSecuencia {
+  n: number;
+  tipo: TipoPasoSecuencia;
+  estado: EstadoPaso;
+  codigoError: string | null;
+  /** Texto legible que arma el backend (el front sólo lo muestra). */
+  detalle: string | null;
+  commandId: string | null;
+  /** ms epoch; sólo en ESPERAR. */
+  esperaHasta: number | null;
+  iniciadoEn: number | null;
+  terminadoEn: number | null;
+}
+
+/** La lectura de la zona que trajo una secuencia LECTURA. `ce` en dS/m; `uv` es % de luz. */
+export interface LecturaSecuencia {
+  recibidaEn: number;
+  metricas: Record<string, number | null>;
+}
+
+export interface Secuencia {
+  id: string;
+  tipo: TipoSecuencia;
+  estado: EstadoPasada;
+  zonaId: string;
+  sectorId: string | null;
+  parametros: ParametrosSecuencia;
+  /** ms epoch */
+  iniciadaEn: number;
+  finalizadaEn: number | null;
+  cancelacionSolicitada: boolean;
+  error: string | null;
+  lectura: LecturaSecuencia | null;
+  pasos: PasoSecuencia[];
+}

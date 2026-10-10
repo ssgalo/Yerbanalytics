@@ -5,6 +5,7 @@
 import type { DataRepository } from '@/data/repository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
+import { SecuenciaRechazadaError } from '@/data/secuenciaError';
 import type {
   ActionRecord,
   CambioParametro,
@@ -17,7 +18,10 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  ParametrosSecuencia,
   Pasada,
+  Secuencia,
+  TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
 } from '@/types/domain';
@@ -25,9 +29,15 @@ import { validateConfig } from '@/lib/configValidation';
 import { buildConfig } from './config';
 import { buildNursery, type TopologiaGrid } from './generators';
 import { buildHistory } from './history';
-import { buildRuleSchema, catalogoVigente, validarCambios, type OverrideParametro } from './reglasMock';
+import {
+  buildRuleSchema,
+  catalogoVigente,
+  validarCambios,
+  type OverrideParametro,
+} from './reglasMock';
 import { evaluarMotor } from './trazaReglas';
 import { simularPasada } from './pasadaMock';
+import { simularSecuencia } from './secuenciaMock';
 import {
   altaDispositivo,
   buildFleet,
@@ -64,6 +74,14 @@ export class MockRepository implements DataRepository {
   /** Inicio de la última pasada simulada y, si se canceló, cuándo; null = no hubo ninguna. */
   private pasadaInicioMs: number | null = null;
   private pasadaCanceladaMs: number | null = null;
+  /** La última secuencia simulada: qué es, con qué parámetros, cuándo empezó y si se canceló. */
+  private secuencia: {
+    tipo: TipoSecuencia;
+    parametros: ParametrosSecuencia;
+    inicioMs: number;
+    canceladaMs: number | null;
+    lectura: Record<string, number | null> | undefined;
+  } | null = null;
 
   constructor(private readonly seed: number) {}
 
@@ -267,7 +285,8 @@ export class MockRepository implements DataRepository {
     const historial = await this.getHistory();
     const delSector = (tipo: string) =>
       historial.filter((h) => h.sectorId === sectorId && h.tipo === tipo && h.ts <= ref);
-    const ultimo = (eventos: { ts: number }[]) => eventos.reduce<number | null>((m, h) => (m === null || h.ts > m ? h.ts : m), null);
+    const ultimo = (eventos: { ts: number }[]) =>
+      eventos.reduce<number | null>((m, h) => (m === null || h.ts > m ? h.ts : m), null);
     const dosis24h = delSector('Insumo').filter((h) => h.ts > ref - 86_400_000).length;
 
     // El despacho riega de a tandas: los sectores que el mapa muestra "Regando" ya tienen su riego
@@ -288,7 +307,9 @@ export class MockRepository implements DataRepository {
       ts: new Date(ts).toISOString(),
       antiguedadSeg: lecturaTs === null ? null : telemetria ? 1 : 300,
       bloqueoManual: false,
-      humSus: telemetria ? (zona.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null) : null,
+      humSus: telemetria
+        ? (zona.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null)
+        : null,
       lluviaPct: slot?.rain ?? null,
       uvIndex: slot?.uv ?? null,
       dosis24h,
@@ -296,7 +317,9 @@ export class MockRepository implements DataRepository {
       confianza: sector.diagnosis.conf,
       lluviaMm: slot ? Math.round(slot.rain) / 10 : null,
       ultimoRiegoMs,
-      ultimoRiegoCriticoMs: ultimo(delSector('Riego').filter((h) => h.regla === 'DeficitCriticoRule')),
+      ultimoRiegoCriticoMs: ultimo(
+        delSector('Riego').filter((h) => h.regla === 'DeficitCriticoRule'),
+      ),
       ultimaAplicacionMs: ultimo(delSector('Insumo')),
       riegoEnCursoHastaMs: regando ? ref + 300_000 : null,
     });
@@ -321,6 +344,11 @@ export class MockRepository implements DataRepository {
     if (this.pasadaAhora()?.estado === 'EN_CURSO') {
       throw new PasadaRechazadaError('Ya hay una pasada en curso.');
     }
+    // Misma exclusión que el guardia del backend: un solo ESP32 para la pasada y las secuencias.
+    const secuencia = this.secuenciaAhora();
+    if (secuencia?.estado === 'EN_CURSO') {
+      throw new PasadaRechazadaError(`Hay una secuencia de ${secuencia.tipo} en curso.`);
+    }
     this.pasadaInicioMs = Date.now();
     this.pasadaCanceladaMs = null;
     return this.pasadaAhora() as Pasada;
@@ -338,5 +366,48 @@ export class MockRepository implements DataRepository {
     // Cancelar dos veces no reinicia el regreso a home.
     this.pasadaCanceladaMs ??= Date.now();
     return this.pasadaAhora() as Pasada;
+  }
+
+  /** La secuencia simulada tal como estaría ahora; null si nunca se inició. */
+  private secuenciaAhora(): Secuencia | null {
+    const q = this.secuencia;
+    if (!q) return null;
+    return simularSecuencia(q.tipo, q.parametros, q.inicioMs, Date.now(), q.canceladaMs, q.lectura);
+  }
+
+  async iniciarSecuencia(
+    tipo: TipoSecuencia,
+    parametros: ParametrosSecuencia = {},
+  ): Promise<Secuencia> {
+    if (this.pasadaAhora()?.estado === 'EN_CURSO') {
+      throw new SecuenciaRechazadaError('Hay una pasada del riel en curso.');
+    }
+    if (this.secuenciaAhora()?.estado === 'EN_CURSO') {
+      throw new SecuenciaRechazadaError('Ya hay una secuencia en curso.');
+    }
+    // La lectura de demostración es la de la primera zona del mock (la del destino fijo).
+    const nursery = await this.getNursery();
+    const metricas = nursery.zonas[0]?.lectura.metrics;
+    const lectura = metricas
+      ? Object.fromEntries(metricas.map((m) => [m.key, m.raw] as const))
+      : undefined;
+    this.secuencia = { tipo, parametros, inicioMs: Date.now(), canceladaMs: null, lectura };
+    return this.secuenciaAhora() as Secuencia;
+  }
+
+  async getSecuenciaActual(): Promise<Secuencia | null> {
+    return this.secuenciaAhora();
+  }
+
+  async cancelarSecuencia(): Promise<Secuencia> {
+    const actual = this.secuenciaAhora();
+    if (!this.secuencia || !actual || actual.estado !== 'EN_CURSO') {
+      throw new SecuenciaRechazadaError('No hay una secuencia en curso.');
+    }
+    if (actual.cancelacionSolicitada) {
+      throw new SecuenciaRechazadaError('La secuencia ya se está cancelando.');
+    }
+    this.secuencia.canceladaMs = Date.now();
+    return this.secuenciaAhora() as Secuencia;
   }
 }
