@@ -305,10 +305,14 @@ Compiló sin errores con las versiones de §1 (incluidas `ESP.getEfuseMac()` y
 2. **Core 2.x.** Si el error es en `ledcAttach`, es el core 2.x (ver tabla de arriba): el original
    tiene lo mismo.
 
-## Pendiente: secuencias de Demo Expo por MQTT (add-secuencias-demo-expo)
+## Secuencias de Demo Expo (add-secuencias-demo-expo)
 
-Este sketch es el de la rama del ESP32-S3 tal cual. Falta portarle lo que necesitan las secuencias de
-Demo Expo: atender el comando de zona `LEER_AHORA` (`nursery/zone/{zona}/command`, QoS 1; responde con la
-telemetría de siempre, sin `commandId` y sin ACK). El riego y la mediasombra ya contestan el ACK que las
-secuencias esperan. Ver `openspec/changes/add-secuencias-demo-expo/` y la sección "Comando de zona" de
+Las secuencias de Demo Expo (riego, mediasombra y lectura) **corren contra el firmware modular
+`nodo_combinado`** (ESP32-S3), no contra este sketch: riego (`valve ON`/`OFF`), mediasombra
+(`shade SET 0/100`) y el comando de zona `LEER_AHORA` (`nursery/zone/{zona}/command`, QoS 1, respondido con la
+telemetría de siempre, sin `commandId` y sin ACK) los atiende ese firmware. Ver
+`Desarrollo/embebido/README.md`, `openspec/changes/add-secuencias-demo-expo/` y la sección "Comando de zona" de
 `Desarrollo/embebido/comun/contrato.h`.
+
+Este sketch queda como **banco de pruebas por serie y del riel por MQTT**: sirve para probar el hardware
+suelto, pero no hace falta para la expo. Hoy no lee sensores ni atiende `LEER_AHORA` a propósito.

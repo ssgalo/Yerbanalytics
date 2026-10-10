@@ -205,6 +205,13 @@ la pestaña Demo Expo y se sigue en vivo, igual que la pasada del riel.
   real si el sustrato da seco. La secuencia no lo evita, a propósito: es el sistema real. Lo que
   hace es mostrar los valores y la traza de la evaluación.
 
+**Actualización (rama del ESP32-S3 integrada).** Se integró la rama `feat/prototipo-esp32-s3-acks`: el ACK de
+riego llega **al final del riego** (no al abrir) y el de la mediasombra al tocar el final de carrera, y el
+backend ya está adaptado a eso. Las secuencias corren sobre el firmware modular `nodo_combinado`
+(`Desarrollo/embebido/`), que además atiende `LEER_AHORA` con los sensores reales; `vivero_esp32_red` queda como
+banco de pruebas por serie y del riel. Lo de `vivero_esp32_red` mencionado arriba (bomba L298N como `valve`) ya
+no aplica al destino.
+
 ### 9.4 Lo que falta saber del hardware
 
 - [ ] ¿Qué sensores van a estar conectados al ESP32 del stand? Hoy `vivero_esp32_red` **no lee
@@ -233,6 +240,10 @@ Cambio OpenSpec: [`openspec/changes/add-secuencias-demo-expo/`](../openspec/chan
 | Firmware de bomba, mediasombra y "leer ahora" | Compila; **sin probar con hardware** |
 | Lectura de sensores en el firmware | **Hueco marcado** (`leer_sensores()`), a completar según §9.4 |
 | Puesta en marcha con el ESP32 (E.1–E.6 del cambio) | Pendiente, desde el 10/10 |
+
+Tras integrar la rama del ESP32-S3, las filas de firmware de la tabla se leen contra `nodo_combinado`:
+bomba/válvula y mediasombra con ACK al finalizar, y "leer ahora" con los sensores reales (compila para los tres
+nodos; sigue **sin probar con hardware**). El "hueco marcado" de `leer_sensores()` ya no es el camino.
 
 Desvío respecto de lo que se pensó acá: la lectura entra por un segundo adaptador MQTT del backend
 (`-lectura`), así que el broker entrega cada telemetría dos veces; el de la ingesta normal no se tocó.
