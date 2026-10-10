@@ -75,6 +75,13 @@ async function start(): Promise<void> {
     console.log(`\n  Yerbanalytics simulator`);
     console.log(`  UI        http://localhost:${config.port}`);
     console.log(`  Backend   ${config.backendUrl}  (via /backend)`);
+    console.log(
+      `  Account   ${
+        config.backendUser && config.backendPassword
+          ? config.backendUser
+          : 'none — set BACKEND_USUARIO/BACKEND_CLAVE (MQTT works without it)'
+      }`,
+    );
     console.log(`  Broker    ${config.mqttUrl}`);
     console.log(`  Auto emission off — turn it on from the UI\n`);
   });

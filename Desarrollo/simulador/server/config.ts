@@ -53,6 +53,13 @@ export const config = {
   port: int('SIMULATOR_PORT', 5180),
   /** Nursery backend. No trailing slash, so routes can be concatenated safely. */
   backendUrl: str('BACKEND_URL', 'http://localhost:8000').replace(/\/+$/, ''),
+  /**
+   * Service account the simulator signs in to the backend with. It is an ordinary user with
+   * the Servicio role, created by the Administrator from the dashboard: the backend has no
+   * account of its own for the simulator. Empty = no sign-in (MQTT still works).
+   */
+  backendUser: str('BACKEND_USUARIO', ''),
+  backendPassword: str('BACKEND_CLAVE', ''),
   mqttUrl: str('MQTT_URL', 'mqtt://localhost:1883'),
   mqttClientId: str('MQTT_CLIENT_ID', 'yerbanalytics-simulator'),
   autoEmissionIntervalMs: int('AUTO_EMISSION_INTERVAL_MS', 10_000),

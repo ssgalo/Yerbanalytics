@@ -15,9 +15,22 @@ export interface SimulatedSensor {
   zonaId: string;
 }
 
+/**
+ * Whether the backend accepts the simulator's service account. Anything but `ok` with the
+ * backend reachable means it answers but rejects the requests.
+ */
+export type BackendAccess =
+  | 'ok'
+  | 'unreachable'
+  | 'no-credentials'
+  | 'rejected'
+  | 'temporary-password'
+  | 'forbidden'
+  | 'error';
+
 /** Health of the simulator and of its two external dependencies. */
 export interface SimulatorStatus {
-  backend: { url: string; up: boolean };
+  backend: { url: string; up: boolean; access: BackendAccess; user: string | null };
   broker: { url: string; connected: boolean };
   emission: { active: boolean; intervalMs: number };
 }

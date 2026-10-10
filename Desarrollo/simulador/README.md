@@ -14,7 +14,7 @@ fuera un nodo ESP32, y ejercita el ciclo de captura del riel.
 
 ```bash
 cd Desarrollo/simulador
-cp env.example .env      # opcional: los defaults sirven para el setup normal
+cp env.example .env      # y completá BACKEND_USUARIO/BACKEND_CLAVE (ver "Cuenta de servicio")
 npm install
 npm run dev              # http://localhost:5180
 ```
@@ -32,9 +32,11 @@ Para que la telemetría llegue a algún lado necesitás además:
 |---|---|---|
 | **Mosquitto** en `:1883` | publicar lecturas | el envío falla con un mensaje claro |
 | **Backend** en `:8000` | topología, cámara y diagnósticos | el simulador arranca igual y lo avisa |
+| **Cuenta de servicio** en el `.env` | que el backend acepte esas peticiones | la telemetría sale igual; el resto lo rechaza el backend |
 
 La barra de estado de arriba muestra los dos, así que si algo no anda se ve de entrada cuál
-de los dos falta.
+de los dos falta. Del backend distingue además si está levantado pero rechaza la cuenta del
+simulador (punto ámbar, con el motivo).
 
 ---
 
@@ -99,12 +101,52 @@ aparecería.
 
 ---
 
+## Cuenta de servicio
+
+El backend exige sesión de usuario en toda `/api/**`, y el simulador entra como cualquier otro
+cliente: con una cuenta de rol **Servicio** cuyas credenciales viven en **su** `.env`.
+
+```
+BACKEND_USUARIO=simulador
+BACKEND_CLAVE=...
+```
+
+- **La cuenta la da de alta el Administrador** desde el dashboard (vista Usuarios), como una
+  cuenta de servicio más. El backend no tiene usuario, rol ni permiso creado para el simulador:
+  borrar esta carpeta deja, como mucho, una cuenta sin uso que se da de baja desde la misma vista.
+- **Nace con clave temporal.** Hasta que se cambia, el backend responde `403` a todo. Entrá una
+  vez al dashboard con esa cuenta, cambiá la clave y poné la nueva en `BACKEND_CLAVE`. La barra
+  de estado lo avisa ("clave temporal").
+- **Cómo la usa.** El servidor inicia sesión la primera vez que necesita el backend, guarda la
+  cookie `YERBA_SESION` en memoria y la adjunta a todo lo que reenvía `/backend/**` y al sondeo
+  de estado (`server/backend-session.ts`). La cookie que traiga el navegador no se reenvía nunca:
+  el backend ve la cuenta del simulador y nada más.
+- **Sesión vencida.** Los sondeos son `GET` y no cuentan como actividad, así que la sesión vence
+  por inactividad como cualquier otra. Ante un `401` reinicia sesión y reintenta **una sola
+  vez**; si varias peticiones lo reciben a la vez, abren una única sesión nueva entre todas.
+- **Sin credenciales** no intenta iniciar sesión: el backend rechaza las peticiones, la barra
+  dice "sin credenciales" y la publicación de telemetría por MQTT sigue funcionando, porque no
+  pasa por el backend. Si el backend rechaza las credenciales, dice "credenciales rechazadas" y
+  no vuelve a probarlas hasta 30 s después.
+- **`/api/camara/v1/**` no lleva la sesión.** Es el contrato del dispositivo, con sus propios
+  tokens; un `401` ahí es del dispositivo y reiniciar la sesión no lo arreglaría.
+
+**Lo que el rol Servicio no trae por defecto.** Regenerar la topología (`POST /api/topologia`)
+pide `topologia.gestionar`, y el rol no lo tiene: el panel muestra el `403` del backend. Hacelo
+desde el dashboard, o que el Administrador le agregue ese permiso al rol en la matriz — sabiendo
+que vale para todas las cuentas de servicio, no sólo para la del simulador. La emisión
+automática tampoco puede leer el intervalo de sensado (`configuracion.ver`) y usa
+`AUTO_EMISSION_INTERVAL_MS`.
+
+---
+
 ## Qué endpoints del sistema usa
 
 Ninguno es del simulador. Todos son superficie **pública** de la plataforma:
 
 | Endpoint | Quién lo va a usar en producción |
 |---|---|
+| `GET /api/topologia`, `GET /api/nursery` | el dashboard |
 | `POST /api/topologia` | el panel de topología del dashboard |
 | `POST /api/capturas/ordenes` | el planificador de pasadas del riel |
 | `GET /api/capturas/ordenes/{id}` | idem |
@@ -132,7 +174,8 @@ simulador/
 │   ├── store.ts       sensores simulados, persistidos en data/
 │   ├── emission.ts    emisión automática
 │   ├── api.ts         API interna (/api/**)
-│   └── proxy.ts       proxy al backend (/backend/**)
+│   ├── proxy.ts       proxy al backend (/backend/**)
+│   └── backend-session.ts  sesión de la cuenta de servicio ante el backend
 ├── src/             UI React, con estilos propios
 └── data/            estado local (no se versiona)
 ```

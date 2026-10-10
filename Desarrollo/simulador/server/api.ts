@@ -9,6 +9,7 @@
    Error messages are surfaced verbatim by the UI, so they are written in Spanish.
    ============================================================ */
 import { Router, type RequestHandler } from 'express';
+import { backendSession } from './backend-session.ts';
 import { config } from './config.ts';
 import {
   METRIC_KEYS,
@@ -46,20 +47,55 @@ function optionalNumber(value: unknown, field: string): number | undefined {
 // Simulator status and that of its two external dependencies
 // ------------------------------------------------------------------
 
+/** Why the backend is or is not usable. The UI turns each value into a Spanish text. */
+type BackendAccess =
+  | 'ok'
+  | 'unreachable'
+  | 'no-credentials'
+  | 'rejected'
+  | 'temporary-password'
+  | 'forbidden'
+  | 'error';
+
+/**
+ * Probes with the same session the proxy uses, so the bar reflects what the camera panel will
+ * actually get. `/api/topologia` needs `topologia.ver`, which the Servicio role has.
+ */
+async function probeBackend(): Promise<BackendAccess> {
+  let r: globalThis.Response;
+  try {
+    r = await backendSession.request('/api/topologia');
+  } catch {
+    return 'unreachable';
+  }
+  if (r.ok) return 'ok';
+  const body = (await r.json().catch(() => null)) as { motivo?: string } | null;
+  if (r.status === 401) {
+    const state = backendSession.state();
+    if (state === 'no-credentials') return 'no-credentials';
+    if (state === 'rejected') return 'rejected';
+    return 'error';
+  }
+  if (r.status === 403) {
+    return body?.motivo === 'CAMBIO_CLAVE_REQUERIDO' ? 'temporary-password' : 'forbidden';
+  }
+  return 'error';
+}
+
 api.get(
   '/status',
   asyncRoute(async (_req, res) => {
-    // The backend is probed on every call: the UI needs to notice if it went down or came back.
-    let backendUp = false;
-    try {
-      const r = await fetch(`${config.backendUrl}/api/topologia`);
-      backendUp = r.ok;
-    } catch {
-      backendUp = false;
-    }
+    // The backend is probed on every call: the UI needs to notice if it went down or came back,
+    // and also whether it accepts the simulator's account.
+    const access = await probeBackend();
 
     res.json({
-      backend: { url: config.backendUrl, up: backendUp },
+      backend: {
+        url: config.backendUrl,
+        up: access === 'ok',
+        access,
+        user: config.backendUser || null,
+      },
       broker: { url: config.mqttUrl, connected: isConnected() },
       emission: { active: emission.isActive(), intervalMs: emission.intervalMs() },
     });

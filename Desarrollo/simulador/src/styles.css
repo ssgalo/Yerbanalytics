@@ -243,6 +243,10 @@ button:hover:not(:disabled) {
   background: var(--error);
 }
 
+.warn {
+  background: var(--warn);
+}
+
 /* ---- Sensors ---- */
 
 .sensors {
