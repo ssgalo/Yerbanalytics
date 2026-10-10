@@ -15,6 +15,7 @@ import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,6 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Tarea 3.7: contrato HTTP de {@code GET /api/rules/evaluaciones/{sectorId}}. */
 @WebMvcTest(ReglasEvaluacionesController.class)
+// Test del controller, sin la cadena de seguridad: los permisos se prueban en seguridad/.
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("ReglasEvaluacionesController")
 class ReglasEvaluacionesControllerTest {
 
