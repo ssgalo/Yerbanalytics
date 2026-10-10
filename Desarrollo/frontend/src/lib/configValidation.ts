@@ -13,6 +13,10 @@ import type {
   RustificacionEtapa,
 } from '@/types/domain';
 
+/** Mirrors the backend range for sensingPullIntervalSeconds. */
+export const SENSING_PULL_MIN_SECONDS = 10;
+export const SENSING_PULL_MAX_SECONDS = 3600;
+
 const factoryByKey = new Map(specs.map((s) => [s.key, s]));
 
 const fmt = (v: number) => String(v);
@@ -49,6 +53,12 @@ export function operativaErrors(op: ConfigOperativa): string[] {
   positive(op.seguimientoDeltaMin, 'el delta mínimo de recuperación');
   positive(op.intervaloSensadoMinutos ?? 0, 'el intervalo de sensado');
   positive(op.intervaloEvaluacionMinutos ?? 0, 'el intervalo de evaluación');
+  const pull = op.sensingPullIntervalSeconds;
+  if (pull != null && !(Number.isInteger(pull) && pull >= SENSING_PULL_MIN_SECONDS && pull <= SENSING_PULL_MAX_SECONDS)) {
+    out.push(
+      `La frecuencia de pedido de lectura debe ser un entero entre ${SENSING_PULL_MIN_SECONDS} y ${SENSING_PULL_MAX_SECONDS} segundos.`,
+    );
+  }
   return out;
 }
 

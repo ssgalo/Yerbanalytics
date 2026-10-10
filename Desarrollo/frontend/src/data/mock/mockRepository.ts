@@ -128,6 +128,9 @@ export class MockRepository implements DataRepository {
         ...config.operativa,
         updatedBy: 'Ingeniero Agrónomo',
         updatedTs: Date.now(),
+        // The real backend computes this read-only value; the mock stands in for it so the
+        // UI hint refreshes on save exactly like against the real API.
+        effectiveStaleThresholdSeconds: Math.max(90, 3 * config.operativa.sensingPullIntervalSeconds),
       },
     };
     this.configCache = saved;
