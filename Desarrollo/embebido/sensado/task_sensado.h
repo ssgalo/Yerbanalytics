@@ -1,7 +1,8 @@
 // ============================================================================
 //  task_sensado.h  -  Tarea FreeRTOS de muestreo periódico
 // ----------------------------------------------------------------------------
-//  Cada SENSOR_POLLING_INTERVAL_MS lee los tres sensores, arma el paquete de
+//  Cada SENSOR_POLLING_INTERVAL_MS lee los sensores (luz, ambiente, suelo y
+//  nivel de los tanques), arma el paquete de
 //  telemetría (con battery/signal/timestamp) y lo entrega a cola_telemetria.
 //  Entre ciclos cede el núcleo con vTaskDelay (ahorro de energía sin deep sleep).
 // ============================================================================

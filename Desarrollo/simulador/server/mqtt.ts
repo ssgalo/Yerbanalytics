@@ -7,13 +7,25 @@
 
    Downlink: the simulator subscribes to the command wildcard topic so that orders sent by the
    backend rules engine are visible in the console. This validates the full cyber-physical loop
-   (measure → detect → decide → command) without needing physical hardware.
+   (measure → detect → decide → command) without needing physical hardware. For the macro-zones
+   it simulates (the ones with a simulated sensor) it also answers each command with the ack the
+   firmware would send when the action ends; commands for other zones belong to a real node and
+   are only logged.
 
    Error messages reaching the UI are in Spanish; console output is internal, so it is not.
    ============================================================ */
 import mqtt, { type MqttClient } from 'mqtt';
 import { config } from './config.ts';
-import { telemetryTopic, valveDurationWarning, type TelemetryPayload } from './contract.ts';
+import {
+  ackTopic,
+  parseCommandTopic,
+  simulatedAck,
+  telemetryTopic,
+  valveDurationWarning,
+  type ActuatorCommand,
+  type TelemetryPayload,
+} from './contract.ts';
+import { listSensors } from './store.ts';
 
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
 const COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/sector/+/command';
@@ -68,16 +80,11 @@ export function connect(): void {
     });
   });
 
-  // Log incoming commands from the backend rules engine.
-  // In production this role is played by the ESP32 nodo_actuador firmware.
+  // Log incoming commands from the backend rules engine, and ack the ones for simulated zones.
+  // In production this role is played by the ESP32 nodo_actuador / nodo_combinado firmware.
   client.on('message', (topic, message) => {
     try {
-      const payload = JSON.parse(message.toString()) as {
-        commandId?: string;
-        actuador?: string;
-        accion?: string;
-        parametros?: Record<string, unknown>;
-      };
+      const payload = JSON.parse(message.toString()) as ActuatorCommand;
       const params = payload.parametros
         ? ' params=' + JSON.stringify(payload.parametros)
         : '';
@@ -90,6 +97,7 @@ export function connect(): void {
       );
       const warning = valveDurationWarning(payload);
       if (warning) console.warn(`[simulator] WARNING ${warning}`);
+      scheduleAck(topic, payload);
     } catch {
       console.log(`[simulator] ← COMMAND topic=${topic} (unparseable payload)`);
     }
@@ -106,6 +114,28 @@ export function connect(): void {
         ' Retrying in the background; publishing is unavailable meanwhile.',
     );
   });
+}
+
+/**
+ * Publishes, after the time the action would take, the ack the firmware would send. Only for
+ * macro-zones with a simulated sensor: a command for another zone is a real node's to answer.
+ */
+function scheduleAck(topic: string, command: ActuatorCommand): void {
+  const target = parseCommandTopic(topic);
+  if (!target || !listSensors().some((s) => s.zonaId === target.zonaId)) return;
+
+  const { delayMs, ack } = simulatedAck(command);
+  const ackOn = ackTopic(target.zonaId, target.sectorId);
+  setTimeout(() => {
+    if (!client || !client.connected) {
+      console.warn(`[simulator] no broker connection: ack for ${ack.commandId ?? '?'} not sent`);
+      return;
+    }
+    client.publish(ackOn, JSON.stringify(ack), { qos: 1 }, (error) => {
+      if (error) console.error(`[simulator] failed to publish ack on ${ackOn}: ${error.message}`);
+      else console.log(`[simulator] → ACK topic=${ackOn} status=${ack.status} tipo=${ack.detalle.tipo}`);
+    });
+  }, delayMs);
 }
 
 /** `true` when the broker connection is alive. The UI uses it to warn before trying. */

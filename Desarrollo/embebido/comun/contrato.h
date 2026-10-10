@@ -1,11 +1,12 @@
 // ============================================================================
 //  contrato.h  -  Contrato MQTT del nodo (fuente única de topics y claves JSON)
 // ----------------------------------------------------------------------------
-//  Alineado con add-mqtt-telemetry y add-rules-engine. Tres tópicos a nivel de
-//  sector; la telemetría del testigo puro usa el topic de zona.
+//  Alineado con add-mqtt-telemetry y add-rules-engine. Comando y ack a nivel de
+//  sector (el nodo atiende dos sectores); la telemetría usa el topic de zona, que
+//  es el que escucha el backend. Más el riel (nursery/rail/*), al final.
 //
 //    Ingesta   : nursery/zone/{zona}/sector/{sector}/telemetry   (o zona)
-//    Comando   : nursery/zone/{zona}/sector/{sector}/command     (QoS 2)
+//    Comando   : nursery/zone/{zona}/sector/{sector}/command     (QoS 1)
 //    Ack       : nursery/zone/{zona}/sector/{sector}/ack
 //    Zona      : nursery/zone/{zona}/command                     (LEER_AHORA, QoS 1)
 //
@@ -21,7 +22,10 @@
 //  QoS por canal
 // ----------------------------------------------------------------------------
 static const uint8_t QOS_TELEMETRIA = 1;
-static const uint8_t QOS_COMANDO     = 2;   // exactly-once: evita doble dosis/riego
+// Suscripción a comandos: QoS 1. PubSubClient rechaza suscribirse con QoS 2 (devuelve
+// false y el nodo quedaba sin recibir comandos), y el backend los publica con QoS 1
+// (MqttConfig). La doble ejecución la evitan el dedup por commandId y el lock del backend.
+static const uint8_t QOS_COMANDO     = 1;
 static const uint8_t QOS_ACK         = 1;
 
 // ----------------------------------------------------------------------------
@@ -50,6 +54,10 @@ static const char* KEY_P          = "p";
 static const char* KEY_K          = "k";
 static const char* KEY_SALINIDAD  = "salinidad";
 static const char* KEY_TDS        = "tds";
+//  Nivel de los tanques (% , HC-SR04). Siempre se envían si la lectura es válida:
+//  el backend ignora las claves que no modela (MetricsPayload, ignoreUnknown).
+static const char* KEY_NIVEL_AGUA   = "nivelAgua";
+static const char* KEY_NIVEL_INSUMO = "nivelInsumo";
 
 // ----------------------------------------------------------------------------
 //  Claves JSON - Comando
@@ -67,12 +75,29 @@ static const char* ACT_VALVE      = "valve";
 static const char* ACT_PUMP       = "pump";
 static const char* ACT_SHADE      = "shade";
 
+//  Valores del campo "accion" (sin distinguir mayúsculas). El backend
+//  (ComandoActuadorPublisher) manda ON / OFF / SET; se aceptan también los
+//  nombres históricos de este contrato.
+//    valve ON {durationSec}  → riega el sector: abre su válvula y prende la bomba de riego
+//    valve OFF               → corta el riego del sector
+//    pump  ON {} | {ml}      → insumo al sector: abre su válvula y prende la bomba de insumo
+//                              (sin ml: INSUMO_SEG_POR_DEFECTO; con ml: BOMBA_INSUMO_MS_POR_ML)
+//    pump  OFF               → corta el insumo del sector
+//    shade SET {targetPct}   → % de APERTURA: >= MEDIASOMBRA_UMBRAL_APERTURA_PCT enrolla, si no desenrolla
+static const char* ACCION_ON      = "ON";
+static const char* ACCION_OFF     = "OFF";
+static const char* ACCION_SET     = "SET";
+static const char* ACCION_OPEN    = "open";     // histórico = ON (valve)
+static const char* ACCION_INJECT  = "inject";   // histórico = ON (pump)
+static const char* ACCION_CLOSE   = "close";    // histórico = OFF
+static const char* ACCION_MOVE    = "move";     // histórico = SET (shade)
+
 // Duración máxima de apertura de la válvula que el backend puede pedir en "durationSec" (s).
 // Fuente de verdad del valor: este archivo. Espejos que deben decir lo mismo:
 //   - backend:   ContratoNodo.DURACION_VALVULA_MAX_SEG
 //   - simulador: simulador/server/contract.ts (VALVE_MAX_DURATION_SEC)
 // El límite local LIMITE_VALVULA_SEG_MAX (config.h) debe ser >= a este valor
-// (act_valvula.cpp lo verifica al compilar).
+// (act_riego.cpp lo verifica al compilar).
 #define CONTRATO_VALVULA_DURACION_MAX_SEG 1200
 
 // ----------------------------------------------------------------------------
@@ -86,26 +111,41 @@ static const char* STATUS_ERROR   = "ERROR";
 
 //  Ack de actuador (add-secuencias-demo-expo, design §1.2)
 //    Topic: nursery/zone/{zona}/sector/{sector}/ack. Un único ack por comando, publicado al
-//    TERMINAR de cumplirlo (válvula abierta/cerrada; mediasombra al tocar el final de carrera).
+//    TERMINAR de cumplirlo:
+//      valve/pump ON   -> al final de la duración (SUCCESS ok), o ERROR cancelado si llega un OFF
+//                         (o ERROR reemplazado si llega otro ON para lo mismo). No hay ack de "apertura".
+//      valve/pump OFF  -> ack inmediato (SUCCESS ok), haya o no riego en curso.
+//      shade SET       -> al tocar el final de carrera (SUCCESS ok) o al rendirse (ERROR falla_mecanica).
+//      comando inválido -> ERROR inmediato con el tipo que corresponda.
 //    El ESP32 de vivero_esp32_red publica QoS 0 (PubSubClient); el backend suscribe QoS 1. Sin retain.
 //      {"commandId":"<uuid>","status":"SUCCESS","detalle":{"tipo":"ok","durationSec":20}}
 //      {"commandId":"<uuid>","status":"ERROR","detalle":{"tipo":"falla_mecanica"}}
 //    "detalle" es un OBJETO (en el evento del riel es un string).
-//    Valores de detalle.tipo:
+//    Valores de detalle.tipo (unión de lo que emite el firmware modular y el sketch de la expo):
 //      ok                    SUCCESS  comando cumplido
 //      sin_cambio            SUCCESS  el actuador ya estaba en el estado pedido
+//      limite_excedido       SUCCESS  se cumplió recortado al límite local (duración o volumen)
 //      comando_invalido      ERROR    JSON ilegible, accion desconocida o targetPct fuera de {0,100}
+//      accion_invalida       ERROR    la acción no aplica al actuador
+//      sector_invalido       ERROR    el sector del tópico no es uno de los que atiende el nodo
+//      parametros_invalidos  ERROR    parámetros ausentes o fuera de rango (p. ej. targetPct)
 //      duracion_invalida     ERROR    durationSec fuera de 1..CONTRATO_VALVULA_DURACION_MAX_SEG
-//      actuador_desconocido  ERROR    actuador que este nodo no tiene (p. ej. pump en la expo)
+//      actuador_desconocido  ERROR    actuador que este nodo no tiene
 //      falla_mecanica        ERROR    la mediasombra no tocó el final de carrera a tiempo
-//      reemplazado           ERROR    otro commandId interrumpió el movimiento; éste se abortó
+//      reemplazado           ERROR    otro commandId interrumpió; éste se abortó (no es una falla)
+//      cancelado             ERROR    un OFF cortó el riego en curso (no es una falla)
 static const char* DETALLE_OK                   = "ok";
 static const char* DETALLE_SIN_CAMBIO           = "sin_cambio";
+static const char* DETALLE_LIMITE_EXCEDIDO      = "limite_excedido";
 static const char* DETALLE_COMANDO_INVALIDO     = "comando_invalido";
+static const char* DETALLE_ACCION_INVALIDA      = "accion_invalida";
+static const char* DETALLE_SECTOR_INVALIDO      = "sector_invalido";
+static const char* DETALLE_PARAMETROS_INVALIDOS = "parametros_invalidos";
 static const char* DETALLE_DURACION_INVALIDA    = "duracion_invalida";
 static const char* DETALLE_ACTUADOR_DESCONOCIDO = "actuador_desconocido";
 static const char* DETALLE_FALLA_MECANICA       = "falla_mecanica";
 static const char* DETALLE_REEMPLAZADO          = "reemplazado";
+static const char* DETALLE_CANCELADO            = "cancelado";
 
 // ----------------------------------------------------------------------------
 //  Comando de zona "leer ahora" (add-secuencias-demo-expo, design §1.3)
@@ -128,9 +168,9 @@ static const uint8_t QOS_COMANDO_ZONA = 1;
 // ----------------------------------------------------------------------------
 //  Riel de la cámara (add-pasada-riel, design.md §1)
 // ----------------------------------------------------------------------------
-//  Un solo riel, sin id en el tópico. Lo implementa el sketch
-//  prototipo_hardware/vivero_esp32_red (que NO incluye este archivo: lo espeja con
-//  #define locales). Espejos que deben decir lo mismo:
+//  Un solo riel, sin id en el tópico. Lo implementan actuacion/act_riel (firmware
+//  modular: nodo_combinado y nodo_actuador) y el sketch prototipo_hardware/vivero_esp32_red
+//  (que NO incluye este archivo: lo espeja con #define locales). Espejos que deben decir lo mismo:
 //    - backend:   mqtt/ContratoRiel.java
 //    - simulador: simulador/server/contract.ts (RAIL_*; sin comportamiento)
 //    - firmware:  prototipo_hardware/vivero_esp32_red/vivero_esp32_red.ino (RIEL_*)
@@ -188,24 +228,32 @@ static const char* CODIGO_RIEL_REEMPLAZADO        = "REEMPLAZADO";
 //  Construcción de topics
 // ----------------------------------------------------------------------------
 //  Se escriben en un buffer provisto por el llamador (sin heap).
+//  El nodo atiende dos sectores (1 y 2): sus ids reales están en config.h.
 
-// Telemetría: nivel sector o zona según TELEMETRIA_NIVEL_SECTOR.
+static const int CANT_SECTORES = 2;
+
+// Id real del sector 1 o 2 (NODO_SECTOR_1_ID / NODO_SECTOR_2_ID).
+inline const char* contratoSectorId(int sector) {
+  return (sector == 2) ? NODO_SECTOR_2_ID : NODO_SECTOR_1_ID;
+}
+
+// Telemetría: nivel sector (del sector 1) o zona según TELEMETRIA_NIVEL_SECTOR.
 inline void contratoTopicTelemetria(char* buf, size_t n) {
 #if TELEMETRIA_NIVEL_SECTOR
-  snprintf(buf, n, "nursery/zone/%s/sector/%s/telemetry", NODO_ZONA_ID, NODO_SECTOR_ID);
+  snprintf(buf, n, "nursery/zone/%s/sector/%s/telemetry", NODO_ZONA_ID, NODO_SECTOR_1_ID);
 #else
   snprintf(buf, n, "nursery/zone/%s/telemetry", NODO_ZONA_ID);
 #endif
 }
 
-// Comando (siempre a nivel sector): el nodo actuador se suscribe a este topic.
-inline void contratoTopicComando(char* buf, size_t n) {
-  snprintf(buf, n, "nursery/zone/%s/sector/%s/command", NODO_ZONA_ID, NODO_SECTOR_ID);
+// Comando del sector 1 o 2: el nodo se suscribe a los dos.
+inline void contratoTopicComando(char* buf, size_t n, int sector) {
+  snprintf(buf, n, "nursery/zone/%s/sector/%s/command", NODO_ZONA_ID, contratoSectorId(sector));
 }
 
-// Ack (siempre a nivel sector): el nodo publica el resultado del comando.
-inline void contratoTopicAck(char* buf, size_t n) {
-  snprintf(buf, n, "nursery/zone/%s/sector/%s/ack", NODO_ZONA_ID, NODO_SECTOR_ID);
+// Ack del sector 1 o 2: el nodo publica el resultado en el sector del comando.
+inline void contratoTopicAck(char* buf, size_t n, int sector) {
+  snprintf(buf, n, "nursery/zone/%s/sector/%s/ack", NODO_ZONA_ID, contratoSectorId(sector));
 }
 
 // Comando de zona "leer ahora": el nodo testigo de la zona se suscribe a este topic.

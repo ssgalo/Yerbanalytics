@@ -63,16 +63,22 @@ public final class ContratoNodo {
     public static final String ACCION_LEER_AHORA = "LEER_AHORA";
 
     /**
-     * ACK de actuador (nodo → backend), con comodines de zona y sector. El payload es
-     * {@code {"commandId","status","detalle":{"tipo":…}}}; un único ACK por comando, al terminar de
-     * cumplirlo. Espeja {@code contratoTopicAck} de {@code contrato.h}.
+     * Suscripción a los acks de todos los sectores. El nodo publica el resultado de cada comando en
+     * {@code nursery/zone/{zona}/sector/{sector}/ack} (espeja {@code contratoTopicAck} de {@code contrato.h}).
      */
-    public static final String TOPIC_ACK = "nursery/zone/+/sector/+/ack";
+    public static final String TOPIC_ACK_SUSCRIPCION = "nursery/zone/+/sector/+/ack";
 
-    /** {@code status} del ACK: el actuador cumplió el comando. */
-    public static final String STATUS_SUCCESS = "SUCCESS";
-    /** {@code status} del ACK: no lo cumplió; {@code detalle.tipo} dice por qué. */
-    public static final String STATUS_ERROR = "ERROR";
+    /** {@code status} de un ack: la acción terminó bien. */
+    public static final String ACK_SUCCESS = "SUCCESS";
+    /** {@code status} de un ack: la acción no se pudo hacer o no terminó; {@code detalle.tipo} dice por qué. */
+    public static final String ACK_ERROR = "ERROR";
+
+    /** {@code detalle.tipo} de un ERROR que no es una falla: llegó otro comando para lo mismo antes de terminar. */
+    public static final String ACK_TIPO_REEMPLAZADO = "reemplazado";
+    /** {@code detalle.tipo} de un ERROR que no es una falla: llegó un OFF. */
+    public static final String ACK_TIPO_CANCELADO = "cancelado";
+    /** {@code detalle.tipo}: la mediasombra no llegó al final de carrera a tiempo. */
+    public static final String ACK_TIPO_FALLA_MECANICA = "falla_mecanica";
 
     private ContratoNodo() {
     }

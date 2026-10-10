@@ -10,11 +10,13 @@ Versión recibida el 03/10/2026.
 | Sketch | Qué prueba |
 |---|---|
 | `vivero_esp32/` | Riel de la cámara (NEMA 17 + DRV8825, con homing y dos finales de carrera), mediasombra (motor DC por L298N canal A, con dos finales de carrera) y bomba de riego (L298N canal B, PWM) |
-| `vivero_esp32_red/` | Lo mismo que `vivero_esp32` (que no se toca) **más WiFi y MQTT**: mueve el riel (`nursery/rail/*`, probado con el riel real el 03/10/2026) y, desde `add-secuencias-demo-expo`, también la **bomba** (como válvula) y la **mediasombra** por MQTT, con ACK, y responde "leer ahora" (sin sensores todavía). Compilado; **sin probar con hardware** la parte nueva (E.3 del cambio). Instalar, configurar, flashear y probar: [`vivero_esp32_red/README.md`](vivero_esp32_red/README.md) |
+| `vivero_esp32_red/` | Basado en `vivero_esp32` (que no se toca), **para ESP32-S3 DevKitC-1 N16R8, con WiFi y MQTT para el riel**: recibe `IR_A`/`HOME` en `nursery/rail/command` y responde en `nursery/rail/event`. El riego pasa a un **módulo de 4 relés** (2 minibombas y 2 electroválvulas); riego y mediasombra son sólo por serie. Pines en su `config.h`. La versión para ESP32 clásico se probó con el riel real (03/10/2026); la del S3 compila pero falta probarla. Instalar, configurar, flashear y probar: [`vivero_esp32_red/README.md`](vivero_esp32_red/README.md) |
 | `test_caudalimetro/` | Lectura del caudalímetro |
 | `test_hcsr04/` | Sensor ultrasónico HC-SR04 |
 
-## Pines de `vivero_esp32`
+## Pines de `vivero_esp32` (ESP32 clásico, DevKit v1)
+
+Los de `vivero_esp32_red` (ESP32-S3) están en su README y en su `config.example.h`.
 
 | Función | Pines |
 |---|---|
@@ -24,25 +26,19 @@ Versión recibida el 03/10/2026.
 | Mediasombra: final de carrera enrollada / desenrollada | 32 / 33 |
 | Bomba: IN3 / IN4 / ENB (PWM) | 26 / 27 / 14 |
 
-En `vivero_esp32_red` los mismos pines responden además a MQTT: la **bomba** (IN3/IN4/ENB) hace de
-electroválvula del sector (`valve ON`/`OFF`, PWM fijo `BOMBA_CAUDAL_PWM`) y la **mediasombra**
-(IN1/IN2/ENA + finales 32/33) acepta `shade SET` con `targetPct` 0 o 100. No se agregaron pines.
-
 Comandos por serie: `home`, `mover N`, `rutina`, `enrollar`, `desenrollar`, `parar motor`,
 `bomba on`, `bomba off`, `estado`.
 
-## Diferencias con el firmware modular
+## Relación con el firmware modular
 
-El hardware real no coincide con lo que supone el firmware modular; hay que resolverlas para
-integrar el prototipo con el backend:
+Desde el 10/10/2026 el firmware modular (`nodo_combinado`, `sensado/`, `actuacion/`) está adaptado a
+este hardware: ESP32-S3, riego por relés, mediasombra de dos estados, riel por MQTT y los sensores
+(LDR, DHT11, sonda RS-485, 2 HC-SR04). Los pines son los mismos que en `vivero_esp32_red`, y su
+fuente de verdad es `comun/config.example.h`. Ver `../README.md`.
 
-- **Riego:** acá es una bomba DC por L298N con PWM, no una electroválvula. `vivero_esp32_red` la presenta al backend como `valve`.
-- **Mediasombra:** dos estados con finales de carrera (enrollada / desenrollada), no un
-  porcentaje de apertura. `vivero_esp32_red` sólo acepta `targetPct` 0 o 100.
-- **Riel de la cámara:** el firmware modular no lo contempla. Su contrato MQTT (`nursery/rail/*`,
-  sección "Riel" de `comun/contrato.h`) lo implementa sólo `vivero_esp32_red`.
-- **Sensores del nodo testigo** (humedad, temperatura, luz, sonda de suelo): no están en este
-  sketch. En `vivero_esp32_red` hay un **hueco marcado** (`leer_sensores()`, vacía) para completarlo
-  cuando se sepa qué va conectado; ver su README.
-- **Conflictos de pines entre sketches:** `test_caudalimetro` usa el 27 (IN4 de la bomba) y
-  `test_hcsr04` el 15 (SLEEP del riel).
+Lo que sigue aplicando a los sketches de esta carpeta:
+
+- `vivero_esp32/`, `test_caudalimetro/` y `test_hcsr04/` son del ESP32 clásico y tienen sus propios
+  pines. Con el S3 sirven como referencia, no para flashear tal cual.
+- **Conflictos de pines entre sketches viejos:** `test_caudalimetro` usa el 27 (IN4 de la bomba de
+  `vivero_esp32`) y `test_hcsr04` el 15 (SLEEP del riel). En el S3 el HC-SR04 va en TRIG 4 y ECHO 5/6.

@@ -397,7 +397,7 @@ public class SecuenciaService implements UsoDelHardware {
             log.debug("ACK ignorado (commandId {} no es el del paso en curso)", ack.commandId());
             return;
         }
-        if (ContratoNodo.STATUS_SUCCESS.equals(ack.status())) {
+        if (ContratoNodo.ACK_SUCCESS.equals(ack.status())) {
             cerrarYSeguir(p, paso, OK, null, null);
             return;
         }

@@ -74,6 +74,16 @@ y dos tablas que no servían a ningún caso de uso del vivero.
 Como el navegador no habla MQTT sobre TCP, el simulador necesita su propio proceso. De ahí que
 sea una app Node y no una SPA suelta.
 
+### Comandos y acks
+
+El simulador también escucha los comandos del backend (`nursery/zone/+/sector/+/command`) y los
+muestra en la consola. Para las macro-zonas que simula (las que tienen un sensor simulado) además
+**responde el ack** en `nursery/zone/{zona}/sector/{sector}/ack`, como el firmware: el riego al
+cumplir `durationSec`, el insumo a los 10 s (o según `ml`/`durationSec`) y la mediasombra a los 3 s.
+Sin esto, el backend registraría una alerta `ActuadorSinRespuesta` por cada comando de la demo. Los
+comandos de otras zonas son de un nodo real y sólo se loguean. Las reglas están en
+`server/contract.ts` (`simulatedAck`).
+
 ---
 
 ## Por qué el backend se consume a través de `/backend/**`

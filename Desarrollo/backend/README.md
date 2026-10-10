@@ -207,7 +207,8 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
 - La cola y lo que está regando están en memoria. Un reinicio pierde lo pendiente y reconstruye lo
   abierto del historial; la siguiente telemetría vuelve a decidir.
 - El estado de la válvula del dashboard (`Regando` / `En cola` / `Cerrada`) lo deriva el despacho; el
-  ESP32 corta solo al cumplir la duración y el backend no escucha el ACK.
+  ESP32 corta solo al cumplir la duración. El ACK no cambia ese estado: `SeguimientoComandosService` lo
+  escucha sólo para alertar en el historial si el nodo informa una falla o no contesta a tiempo.
 
 > **No operar con plantines reales sin E-01 y S-06.** Un sensor de humedad trabado en un valor seco
 > plausible haría regar en cada ciclo de lectura de la ventana (~20 L por día y por sector con el 40 %

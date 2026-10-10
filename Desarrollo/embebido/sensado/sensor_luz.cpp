@@ -4,12 +4,12 @@
 namespace sensor_luz {
 
 void iniciar() {
-  pinMode(PIN_SENSOR_LUZ, INPUT);
+  pinMode(PIN_LDR_AO, INPUT);
 }
 
 LecturaLuz leer() {
   LecturaLuz r;
-  int crudo = analogRead(PIN_SENSOR_LUZ);
+  int crudo = analogRead(PIN_LDR_AO);
 
   // Mapeo LDR: valor crudo (oscuridad->brillante) a 0-100%.
   long pct = map(crudo, LUZ_ADC_OSCURIDAD, LUZ_ADC_BRILLANTE, 0, 100);

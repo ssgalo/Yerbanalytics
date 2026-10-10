@@ -118,6 +118,8 @@ void setup()
   sys.telemetria = xQueueCreate(10, sizeof(PaqueteTelemetria));
   sys.comandos = nullptr;
   sys.ack = nullptr;
+  sys.comandoRiel = nullptr;
+  sys.eventoRiel = nullptr;
 
   // Infraestructura común. Sin suscripciones: callback nulo (nunca se invoca).
   net_wifi::iniciar();
