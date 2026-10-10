@@ -58,13 +58,19 @@ bool encolar(const PaqueteTelemetria& p) {
 }
 
 bool verMasAntiguo(PaqueteTelemetria& out) {
-  if (count == 0) {
-    return false;
+  // Un registro ilegible o de otro tamaño (guardado por un firmware anterior, con
+  // otro PaqueteTelemetria) se descarta: si no, trabaría el drenaje para siempre.
+  while (count > 0) {
+    char clave[8];
+    clavePaquete(clave, sizeof(clave), head);
+    if (prefs.getBytesLength(clave) == sizeof(PaqueteTelemetria) &&
+        prefs.getBytes(clave, &out, sizeof(PaqueteTelemetria)) == sizeof(PaqueteTelemetria)) {
+      return true;
+    }
+    Serial.println("[buffer] Registro ilegible o de otro firmware: se descarta");
+    removerMasAntiguo();
   }
-  char clave[8];
-  clavePaquete(clave, sizeof(clave), head);
-  size_t leidos = prefs.getBytes(clave, &out, sizeof(PaqueteTelemetria));
-  return leidos == sizeof(PaqueteTelemetria);
+  return false;
 }
 
 void removerMasAntiguo() {
