@@ -2,8 +2,12 @@
    Repositorio HTTP: consume el backend Spring Boot real
    (GET {baseUrl}/nursery y demás endpoints). Se activa con
    VITE_DATA_SOURCE=http.
+
+   Todas las llamadas pasan por `apiFetch`: llevan la cookie de sesión y un 401/403 se
+   convierte en un error tipado y en un aviso a la capa de sesión, igual en todos lados.
    ============================================================ */
 import type { DataRepository } from '@/data/repository';
+import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import type {
@@ -45,7 +49,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getNursery(): Promise<NurseryData> {
-    const res = await fetch(`${this.baseUrl}/nursery?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/nursery?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el vivero desde ${this.baseUrl}`);
     }
@@ -64,7 +68,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getHistory(): Promise<ActionRecord[]> {
-    const res = await fetch(`${this.baseUrl}/historial?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/historial?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el historial desde ${this.baseUrl}`);
     }
@@ -72,7 +76,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getConfig(): Promise<Configuracion> {
-    const res = await fetch(`${this.baseUrl}/configuracion?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/configuracion?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener la configuración desde ${this.baseUrl}`);
     }
@@ -86,7 +90,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async saveConfig(config: Configuracion): Promise<Configuracion> {
-    const res = await fetch(`${this.baseUrl}/configuracion`, {
+    const res = await apiFetch(`${this.baseUrl}/configuracion`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
@@ -100,7 +104,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getHardware(): Promise<HardwareData> {
-    const res = await fetch(`${this.baseUrl}/hardware?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/hardware?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el hardware desde ${this.baseUrl}`);
     }
@@ -121,7 +125,7 @@ export class HttpRepository implements DataRepository {
     url: string,
     device: NuevoDispositivo,
   ): Promise<HardwareData> {
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(device),
@@ -134,7 +138,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getTopologia(): Promise<TopologiaVivero> {
-    const res = await fetch(`${this.baseUrl}/topologia?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/topologia?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener la topología desde ${this.baseUrl}`);
     }
@@ -142,7 +146,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero> {
-    const res = await fetch(`${this.baseUrl}/topologia`, {
+    const res = await apiFetch(`${this.baseUrl}/topologia`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -156,7 +160,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero> {
-    const res = await fetch(`${this.baseUrl}/topologia/disposicion`, {
+    const res = await apiFetch(`${this.baseUrl}/topologia/disposicion`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -170,7 +174,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getCatalogoReglas(): Promise<CatalogoReglas> {
-    const res = await fetch(`${this.baseUrl}/rules/parametros?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/rules/parametros?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener los parámetros del motor desde ${this.baseUrl}`);
     }
@@ -178,7 +182,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas> {
-    const res = await fetch(`${this.baseUrl}/rules/parametros`, {
+    const res = await apiFetch(`${this.baseUrl}/rules/parametros`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cambios }),
@@ -202,7 +206,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getRuleSchema(): Promise<DagSchema> {
-    const res = await fetch(`${this.baseUrl}/rules/schema`);
+    const res = await apiFetch(`${this.baseUrl}/rules/schema`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el esquema del motor`);
     }
@@ -214,7 +218,7 @@ export class HttpRepository implements DataRepository {
     origen?: OrigenEvaluacion,
   ): Promise<TrazaEvaluacion | null> {
     const filtro = origen ? `origen=${origen}&` : '';
-    const res = await fetch(
+    const res = await apiFetch(
       `${this.baseUrl}/rules/evaluaciones/${encodeURIComponent(sectorId)}?${filtro}t=${Date.now()}`,
     );
     // 204: el sector existe pero el motor todavía no lo evaluó desde el arranque.
@@ -232,7 +236,7 @@ export class HttpRepository implements DataRepository {
 
   /** POST sin body de las pasadas: un 409 trae { error } y es un rechazo esperable, no una falla. */
   private async postPasada(url: string, accion: string): Promise<Pasada> {
-    const res = await fetch(url, { method: 'POST' });
+    const res = await apiFetch(url, { method: 'POST' });
     if (res.status === 409) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new PasadaRechazadaError(body?.error ?? `No se pudo ${accion} la pasada.`);
@@ -248,7 +252,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getPasadaActual(): Promise<Pasada | null> {
-    const res = await fetch(`${this.baseUrl}/pasadas/actual?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/pasadas/actual?t=${Date.now()}`);
     // 204: todavía no hubo ninguna pasada desde el arranque del backend.
     if (res.status === 204) return null;
     if (!res.ok) {
@@ -262,7 +266,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async getDemoExpo(): Promise<boolean> {
-    const res = await fetch(`${this.baseUrl}/configuracion/demo-expo?t=${Date.now()}`);
+    const res = await apiFetch(`${this.baseUrl}/configuracion/demo-expo?t=${Date.now()}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener la preferencia de Demo Expo`);
     }
@@ -270,7 +274,7 @@ export class HttpRepository implements DataRepository {
   }
 
   async setDemoExpo(visible: boolean): Promise<boolean> {
-    const res = await fetch(`${this.baseUrl}/configuracion/demo-expo`, {
+    const res = await apiFetch(`${this.baseUrl}/configuracion/demo-expo`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visible }),
