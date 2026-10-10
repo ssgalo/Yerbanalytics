@@ -61,10 +61,25 @@
   background: var(--line);
 }
 
+.userWrap {
+  position: relative;
+}
+
 .user {
   display: flex;
   align-items: center;
   gap: 10px;
+  border: none;
+  background: transparent;
+  padding: 4px 4px 4px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.user:hover {
+  background: var(--line2);
 }
 
 .userName {
@@ -89,4 +104,50 @@
   font-weight: 700;
   font-family: var(--font-display);
   font-size: 15px;
+}
+
+/* Menú de usuario */
+.menu {
+  position: absolute;
+  right: 0;
+  top: 54px;
+  min-width: 220px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px -12px rgba(12, 35, 25, 0.32);
+  overflow: hidden;
+  z-index: 50;
+  padding: 6px;
+}
+
+.menuHead {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line2);
+  margin-bottom: 4px;
+}
+
+.menuUser {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--bg);
 }

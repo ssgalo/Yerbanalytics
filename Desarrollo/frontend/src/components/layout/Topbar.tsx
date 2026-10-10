@@ -1,11 +1,13 @@
-import { useNurseryData } from '@/hooks/NurseryContext';
+import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
 import { usePageMeta } from '@/hooks/PageMeta';
 import { Icon } from '@/components/ui/Icon';
 import { AlertsDropdown } from './AlertsDropdown';
+import { UserMenu } from './UserMenu';
 import styles from './Topbar.module.css';
 
 export function Topbar() {
-  const { weather } = useNurseryData();
+  // Clima y alertas salen del snapshot del vivero: sin `vivero.ver` no hay ninguno de los dos.
+  const vivero = useNurseryDataOpcional();
   const { title, subtitle } = usePageMeta();
 
   return (
@@ -16,27 +18,25 @@ export function Topbar() {
       </div>
 
       <div className={styles.right}>
-        <div className={styles.weather}>
-          <Icon name="sun" size={18} stroke="var(--warn)" />
-          <div style={{ lineHeight: 1.1 }}>
-            <div className={styles.weatherTemp}>{weather.tempC}°C</div>
-            <div className={styles.weatherSub}>
-              UV {weather.uv} · {weather.cond}
+        {vivero && (
+          <>
+            <div className={styles.weather}>
+              <Icon name="sun" size={18} stroke="var(--warn)" />
+              <div style={{ lineHeight: 1.1 }}>
+                <div className={styles.weatherTemp}>{vivero.weather.tempC}°C</div>
+                <div className={styles.weatherSub}>
+                  UV {vivero.weather.uv} · {vivero.weather.cond}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <AlertsDropdown />
+            <AlertsDropdown />
 
-        <div className={styles.divider} />
+            <div className={styles.divider} />
+          </>
+        )}
 
-        <div className={styles.user}>
-          <div style={{ textAlign: 'right', lineHeight: 1.15 }}>
-            <div className={styles.userName}>Mariano Duarte</div>
-            <div className={styles.userRole}>Productor Viverista</div>
-          </div>
-          <div className={styles.avatar}>MD</div>
-        </div>
+        <UserMenu />
       </div>
     </header>
   );

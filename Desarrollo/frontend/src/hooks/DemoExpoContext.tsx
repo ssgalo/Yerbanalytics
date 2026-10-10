@@ -17,11 +17,21 @@ interface DemoExpoValue {
 
 const DemoExpoContext = createContext<DemoExpoValue | null>(null);
 
-export function DemoExpoProvider({ children }: { children: ReactNode }) {
+interface DemoExpoProviderProps {
+  children: ReactNode;
+  /**
+   * false = el rol no puede leer la preferencia (`vivero.ver`): no se pide y la pestaña queda
+   * oculta. Por defecto, true.
+   */
+  habilitado?: boolean;
+}
+
+export function DemoExpoProvider({ children, habilitado = true }: DemoExpoProviderProps) {
   const [visible, setVisible] = useState(false);
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(habilitado);
 
   useEffect(() => {
+    if (!habilitado) return undefined;
     let activo = true;
     getRepository()
       .getDemoExpo()
@@ -32,7 +42,7 @@ export function DemoExpoProvider({ children }: { children: ReactNode }) {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [habilitado]);
 
   const cambiar = useCallback(async (nuevo: boolean) => {
     setVisible(await getRepository().setDemoExpo(nuevo));

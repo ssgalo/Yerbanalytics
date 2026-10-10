@@ -1,11 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import { useNurseryData } from '@/hooks/NurseryContext';
+import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
 import { useDemoExpo } from '@/hooks/DemoExpoContext';
+import { useAuth } from '@/hooks/AuthContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { puedeVer, VISTAS, type Vista } from '@/lib/vistas';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
   to: string;
+  /** Permisos de la vista: la misma tabla que usa el router. */
+  vista: Vista;
   icon: IconName;
   label: string;
   /** ruta exacta (para '/') */
@@ -18,19 +22,20 @@ interface NavItem {
    macro-zona en el Panel general, y desde adentro sólo se vuelve. Sin ese contexto previo
    la vista no tiene de dónde sacar qué zona mostrar. */
 const PRINCIPAL: NavItem[] = [
-  { to: '/', icon: 'dashboard', label: 'Panel general', end: true },
-  { to: '/diagnosticos', icon: 'diagnostics', label: 'Diagnósticos de IA', showCount: true },
+  { to: '/', vista: VISTAS.panel, icon: 'dashboard', label: 'Panel general', end: true },
+  { to: '/diagnosticos', vista: VISTAS.diagnosticos, icon: 'diagnostics', label: 'Diagnósticos de IA', showCount: true },
 ];
 
 /* Sólo se agrega si el interruptor de Configuración la enciende; va pegada a Diagnósticos de IA. */
-const DEMO_EXPO: NavItem = { to: '/demo-expo', icon: 'camera', label: 'Demo Expo' };
+const DEMO_EXPO: NavItem = { to: '/demo-expo', vista: VISTAS.demoExpo, icon: 'camera', label: 'Demo Expo' };
 
 const GESTION: NavItem[] = [
-  { to: '/historial', icon: 'history', label: 'Historial' },
-  { to: '/configuracion', icon: 'config', label: 'Configuración' },
-  { to: '/reglas', icon: 'rules', label: 'Motor de reglas' },
-  { to: '/hardware', icon: 'hardware', label: 'Hardware' },
-  { to: '/topologia', icon: 'cube', label: 'Topología' },
+  { to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' },
+  { to: '/configuracion', vista: VISTAS.configuracion, icon: 'config', label: 'Configuración' },
+  { to: '/reglas', vista: VISTAS.reglas, icon: 'rules', label: 'Motor de reglas' },
+  { to: '/hardware', vista: VISTAS.hardware, icon: 'hardware', label: 'Hardware' },
+  { to: '/topologia', vista: VISTAS.topologia, icon: 'cube', label: 'Topología' },
+  { to: '/usuarios', vista: VISTAS.usuarios, icon: 'users', label: 'Usuarios' },
 ];
 
 function NavItemLink({ item, count }: { item: NavItem; count: number }) {
@@ -48,9 +53,14 @@ function NavItemLink({ item, count }: { item: NavItem; count: number }) {
 }
 
 export function Sidebar() {
-  const { stats } = useNurseryData();
+  const vivero = useNurseryDataOpcional();
+  const diagCount = vivero?.stats.diagCount ?? 0;
   const { visible: demoExpoVisible } = useDemoExpo();
-  const principal = demoExpoVisible ? [...PRINCIPAL, DEMO_EXPO] : PRINCIPAL;
+  const { puede } = useAuth();
+  // Cada ítem sólo si el rol puede ver la vista; un grupo sin ítems no se muestra.
+  const habilitados = (items: NavItem[]) => items.filter((i) => puedeVer(i.vista, puede));
+  const principal = habilitados(demoExpoVisible ? [...PRINCIPAL, DEMO_EXPO] : PRINCIPAL);
+  const gestion = habilitados(GESTION);
 
   return (
     <aside className={styles.sidebar}>
@@ -64,19 +74,29 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className={styles.section}>Principal</div>
-      <nav className={styles.nav}>
-        {principal.map((item) => (
-          <NavItemLink key={item.to} item={item} count={stats.diagCount} />
-        ))}
-      </nav>
+      {principal.length > 0 && (
+        <>
+          <div className={styles.section}>Principal</div>
+          <nav className={styles.nav} aria-label="Principal">
+            {principal.map((item) => (
+              <NavItemLink key={item.to} item={item} count={diagCount} />
+            ))}
+          </nav>
+        </>
+      )}
 
-      <div className={`${styles.section} ${styles.sectionTop}`}>Gestión</div>
-      <nav className={styles.nav}>
-        {GESTION.map((item) => (
-          <NavItemLink key={item.to} item={item} count={stats.diagCount} />
-        ))}
-      </nav>
+      {gestion.length > 0 && (
+        <>
+          <div className={principal.length > 0 ? `${styles.section} ${styles.sectionTop}` : styles.section}>
+            Gestión
+          </div>
+          <nav className={styles.nav} aria-label="Gestión">
+            {gestion.map((item) => (
+              <NavItemLink key={item.to} item={item} count={diagCount} />
+            ))}
+          </nav>
+        </>
+      )}
 
       <div className={styles.status}>
         <div className={styles.statusRow}>
