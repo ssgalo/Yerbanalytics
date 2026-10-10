@@ -674,6 +674,9 @@ public class NurseryService {
      * Antigüedad máxima de la lectura de una zona, en ms, según el catálogo de parámetros
      * ({@code seguridad.antiguedad-max-lectura}, en segundos): el mismo valor que usa
      * {@code StaleSensorRule}, así la vista y el motor no pueden discrepar.
+     *
+     * <p>Note: the snapshot value is the effective threshold {@code max(floor, 3 x pull interval)}
+     * (see {@code SensingCadence}), not just the catalog floor.
      */
     private long umbralAntiguedadMs() {
         return (long) (parametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA) * 1000);

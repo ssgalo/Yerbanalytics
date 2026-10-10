@@ -4,7 +4,14 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
-/** Parámetros de seguridad del motor: condiciones que frenan todo antes de actuar. */
+/**
+ * Parámetros de seguridad del motor: condiciones que frenan todo antes de actuar.
+ *
+ * <p>Note: {@code seguridad.antiguedad-max-lectura} is only the FLOOR of the stale threshold. The value the
+ * engine actually uses is {@code max(floor, 3 x sensing pull interval)}, resolved in
+ * {@code SensingCadence} and overlaid by {@code CatalogoParametrosService.vigentes()}. The catalog API
+ * ({@code catalogo()}) still shows the raw floor.
+ */
 @Getter
 @Accessors(fluent = true)
 @AllArgsConstructor

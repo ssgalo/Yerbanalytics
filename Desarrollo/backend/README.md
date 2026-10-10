@@ -29,6 +29,19 @@ La configuración principal se encuentra en `src/main/resources/application.prop
 El esquema lo genera Hibernate (`ddl-auto=update`) y se siembra con
 `src/main/resources/data.sql` (600 sectores, 6 macro-zonas, umbrales de fábrica).
 
+### Sensado por pull del backend · columna nueva (sin migración)
+
+**No hace falta correr nada.** `ddl-auto=update` agrega `configuracion_operativa.sensing_pull_interval_seconds`
+como columna **nullable**; las filas existentes quedan en `NULL` y el backend las lee como **60 s**.
+
+| Dato | Valor |
+|---|---|
+| Columna | `configuracion_operativa.sensing_pull_interval_seconds` (nullable) |
+| `NULL` | se lee como 60 s |
+| Rango válido | 10-3600 s (el `PUT /api/configuracion` rechaza fuera de rango con 400; `null` conserva el valor guardado) |
+| Efecto | el backend pide `LEER_AHORA` a cada zona cada X s; el umbral de lectura vieja pasa a `max(piso, 3 × X)` |
+| Rollback | revertir el código; la columna sobrante se ignora |
+
 ### Migración manual pendiente · sensado por macro-zona
 
 Las lecturas sensadas se mudaron del sector a la macro-zona (un solo nodo testigo por MZ).

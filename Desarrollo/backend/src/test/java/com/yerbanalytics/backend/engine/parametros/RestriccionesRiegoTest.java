@@ -35,7 +35,8 @@ class RestriccionesRiegoTest {
     @BeforeEach
     void setUp() {
         catalogo = new CatalogoParametros(List.of());
-        service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager);
+        service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
+                org.mockito.Mockito.mock(com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository.class));
     }
 
     private static CambioParametro cambio(String clave, String valor) {
