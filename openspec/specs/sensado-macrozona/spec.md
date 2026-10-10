@@ -71,25 +71,35 @@ métrica a otra sin cerrarlo. El inspector SHALL empezar cerrado.
 
 ### Requirement: Estado del nodo testigo
 
-El panel SHALL mostrar el estado del nodo que produjo la lectura: nivel de batería,
-calidad de señal y antigüedad de la última lectura. SHALL señalar de forma visible cuando
-la batería está baja o cuando el nodo lleva demasiado tiempo sin reportar.
+The panel SHALL show the status of the node that produced the reading: battery level, signal
+quality and age of the last reading. It SHALL visibly flag a low battery and a node that has been
+silent for too long. "Too long" SHALL be the effective stale threshold `max(floor, 3 × X)`
+provided by the backend (see `sensing-cadence`); the panel SHALL NOT hardcode its own value. Nodes
+report only at boot and when asked (`LEER_AHORA`), so the expected reading age is about X.
+(Previously: the silence threshold was implicit and sized for a 30 s autonomous firmware push.)
 
-#### Scenario: Nodo operativo
+#### Scenario: Node operating
 
-- **WHEN** el nodo reportó recientemente
-- **THEN** se muestran batería, señal y el tiempo transcurrido desde la última lectura
+- **GIVEN** an effective threshold of 180 s
+- **WHEN** the node's last reading is 60 s old
+- **THEN** battery, signal and the elapsed time since the last reading are shown, with no stale warning
 
-#### Scenario: Nodo sin reportar
+#### Scenario: Node silent
 
-- **WHEN** el nodo superó el umbral de silencio
-- **THEN** el panel marca la lectura como desactualizada y advierte que los valores
-  mostrados no son vigentes
+- **GIVEN** an effective threshold of 180 s
+- **WHEN** the node's last reading is 181 s old
+- **THEN** the panel marks the reading as outdated and warns that the values are not current
 
-#### Scenario: Batería baja
+#### Scenario: Threshold changes with the interval
 
-- **WHEN** el nivel de batería del nodo cae bajo el umbral definido
-- **THEN** el panel lo señala visualmente
+- **GIVEN** a 200 s old reading
+- **WHEN** the backend-reported threshold changes from 180 s to 360 s
+- **THEN** the panel stops marking the reading as outdated
+
+#### Scenario: Low battery
+
+- **WHEN** the node's battery level falls below the defined threshold
+- **THEN** the panel flags it visually
 
 ### Requirement: Métricas nuevas informativas hasta validar sus umbrales
 

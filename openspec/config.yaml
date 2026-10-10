@@ -1,1 +1,14 @@
 schema: spec-driven
+context: |
+  Yerbanalytics: monitoreo/riego de vivero de yerba. Monorepo en Desarrollo/.
+  backend: Spring Boot 3.2.4, Java 17, Maven (./mvnw), JUnit via spring-boot-starter-test.
+  frontend: React+Vite+TS, vitest, eslint, prettier.
+  simulador: Node/TS (tsx --test). embebido: ESP32-S3 Arduino (arduino-cli; PlatformIO roto).
+  servicio-inferencia: Python (sin tests).
+strict_tdd: true
+testing:
+  backend: { cmd: "cd Desarrollo/backend && ./mvnw test", framework: JUnit5 }
+  frontend: { cmd: "cd Desarrollo/frontend && npm test", lint: "npm run lint", typecheck: "tsc -b", format: "npm run format" }
+  simulador: { cmd: "cd Desarrollo/simulador && npm test", typecheck: "npm run typecheck" }
+  embebido: { cmd: "arduino-cli compile (solo compilacion)", unit: false }
+  servicio-inferencia: { cmd: null, unit: false }
