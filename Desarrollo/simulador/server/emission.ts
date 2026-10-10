@@ -1,14 +1,17 @@
 /* ============================================================
-   Automatic telemetry emission: periodic noise to every macro-zone, to give the nursery some
+   Automatic telemetry emission: random readings for every macro-zone, to give the nursery some
    background activity without entering values by hand.
+
+   Sensing is backend-driven (pure pull), like the real firmware: there are no timers here.
+   Turning emission on sends one boot round; while it is on, each LEER_AHORA the backend
+   publishes for a macro-zone is answered with one reading for that zone.
 
    It ALWAYS starts off. Once on it overwrites manually entered values, so the user has to
    ask for it explicitly. The ranges are the ones the simulator that used to live inside the
    backend used, including the low-battery macro-zone, which exists to exercise the
    "Batería Baja" alert (HU-21 CA-02).
    ============================================================ */
-import { config } from './config.ts';
-import type { ContractMetrics, TelemetryPayload } from './contract.ts';
+import { macroZoneIndex, type ContractMetrics, type TelemetryPayload } from './contract.ts';
 import { publish } from './mqtt.ts';
 import { fetchFromBackend } from './proxy.ts';
 
@@ -18,36 +21,33 @@ const DEFAULT_MACRO_ZONES = 6;
 /** Macro-zone reporting low battery, so the alert always has a case. */
 const LOW_BATTERY_ZONE = 2;
 
-let timer: NodeJS.Timeout | null = null;
-let configWatcher: NodeJS.Timeout | null = null;
-let currentIntervalMs: number = config.autoEmissionIntervalMs;
+let active = false;
+
+/** Collaborators, replaceable in tests (see setDependencies). Defaults are the real ones. */
+interface Dependencies {
+  publish: (zoneId: string, payload: TelemetryPayload) => Promise<void>;
+  fetchTopology: () => Promise<{ macroZonas?: number } | null | undefined>;
+}
+
+const defaultDependencies: Dependencies = {
+  publish: (zoneId, payload) => publish(zoneId, payload),
+  fetchTopology: () => fetchFromBackend<{ macroZonas?: number }>('/api/topologia'),
+};
+
+let deps: Dependencies = defaultDependencies;
+
+/** Test seam: replaces the broker publisher and the topology fetcher. Call with no argument to restore. */
+export function setDependencies(overrides?: Partial<Dependencies>): void {
+  deps = { ...defaultDependencies, ...overrides };
+}
 
 const around = (base: number, span: number) => base + Math.random() * span;
 
 /** Macro-zones of the current topology. Falls back to the seed's if the backend is down. */
 async function currentMacroZones(): Promise<number> {
-  const topology = await fetchFromBackend<{ macroZonas?: number }>('/api/topologia');
+  const topology = await deps.fetchTopology();
   const count = topology?.macroZonas ?? 0;
   return count > 0 ? count : DEFAULT_MACRO_ZONES;
-}
-
-/** Updates the emission interval based on backend configuration. */
-async function checkConfig() {
-  if (!isActive()) return;
-  try {
-    const cfg = await fetchFromBackend<any>('/api/configuracion');
-    if (cfg?.operativa?.intervaloSensadoMinutos) {
-      const newIntervalMs = cfg.operativa.intervaloSensadoMinutos * 60_000;
-      if (newIntervalMs !== currentIntervalMs) {
-        console.log(`[simulator] auto emission interval changed from ${currentIntervalMs} to ${newIntervalMs} ms`);
-        currentIntervalMs = newIntervalMs;
-        if (timer) clearInterval(timer);
-        timer = setInterval(() => void emitRound(), currentIntervalMs);
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
 }
 
 /** Values in CONTRACT units, as a real node would publish them (ce in µS/cm, uv in %). */
@@ -66,20 +66,25 @@ function randomMetrics(): ContractMetrics {
   };
 }
 
+/** Publishes one reading for macro-zone `i` (1-based). Throws if the broker is unavailable. */
+async function emitZone(i: number): Promise<void> {
+  const payload: TelemetryPayload = {
+    // A distinct MAC per macro-zone, so each witness node refreshes its own row.
+    mac: `A4:CF:12:9A:00:${String(i).padStart(2, '0')}`,
+    battery: i === LOW_BATTERY_ZONE ? Math.floor(around(12, 8)) : Math.floor(around(70, 30)),
+    signal: Math.floor(-55 - Math.random() * 35), // dBm: -55 to -89
+    timestamp: Date.now(),
+    metrics: randomMetrics(),
+  };
+  await deps.publish(`MZ-${i}`, payload);
+}
+
+/** Boot round: one reading for every macro-zone, as a node does when it powers up. */
 async function emitRound(): Promise<void> {
   const zones = await currentMacroZones();
   for (let i = 1; i <= zones; i++) {
-    const zonaId = `MZ-${i}`;
-    const payload: TelemetryPayload = {
-      // A distinct MAC per macro-zone, so each witness node refreshes its own row.
-      mac: `A4:CF:12:9A:00:${String(i).padStart(2, '0')}`,
-      battery: i === LOW_BATTERY_ZONE ? Math.floor(around(12, 8)) : Math.floor(around(70, 30)),
-      signal: Math.floor(-55 - Math.random() * 35), // dBm: -55 to -89
-      timestamp: Date.now(),
-      metrics: randomMetrics(),
-    };
     try {
-      await publish(zonaId, payload);
+      await emitZone(i);
     } catch (e) {
       // A failed round does not turn emission off: the broker may return on the next one.
       console.error(`[simulator] auto emission: ${e instanceof Error ? e.message : String(e)}`);
@@ -88,28 +93,34 @@ async function emitRound(): Promise<void> {
   }
 }
 
-export function isActive(): boolean {
-  return timer !== null;
+/**
+ * Answers a LEER_AHORA for `zonaId` with one reading. Ignored while emission is off, and for
+ * zones that are not simulated macro-zones (those belong to a real node).
+ */
+export async function answerReadNow(zonaId: string): Promise<void> {
+  if (!active) return;
+  const index = macroZoneIndex(zonaId);
+  if (index === null || index > (await currentMacroZones())) return;
+  try {
+    await emitZone(index);
+    console.log(`[simulator] → TELEMETRY zone=${zonaId} (answer to LEER_AHORA)`);
+  } catch (e) {
+    console.error(`[simulator] LEER_AHORA ${zonaId}: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
-export function intervalMs(): number {
-  return currentIntervalMs;
+export function isActive(): boolean {
+  return active;
 }
 
 /** Turns automatic emission on or off. Idempotent. */
 export function setActive(on: boolean): void {
-  if (on && !timer) {
-    void emitRound(); // First round without waiting: the effect is visible right away.
-    timer = setInterval(() => void emitRound(), currentIntervalMs);
-    configWatcher = setInterval(() => void checkConfig(), 5_000); // Check config every 5s for near-instant update
-    console.log(`[simulator] auto emission on (every ${currentIntervalMs} ms)`);
-  } else if (!on && timer) {
-    clearInterval(timer);
-    timer = null;
-    if (configWatcher) {
-      clearInterval(configWatcher);
-      configWatcher = null;
-    }
+  if (on && !active) {
+    active = true;
+    void emitRound(); // Boot round without waiting: the effect is visible right away.
+    console.log('[simulator] auto emission on (answers LEER_AHORA from the backend)');
+  } else if (!on && active) {
+    active = false;
     console.log('[simulator] auto emission off');
   }
 }

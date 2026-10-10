@@ -47,8 +47,11 @@ de los dos falta.
 - **Envío de lecturas** — cada métrica por separado, con su propia fecha/hora opcional, o las
   diez juntas con batería y señal. Fecha vacía = ahora. Las métricas que no mandás conservan
   su último valor en el vivero.
-- **Emisión automática** — ruido periódico a todas las macro-zonas, para darle actividad de
+- **Emisión automática** — lecturas al azar para todas las macro-zonas, para darle actividad de
   fondo al vivero. Arranca siempre apagada, porque encendida pisa lo que cargaste a mano.
+  Sensing is backend-driven: there is no interval. On activation it sends one boot round, then
+  answers each `LEER_AHORA` the backend publishes on `nursery/zone/{id}/command` with one reading
+  for that zone (only simulated macro-zones, only while on).
 - **Topología** — regenera la grilla (N macro-zonas × M sectores) para que coincida con el
   hardware a simular.
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a

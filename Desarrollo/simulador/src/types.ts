@@ -19,7 +19,7 @@ export interface SimulatedSensor {
 export interface SimulatorStatus {
   backend: { url: string; up: boolean };
   broker: { url: string; connected: boolean };
-  emission: { active: boolean; intervalMs: number };
+  emission: { active: boolean };
 }
 
 /** A reading to publish. Metrics are in UI units; the server converts `ce`. */

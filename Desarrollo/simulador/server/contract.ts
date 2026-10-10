@@ -281,8 +281,8 @@ export interface RailEvent {
    `Desarrollo/embebido/comun/contrato.h`; also mirrored by `ContratoNodo.java` (backend) and
    the sketch `vivero_esp32_red.ino`.
 
-   Constants and types only: the simulator does NOT react to the zone command. They live here
-   so a future change speaks the same vocabulary as the firmware.
+   The simulator answers the zone command for the zones it simulates (backend-driven sensing):
+   it replies with one telemetry round, like the firmware does.
 
    - Zone command (backend → zone's witness node): QoS 1 both ways, no retain. The node answers
      with the usual telemetry on the zone telemetry topic, without a commandId and without ACK.
@@ -296,6 +296,28 @@ export function zoneCommandTopic(zonaId: string): string {
 }
 
 export const READ_NOW_ACTION = 'LEER_AHORA';
+
+/** Zone of a zone-level command topic (`nursery/zone/{id}/command`), or `null` if it is not one. */
+export function parseZoneCommandTopic(topic: string): { zonaId: string } | null {
+  const parts = topic.split('/');
+  if (parts.length !== 4) return null;
+  const [root, zone, zonaId, leaf] = parts;
+  if (root !== 'nursery' || zone !== 'zone' || leaf !== 'command' || !zonaId) return null;
+  return { zonaId };
+}
+
+/** Index `n` of a macro-zone id `MZ-n` (n >= 1), or `null` for any other id. */
+export function macroZoneIndex(zonaId: string): number | null {
+  const m = /^MZ-(\d+)$/.exec(zonaId);
+  const n = m ? Number(m[1]) : 0;
+  return n >= 1 ? n : null;
+}
+
+/** `true` only for a parsed payload whose `accion` is exactly `LEER_AHORA`. */
+export function isReadNow(payload: unknown): boolean {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
+  return (payload as { accion?: unknown }).accion === READ_NOW_ACTION;
+}
 
 /** Zone command payload, exactly as the backend publishes it. No `actuador`: it is not an actuator. */
 export interface ZoneCommand {
