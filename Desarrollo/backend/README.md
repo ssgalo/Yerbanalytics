@@ -18,6 +18,10 @@ mvn spring-boot:run
 
 La API quedará escuchando en `http://localhost:8000`.
 
+**Primer arranque contra una base vacía:** se crea el Administrador inicial (`admin`). Definí antes
+su contraseña temporal con `YERBANALYTICS_ADMIN_CLAVE`; si no, se genera una y aparece **una sola
+vez** en el log de arranque. Detalle en [Autenticación y permisos](#autenticación-y-permisos-hu-01--hu-20).
+
 ## Configuración
 
 La configuración principal se encuentra en `src/main/resources/application.properties`.
@@ -138,12 +142,146 @@ Qué cambió, en concreto:
   publicador de telemetría existía únicamente para que el backend se publicara lecturas a sí
   mismo.
 
+## Autenticación y permisos (HU-01 / HU-20)
+
+Toda la API exige **sesión de usuario y permiso**, salvo tres excepciones: `POST /api/auth/login`,
+`/ca.pem` y el contrato del dispositivo de captura (`/api/camara/v1/**`, que tiene su propio
+token). Es *deny-by-default*: una ruta que no tiene permiso declarado queda cerrada para todos.
+
+### Dos cadenas de Spring Security (`seguridad/SeguridadConfig`)
+
+| Cadena | Rutas | Credencial | Filtro |
+|---|---|---|---|
+| `@Order(1)` | `/api/camara/v1/**` | Token JWT del dispositivo | `config/CamaraAuthFilter` |
+| `@Order(2)` | todo lo demás | Cookie de sesión de usuario | `seguridad/SesionFilter` |
+
+Las credenciales no se cruzan: un token de cámara contra `/api/nursery` recibe `401`, y una
+sesión de usuario contra `/api/camara/v1/config` también.
+
+Se apagan a propósito, documentado en el código: CSRF (la cookie es `SameSite=Strict`),
+`formLogin`, `httpBasic`, `logout` de Spring, la sesión HTTP del contenedor y el
+`Cache-Control: no-store` que Spring agrega por defecto (rompería el `ETag` de las imágenes).
+
+### Sesiones
+
+- `POST /api/auth/login` (`{"username","clave"}`) → `200` con el perfil (nombre, rol, permisos,
+  `inactividadMin`, `debeCambiarClave`) y la cookie `YERBA_SESION` (`HttpOnly; SameSite=Strict;
+  Path=/api`). La respuesta nunca trae el identificador de sesión.
+- Ante **cualquier** falla responde lo mismo: `401 {"error":"Credenciales incorrectas"}`. Usuario
+  inexistente, clave errónea, suspendido o dado de baja son indistinguibles, también en el tiempo
+  de respuesta (hash de relleno; el estado se evalúa después de la clave).
+- La sesión es opaca y vive en la tabla `sesion` (se guarda su SHA-256, nunca el valor). Por eso
+  revocar es inmediato: un cambio de rol, una suspensión, una baja, un blanqueo o un cambio de la
+  matriz del rol cortan las sesiones en el acto (`401 SESION_REVOCADA` en la próxima petición).
+- **Inactividad:** el backend decide. Si `ahora − ultima_actividad` supera el tiempo máximo
+  (60 min por defecto, editable 5–480 desde `PUT /api/seguridad/politica`) responde
+  `401 SESION_EXPIRADA`. **Sólo cuenta como actividad lo explícito**: el login, toda petición que
+  no sea `GET` y `POST /api/auth/actividad`, que el dashboard manda cuando detecta interacción. Los
+  sondeos (`GET`) no mantienen viva la sesión.
+- `GET /api/auth/perfil`, `POST /api/auth/logout`, `PUT /api/auth/clave` (`{"actual","nueva"}`,
+  cierra las demás sesiones del usuario).
+- Contraseña temporal (alta, blanqueo, admin inicial): mientras no se cambie, todo lo demás
+  responde `403 {"motivo":"CAMBIO_CLAVE_REQUERIDO"}`.
+- Un barrido diario (`yerbanalytics.auth.barrido-cron`) borra las sesiones cerradas o inactivas
+  hace más de 7 días.
+
+Cuerpos de error: `401 {"error","motivo": SIN_SESION|SESION_EXPIRADA|SESION_REVOCADA}` y
+`403 {"error","permiso":"reglas.editar"}`.
+
+### Clientes que no son navegador
+
+El simulador, el servicio de inferencia y la suite de conformidad usan una cuenta de rol
+**Servicio** que da de alta el Administrador: hacen login, guardan el `Set-Cookie` y lo reenvían
+en `Cookie:`; ante un `401` vuelven a iniciar sesión y reintentan una vez. El backend no tiene
+ninguna rama para ellos: son usuarios como cualquier otro.
+
+### Permisos: catálogo, matriz y mapa de rutas
+
+- **Roles** (`seguridad/Rol`): Administrador, Ingeniero Agrónomo, Productor Viverista, Operario y
+  Servicio. Fijos.
+- **Permisos** (`seguridad/Permiso`): catálogo fijo en código, con su grupo y su par de lectura.
+  Un permiso de edición no implica el de lectura; la matriz se rechaza si falta el par.
+- **Matriz** (`rol_permiso`): la edita el Administrador (`GET /api/roles`,
+  `PUT /api/roles/{rol}/permisos`). Se siembra con la matriz por defecto **sólo si la tabla está
+  vacía**. Salvaguardas: el Administrador nunca pierde `usuarios.gestionar` ni `auditoria.ver`
+  (`409`), y nunca queda el sistema sin un Administrador activo (`409`).
+- **Mapa ruta → permiso** (`seguridad/MapaPermisos`): **el único lugar** donde se declara qué
+  permiso exige cada ruta. Al agregar un endpoint, se le agrega una línea ahí;
+  `MapaPermisosCoberturaTest` falla si alguno quedó sin declarar.
+
+| Rutas | Permiso |
+|---|---|
+| `GET /api/nursery`, `GET /api/configuracion/demo-expo` | `vivero.ver` |
+| `PUT /api/configuracion/demo-expo` | `demo-expo.configurar` |
+| `GET` / `PUT /api/configuracion` | `configuracion.ver` / `configuracion.editar` |
+| `GET` / `POST /api/diagnosticos` | `diagnosticos.ver` / `diagnosticos.registrar` |
+| `GET /api/historial` | `historial.ver` |
+| `GET /api/rules/**` / `PUT /api/rules/parametros` | `reglas.ver` / `reglas.editar` |
+| `GET` / `POST`,`PUT /api/hardware/**` | `hardware.ver` / `hardware.gestionar` |
+| `GET` / `POST`,`PUT /api/topologia/**` | `topologia.ver` / `topologia.gestionar` |
+| `GET /api/capturas/**` / `POST /api/capturas/ordenes` | `capturas.ver` / `capturas.ordenar` |
+| `/api/camara/vinculacion`, `/api/camara/dispositivos/**` | `camara.gestionar` |
+| `GET` / `POST /api/pasadas/**` | `pasadas.ver` / `pasadas.operar` |
+| `/api/usuarios/**`, `/api/roles/**`, `/api/seguridad/politica` | `usuarios.gestionar` |
+| `GET /api/auditoria/**` | `auditoria.ver` |
+| `/api/auth/perfil`, `/actividad`, `/logout`, `/clave` | sólo sesión |
+
+Los permisos se evalúan en cada petición contra la matriz vigente (caché en memoria que se
+invalida al guardar): un cambio rige en la petición siguiente.
+
+### Gestión de usuarios (`/api/usuarios`)
+
+Alta (`username` de 3–40 caracteres `[a-z0-9._-]`, único sin distinguir mayúsculas e incluso
+frente a bajas; contraseña temporal ≥ 8 y distinta del username), edición de nombre y rol,
+`/suspender`, `/reactivar`, `/baja` (lógica y definitiva) y `PUT /{id}/clave` (blanqueo). Nadie
+puede suspenderse ni darse de baja a sí mismo.
+
+### Auditoría de seguridad (`auditoria_seguridad`)
+
+Cada cambio sobre usuarios, matriz o política queda registrado **en la misma transacción**:
+si la auditoría falla, el cambio se revierte. Append-only en tres capas: entidad `@Immutable`
+con repositorio sólo de alta; **triggers** que rechazan `UPDATE`, `DELETE` y `TRUNCATE`; y una
+**cadena de hashes** SHA-256 que `GET /api/auditoria/verificacion` recorre para detectar una
+fila alterada por fuera. Consulta: `GET /api/auditoria?autor=&objetivo=&tipo=&desde=&hasta=&pagina=&tamanio=`.
+
+Los triggers los instala la app al arrancar (`SeguridadInicializador`, script idempotente
+`src/main/resources/auditoria-triggers.sql`): **no es una migración manual más**. Si el usuario de
+la base no puede crear funciones, el arranque falla con un mensaje que lo dice; en ese caso corré
+el script a mano con un usuario que pueda:
+
+```bash
+psql -U <usuario-con-permisos> -d yerbanalytics -f src/main/resources/auditoria-triggers.sql
+```
+
+La cadena es evidencia de alteración, no prueba criptográfica: quien tenga acceso total a la
+base podría recalcularla entera.
+
+### Administrador inicial y configuración
+
+| Propiedad | Default | Para qué |
+|---|---|---|
+| `yerbanalytics.auth.admin-inicial.usuario` | `admin` | Nombre del Administrador que se crea si no hay ninguno activo |
+| `yerbanalytics.auth.admin-inicial.clave` | `${YERBANALYTICS_ADMIN_CLAVE:}` | Su contraseña temporal. Vacía → se genera y se loguea una vez |
+| `yerbanalytics.auth.cookie-secure` | `false` | Atributo `Secure` de la cookie. Encendelo si todo va por HTTPS |
+| `yerbanalytics.auth.barrido-cron` | `0 30 3 * * *` | Barrido de sesiones viejas |
+
+> **Dashboard y API tienen que compartir esquema y host.** `localhost:5173` → `localhost:8000`
+> (o `IP:5173` → `IP:8000`) es *same-site* y la cookie viaja. Si el dashboard va por `http` y
+> `VITE_API_BASE_URL` apunta a `https://…:8443`, el navegador los trata como sitios distintos y no
+> manda la cookie: el login "funciona" pero la sesión no se establece.
+
+Ningún dato existente se migra (no había usuarios). Las tablas nuevas las crea Hibernate.
+
+**Riesgo conocido:** no hay bloqueo por intentos fallidos (para no abrir un vector de denegación
+contra el Administrador). BCrypt costo 10 vuelve lenta la fuerza bruta.
+
 ## Arquitectura
 
 El proyecto sigue el patrón multicapa clásico de Spring Boot:
 
 - `controller/`: Controladores REST. Definen los endpoints, rutas y manejan las peticiones HTTP.
 - `config/`: Clases de configuración global (CORS, propiedades, beans).
+- `seguridad/`: Autenticación, roles, permisos, gestión de usuarios y auditoría (HU-01 / HU-20).
 - `dto/`: Objetos de Transferencia de Datos. Mantienen paridad con `domain.ts` del frontend.
 - `service/`: Lógica de negocio. `NurseryService` genera el snapshot del vivero.
 - `service/mock/`: Generador determinístico portado del mock del frontend.
@@ -172,7 +310,7 @@ y los intervalos de sensado y evaluación (configuración operativa).
   `valor: null` restablece la fábrica). Valida tipo, rango y restricciones cruzadas (crítico < umbral
   de riego < humedad objetivo; bloqueo ≤ alerta de saturación; el volumen máximo debe caber en los
   1200 s de la válvula); si algo falla responde `400 {"errores":[{"clave","mensaje"}]}` y no persiste
-  nada. Audita con `X-Usuario`.
+  nada. El historial lo firma el usuario de la sesión.
 - `GET /api/rules/evaluaciones/{sectorId}?origen=TELEMETRIA|BARRIDO`: última traza de evaluación
   del sector (qué recibió cada regla contra qué umbral). Vive en memoria: `204` si todavía no se
   evaluó desde el arranque, `404` si el sector no existe.
@@ -283,10 +421,12 @@ el servicio de inferencia. Un dispositivo de captura no debe usarlas.
 
 ### Autenticación
 
-Sólo las rutas del contrato exigen token, y el filtro está **acotado por path**
-(`CamaraAuthFilter`): el resto de la API queda exactamente como estaba. Deliberadamente no se
-usa `spring-boot-starter-security` — traer la cadena de filtros completa protegería por
-defecto endpoints que hoy son abiertos. Cuando llegue HU-01 (login) habrá que unificar.
+Las rutas del contrato exigen el token del dispositivo, y las atiende su propia cadena de Spring
+Security (`CamaraAuthFilter`, ver [Autenticación y permisos](#autenticación-y-permisos-hu-01--hu-20)).
+La API de plataforma de la tabla anterior exige, en cambio, **sesión de usuario** con el permiso
+que corresponda (`camara.gestionar`, `capturas.ordenar`, `capturas.ver`, `diagnosticos.registrar`).
+Las credenciales no se cruzan: el token del dispositivo no abre la plataforma ni una sesión abre
+el contrato.
 
 El flujo es: la plataforma emite un **código de un solo uso** → el dispositivo se enrola y
 recibe una credencial de renovación → la canjea por **tokens de ~15 minutos**. Nada de larga
@@ -421,3 +561,5 @@ cd Desarrollo/frontend
 # En .env: VITE_DATA_SOURCE=http y VITE_API_BASE_URL=http://localhost:8000/api
 npm run dev
 ```
+
+El dashboard pide login: entrá con `admin` y la contraseña temporal del primer arranque.
