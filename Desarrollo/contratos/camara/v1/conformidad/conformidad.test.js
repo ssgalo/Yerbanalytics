@@ -11,8 +11,13 @@
  *      Si esta suite pasa, escribir ese cliente no requiere tocar el backend.
  *
  * Uso:
- *   npm test
- *   BASE_URL=https://mi-host npm test
+ *   PLATAFORMA_USUARIO=... PLATAFORMA_CLAVE=... npm test
+ *   BASE_URL=https://mi-host PLATAFORMA_USUARIO=... PLATAFORMA_CLAVE=... npm test
+ *
+ * Las credenciales son de un usuario de la plataforma (p. ej. una cuenta de rol Servicio), y
+ * sólo se usan para PREPARAR los casos: emitir códigos de vinculación y órdenes, que es API de
+ * plataforma y exige sesión de usuario desde HU-01. El contrato del dispositivo
+ * (`/api/camara/v1/**`) se ejercita exclusivamente con sus propios tokens, como siempre.
  *
  * Sin dependencias: node:test y fetch nativo.
  */
@@ -46,6 +51,14 @@ async function http(url, init = {}) {
     if (!(e instanceof TypeError)) throw e;
     return fetch(url, init);
   }
+}
+
+/** Cookie de sesión de plataforma; la obtiene `before` con las credenciales del entorno. */
+let SESION;
+
+/** Llamada a la API de plataforma (no al contrato): viaja con la sesión de usuario. */
+function plataforma(url, init = {}) {
+  return http(url, { ...init, headers: { ...(init.headers ?? {}), Cookie: SESION } });
 }
 
 async function json(res) {
@@ -113,7 +126,7 @@ async function esperarEvento(res, nombre, { timeoutMs = 10_000, esperado = null 
 // ---------------------------------------------------------------------------
 
 async function generarCodigo() {
-  const res = await http(`${BASE}/api/camara/vinculacion`, { method: 'POST' });
+  const res = await plataforma(`${BASE}/api/camara/vinculacion`, { method: 'POST' });
   assert.equal(res.status, 200, 'la plataforma debe poder emitir un código de vinculación');
   const body = await json(res);
   assert.ok(body.codigo, 'el código de vinculación no puede venir vacío');
@@ -169,7 +182,7 @@ async function dispositivoConectado(nombre) {
 }
 
 async function emitirOrden(sectorId = SECTOR, posicionRiel = 1200) {
-  const res = await http(`${BASE}/api/capturas/ordenes`, {
+  const res = await plataforma(`${BASE}/api/capturas/ordenes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sectorId, posicionRiel }),
@@ -179,7 +192,7 @@ async function emitirOrden(sectorId = SECTOR, posicionRiel = 1200) {
 }
 
 async function estadoOrden(ordenId) {
-  const res = await http(`${BASE}/api/capturas/ordenes/${ordenId}`);
+  const res = await plataforma(`${BASE}/api/capturas/ordenes/${ordenId}`);
   assert.equal(res.status, 200);
   return json(res);
 }
@@ -217,14 +230,27 @@ async function acusarFallo(ordenId, token, motivo, detalle) {
 // ---------------------------------------------------------------------------
 
 before(async () => {
+  const usuario = process.env.PLATAFORMA_USUARIO;
+  const clave = process.env.PLATAFORMA_CLAVE;
+  assert.ok(usuario && clave,
+    'Faltan PLATAFORMA_USUARIO y PLATAFORMA_CLAVE: la preparación de los casos usa la API de plataforma, '
+    + 'que exige sesión (p. ej. una cuenta de rol Servicio, con la contraseña temporal ya cambiada).');
   let res;
   try {
-    res = await http(`${BASE}/api/nursery`);
+    res = await http(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: usuario, clave }),
+    });
   } catch (e) {
     assert.fail(
       `No se pudo contactar el backend en ${BASE}. Levantalo con './mvnw spring-boot:run'.\n${e.message}`,
     );
   }
+  assert.equal(res.status, 200, 'las credenciales de plataforma deben iniciar sesión');
+  SESION = res.headers.get('set-cookie').split(';')[0];
+
+  res = await plataforma(`${BASE}/api/nursery`);
   assert.equal(res.status, 200, 'el backend debe responder el snapshot del vivero');
   const nursery = await json(res);
   SECTOR = nursery.sectors?.[0]?.id;
@@ -357,7 +383,7 @@ describe('Señal de vida', () => {
     });
     assert.equal(res.status, 204);
 
-    const flota = await json(await http(`${BASE}/api/camara/dispositivos`));
+    const flota = await json(await plataforma(`${BASE}/api/camara/dispositivos`));
     const yo = flota.find((d) => d.id === dispositivoId);
     assert.ok(yo, 'el dispositivo debe figurar en la flota');
     assert.equal(yo.estado, 'operativo', 'tras reportar, debe verse operativo');
@@ -420,7 +446,7 @@ describe('Entrega de la captura', () => {
     assert.equal(estado.capturaId, creada.capturaId);
 
     // La imagen queda servida y es exactamente la que se subió.
-    const img = await http(`${BASE}${creada.imagenUrl}`);
+    const img = await plataforma(`${BASE}${creada.imagenUrl}`);
     assert.equal(img.status, 200);
     assert.equal(sha256(Buffer.from(await img.arrayBuffer())), sha256(JPEG));
     cerrar();

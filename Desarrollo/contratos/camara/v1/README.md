@@ -216,9 +216,15 @@ verifica códigos de respuesta y transiciones de estado.
 ```bash
 cd Desarrollo/contratos/camara/v1/conformidad
 npm install
-npm test                     # contra http://localhost:8000 por defecto
-BASE_URL=https://mi-host npm test
+PLATAFORMA_USUARIO=... PLATAFORMA_CLAVE=... npm test        # contra http://localhost:8000
+BASE_URL=https://mi-host PLATAFORMA_USUARIO=... PLATAFORMA_CLAVE=... npm test
 ```
+
+Las credenciales son de un usuario de la plataforma —lo natural es una cuenta de rol Servicio,
+con la contraseña temporal ya cambiada— y se usan **sólo para preparar** los casos: emitir
+códigos de vinculación y órdenes de captura es API de plataforma y, desde HU-01, exige sesión.
+El contrato del dispositivo se ejercita únicamente con sus propios tokens, igual que antes: lo
+que cambió es cómo se arma el escenario, no lo que se verifica.
 
 Sirve para dos cosas:
 
