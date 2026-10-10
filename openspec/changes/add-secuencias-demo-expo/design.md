@@ -500,3 +500,33 @@ igual llegara, el `loop()` lo atiende al terminar el tramo.
 | La bomba no mueve agua de verdad en el stand | No afecta el flujo: el ACK lo da el firmware al energizar el driver |
 | Reinicio del backend con la mediasombra desplegada | Documentado (§2.8); se enrolla corriendo otra secuencia o por serie |
 | Brownout al arrancar el motor DC o la bomba con WiFi | Mismo aviso que el riel (fuente aparte / capacitor) |
+
+---
+
+## Adaptación al firmware ESP32-S3 (rama de ezecatania13)
+
+Al integrar `feat/prototipo-esp32-s3-acks` (la última versión del firmware, que gana en los conflictos)
+cambió **cuándo** llega el ACK del riego. Lo de §1.2 y §2.3 queda así; los tipos de paso no cambian, así
+que el frontend sigue igual.
+
+- **El ACK del `valve ON {durationSec}` llega al final del riego** (`SUCCESS ok`; `SUCCESS limite_excedido`
+  si el nodo recortó la duración). Un `valve OFF` corta el riego en curso: el ON recibe `ERROR cancelado` y
+  el OFF `SUCCESS ok` (inmediato, haya o no riego). Un comando inválido recibe un `ERROR` inmediato
+  (`duracion_invalida`, `accion_invalida`, `sector_invalido`, `parametros_invalidos`, ...).
+- **ABRIR** publica `valve ON durationSec=N` (ya no `N + timeout`: el firmware cierra solo a los N s). Queda
+  OK apenas el publish sale bien; no espera ACK. El tope de `duracionSeg` pasa a ser 1200 (el del contrato).
+- **ESPERAR** (riego) espera el ACK del ON, citando su `commandId`. `SUCCESS` -> OK; `ERROR` -> el paso falla
+  con el tipo como código. Plazo: N + `yerbanalytics.secuencia.margen-ack-riego-seg` (15 por defecto). La
+  cuenta regresiva de la UI llega a 0 en N s y pasa a "Esperando la confirmación del nodo...".
+- **CERRAR** corre siempre como paso seguro: `valve OFF` esperando su ACK (`timeout-ack-valvula-seg`). El
+  `ERROR cancelado` del ON tras una cancelación se ignora: llega con el `commandId` del ON, que ya no es el
+  del paso en curso.
+- **Mediasombra**: sin cambios. El firmware (`act_mediasombra`) manda el ACK al **terminar** el movimiento
+  (final de carrera -> `ok`; se rinde -> `falla_mecanica`; otro comando lo interrumpe -> `reemplazado`; ya
+  estaba en la posición -> `sin_cambio` inmediato, que también es éxito).
+- **Seguimiento de comandos**: los comandos de las secuencias salen por `ComandoActuadorPublisher`, así que
+  `SeguimientoComandosService` (B) también los vigila. Es a propósito: una falla mecánica es una alerta real
+  sin importar quién mandó el comando. No hay bandera ni rama para las secuencias. `AckActuadorReceiver`
+  parsea una vez y entrega a ambos consumidores.
+- **Firmware**: el sketch `vivero_esp32_red` es el de B tal cual; falta portarle el manejo de las
+  secuencias por MQTT (comando de zona `LEER_AHORA`).

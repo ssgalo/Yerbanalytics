@@ -174,3 +174,21 @@ pista (A, B, C) con `size:exception`, como se hizo en `add-pasada-riel`. Con la 
 más rápido; (a) es lo más revisable. Lo decide el equipo antes de aplicar.
 
 Total de tareas: 40 (A 12, B 8, C 9, D 5, E 6), más 7 subtareas de test en A.8.
+
+---
+
+## Adaptación al firmware ESP32-S3 (rama de ezecatania13)
+
+Hecho al integrar `feat/prototipo-esp32-s3-acks` (ver design.md, misma sección):
+
+- [x] Merge con B: `AckActuador` unificado (`commandId`, `status`, `JsonNode detalle`, `zonaId`, `sectorId`,
+  `tipoDetalle()`), `AckActuadorReceiver` entrega a `SeguimientoComandosService` y `SecuenciaService`,
+  `ContratoNodo` con los nombres de B (`TOPIC_ACK_SUSCRIPCION`, `ACK_*`) más el comando de zona.
+- [x] `contrato.h`: lista de `DETALLE_*` = unión de lo que emite el firmware; comando de zona documentado a QoS 1.
+- [x] `SecuenciaService` RIEGO: ABRIR sin ACK con `durationSec = N`; ESPERAR espera el ACK del ON hasta
+  N + `margen-ack-riego-seg`; CERRAR siempre; el `ERROR cancelado` del ON tras cancelar se ignora.
+- [x] Simulador: `ActuatorAck` unificado con el conjunto ampliado de tipos (sin comportamiento nuevo).
+- [x] Frontend: cumplido el plazo, la espera muestra "Esperando la confirmación del nodo...".
+- [ ] **Pendiente: secuencias de Demo Expo por MQTT (add-secuencias-demo-expo)** en el sketch
+  `vivero_esp32_red`: manejar el comando de zona `LEER_AHORA` (lectura de sensores y telemetría de siempre,
+  sin ACK). El riego y la mediasombra ya responden con el ACK que las secuencias esperan.

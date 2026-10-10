@@ -304,3 +304,11 @@ Compiló sin errores con las versiones de §1 (incluidas `ESP.getEfuseMac()` y
    (`setBufferSize`, `setKeepAlive`, `setSocketTimeout`), no compila: actualizarlas.
 2. **Core 2.x.** Si el error es en `ledcAttach`, es el core 2.x (ver tabla de arriba): el original
    tiene lo mismo.
+
+## Pendiente: secuencias de Demo Expo por MQTT (add-secuencias-demo-expo)
+
+Este sketch es el de la rama del ESP32-S3 tal cual. Falta portarle lo que necesitan las secuencias de
+Demo Expo: atender el comando de zona `LEER_AHORA` (`nursery/zone/{zona}/command`, QoS 1; responde con la
+telemetría de siempre, sin `commandId` y sin ACK). El riego y la mediasombra ya contestan el ACK que las
+secuencias esperan. Ver `openspec/changes/add-secuencias-demo-expo/` y la sección "Comando de zona" de
+`Desarrollo/embebido/comun/contrato.h`.
