@@ -406,7 +406,7 @@ Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de 
 ## Secuencias de la Demo Expo
 
 Una **secuencia** es un guion corto contra el actuador de un sector, con cada paso visible: **riego**
-(abre la válvula, espera, cierra), **mediasombra** (despliega, espera, enrolla) y **lectura** (pide una
+(abre la válvula, espera el ACK del final del riego, cierra), **mediasombra** (despliega, espera, enrolla) y **lectura** (pide una
 lectura al nodo testigo y la muestra). No pasan por el motor de reglas: son una prueba directa del
 hardware. Una sola a la vez, y ninguna mientras corre una pasada del riel (ni al revés).
 
@@ -417,7 +417,7 @@ hardware. Una sola a la vez, y ninguna mientras corre una pasada del riel (ni al
 | `POST /api/secuencias/actual/cancelar` | `200` + `Secuencia` · `409` si no hay una en curso o ya se está cancelando |
 
 Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
-`duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200 menos `timeout-ack-valvula-seg`, o sea 1190);
+`duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200: el tope del contrato);
 `esperaSeg` sólo a `MEDIASOMBRA` (default 10, de 0 a 600). La forma de `Secuencia` y sus pasos:
 `openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.
 
@@ -425,15 +425,24 @@ Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA", "parametros": {"duracionS
 - **MQTT que ahora sí se usa.** Publica `ON`/`OFF` de la válvula y `SET` de la mediasombra en
   `nursery/zone/{zona}/sector/{sector}/command`, y `LEER_AHORA` en `nursery/zone/{zona}/command` (QoS 1,
   sin ACK). **Escucha el ACK de los actuadores** (`nursery/zone/+/sector/+/ack`) con un adaptador propio
-  (`-ack`) y la telemetría con otro (`-lectura`); el de telemetría que alimenta al motor queda idéntico, a
+  (`-ack`), que `AckActuadorReceiver` entrega a `SeguimientoComandosService` *y* a `SecuenciaService`
+  (los comandos de las secuencias también los vigila el seguimiento, a propósito: una falla mecánica es una
+  alerta real sin importar quién mandó el comando), y la telemetría con otro (`-lectura`); el de telemetría que alimenta al motor queda idéntico, a
   costa de que el broker entregue cada lectura dos veces. Sólo cuentan los ACK que citan el `commandId`
   del paso en curso. Contrato: `mqtt/ContratoNodo.java`, espejo de `Desarrollo/embebido/comun/contrato.h`.
-- **Tiempos** (`yerbanalytics.secuencia.*`): ACK de la válvula `timeout-ack-valvula-seg` (10), ACK de la
+- **Tiempos** (`yerbanalytics.secuencia.*`): ACK del OFF de la válvula `timeout-ack-valvula-seg` (10), ACK del
+  ON del riego `margen-ack-riego-seg` (15: el firmware lo manda al *terminar* el riego, así que se espera
+  hasta N + margen), ACK de la
   mediasombra `timeout-ack-mediasombra-seg` (45; el firmware se rinde a los 30 s), lectura
   `timeout-lectura-seg` (20), cadencia del orquestador `tick-ms` (1000, carril propio `secuenciaScheduler`).
 - **Guardia compartido.** Hay un único ESP32: `GuardiaHardware` arbitra entre secuencia y pasada
   (`UsoDelHardware`), y quien pierde recibe el `409` con el motivo del otro.
-- **Paso seguro.** El `ON` de la válvula lleva `durationSec = N + timeout-ack-valvula-seg`, así que el
+- **Riego contra el firmware ESP32-S3.** `ABRIR` publica `valve ON durationSec=N` y queda OK al publicar
+  (el ON no se confirma al abrir); `ESPERAR` espera el ACK de ese ON, que llega al final del riego
+  (`SUCCESS`, con cualquier `tipo`: `ok` o `limite_excedido`); un `ERROR` inmediato (`duracion_invalida`,
+  `sector_invalido`…) falla el paso con el tipo como código. `CERRAR` corre siempre: `valve OFF` y su ACK
+  inmediato. El `ERROR cancelado` que recibe el ON cuando el OFF lo corta se ignora (cita otro `commandId`).
+- **Paso seguro.** El `ON` de la válvula lleva `durationSec = N`, así que el
   nodo la apaga solo aunque el backend desaparezca. Ante cualquier falla o cancelación se publica el `OFF`
   (riego) o el `SET 100` (mediasombra) igual, se marcan `OMITIDO` los pasos de espera y la secuencia
   termina `FALLIDA` o `CANCELADA`. Si falla el propio CERRAR, el error avisa que el nodo apaga la bomba

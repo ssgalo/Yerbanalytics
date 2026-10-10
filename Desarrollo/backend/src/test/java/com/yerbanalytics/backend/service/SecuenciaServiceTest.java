@@ -141,8 +141,9 @@ class SecuenciaServiceTest {
     class Riego {
 
         @Test
-        @DisplayName("iniciar abre la válvula del primer sector de la zona de menor número, con durationSec = N + timeout del ACK")
-        void iniciaConElDestinoYLaRedDeSeguridad() {
+        @DisplayName("iniciar abre la válvula del primer sector de la zona de menor número con durationSec = N: ABRIR queda OK al publicar y ESPERAR espera el ACK")
+        void iniciaConElDestino() {
+            long t0 = reloj.millis();
             Secuencia s = iniciar("RIEGO", 15, null);
 
             assertThat(s.tipo()).isEqualTo("RIEGO");
@@ -151,10 +152,13 @@ class SecuenciaServiceTest {
             assertThat(s.sectorId()).isEqualTo(SECTOR);
             assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(15, null));
             assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("ABRIR", "ESPERAR", "CERRAR");
-            assertThat(s.pasos()).extracting(PasoSecuencia::estado).containsExactly("EN_CURSO", "PENDIENTE", "PENDIENTE");
+            assertThat(s.pasos()).extracting(PasoSecuencia::estado).containsExactly("OK", "EN_CURSO", "PENDIENTE");
             assertThat(s.pasos().get(0).commandId()).isEqualTo("cmd-1");
+            // La espera es la del ACK del ON: cita el mismo commandId y muestra el fin esperado del riego.
+            assertThat(s.pasos().get(1).commandId()).isEqualTo("cmd-1");
+            assertThat(s.pasos().get(1).esperaHasta()).isEqualTo(t0 + 15_000);
             assertThat(s.iniciadaEn()).isEqualTo(reloj.millis());
-            verificarPublicado("valve", "ON", Map.of("durationSec", 25));
+            verificarPublicado("valve", "ON", Map.of("durationSec", 15));
         }
 
         @Test
@@ -163,25 +167,20 @@ class SecuenciaServiceTest {
             Secuencia s = service.iniciar(new IniciarSecuencia("RIEGO", null));
 
             assertThat(s.parametros().duracionSeg()).isEqualTo(10);
-            verificarPublicado("valve", "ON", Map.of("durationSec", 20));
+            verificarPublicado("valve", "ON", Map.of("durationSec", 10));
         }
 
         @Test
-        @DisplayName("ACK SUCCESS pasa a ESPERAR con esperaHasta; a los N s cierra con OFF y el ACK completa")
+        @DisplayName("el ACK del ON llega al FINAL del riego (SUCCESS ok): recién ahí cierra con OFF y el ACK del OFF completa")
         void caminoFeliz() {
             iniciar("RIEGO", 15, null);
-            long t0 = reloj.millis();
-
-            ackOk(1);
-            assertThat(paso(1).estado()).isEqualTo("OK");
-            assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
-            assertThat(paso(2).esperaHasta()).isEqualTo(t0 + 15_000);
 
             avanzar(14);
+            avanzar(10);   // pasado el N, dentro del margen: sigue esperando el ACK, no cierra por su cuenta
             verify(actuadores, never()).publicar(anyString(), anyString(), eq("valve"), eq("OFF"), anyMap());
             assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
 
-            avanzar(1);
+            ackOk(2);
             assertThat(paso(2).estado()).isEqualTo("OK");
             assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
             verificarPublicado("valve", "OFF", Map.of());
@@ -195,29 +194,40 @@ class SecuenciaServiceTest {
         }
 
         @Test
+        @DisplayName("un SUCCESS con tipo limite_excedido (el nodo recortó la duración) también es éxito")
+        void successRecortadoEsExito() {
+            iniciar("RIEGO", 15, null);
+
+            ack(paso(2).commandId(), "SUCCESS", "{\"tipo\":\"limite_excedido\"}");
+
+            assertThat(paso(2).estado()).isEqualTo("OK");
+            assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
+        }
+
+        @Test
         @DisplayName("un ACK con commandId ajeno (del motor, por ejemplo) se ignora")
         void ackAjenoSeIgnora() {
             iniciar("RIEGO", 15, null);
 
             ack("de-otro-comando", "SUCCESS", "{\"tipo\":\"ok\"}");
 
-            assertThat(paso(1).estado()).isEqualTo("EN_CURSO");
+            assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
         }
 
         @Test
-        @DisplayName("ABRIR sin ACK a los 10 s: ACTUADOR_SIN_RESPUESTA, ESPERAR omitido, el OFF se publica igual y termina FALLIDA")
-        void abrirSinAck() {
+        @DisplayName("sin ACK a N + margen (15 + 15 s): ACTUADOR_SIN_RESPUESTA, el OFF se publica igual y termina FALLIDA")
+        void esperarSinAck() {
             iniciar("RIEGO", 15, null);
 
-            avanzar(9);
-            assertThat(paso(1).estado()).isEqualTo("EN_CURSO");
+            avanzar(29);
+            assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
 
             avanzar(1);
-            assertThat(paso(1).estado()).isEqualTo("ERROR");
-            assertThat(paso(1).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
-            assertThat(paso(1).detalle()).isEqualTo(
-                    "La válvula no respondió en 10 s. ¿El ESP32 está encendido y conectado al broker?");
-            assertThat(paso(2).estado()).isEqualTo("OMITIDO");
+            assertThat(paso(1).estado()).isEqualTo("OK");
+            assertThat(paso(2).estado()).isEqualTo("ERROR");
+            assertThat(paso(2).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
+            assertThat(paso(2).detalle()).isEqualTo(
+                    "La válvula no respondió en 30 s. ¿El ESP32 está encendido y conectado al broker?");
             assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
             verificarPublicado("valve", "OFF", Map.of());
 
@@ -227,18 +237,44 @@ class SecuenciaServiceTest {
         }
 
         @Test
-        @DisplayName("ACK ERROR en ABRIR: el código sale de detalle.tipo y el OFF se publica igual")
-        void ackErrorEnAbrir() {
+        @DisplayName("el margen del ACK es configurable (yerbanalytics.secuencia.margen-ack-riego-seg)")
+        void margenConfigurable() {
+            SecuenciaProperties props = new SecuenciaProperties();
+            props.setMargenAckRiegoSeg(5);
+            service = new SecuenciaService(actuadores, zonaPublisher, zonaRepo,
+                    GuardiaHardwareTest.guardiaCon(() -> pasadaOcupada.get()), props, reloj);
             iniciar("RIEGO", 15, null);
 
-            ack(paso(1).commandId(), "ERROR", "{\"tipo\":\"duracion_invalida\"}");
+            avanzar(19);
+            assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
+            avanzar(1);
+            assertThat(paso(2).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
+        }
 
-            assertThat(paso(1).estado()).isEqualTo("ERROR");
-            assertThat(paso(1).codigoError()).isEqualTo("DURACION_INVALIDA");
-            assertThat(paso(1).detalle()).isEqualTo("El ESP32 rechazó el comando (duracion_invalida).");
-            assertThat(paso(2).estado()).isEqualTo("OMITIDO");
+        @Test
+        @DisplayName("ACK ERROR inmediato (comando rechazado): el código sale de detalle.tipo y el OFF se publica igual")
+        void ackErrorEnEsperar() {
+            iniciar("RIEGO", 15, null);
+
+            ack(paso(2).commandId(), "ERROR", "{\"tipo\":\"duracion_invalida\"}");
+
+            assertThat(paso(1).estado()).isEqualTo("OK");
+            assertThat(paso(2).estado()).isEqualTo("ERROR");
+            assertThat(paso(2).codigoError()).isEqualTo("DURACION_INVALIDA");
+            assertThat(paso(2).detalle()).isEqualTo("El ESP32 rechazó el comando (duracion_invalida).");
             assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
             verificarPublicado("valve", "OFF", Map.of());
+        }
+
+        @Test
+        @DisplayName("los tipos de rechazo del firmware nuevo (accion_invalida, sector_invalido, parametros_invalidos) son rechazos")
+        void rechazosDelFirmwareNuevo() {
+            iniciar("RIEGO", 15, null);
+
+            ack(paso(2).commandId(), "ERROR", "{\"tipo\":\"sector_invalido\"}");
+
+            assertThat(paso(2).codigoError()).isEqualTo("SECTOR_INVALIDO");
+            assertThat(paso(2).detalle()).isEqualTo("El ESP32 rechazó el comando (sector_invalido).");
         }
 
         @Test
@@ -246,25 +282,37 @@ class SecuenciaServiceTest {
         void ackErrorDesconocido() {
             iniciar("RIEGO", 15, null);
 
-            ack(paso(1).commandId(), "ERROR", "{\"tipo\":\"rayo_cosmico\"}");
+            ack(paso(2).commandId(), "ERROR", "{\"tipo\":\"rayo_cosmico\"}");
 
-            assertThat(paso(1).codigoError()).isEqualTo("RAYO_COSMICO");
-            assertThat(paso(1).detalle()).isEqualTo("El actuador informó un error: rayo_cosmico");
+            assertThat(paso(2).codigoError()).isEqualTo("RAYO_COSMICO");
+            assertThat(paso(2).detalle()).isEqualTo("El actuador informó un error: rayo_cosmico");
+        }
+
+        @Test
+        @DisplayName("un ERROR cancelado del ON sin que el operador cancele (alguien más cortó el riego) falla la espera")
+        void cortadoPorOtro() {
+            iniciar("RIEGO", 15, null);
+
+            ack(paso(2).commandId(), "ERROR", "{\"tipo\":\"cancelado\"}");
+
+            assertThat(paso(2).estado()).isEqualTo("ERROR");
+            assertThat(paso(2).codigoError()).isEqualTo("CANCELADO");
+            assertThat(paso(2).detalle()).isEqualTo("El riego fue cortado por otro comando antes de terminar.");
+            assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
         }
 
         @Test
         @DisplayName("CERRAR sin ACK: FALLIDA, y el detalle avisa que el nodo apaga solo a los durationSec")
         void cerrarSinAck() {
             iniciar("RIEGO", 15, null);
-            ackOk(1);
-            avanzar(15);
+            ackOk(2);
 
             avanzar(10);
 
             assertThat(paso(3).estado()).isEqualTo("ERROR");
             assertThat(paso(3).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
             assertThat(paso(3).detalle()).contains("La válvula no respondió en 10 s")
-                    .endsWith("El nodo apaga la bomba solo a los 25 s.");
+                    .endsWith("El nodo apaga la bomba solo a los 15 s.");
             assertThat(secuencia().estado()).isEqualTo("FALLIDA");
             // El paso seguro no se reintenta.
             verify(actuadores, times(1)).publicar(anyString(), anyString(), eq("valve"), eq("OFF"), anyMap());
@@ -289,22 +337,21 @@ class SecuenciaServiceTest {
         @DisplayName("publicación fallida de CERRAR: FALLIDA con PUBLICACION_FALLIDA")
         void publicacionFallidaAlCerrar() {
             iniciar("RIEGO", 15, null);
-            ackOk(1);
             when(actuadores.publicar(anyString(), anyString(), eq("valve"), eq("OFF"), anyMap()))
                     .thenReturn(new Resultado(false, "x", "broker caído"));
 
-            avanzar(15);
+            ackOk(2);
 
             assertThat(paso(3).codigoError()).isEqualTo("PUBLICACION_FALLIDA");
-            assertThat(paso(3).detalle()).contains("broker caído").contains("El nodo apaga la bomba solo a los 25 s.");
+            assertThat(paso(3).detalle()).contains("broker caído").contains("El nodo apaga la bomba solo a los 15 s.");
             assertThat(secuencia().estado()).isEqualTo("FALLIDA");
         }
 
         @Test
-        @DisplayName("cancelar en la espera: ESPERAR omitido, OFF, y al ACK queda CANCELADA")
+        @DisplayName("cancelar en la espera: ESPERAR omitido, OFF, y al ACK queda CANCELADA; el ERROR cancelado del ON se ignora")
         void cancelarEnLaEspera() {
             iniciar("RIEGO", 15, null);
-            ackOk(1);
+            String on = paso(2).commandId();
             avanzar(3);
 
             Secuencia s = service.cancelar();
@@ -316,25 +363,27 @@ class SecuenciaServiceTest {
             assertThat(s.pasos().get(2).estado()).isEqualTo("EN_CURSO");
             verificarPublicado("valve", "OFF", Map.of());
 
+            // El firmware contesta primero el ON ("cancelado") y después el OFF ("ok"): el primero no es falla.
+            ack(on, "ERROR", "{\"tipo\":\"cancelado\"}");
+            assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
+            assertThat(secuencia().error()).isNull();
+
             ackOk(3);
             assertThat(secuencia().estado()).isEqualTo("CANCELADA");
             assertThat(secuencia().finalizadaEn()).isNotNull();
+            assertThat(secuencia().error()).isNull();
         }
 
         @Test
-        @DisplayName("cancelar mientras espera el ACK de ABRIR: ABRIR omitido, OFF, y el ACK viejo ya no cuenta")
-        void cancelarEnAbrir() {
+        @DisplayName("un SUCCESS del ON que llega con el OFF en vuelo (carrera con la cancelación) no cierra CERRAR")
+        void successTardioDelOnNoCierraElOff() {
             iniciar("RIEGO", 15, null);
-            String viejo = paso(1).commandId();
-
+            String on = paso(2).commandId();
             service.cancelar();
-            assertThat(paso(1).estado()).isEqualTo("OMITIDO");
-            assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
 
-            ack(viejo, "SUCCESS", "{\"tipo\":\"ok\"}");
+            ack(on, "SUCCESS", "{\"tipo\":\"ok\"}");
+
             assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
-            ackOk(3);
-            assertThat(secuencia().estado()).isEqualTo("CANCELADA");
         }
 
         @Test
@@ -356,29 +405,29 @@ class SecuenciaServiceTest {
         }
 
         @Test
-        @DisplayName("400: tipo desconocido, duracionSeg < 1 o mayor que el tope (1200 - timeout del ACK); nada se publica")
+        @DisplayName("400: tipo desconocido, duracionSeg < 1 o mayor que el tope del contrato (1200); nada se publica")
         void validacion() {
             assertThatThrownBy(() -> iniciar("LLUVIA", null, null)).isInstanceOf(SecuenciaInvalidaException.class);
             assertThatThrownBy(() -> iniciar(null, null, null)).isInstanceOf(SecuenciaInvalidaException.class);
             assertThatThrownBy(() -> iniciar("RIEGO", 0, null)).isInstanceOf(SecuenciaInvalidaException.class);
             assertThatThrownBy(() -> iniciar("RIEGO", -5, null)).isInstanceOf(SecuenciaInvalidaException.class);
-            assertThatThrownBy(() -> iniciar("RIEGO", 1191, null))
+            assertThatThrownBy(() -> iniciar("RIEGO", 1201, null))
                     .isInstanceOf(SecuenciaInvalidaException.class)
-                    .hasMessageContaining("1190");
+                    .hasMessageContaining("1200");
 
             verifyNoInteractions(actuadores);
             assertThat(service.estado()).isEmpty();
         }
 
         @Test
-        @DisplayName("los topes se aceptan: 1 y 1190 s")
+        @DisplayName("los topes se aceptan: 1 y 1200 s")
         void topesValidos() {
             iniciar("RIEGO", 1, null);
-            verificarPublicado("valve", "ON", Map.of("durationSec", 11));
+            verificarPublicado("valve", "ON", Map.of("durationSec", 1));
             service.cancelar();
             ackOk(3);
 
-            iniciar("RIEGO", 1190, null);
+            iniciar("RIEGO", 1200, null);
             verificarPublicado("valve", "ON", Map.of("durationSec", 1200));
         }
 

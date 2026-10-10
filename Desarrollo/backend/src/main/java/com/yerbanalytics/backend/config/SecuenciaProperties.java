@@ -6,8 +6,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "yerbanalytics.secuencia")
 public class SecuenciaProperties {
 
-    /** Plazo para el ACK de la válvula. Abrir es instantáneo: esto cubre la latencia del broker. */
+    /**
+     * Plazo para el ACK del OFF de la válvula (cerrar es instantáneo: esto cubre la latencia del
+     * broker). El ACK del ON, en cambio, llega al <em>final</em> del riego: ver {@link #margenAckRiegoSeg}.
+     */
     private int timeoutAckValvulaSeg = 10;
+
+    /** Margen sobre la duración N del riego para que llegue el ACK del ON (que el firmware manda al terminar). */
+    private int margenAckRiegoSeg = 15;
 
     /** Plazo para el ACK de la mediasombra: el firmware se rinde a los 30 s sin final de carrera. */
     private int timeoutAckMediasombraSeg = 45;
@@ -20,6 +26,9 @@ public class SecuenciaProperties {
 
     public int getTimeoutAckValvulaSeg() { return timeoutAckValvulaSeg; }
     public void setTimeoutAckValvulaSeg(int v) { this.timeoutAckValvulaSeg = v; }
+
+    public int getMargenAckRiegoSeg() { return margenAckRiegoSeg; }
+    public void setMargenAckRiegoSeg(int v) { this.margenAckRiegoSeg = v; }
 
     public int getTimeoutAckMediasombraSeg() { return timeoutAckMediasombraSeg; }
     public void setTimeoutAckMediasombraSeg(int v) { this.timeoutAckMediasombraSeg = v; }

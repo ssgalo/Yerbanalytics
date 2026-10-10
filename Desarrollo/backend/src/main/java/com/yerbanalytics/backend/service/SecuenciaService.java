@@ -54,6 +54,13 @@ import java.util.regex.Pattern;
  * El {@link #tick} consume, publica y avanza. La lectura ({@link #estado}) usa una foto inmutable
  * publicada tras cada mutación, sin lock.
  *
+ * <p><b>Riego y el ACK del firmware.</b> El ACK del {@code valve ON} llega al <em>final</em> del riego
+ * ({@code SUCCESS ok}; {@code ERROR cancelado} si algo lo corta con un OFF). Por eso ABRIR queda OK en cuanto
+ * el comando se publica (sin ACK, y {@code durationSec} = N: el firmware cierra solo a los N s), ESPERAR
+ * espera ese ACK hasta N + {@code margen-ack-riego-seg}, y CERRAR (el OFF, con su propio ACK inmediato) corre
+ * siempre. El {@code ERROR cancelado} del ON que provoca nuestro propio OFF se ignora: llega con el
+ * commandId del ON, que ya no es el del paso en curso.
+ *
  * <p><b>Qué pasa ante una falla.</b> Siempre se llega al paso seguro: si falla el ABRIR o la espera se
  * cierra la válvula igual, porque un ACK perdido no prueba que la bomba no arrancó (idem la mediasombra,
  * que se enrolla). Si falla el paso seguro no se reintenta. Un comando sin ACK no se republica: el ACK
@@ -241,7 +248,7 @@ public class SecuenciaService implements UsoDelHardware {
         }
         switch (tipo) {
             case RIEGO -> {
-                int max = ContratoNodo.DURACION_VALVULA_MAX_SEG - props.getTimeoutAckValvulaSeg();
+                int max = ContratoNodo.DURACION_VALVULA_MAX_SEG;
                 int duracion = pedidos.duracionSeg() != null ? pedidos.duracionSeg() : DURACION_RIEGO_DEFECTO_SEG;
                 if (duracion < 1 || duracion > max) {
                     throw new SecuenciaInvalidaException(
@@ -281,7 +288,7 @@ public class SecuenciaService implements UsoDelHardware {
                 parametros, reloj.millis());
         switch (tipo) {
             case RIEGO -> {
-                p.duracionValvulaSeg = parametros.duracionSeg() + props.getTimeoutAckValvulaSeg();
+                p.duracionValvulaSeg = parametros.duracionSeg();
                 p.pasos.add(new Paso(1, ABRIR));
                 p.pasos.add(new Paso(2, ESPERAR));
                 p.pasos.add(new Paso(3, CERRAR));
@@ -358,11 +365,27 @@ public class SecuenciaService implements UsoDelHardware {
         paso.estado = EN_CURSO;
         paso.iniciadoEn = reloj.millis();
         switch (paso.tipo) {
-            case ABRIR -> publicarComando(p, paso, "valve", "ON", Map.of("durationSec", p.duracionValvulaSeg));
+            case ABRIR -> {
+                publicarComando(p, paso, "valve", "ON", Map.of("durationSec", p.duracionValvulaSeg));
+                // El firmware contesta el ON al FINAL del riego, no al abrir: publicar bien es todo lo que se
+                // verifica acá. El ACK se espera en ESPERAR, citando el commandId de este comando.
+                if (EN_CURSO.equals(paso.estado)) {
+                    p.comandoOnId = paso.commandId;
+                    cerrarYSeguir(p, paso, OK, null, null);
+                }
+            }
             case CERRAR -> publicarComando(p, paso, "valve", "OFF", Map.of());
             case DESPLEGAR -> publicarComando(p, paso, "shade", "SET", Map.of("targetPct", APERTURA_DESPLEGADA));
             case ENROLLAR -> publicarComando(p, paso, "shade", "SET", Map.of("targetPct", APERTURA_ENROLLADA));
-            case ESPERAR -> paso.esperaHasta = reloj.millis() + esperaSeg(p) * 1000L;
+            case ESPERAR -> {
+                long ahora = reloj.millis();
+                paso.esperaHasta = ahora + esperaSeg(p) * 1000L;
+                if (RIEGO.equals(p.tipo)) {
+                    // Espera el ACK del ON: llega cuando el riego termina (N s) o antes, si lo rechazan o lo cortan.
+                    paso.commandId = p.comandoOnId;
+                    paso.venceAckEn = paso.esperaHasta + props.getMargenAckRiegoSeg() * 1000L;
+                }
+            }
             case PEDIR -> {
                 p.pedidoEn = reloj.millis();
                 ComandoZonaPublisher.Resultado r = zonaPublisher.leerAhora(p.zonaId);
@@ -392,7 +415,7 @@ public class SecuenciaService implements UsoDelHardware {
 
     private void aplicarAck(SecuenciaInterna p, AckActuador ack) {
         Paso paso = enCurso(p);
-        if (paso == null || paso.commandId == null || !esDeComando(paso)
+        if (paso == null || paso.commandId == null || !esDeComando(p, paso)
                 || !Objects.equals(paso.commandId, ack.commandId())) {
             log.debug("ACK ignorado (commandId {} no es el del paso en curso)", ack.commandId());
             return;
@@ -411,13 +434,19 @@ public class SecuenciaService implements UsoDelHardware {
         long ahora = reloj.millis();
         switch (paso.tipo) {
             case ESPERAR -> {
-                if (ahora >= paso.esperaHasta) {
+                if (RIEGO.equals(p.tipo)) {
+                    // El paso termina con el ACK del ON (aplicarAck); acá sólo vence si no llega.
+                    if (ahora >= paso.venceAckEn) {
+                        cerrarYSeguir(p, paso, ERROR, "ACTUADOR_SIN_RESPUESTA", detalleDeError(p, paso,
+                                "ACTUADOR_SIN_RESPUESTA", null));
+                    }
+                } else if (ahora >= paso.esperaHasta) {
                     cerrarYSeguir(p, paso, OK, null, null);
                 }
             }
             case ESPERAR_TELEMETRIA -> revisarLectura(p, paso, recibidas);
             default -> {
-                int timeoutSeg = timeoutAckSeg(paso);
+                int timeoutSeg = timeoutAckSeg(p, paso);
                 if (ahora - paso.publicadoEn >= timeoutSeg * 1000L) {
                     cerrarYSeguir(p, paso, ERROR, "ACTUADOR_SIN_RESPUESTA", detalleDeError(p, paso,
                             "ACTUADOR_SIN_RESPUESTA", null));
@@ -513,19 +542,25 @@ public class SecuenciaService implements UsoDelHardware {
         return !LECTURA.equals(p.tipo) && paso == ultimo(p);
     }
 
-    private static boolean esDeComando(Paso paso) {
+    /** Pasos que esperan el ACK de un comando. En el riego, ABRIR no (se da por hecho al publicar): lo espera ESPERAR. */
+    private static boolean esDeComando(SecuenciaInterna p, Paso paso) {
         return switch (paso.tipo) {
-            case ABRIR, CERRAR, DESPLEGAR, ENROLLAR -> true;
+            case CERRAR, DESPLEGAR, ENROLLAR -> true;
+            case ESPERAR -> RIEGO.equals(p.tipo);
             default -> false;
         };
     }
 
-    private static boolean esValvula(Paso paso) {
-        return ABRIR.equals(paso.tipo) || CERRAR.equals(paso.tipo);
+    private static boolean esValvula(SecuenciaInterna p, Paso paso) {
+        return CERRAR.equals(paso.tipo) || ABRIR.equals(paso.tipo) || (ESPERAR.equals(paso.tipo) && RIEGO.equals(p.tipo));
     }
 
-    private int timeoutAckSeg(Paso paso) {
-        return esValvula(paso) ? props.getTimeoutAckValvulaSeg() : props.getTimeoutAckMediasombraSeg();
+    /** Plazo del ACK: el del OFF es corto; el del ON del riego es la duración N más el margen. */
+    private int timeoutAckSeg(SecuenciaInterna p, Paso paso) {
+        if (ESPERAR.equals(paso.tipo) && RIEGO.equals(p.tipo)) {
+            return p.duracionValvulaSeg + props.getMargenAckRiegoSeg();
+        }
+        return esValvula(p, paso) ? props.getTimeoutAckValvulaSeg() : props.getTimeoutAckMediasombraSeg();
     }
 
     private static int esperaSeg(SecuenciaInterna p) {
@@ -547,12 +582,14 @@ public class SecuenciaService implements UsoDelHardware {
     /** Texto legible del error (design §2.5). Para CERRAR avisa que el nodo apaga la bomba solo. */
     private String detalleDeError(SecuenciaInterna p, Paso paso, String codigo, String tipoOriginal) {
         String detalle = switch (codigo) {
-            case "ACTUADOR_SIN_RESPUESTA" -> (esValvula(paso) ? "La válvula" : "La mediasombra")
-                    + " no respondió en " + timeoutAckSeg(paso)
+            case "ACTUADOR_SIN_RESPUESTA" -> (esValvula(p, paso) ? "La válvula" : "La mediasombra")
+                    + " no respondió en " + timeoutAckSeg(p, paso)
                     + " s. ¿El ESP32 está encendido y conectado al broker?";
             case "FALLA_MECANICA" -> "La mediasombra no llegó al final de carrera.";
             case "REEMPLAZADO" -> "El movimiento fue interrumpido por otro comando.";
-            case "COMANDO_INVALIDO", "DURACION_INVALIDA", "ACTUADOR_DESCONOCIDO" ->
+            case "CANCELADO" -> "El riego fue cortado por otro comando antes de terminar.";
+            case "COMANDO_INVALIDO", "DURACION_INVALIDA", "ACTUADOR_DESCONOCIDO", "ACCION_INVALIDA",
+                 "SECTOR_INVALIDO", "PARAMETROS_INVALIDOS" ->
                     "El ESP32 rechazó el comando (" + tipoOriginal + ").";
             default -> "El actuador informó un error: " + Objects.toString(tipoOriginal, codigo);
         };
@@ -623,8 +660,10 @@ public class SecuenciaService implements UsoDelHardware {
         boolean cancelacionSolicitada;
         String error;
         LecturaSecuencia lectura;
-        /** durationSec del {@code valve ON}: el nodo apaga solo a ese plazo. Sólo riego. */
+        /** durationSec del {@code valve ON}: el nodo apaga solo a ese plazo (= duracionSeg). Sólo riego. */
         int duracionValvulaSeg;
+        /** commandId del {@code valve ON}: su ACK llega al final del riego y lo espera ESPERAR. Sólo riego. */
+        String comandoOnId;
         /** Hora del pedido de lectura; la respuesta es la primera telemetría recibida desde acá. */
         long pedidoEn;
 
@@ -650,6 +689,8 @@ public class SecuenciaService implements UsoDelHardware {
         Long iniciadoEn;
         Long terminadoEn;
         long publicadoEn;
+        /** Plazo del ACK del ON, para el ESPERAR del riego (N + margen). */
+        long venceAckEn;
 
         Paso(int n, String tipo) {
             this.n = n;
