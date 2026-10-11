@@ -111,12 +111,14 @@ BACKEND_USUARIO=simulador
 BACKEND_CLAVE=...
 ```
 
-- **La cuenta la da de alta el Administrador** desde el dashboard (vista Usuarios), como una
-  cuenta de servicio más. El backend no tiene usuario, rol ni permiso creado para el simulador:
-  borrar esta carpeta deja, como mucho, una cuenta sin uso que se da de baja desde la misma vista.
-- **Nace con clave temporal.** Hasta que se cambia, el backend responde `403` a todo. Entrá una
-  vez al dashboard con esa cuenta, cambiá la clave y poné la nueva en `BACKEND_CLAVE`. La barra
-  de estado lo avisa ("clave temporal").
+- **En desarrollo ya viene creada.** El `env.example` del backend la declara en
+  `YERBANALYTICS_USUARIOS_INICIALES` con la misma clave que trae `env.example` de acá, así que
+  copiando ambos `.env` entra sola. Es una entrada de configuración, no código: el backend no
+  tiene usuario, rol ni permiso programado para el simulador, y borrar esta carpeta deja, como
+  mucho, una cuenta sin uso que se da de baja desde la vista Usuarios (o se quita de la lista).
+- **Si la da de alta el Administrador** desde el dashboard, nace con clave temporal: hasta que se
+  cambia, el backend responde `403` a todo. Entrá una vez al dashboard con esa cuenta, cambiá la
+  clave y poné la nueva en `BACKEND_CLAVE`. La barra de estado lo avisa ("clave temporal").
 - **Cómo la usa.** El servidor inicia sesión la primera vez que necesita el backend, guarda la
   cookie `YERBA_SESION` en memoria y la adjunta a todo lo que reenvía `/backend/**` y al sondeo
   de estado (`server/backend-session.ts`). La cookie que traiga el navegador no se reenvía nunca:

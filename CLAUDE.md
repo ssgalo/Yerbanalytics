@@ -247,6 +247,10 @@ cd Desarrollo/backend
   tabla, no JWT: así la revocación y el cierre por inactividad son inmediatos y los decide el
   servidor. **Los `GET` no cuentan como actividad** (los sondeos no mantienen viva la sesión): no
   revertir sin leer el design de `add-login-y-permisos`.
+- **Las cuentas iniciales salen de `Desarrollo/backend/.env`** (plantilla `env.example`, importado con
+  `spring.config.import`): el Administrador (`YERBANALYTICS_ADMIN_*`) y una lista genérica
+  `YERBANALYTICS_USUARIOS_INICIALES` (`usuario:ROL:clave,…`). Se crean si no existen y nunca se pisan.
+  Sus claves de desarrollo coinciden con los `env.example` del simulador y de la inferencia.
 - **La auditoría de seguridad es append-only también en la base** (triggers que instala la app al
   arrancar). No la toques con `UPDATE`/`DELETE` ni le agregues endpoints de escritura.
 - **El backend no tiene modos de operación.** Ningún endpoint, tabla ni propiedad depende de
@@ -329,9 +333,10 @@ Invariantes a respetar al tocar esta área:
   Se descartó pasar por un endpoint del backend: ése era el acoplamiento que se vino a sacar.
 - **La UI habla con el backend a través de `/backend/**`**, el proxy de su propio servidor. Si
   llamara directo, el backend tendría que permitir su origen por CORS — y eso sería un rastro.
-- **Entra con una cuenta de rol Servicio** (`BACKEND_USUARIO`/`BACKEND_CLAVE` en su `.env`), que da
-  de alta el Administrador como a cualquier otra: el backend no tiene usuario, rol ni permiso
-  creado para él. Su servidor inicia sesión y adjunta la cookie en el proxy. Sin credenciales, la
+- **Entra con una cuenta de rol Servicio** (`BACKEND_USUARIO`/`BACKEND_CLAVE` en su `.env`). En
+  desarrollo la crea el backend al arrancar porque figura en `YERBANALYTICS_USUARIOS_INICIALES` de
+  su `.env` —una lista de configuración genérica—; el backend no tiene usuario, rol ni permiso
+  programado para él. Su servidor inicia sesión y adjunta la cookie en el proxy. Sin credenciales, la
   telemetría MQTT sigue saliendo y su UI avisa que el backend rechaza el resto.
 - **Su estado vive en `simulador/data/`**, nunca en la base del vivero.
 - **No tiene superficie de API propia en el sistema**: topología, órdenes de captura,

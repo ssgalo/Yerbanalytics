@@ -215,6 +215,43 @@ public class UsuarioService {
         return Optional.of(UsuarioDto.de(u));
     }
 
+    /**
+     * Crea una cuenta declarada en la configuración ({@code yerbanalytics.auth.usuarios-iniciales})
+     * si su nombre de usuario no existe, bajas incluidas. Nunca toca una cuenta existente: una vez
+     * creada, se administra desde la vista Usuarios como cualquier otra.
+     *
+     * <p>Las cuentas de rol {@link Rol#SERVICIO} nacen con la contraseña definitiva: no hay una
+     * persona que pueda cambiarla, y con clave temporal el backend las rechazaría. Las de personas
+     * nacen con clave temporal, igual que un alta desde el dashboard.
+     *
+     * @return el usuario creado, o vacío si ya existía
+     */
+    @Transactional
+    public Optional<UsuarioDto> crearUsuarioInicialSiFalta(String username, Rol rol, String clave) {
+        String normalizado = username == null ? "" : username.trim().toLowerCase();
+        if (!FORMATO_USERNAME.matcher(normalizado).matches()) {
+            throw new SeguridadExceptions.Invalida("El usuario inicial '" + username + "' no es válido: entre 3 y 40 "
+                    + "caracteres, letras, números, '.', '_' o '-'.");
+        }
+        ReglasClave.validar(normalizado, clave);
+        if (usuarios.existsByUsername(normalizado)) {
+            return Optional.empty();
+        }
+        UsuarioEntity u = new UsuarioEntity();
+        u.setUsername(normalizado);
+        u.setNombre(normalizado);
+        u.setRol(rol);
+        u.setEstado(EstadoUsuario.ACTIVO);
+        u.setClaveHash(encoder.encode(clave));
+        u.setDebeCambiarClave(rol != Rol.SERVICIO);
+        u.setCreadoEn(Instant.now(reloj));
+        usuarios.saveAndFlush(u);
+
+        auditoria.registrarComoSistema(TipoAuditoria.USUARIO_ALTA, ObjetivoAuditoria.USUARIO,
+                u.getUsername(), Map.of("nuevo", Map.of("nombre", u.getNombre(), "rol", u.getRol().name())));
+        return Optional.of(UsuarioDto.de(u));
+    }
+
     // ------------------------------------------------------------------
 
     private UsuarioDto cambiarEstado(UsuarioEntity u, EstadoUsuario nuevo, TipoAuditoria tipo, boolean revocar) {

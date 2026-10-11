@@ -132,6 +132,23 @@ if (-not (Test-Path $frontEnv)) {
     Write-Host ""
 }
 
+# El .env del backend trae las credenciales iniciales (admin y cuentas de servicio). Las del
+# simulador coinciden con las de desarrollo del backend: con ambos copiados, todo entra solo.
+$backEnv = Join-Path $backendDir ".env"
+if (-not (Test-Path $backEnv)) {
+    Copy-Item (Join-Path $backendDir "env.example") $backEnv
+    Write-Host "[setup] .env del backend creado desde env.example (credenciales de desarrollo)." -ForegroundColor Yellow
+    Write-Host ""
+}
+if ($haySimulador) {
+    $simEnv = Join-Path $simuladorDir ".env"
+    if (-not (Test-Path $simEnv)) {
+        Copy-Item (Join-Path $simuladorDir "env.example") $simEnv
+        Write-Host "[setup] .env del simulador creado desde env.example." -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
+
 $inferenciaDir = Join-Path $ScriptRoot "Desarrollo\servicio-inferencia"
 $hayInferencia = Test-Path $inferenciaDir
 

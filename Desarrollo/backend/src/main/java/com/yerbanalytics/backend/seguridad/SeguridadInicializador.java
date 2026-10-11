@@ -14,7 +14,10 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 
 /**
  * Pone la seguridad en condiciones al arrancar, en este orden:
@@ -25,6 +28,10 @@ import java.util.Base64;
  *       que Hibernate creó la tabla. No es una migración manual más: se aplica sola.</li>
  *   <li>Siembra la matriz por defecto si la tabla está vacía, y la fila de la política de sesión.</li>
  *   <li>Crea el Administrador inicial si no hay ninguno activo (design D9).</li>
+ *   <li>Crea las cuentas declaradas en {@code yerbanalytics.auth.usuarios-iniciales} que no
+ *       existan. Así un clon nuevo arranca con las cuentas de servicio que el simulador y la
+ *       inferencia esperan en su {@code .env}, sin pasar por el dashboard. El backend no sabe
+ *       para qué es cada una: es una lista de configuración, no código.</li>
  * </ol>
  */
 @Component
@@ -41,17 +48,20 @@ public class SeguridadInicializador implements ApplicationRunner {
     private final UsuarioService usuarios;
     private final String adminUsuario;
     private final String adminClave;
+    private final String usuariosIniciales;
 
     public SeguridadInicializador(JdbcTemplate jdbc, RolPermisoService matriz, PoliticaSesionService politica,
                                   UsuarioService usuarios,
                                   @Value("${yerbanalytics.auth.admin-inicial.usuario:admin}") String adminUsuario,
-                                  @Value("${yerbanalytics.auth.admin-inicial.clave:}") String adminClave) {
+                                  @Value("${yerbanalytics.auth.admin-inicial.clave:}") String adminClave,
+                                  @Value("${yerbanalytics.auth.usuarios-iniciales:}") String usuariosIniciales) {
         this.jdbc = jdbc;
         this.matriz = matriz;
         this.politica = politica;
         this.usuarios = usuarios;
         this.adminUsuario = adminUsuario;
         this.adminClave = adminClave;
+        this.usuariosIniciales = usuariosIniciales;
     }
 
     @Override
@@ -62,6 +72,7 @@ public class SeguridadInicializador implements ApplicationRunner {
         }
         politica.asegurarFila();
         crearAdministradorInicial();
+        crearUsuariosIniciales();
     }
 
     void instalarTriggersAuditoria() {
@@ -107,6 +118,48 @@ public class SeguridadInicializador implements ApplicationRunner {
                         + "en el primer ingreso", u.username());
             }
         });
+    }
+
+    /** Una entrada de {@code yerbanalytics.auth.usuarios-iniciales}. */
+    record UsuarioInicial(String username, Rol rol, String clave) {}
+
+    private void crearUsuariosIniciales() {
+        for (UsuarioInicial ui : parsearUsuariosIniciales(usuariosIniciales)) {
+            usuarios.crearUsuarioInicialSiFalta(ui.username(), ui.rol(), ui.clave()).ifPresent(u ->
+                    log.info("Usuario inicial '{}' creado con rol {}", u.username(), u.rol().getNombre()));
+        }
+    }
+
+    /**
+     * Formato: {@code usuario:ROL:clave} separados por coma, p. ej.
+     * {@code simulador:SERVICIO:una-clave,ana:OPERARIO:otra-clave}. La clave es lo que sigue al
+     * segundo ':' (puede contener ':'), pero no comas. Una entrada mal formada frena el arranque:
+     * es preferible a descubrir después que una integración no puede entrar.
+     */
+    static List<UsuarioInicial> parsearUsuariosIniciales(String valor) {
+        List<UsuarioInicial> lista = new ArrayList<>();
+        if (valor == null || valor.isBlank()) {
+            return lista;
+        }
+        for (String entrada : valor.split(",")) {
+            if (entrada.isBlank()) {
+                continue;
+            }
+            String[] partes = entrada.trim().split(":", 3);
+            if (partes.length != 3 || partes[0].isBlank() || partes[2].isEmpty()) {
+                throw new IllegalStateException("yerbanalytics.auth.usuarios-iniciales: la entrada '"
+                        + partes[0] + ":…' no respeta el formato usuario:ROL:clave");
+            }
+            Rol rol;
+            try {
+                rol = Rol.valueOf(partes[1].trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalStateException("yerbanalytics.auth.usuarios-iniciales: el rol '" + partes[1]
+                        + "' de '" + partes[0] + "' no existe (usá " + Arrays.toString(Rol.values()) + ")");
+            }
+            lista.add(new UsuarioInicial(partes[0].trim(), rol, partes[2]));
+        }
+        return lista;
     }
 
     private static String claveAleatoria() {

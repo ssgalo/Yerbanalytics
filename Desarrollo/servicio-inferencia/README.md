@@ -21,12 +21,15 @@ El backend asigna el diagnóstico al sector internamente vía la relación `capt
 ## Cuenta de servicio
 
 El backend exige sesión de usuario en toda `/api/**`, y este servicio entra como cualquier otro
-cliente: con una cuenta de rol **Servicio** (`BACKEND_USUARIO` / `BACKEND_CLAVE`). El backend no
-tiene nada creado para la inferencia; la cuenta la da de alta el Administrador desde el dashboard
-(vista Usuarios), y el rol ya trae lo que hace falta (`capturas.ver`, `diagnosticos.registrar`).
+cliente: con una cuenta de rol **Servicio** (`BACKEND_USUARIO` / `BACKEND_CLAVE`). El rol ya trae
+lo que hace falta (`capturas.ver`, `diagnosticos.registrar`).
 
-- **Nace con clave temporal.** Hasta que se cambia, el backend responde `403` a todo. Entrá una
-  vez al dashboard con esa cuenta, cambiá la clave y poné la nueva en `BACKEND_CLAVE`.
+- **En desarrollo ya viene creada.** El `env.example` del backend la declara en
+  `YERBANALYTICS_USUARIOS_INICIALES` (`inferencia` / `inferencia-yerba-2026`), la misma que traen
+  `.env.example` y el default de `docker-compose.yml`. En otro entorno, cambiá la clave en los dos lados.
+- **Si la da de alta el Administrador** desde el dashboard, nace con clave temporal: hasta que se
+  cambia, el backend responde `403` a todo. Entrá una vez con esa cuenta, cambiá la clave y poné la
+  nueva en `BACKEND_CLAVE`.
 - **Login perezoso.** La primera llamada inicia sesión; la cookie `YERBA_SESION` queda en un
   `requests.Session` del módulo (`src/api.py`).
 - **Sesión vencida.** Entre ciclos (4 h por defecto) la sesión vence por inactividad: la próxima

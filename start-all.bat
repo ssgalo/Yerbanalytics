@@ -89,6 +89,19 @@ if not exist "Desarrollo\frontend\.env" (
     echo.
 )
 
+:: El .env del backend trae las credenciales iniciales (admin y cuentas de servicio). Las del
+:: simulador coinciden con las de desarrollo del backend: con ambos copiados, todo entra solo.
+if not exist "Desarrollo\backend\.env" (
+    copy /y "Desarrollo\backend\env.example" "Desarrollo\backend\.env" >nul
+    echo [setup] .env del backend creado desde env.example ^(credenciales de desarrollo^).
+    echo.
+)
+if exist "Desarrollo\simulador" if not exist "Desarrollo\simulador\.env" (
+    copy /y "Desarrollo\simulador\env.example" "Desarrollo\simulador\.env" >nul
+    echo [setup] .env del simulador creado desde env.example.
+    echo.
+)
+
 :: Si el servicio de inferencia existe pero no tiene .env, copiar el ejemplo.
 :: Sin .env el contenedor crashea porque MODEL_PATH es obligatoria.
 set "HAY_INFERENCIA=0"

@@ -18,9 +18,11 @@ mvn spring-boot:run
 
 La API quedará escuchando en `http://localhost:8000`.
 
-**Primer arranque contra una base vacía:** se crea el Administrador inicial (`admin`). Definí antes
-su contraseña temporal con `YERBANALYTICS_ADMIN_CLAVE`; si no, se genera una y aparece **una sola
-vez** en el log de arranque. Detalle en [Autenticación y permisos](#autenticación-y-permisos-hu-01--hu-20).
+**Primer arranque contra una base vacía:** copiá `env.example` a `.env` (lo hace `start-all` si
+falta). El backend lo lee al arrancar y crea el Administrador inicial (`admin` / `admin-yerba-2026`,
+con cambio de clave en el primer ingreso) y las cuentas de servicio que esperan el simulador y la
+inferencia, con las mismas claves de desarrollo que sus `env.example`. Sin `YERBANALYTICS_ADMIN_CLAVE`,
+la clave del admin se genera y aparece **una sola vez** en el log de arranque. Detalle en [Autenticación y permisos](#autenticación-y-permisos-hu-01--hu-20).
 
 ## Configuración
 
@@ -260,10 +262,19 @@ base podría recalcularla entera.
 
 | Propiedad | Default | Para qué |
 |---|---|---|
-| `yerbanalytics.auth.admin-inicial.usuario` | `admin` | Nombre del Administrador que se crea si no hay ninguno activo |
+| `yerbanalytics.auth.admin-inicial.usuario` | `${YERBANALYTICS_ADMIN_USUARIO:admin}` | Nombre del Administrador que se crea si no hay ninguno activo |
 | `yerbanalytics.auth.admin-inicial.clave` | `${YERBANALYTICS_ADMIN_CLAVE:}` | Su contraseña temporal. Vacía → se genera y se loguea una vez |
+| `yerbanalytics.auth.usuarios-iniciales` | `${YERBANALYTICS_USUARIOS_INICIALES:}` | Cuentas `usuario:ROL:clave,…` que se crean si su usuario no existe |
 | `yerbanalytics.auth.cookie-secure` | `false` | Atributo `Secure` de la cookie. Encendelo si todo va por HTTPS |
 | `yerbanalytics.auth.barrido-cron` | `0 30 3 * * *` | Barrido de sesiones viejas |
+
+Las variables se leen de `Desarrollo/backend/.env` (plantilla: `env.example`, no se versiona) vía
+`spring.config.import`; una variable de entorno del sistema con el mismo nombre le gana al archivo.
+Los **usuarios iniciales** se crean sólo si el nombre no existe (bajas incluidas) y **nunca se
+modifican después**: cambiar la clave en `.env` no toca una cuenta ya creada (eso se hace desde la
+vista Usuarios). Las de rol `SERVICIO` nacen con la clave definitiva, porque no hay persona que pueda
+cambiarla; las de personas, con clave temporal. Cada alta queda en la auditoría como `USUARIO_ALTA`
+del sistema. Una entrada mal formada o una clave que no cumple las reglas frena el arranque.
 
 > **Dashboard y API tienen que compartir esquema y host.** `localhost:5173` → `localhost:8000`
 > (o `IP:5173` → `IP:8000`) es *same-site* y la cookie viaja. Si el dashboard va por `http` y

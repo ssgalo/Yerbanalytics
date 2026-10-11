@@ -40,11 +40,12 @@ services:
     environment:
       # URL del backend (Spring Boot) que corre en la máquina host en el puerto 8000
       BACKEND_URL: http://host.docker.internal:8000
-      # Cuenta de rol Servicio con la que inicia sesión en el backend. La da de alta el
-      # Administrador desde el dashboard; la clave se pasa por entorno, nunca en este archivo:
+      # Cuenta de rol Servicio con la que inicia sesión en el backend. El backend la crea al
+      # arrancar (YERBANALYTICS_USUARIOS_INICIALES en Desarrollo/backend/env.example). El default
+      # es la clave de DESARROLLO de ese archivo; fuera de desarrollo se pasa por entorno:
       #     INFERENCIA_BACKEND_CLAVE=... docker compose up -d servicio-inferencia
       BACKEND_USUARIO: ${INFERENCIA_BACKEND_USUARIO:-inferencia}
-      BACKEND_CLAVE: ${INFERENCIA_BACKEND_CLAVE:-}
+      BACKEND_CLAVE: ${INFERENCIA_BACKEND_CLAVE:-inferencia-yerba-2026}
       # Directorio de capturas montado como volumen compartido.
       CAPTURAS_DIR: /capturas
       # Intervalo de polling en segundos. El default de 4 horas es el ritmo de
