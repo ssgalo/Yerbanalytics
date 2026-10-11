@@ -10,7 +10,7 @@ import { theme } from './theme';
 
 const SRC = join(__dirname, '..');
 const RETIRADOS = /--(g900|g800|g700|orange|orange-soft|cream|cdim|cfaint)\b/;
-const PALETA_VIEJA = /#(3fa06a|e0972c|dd5238|a9b2ab|3b82f6|ec6a1e)\b/i;
+const PALETA_VIEJA = /#(3fa06a|e0972c|dd5238|a9b2ab|3b82f6)\b/i;
 
 function archivos(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {

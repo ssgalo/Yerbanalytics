@@ -15,10 +15,13 @@
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
+/* Hover: borde y halo naranja de acento; el verde/tinta sigue siendo el relleno. */
 .btn:hover {
   background: var(--card-2);
-  border-color: #cfd6cd;
+  border-color: var(--accent-line);
+  box-shadow: var(--accent-glow);
 }
 .primary {
   background: var(--ink);
@@ -26,16 +29,18 @@
   color: var(--on-brand);
 }
 .primary:hover {
-  background: var(--ink-2);
-  border-color: var(--ink-2);
+  background: var(--brand);
+  border-color: var(--accent);
 }
 .ghost {
   border-color: transparent;
   background: none;
 }
 .ghost:hover {
-  background: rgba(21, 35, 27, 0.05);
+  background: var(--accent-soft);
   border-color: transparent;
+  box-shadow: none;
+  color: var(--accent-ink);
 }
 .danger {
   color: var(--crit-ink);
@@ -44,6 +49,7 @@
 .danger:hover {
   background: var(--crit-soft);
   border-color: #e6b3a6;
+  box-shadow: none;
 }
 .sm {
   height: 32px;
@@ -70,5 +76,6 @@
   cursor: pointer;
 }
 .link:hover {
-  color: var(--ink);
+  color: var(--accent-ink);
+  text-decoration-color: var(--accent);
 }

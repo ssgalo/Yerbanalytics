@@ -24,6 +24,7 @@
   height: 38px;
   border-radius: 11px;
   background: var(--brand);
+  box-shadow: inset 0 -3px 0 var(--accent), 0 4px 16px -4px rgba(236, 106, 30, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +92,11 @@
   background: var(--bg);
 }
 
-/* Ítem activo: fondo yerba suave y una barra de marca pegada al borde del sidebar. */
+.item:hover svg {
+  color: var(--accent);
+}
+
+/* Ítem activo: fondo yerba suave y una barra naranja de acento pegada al borde del sidebar. */
 .itemActive {
   background: var(--brand-soft);
   color: var(--ink);
@@ -110,11 +115,16 @@
   bottom: 8px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--brand);
+  background: var(--accent);
+  box-shadow: 0 0 10px 1px rgba(236, 106, 30, 0.55);
 }
 
 .itemActive:hover {
   background: var(--brand-soft);
+}
+
+.itemActive:hover svg {
+  color: var(--brand);
 }
 
 .count {

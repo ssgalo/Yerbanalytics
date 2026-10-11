@@ -26,6 +26,14 @@
   --brand: #2c6a4f; /* marca, ítem activo, links */
   --brand-soft: #e6efe9;
 
+  /* acento: naranja de la marca original. SÓLO detalles decorativos (barra del ítem activo,
+     avatar, subrayados); nunca para estado, que ya tiene --crit/--warn. */
+  --accent: #ec6a1e;
+  --accent-soft: #fdeadd;
+  --accent-ink: #a8470f; /* texto naranja sobre blanco (5,2:1) */
+  --accent-line: #f5b48c;
+  --accent-glow: 0 0 0 3px rgba(236, 106, 30, 0.16), 0 4px 14px -4px rgba(236, 106, 30, 0.45);
+
   /* estados: los únicos colores saturados. Relleno = --x; texto = --x-ink. */
   --ok: #2f9b62;
   --ok-soft: #e3f2e8;

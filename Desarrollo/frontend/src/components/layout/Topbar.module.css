@@ -76,7 +76,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent-line);
   color: var(--on-brand);
   display: flex;
   align-items: center;
