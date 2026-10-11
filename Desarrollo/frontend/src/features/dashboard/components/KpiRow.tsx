@@ -20,7 +20,7 @@ export function KpiRow({ stats }: KpiRowProps) {
         <div className={styles.baseline}>
           <span
             className={styles.mainNumber}
-            style={{ color: 'var(--ok)' }}
+            style={{ color: 'var(--ok-ink)' }}
           >
             {stats.sano}
           </span>
@@ -41,7 +41,7 @@ export function KpiRow({ stats }: KpiRowProps) {
         <div className={styles.baseline}>
           <span
             className={styles.mainNumber}
-            style={{ color: 'var(--warn)' }}
+            style={{ color: 'var(--warn-ink)' }}
           >
             {alerta}
           </span>
@@ -50,7 +50,7 @@ export function KpiRow({ stats }: KpiRowProps) {
         <div className={styles.chips}>
           <span
             className={styles.chip}
-            style={{ background: 'var(--warn-soft)', color: '#A66A12' }}
+            style={{ background: 'var(--warn-soft)', color: 'var(--warn-ink)' }}
           >
             <span
               className={styles.chipDot}
@@ -60,7 +60,7 @@ export function KpiRow({ stats }: KpiRowProps) {
           </span>
           <span
             className={styles.chip}
-            style={{ background: 'var(--crit-soft)', color: '#A8331C' }}
+            style={{ background: 'var(--crit-soft)', color: 'var(--crit-ink)' }}
           >
             <span
               className={styles.chipDot}
@@ -70,7 +70,7 @@ export function KpiRow({ stats }: KpiRowProps) {
           </span>
           <span
             className={styles.chip}
-            style={{ background: 'var(--off-soft)', color: 'var(--muted)' }}
+            style={{ background: 'var(--off-soft)', color: 'var(--off-ink)' }}
           >
             <span
               className={styles.chipDot}
@@ -81,18 +81,10 @@ export function KpiRow({ stats }: KpiRowProps) {
         </div>
       </div>
 
-      {/* KPI 3 — Acciones autónomas (fondo oscuro) */}
-      <div
-        className={styles.cardDark}
-        style={{ background: 'linear-gradient(150deg,var(--g800),var(--g700))', border: '1px solid var(--g700)' }}
-      >
+      {/* KPI 3 — Acciones autónomas: en agua, el color de "el sistema actuó" */}
+      <div className={styles.cardSys}>
         <div className={styles.labelDim}>Acciones autónomas hoy</div>
-        <div
-          className={styles.mainNumber}
-          style={{ color: 'var(--cream)' }}
-        >
-          {stats.actToday}
-        </div>
+        <div className={styles.mainNumber}>{stats.actToday}</div>
         <div className={styles.actRow}>
           <span><b className={styles.actNum}>{stats.actRiego}</b> riego</span>
           <span><b className={styles.actNum}>{stats.actInsumo}</b> insumo</span>

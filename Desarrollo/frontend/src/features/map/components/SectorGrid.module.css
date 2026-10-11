@@ -32,6 +32,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.82);
   transition: transform 0.12s;
@@ -40,7 +41,7 @@
 
 .cell:hover {
   transform: scale(1.12);
-  box-shadow: 0 5px 14px rgba(12, 35, 25, 0.32);
+  box-shadow: 0 5px 14px rgba(21, 35, 27, 0.32);
   z-index: 2;
   position: relative;
 }

@@ -59,6 +59,7 @@
 
 .zonaName {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
@@ -73,7 +74,7 @@
   width: 13px;
   height: 13px;
   border-radius: 2px;
-  background: var(--off, #a9b2ab);
+  background: var(--off);
   opacity: 0.55;
   animation: cellIn 0.22s ease-out both;
 }

@@ -10,6 +10,7 @@
 .title {
   margin: 0 0 4px;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 17px;
   font-weight: 600;
 }
@@ -95,13 +96,14 @@
 
 .evTitle {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 13.5px;
   font-weight: 600;
 }
 
 .evTime {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .evDetail {
@@ -116,7 +118,7 @@
   padding: 20px;
   text-align: center;
   font-size: 13px;
-  color: var(--faint);
+  color: var(--muted);
   background: var(--surface-sunken, rgba(0,0,0,0.04));
   border-radius: 10px;
   border: 1px dashed var(--line);

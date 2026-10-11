@@ -60,7 +60,7 @@ export function NurseryProvider({ children, habilitado = true }: NurseryProvider
 
   if (error) {
     return (
-      <div style={{ padding: 40, fontFamily: 'var(--font-body)', color: 'var(--crit)' }}>
+      <div style={{ padding: 40, fontFamily: 'var(--font-body)', color: 'var(--crit-ink)' }}>
         No se pudo cargar el vivero: {error.message}
       </div>
     );

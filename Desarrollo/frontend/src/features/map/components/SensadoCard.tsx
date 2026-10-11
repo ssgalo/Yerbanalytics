@@ -112,7 +112,7 @@ function MetricButton({ tile, active, onSelect }: MetricButtonProps) {
 
       <span className={styles.valueRow}>
         {/* Sin lectura: se muestra el guión sin color de estado, para no fingir un dato */}
-        <span className={styles.value} style={{ color: sinDato ? 'var(--faint)' : tile.color }}>
+        <span className={styles.value} style={{ color: sinDato ? 'var(--muted)' : tile.color }}>
           {tile.value}
         </span>
         {!sinDato && <span className={styles.unit}>{tile.unit}</span>}

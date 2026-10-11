@@ -1,0 +1,74 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-15);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--card-2);
+  border-color: #cfd6cd;
+}
+.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-brand);
+}
+.primary:hover {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+}
+.ghost {
+  border-color: transparent;
+  background: none;
+}
+.ghost:hover {
+  background: rgba(21, 35, 27, 0.05);
+  border-color: transparent;
+}
+.danger {
+  color: var(--crit-ink);
+  border-color: var(--crit-line);
+}
+.danger:hover {
+  background: var(--crit-soft);
+  border-color: #e6b3a6;
+}
+.sm {
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--t-13);
+}
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Acción secundaria con aspecto de enlace, dentro de un texto. */
+.link {
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.link:hover {
+  color: var(--ink);
+}

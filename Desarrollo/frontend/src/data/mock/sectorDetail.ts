@@ -53,9 +53,9 @@ export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: s
     const enCola = a.state === 'En cola';
     return {
       ...a,
-      soft: a.active ? '#E7F1EA' : enCola ? '#FBF0DC' : '#F0EFE7',
-      ink: a.active ? '#2E7A4F' : enCola ? '#8A5A10' : '#6A776E',
-      dot: a.active ? '#3FA06A' : enCola ? '#E0972C' : '#A9B2AB',
+      soft: a.active ? '#E3F2E8' : enCola ? '#FBF0D9' : '#E9ECE6',
+      ink: a.active ? '#1E6B41' : enCola ? '#7A5310' : '#545C57',
+      dot: a.active ? '#2F9B62' : enCola ? '#E2A230' : '#9BA39E',
     };
   });
 
@@ -83,8 +83,8 @@ export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: s
     delta: (delta >= 0 ? '+' : '') + delta.toFixed(0),
     latencia: '2 h',
     verdict: evoVerdict,
-    vSoft: evoVerdict === 'Efectiva' ? '#E7F1EA' : '#F3ECDD',
-    vInk: evoVerdict === 'Efectiva' ? '#2E7A4F' : '#8A6A22',
+    vSoft: evoVerdict === 'Efectiva' ? '#E3F2E8' : '#E2ECF8',
+    vInk: evoVerdict === 'Efectiva' ? '#1E6B41' : '#1F4F86',
   };
 
   return {
@@ -94,19 +94,19 @@ export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: s
     evo,
     statusSoft:
       s.status === 'ok'
-        ? '#E7F1EA'
+        ? '#E3F2E8'
         : s.status === 'warning'
-          ? '#FBF0DC'
+          ? '#FBF0D9'
           : s.status === 'critical'
-            ? '#FBE6E0'
-            : '#EEEDE5',
+            ? '#FBE3DD'
+            : '#ECEEEB',
     statusInk:
       s.status === 'ok'
-        ? '#2E7A4F'
+        ? '#1E6B41'
         : s.status === 'warning'
-          ? '#A66A12'
+          ? '#7A5310'
           : s.status === 'critical'
-            ? '#A8331C'
-            : '#6A776E',
+            ? '#9A2B17'
+            : '#545C57',
   };
 }

@@ -21,7 +21,7 @@
 }
 
 .chip[data-estado='low'] {
-  color: var(--warn);
+  color: var(--warn-ink);
   border-color: var(--warn);
   background: var(--warn-soft);
 }
@@ -31,7 +31,7 @@
 }
 
 .chip[data-estado='stale'] {
-  color: var(--off);
+  color: var(--off-ink);
 }
 
 .chip[data-estado='stale'] .dot {

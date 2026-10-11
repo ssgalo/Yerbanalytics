@@ -23,6 +23,7 @@ import '@xyflow/react/dist/style.css';
 import type { ActionRecord, DagSchema, TrazaEvaluacion } from '@/types/domain';
 import { computeLayout } from './layoutDag';
 import { TrazaGraph } from './TrazaGraph';
+import { theme } from '@/styles/theme';
 import styles from './RuleGraph.module.css';
 
 // -----------------------------------------------------------------------
@@ -30,9 +31,9 @@ import styles from './RuleGraph.module.css';
 // -----------------------------------------------------------------------
 
 const STYLE_IDLE: React.CSSProperties = {
-  background: '#1e293b',
-  border: '1.5px solid #334155',
-  color: '#94a3b8',
+  background: 'var(--tray-2)',
+  border: '1.5px solid var(--tray-line)',
+  color: 'var(--on-tray-muted)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 500,
@@ -40,9 +41,9 @@ const STYLE_IDLE: React.CSSProperties = {
 };
 
 const STYLE_PASSED: React.CSSProperties = {
-  background: '#14532d',
-  border: '2px solid #22c55e',
-  color: '#bbf7d0',
+background: 'color-mix(in srgb, var(--ok) 18%, var(--tray))',
+  border: '2px solid var(--ok)',
+  color: 'var(--on-tray)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 600,
@@ -50,51 +51,52 @@ const STYLE_PASSED: React.CSSProperties = {
 };
 
 const STYLE_BLOCKED: React.CSSProperties = {
-  background: '#450a0a',
-  border: '2px solid #ef4444',
-  color: '#fecaca',
+background: 'color-mix(in srgb, var(--crit) 18%, var(--tray))',
+  border: '2px solid var(--crit)',
+  color: 'var(--on-tray)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 700,
   width: 180,
-  boxShadow: '0 0 12px rgba(239,68,68,0.4)',
+  boxShadow: '0 0 12px color-mix(in srgb, var(--crit) 40%, transparent)',
 };
 
 const STYLE_POSTPONED: React.CSSProperties = {
-  background: '#422006',
-  border: '2px solid #f59e0b',
-  color: '#fde68a',
+background: 'color-mix(in srgb, var(--warn) 18%, var(--tray))',
+  border: '2px solid var(--warn)',
+  color: 'var(--on-tray)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 700,
   width: 180,
-  boxShadow: '0 0 12px rgba(245,158,11,0.4)',
+  boxShadow: '0 0 12px color-mix(in srgb, var(--warn) 40%, transparent)',
 };
 
 const STYLE_ACTION: React.CSSProperties = {
-  background: '#0c2a6b',
-  border: '2px solid #3b82f6',
-  color: '#bfdbfe',
+background: 'color-mix(in srgb, var(--info) 22%, var(--tray))',
+  border: '2px solid var(--info)',
+  color: 'var(--on-tray)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 700,
   width: 180,
-  boxShadow: '0 0 12px rgba(59,130,246,0.4)',
+  boxShadow: '0 0 12px color-mix(in srgb, var(--info) 40%, transparent)',
 };
 
 const STYLE_SKIPPED: React.CSSProperties = {
-  background: '#0f172a',
-  border: '1.5px dashed #1e293b',
-  color: '#334155',
+  background: 'var(--tray)',
+  border: '1.5px dashed var(--tray-line)',
+  color: 'var(--on-tray-muted)',
+  opacity: 0.6,
   borderRadius: 10,
   fontSize: 12,
   width: 180,
 };
 
 const STYLE_START: React.CSSProperties = {
-  background: '#1e3a5f',
-  border: '1.5px solid #3b82f6',
-  color: '#93c5fd',
+  background: 'var(--tray-2)',
+  border: '1.5px solid var(--brand)',
+  color: 'var(--on-tray)',
   borderRadius: 20,
   fontSize: 11,
   fontWeight: 600,
@@ -102,18 +104,18 @@ const STYLE_START: React.CSSProperties = {
 };
 
 const STYLE_ABORT_TERMINAL: React.CSSProperties = {
-  background: '#1c0606',
-  border: '1.5px solid #7f1d1d',
-  color: '#f87171',
+  background: 'color-mix(in srgb, var(--crit) 10%, var(--tray))',
+  border: '1.5px solid color-mix(in srgb, var(--crit) 55%, var(--tray))',
+  color: 'var(--on-tray)',
   borderRadius: 10,
   fontSize: 11,
   width: 160,
 };
 
 const STYLE_SUCCESS_TERMINAL: React.CSSProperties = {
-  background: '#052e16',
-  border: '1.5px solid #15803d',
-  color: '#4ade80',
+  background: 'color-mix(in srgb, var(--ok) 10%, var(--tray))',
+  border: '1.5px solid color-mix(in srgb, var(--ok) 55%, var(--tray))',
+  color: 'var(--on-tray)',
   borderRadius: 10,
   fontSize: 11,
   width: 160,
@@ -264,7 +266,7 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
   const buildEdges = useCallback((): Edge[] => {
     return filteredSchema.edges.map((e) => {
       let animated = false;
-      let strokeColor = '#334155';
+      let strokeColor = 'var(--tray-line)';
 
       if (activeEvents && activeEvents.length > 0) {
         const sourceNode = filteredSchema.nodes.find((n) => n.id === e.source);
@@ -286,21 +288,21 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
 
             if (e.label === 'Continúa' && srcPriority < evNode.priority && tgtPriority <= evNode.priority) {
               animated = true;
-              strokeColor = '#22c55e';
+              strokeColor = 'var(--ok)';
             } else if (
               e.source === ruleName &&
               (e.target.startsWith('abort-') || e.label === 'Bloquea') &&
               isBlock
             ) {
               animated = true;
-              strokeColor = isPostpone(ev) ? '#f59e0b' : '#ef4444';
+              strokeColor = isPostpone(ev) ? 'var(--warn)' : 'var(--crit)';
             } else if (e.target.startsWith('success-') && isActionEvent(ev) && e.source === ruleName) {
               animated = true;
-              strokeColor = '#3b82f6';
+              strokeColor = 'var(--info)';
             } else if (e.source === ruleName && e.target.startsWith('success-') && isPass) {
               // Si la regla terminal (RiegoRule) devolvió NOOP_INFO, llega al final verde.
               animated = true;
-              strokeColor = '#22c55e';
+              strokeColor = 'var(--ok)';
             }
           }
         });
@@ -314,8 +316,8 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
         animated,
         style: { stroke: strokeColor, strokeWidth: animated ? 2 : 1 },
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
-        labelStyle: { fontSize: 10, fill: '#64748b' },
-        labelBgStyle: { fill: '#0f172a', fillOpacity: 0.9 },
+        labelStyle: { fontSize: 10, fill: 'var(--on-tray-muted)' },
+        labelBgStyle: { fill: 'var(--tray)', fillOpacity: 0.9 },
       };
     });
   }, [filteredSchema, activeEvents]);
@@ -356,9 +358,9 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
         style={{ width: '100%', height: '100%' }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1e293b" gap={20} size={1} />
+        <Background color="var(--tray-2)" gap={20} size={1} />
         <Controls showInteractive={false} />
-        <MiniMap nodeColor={(n) => (n.style as React.CSSProperties)?.borderColor ?? '#334155'} />
+        <MiniMap nodeColor={(n) => (n.style as React.CSSProperties)?.borderColor ?? theme.trayLine} />
       </ReactFlow>
 
       {/* Leyenda */}

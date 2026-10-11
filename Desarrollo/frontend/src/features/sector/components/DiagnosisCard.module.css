@@ -7,6 +7,7 @@
 .title {
   margin: 0 0 14px;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 16px;
   font-weight: 600;
 }
@@ -49,7 +50,7 @@
   right: 9px;
   padding: 3px 8px;
   border-radius: 7px;
-  background: rgba(12, 35, 25, 0.45);
+  background: rgba(21, 35, 27, 0.45);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -83,6 +84,7 @@
 
 .estadoText {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 22px;
   font-weight: 700;
 }
@@ -104,6 +106,7 @@
   font-weight: 700;
   color: var(--ink);
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
 }
 
 /* Caja concluyente */
@@ -118,7 +121,7 @@
 
 .conclusionText {
   font-size: 12.5px;
-  color: #2e7a4f;
+  color: var(--ok-ink);
   line-height: 1.45;
 }
 
@@ -128,12 +131,12 @@
   gap: 9px;
   margin-top: 15px;
   padding: 11px 13px;
-  background: #fff3cd;
+  background: var(--warn-soft);
   border-radius: 11px;
 }
 
 .warningText {
   font-size: 12.5px;
-  color: #856404;
+  color: var(--warn-ink);
   line-height: 1.45;
 }

@@ -1,0 +1,121 @@
+/* ── composición: cuántos sectores hay en cada estado ── */
+.compbar {
+  display: flex;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+}
+.compbar > i {
+  display: block;
+  height: 100%;
+}
+/* La trama es la forma: observación rayada, sin señal en líneas finas. */
+.compbar .ok {
+  background: var(--ok);
+}
+.compbar .warn {
+  background: repeating-linear-gradient(135deg, var(--warn) 0 5px, #edbd62 5px 8px);
+}
+.compbar .crit {
+  background: var(--crit);
+}
+.compbar .off {
+  background: repeating-linear-gradient(90deg, var(--off) 0 1.5px, var(--off-soft) 1.5px 5px);
+}
+
+/* ── valor contra su rango: bandas crítico / observación / ideal ── */
+.rangebar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--crit-soft);
+}
+.rangebar .bandWarn,
+.rangebar .bandIdeal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.rangebar .bandWarn {
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+}
+.rangebar .bandIdeal {
+  background: #cfe8d8;
+  box-shadow: inset 0 0 0 1px #b4dbc2;
+}
+.mark {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--card);
+}
+.scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+  margin-top: 4px;
+}
+
+/* ── confianza con su mínimo ── */
+.confHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: var(--t-13);
+}
+.confValor {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.05;
+}
+.conf {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line2);
+}
+.conf > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--ink-2);
+}
+.low > i {
+  background: var(--off);
+}
+.thr {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ink);
+}
+.thrLabel {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+  white-space: nowrap;
+}
+.confNota {
+  margin-top: 28px;
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+}

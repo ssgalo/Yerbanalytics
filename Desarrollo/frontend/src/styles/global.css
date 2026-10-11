@@ -17,7 +17,10 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* cifras del mismo ancho: los valores que se actualizan no "bailan" */
+  font-variant-numeric: tabular-nums;
 }
 
 /* Alto EXACTO (no min-height): así el área de contenido tiene una altura definida y las
@@ -28,8 +31,37 @@ body {
   height: 100vh;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font-family: var(--font-body);
+}
+
+/* Foco visible común (sistema de diseño): sólo con teclado, nunca con el mouse. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-s);
+}
+
+/* Texto sólo para lectores de pantalla. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 a {
@@ -43,13 +75,13 @@ a {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(22, 36, 29, 0.18);
+  background: rgba(21, 35, 27, 0.18);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(22, 36, 29, 0.32);
+  background: rgba(21, 35, 27, 0.32);
   background-clip: padding-box;
 }
 
@@ -67,10 +99,10 @@ a {
 @keyframes ybPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(224, 86, 62, 0.55);
+    box-shadow: 0 0 0 0 rgba(210, 70, 46, 0.55);
   }
   70% {
-    box-shadow: 0 0 0 6px rgba(224, 86, 62, 0);
+    box-shadow: 0 0 0 6px rgba(210, 70, 46, 0);
   }
 }
 @keyframes ybBlink {

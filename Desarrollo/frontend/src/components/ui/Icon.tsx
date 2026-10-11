@@ -35,7 +35,8 @@ export type IconName =
   | 'users'
   | 'lock'
   | 'key'
-  | 'logout';
+  | 'logout'
+  | 'info';
 
 const PATHS: Record<IconName, JSX.Element> = {
   // Seguridad: personas, candado, llave y salida.
@@ -144,6 +145,12 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <path d="M12 9v4M12 17h.01" />
       <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
     </>
   ),
   check: <path d="M20 6 9 17l-5-5" />,

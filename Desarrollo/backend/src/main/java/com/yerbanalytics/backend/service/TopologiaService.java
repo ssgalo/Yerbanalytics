@@ -54,7 +54,7 @@ public class TopologiaService {
 
     // Defaults offline, idénticos al seed de data.sql (sector "Fuera de servicio").
     private static final String STATUS_OFFLINE = "offline";
-    private static final String COLOR_OFFLINE = "#A9B2AB";
+    private static final String COLOR_OFFLINE = "#9BA39E";
     private static final String LABEL_OFFLINE = "Fuera de servicio";
     private static final String DIAG_OFFLINE = "Sin diagnóstico";
     private static final String SEV_OFFLINE = "—";

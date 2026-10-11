@@ -46,53 +46,55 @@
   justify-content: center;
   width: fit-content;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-weight: 800;
   font-size: 15px;
   padding: 3px 11px;
   border-radius: 8px;
   border: 2px solid var(--off);
   background: var(--off-soft);
-  color: var(--off);
+  color: var(--off-ink);
 }
 
 .badge[data-status='ok'] {
-  color: var(--ok);
+  color: var(--ok-ink);
   border-color: var(--ok);
   background: var(--ok-soft);
 }
 .badge[data-status='warning'] {
-  color: var(--warn);
+  color: var(--warn-ink);
   border-color: var(--warn);
   background: var(--warn-soft);
 }
 .badge[data-status='critical'] {
-  color: var(--crit);
+  color: var(--crit-ink);
   border-color: var(--crit);
   background: var(--crit-soft);
 }
 
 .sub {
   font-size: 10.5px;
-  color: var(--faint);
+  color: var(--muted);
   font-weight: 600;
 }
 
 .plain {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 13px;
   font-weight: 700;
   margin-top: 11px;
-  color: var(--off);
+  color: var(--off-ink);
 }
 
 .plain[data-status='ok'] {
-  color: var(--ok);
+  color: var(--ok-ink);
 }
 .plain[data-status='warning'] {
-  color: var(--warn);
+  color: var(--warn-ink);
 }
 .plain[data-status='critical'] {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 
 .stats {
@@ -146,7 +148,7 @@
 
 .cell:hover {
   transform: scale(1.5);
-  box-shadow: 0 2px 7px rgba(12, 35, 25, 0.4);
+  box-shadow: 0 2px 7px rgba(21, 35, 27, 0.4);
   position: relative;
   z-index: 3;
 }

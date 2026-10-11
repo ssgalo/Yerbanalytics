@@ -1,5 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { MapPage } from '@/features/map/MapPage';
@@ -25,7 +25,30 @@ const con = (vista: Vista, pagina: ReactNode) => <RequirePermiso vista={vista}>{
  * `/login` y `/cambiar-clave` van fuera del shell: sin sesión (o con clave temporal) no hay
  * sidebar ni datos del vivero.
  */
+/**
+ * Catálogo del sistema de diseño: sólo en desarrollo. En el build de producción
+ * `import.meta.env.DEV` es `false`, la rama se descarta y el módulo ni se empaqueta.
+ */
+const rutasDesarrollo: RouteObject[] = import.meta.env.DEV
+  ? (() => {
+      const SistemaDisenoPage = lazy(() =>
+        import('@/features/sistema-diseno/SistemaDisenoPage').then((m) => ({ default: m.SistemaDisenoPage })),
+      );
+      return [
+        {
+          path: '/sistema-diseno',
+          element: (
+            <Suspense fallback={null}>
+              <SistemaDisenoPage />
+            </Suspense>
+          ),
+        },
+      ];
+    })()
+  : [];
+
 export const routes: RouteObject[] = [
+  ...rutasDesarrollo,
   { path: '/login', element: <LoginPage /> },
   { path: '/cambiar-clave', element: <CambiarClavePage /> },
   {

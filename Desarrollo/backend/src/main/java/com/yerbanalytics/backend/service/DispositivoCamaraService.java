@@ -36,9 +36,9 @@ public class DispositivoCamaraService {
             FUERA_DE_SERVICIO, "Fuera de servicio"
     );
     private static final Map<String, String[]> ESTADO_COLOR = Map.of(
-            OPERATIVO, new String[]{"#E7F1EA", "#2E7A4F"},
-            INTERMITENTE, new String[]{"#FBF0DC", "#A66A12"},
-            FUERA_DE_SERVICIO, new String[]{"#FBE6E0", "#A8331C"}
+            OPERATIVO, new String[]{"#E3F2E8", "#1E6B41"},
+            INTERMITENTE, new String[]{"#FBF0D9", "#7A5310"},
+            FUERA_DE_SERVICIO, new String[]{"#FBE3DD", "#9A2B17"}
     );
 
     /**

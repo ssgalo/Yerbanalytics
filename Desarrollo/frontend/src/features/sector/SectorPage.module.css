@@ -65,6 +65,7 @@
 .sectorId {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -120,6 +121,7 @@
 .dibujoTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 16px;
   font-weight: 600;
 }
@@ -144,6 +146,7 @@
 .que summary {
   cursor: pointer;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-weight: 700;
   font-size: 13px;
   color: var(--brand);

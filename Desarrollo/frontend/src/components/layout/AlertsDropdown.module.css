@@ -42,7 +42,7 @@
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 16px;
-  box-shadow: 0 18px 50px -12px rgba(12, 35, 25, 0.32);
+  box-shadow: var(--shadow-overlay);
   overflow: hidden;
   z-index: 50;
 }
@@ -58,6 +58,7 @@
 .headerTitle {
   font-weight: 700;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 15px;
 }
 
@@ -100,7 +101,7 @@
 
 .alertMeta {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .alertMsg {

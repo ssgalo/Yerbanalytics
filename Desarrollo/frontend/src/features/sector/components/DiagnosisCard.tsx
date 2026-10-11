@@ -99,7 +99,7 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
               <Icon
                 name="alert"
                 size={17}
-                stroke="#856404"
+                stroke="var(--warn-ink)"
                 strokeWidth={2.2}
                 style={{ flexShrink: 0, marginTop: 1 }}
               />

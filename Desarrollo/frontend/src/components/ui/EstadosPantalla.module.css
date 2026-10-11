@@ -1,0 +1,103 @@
+/* barra de guardado: aparece con cambios sin guardar, pegada al pie del contenido */
+.savebar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  padding: 12px 14px 12px 18px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-brand);
+  box-shadow: var(--shadow-overlay);
+  font-size: var(--t-15);
+}
+.saveDetalle {
+  color: #c9d6cf;
+}
+.spacer {
+  flex: 1;
+}
+.saveGhost {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: #dfe7e2;
+  font-family: var(--font-body);
+  font-size: var(--t-15);
+  font-weight: 600;
+  cursor: pointer;
+}
+.saveGhost:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.saveLight {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #fff;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-15);
+  font-weight: 600;
+  cursor: pointer;
+}
+.savebar button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* esqueleto: carga con el shell visible */
+.skel {
+  background: linear-gradient(90deg, #e8ebe5 0%, #f2f4ef 50%, #e8ebe5 100%);
+  background-size: 200% 100%;
+  animation: skel 1.4s infinite linear;
+  border-radius: var(--r-s);
+}
+@keyframes skel {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* vacío con acción */
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 28px 22px;
+}
+.emptyTitulo {
+  margin: 0;
+  font-size: var(--t-18);
+  font-weight: 650;
+  line-height: 1.35;
+}
+.emptyTexto {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+/* sin conexión */
+.offline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--r-m);
+  background: var(--ink);
+  color: var(--on-brand);
+  font-size: var(--t-13);
+}
+.offline svg {
+  flex: none;
+  margin-top: 1px;
+}

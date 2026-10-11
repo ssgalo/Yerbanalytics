@@ -48,7 +48,7 @@ export function TopologiaPage() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit)' }}>
+      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
         No se pudo cargar la topología: {error.message}
       </div>
     );

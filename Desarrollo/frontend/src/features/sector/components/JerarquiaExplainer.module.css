@@ -25,9 +25,9 @@
 }
 
 .activo {
-  background: var(--g800);
-  border-color: var(--g800);
-  color: var(--cream);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-brand);
 }
 
 .flecha {

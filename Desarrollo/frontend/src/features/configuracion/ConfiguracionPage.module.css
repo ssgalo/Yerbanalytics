@@ -29,6 +29,7 @@
 
 .sectionTitle {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
@@ -57,18 +58,18 @@
 .feedbackOk {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ok);
+  color: var(--ok-ink);
 }
 
 .feedbackErr {
   font-size: 13px;
   font-weight: 600;
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 
 .audit {
   font-size: 12px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .btnPrimary {

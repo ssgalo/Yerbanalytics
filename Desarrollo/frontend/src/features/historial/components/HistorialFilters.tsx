@@ -100,7 +100,7 @@ export function HistorialFilters({ value, zonaOpts, count, onChange }: Historial
       </div>
 
       <div className={styles.count}>
-        <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{count}</b> acciones
+        <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)', fontStretch: 'var(--w-exp)' }}>{count}</b> acciones
       </div>
     </div>
   );

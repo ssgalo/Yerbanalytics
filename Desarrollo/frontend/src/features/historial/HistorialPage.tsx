@@ -51,7 +51,7 @@ export function HistorialPage() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit)' }}>
+      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
         No se pudo cargar el historial: {error.message}
       </div>
     );

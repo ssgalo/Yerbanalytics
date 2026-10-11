@@ -74,7 +74,7 @@ export function HardwareTable({ dispositivos, onRecambiar }: HardwareTableProps)
                       {d.estadoLabel}
                     </Badge>
                     {d.bateriaBaja && (
-                      <Badge soft="#FBF0DC" ink="#A66A12">
+                      <Badge soft="var(--warn-soft)" ink="var(--warn-ink)">
                         Batería Baja
                       </Badge>
                     )}

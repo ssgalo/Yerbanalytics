@@ -13,7 +13,7 @@
   /* Sombra hacia la izquierda: refuerza que está POR ENCIMA de la grilla.
      Alcance = 18 + 40 = 58px; `--sombra-alcance` en MapPage.module.css lo compensa
      al esconder el panel, si no la sombra asoma sobre la caja de la grilla. */
-  box-shadow: -18px 0 40px rgba(12, 35, 25, 0.13);
+  box-shadow: -18px 0 40px rgba(21, 35, 27, 0.13);
 }
 
 .header {
@@ -40,6 +40,7 @@
 .title {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 16px;
   font-weight: 600;
   white-space: nowrap;
@@ -48,7 +49,7 @@
 .provisional {
   font-size: 10px;
   font-weight: 700;
-  color: #a66a12;
+  color: var(--warn-ink);
   background: var(--warn-soft);
   border-radius: 6px;
   padding: 2px 7px;
@@ -123,6 +124,7 @@
 
 .actualValue {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -131,13 +133,13 @@
 
 .actualUnit {
   font-size: 13px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .actualLabel {
   margin-left: 8px;
   font-size: 11.5px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 /* Cuerpo: el gráfico se estira para llenar el alto disponible del inspector */
@@ -165,7 +167,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
   margin-top: 6px;
   flex-shrink: 0;
 }
@@ -178,5 +180,5 @@
   justify-content: center;
   text-align: center;
   font-size: 13px;
-  color: var(--faint);
+  color: var(--muted);
 }

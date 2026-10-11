@@ -3,7 +3,7 @@
 .canvas {
   position: relative;
   width: 100%;
-  background: var(--g900);
+  background: var(--tray);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -18,10 +18,10 @@
   align-items: center;
   gap: 10px;
   padding: 7px 12px;
-  border: 1px solid var(--g700);
+  border: 1px solid var(--tray-line);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--g900) 88%, transparent);
-  color: var(--cdim);
+  background: color-mix(in srgb, var(--tray) 88%, transparent);
+  color: var(--on-tray-muted);
   font-size: 11px;
   pointer-events: none;
   backdrop-filter: blur(6px);

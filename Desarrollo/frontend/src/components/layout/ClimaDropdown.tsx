@@ -85,7 +85,7 @@ export function ClimaDropdown() {
                 height={18}
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--orange)"
+                stroke="var(--info-ink)"
                 strokeWidth={1.9}
                 strokeLinecap="round"
                 strokeLinejoin="round"

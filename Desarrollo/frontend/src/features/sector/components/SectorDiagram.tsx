@@ -11,7 +11,7 @@ interface SectorDiagramProps {
 const GEO = calcularGeometria();
 
 /** Azul del microaspersor: sólo se usa acá, no es un color de estado. */
-const AGUA = '#3f8fd1';
+const AGUA = 'var(--info)';
 
 /**
  * Dibujo del sector físico: 4 bandejas de 5×5 tubetes, un microaspersor compartido y el riel.

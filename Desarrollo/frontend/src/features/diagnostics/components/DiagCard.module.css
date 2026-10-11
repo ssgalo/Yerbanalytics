@@ -56,7 +56,7 @@
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  background: rgba(12, 35, 25, 0.4);
+  background: rgba(21, 35, 27, 0.4);
   backdrop-filter: blur(3px);
   padding: 3px 9px;
   border-radius: 20px;
@@ -78,6 +78,7 @@
 
 .estado {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 14.5px;
   font-weight: 600;
 }
@@ -104,10 +105,11 @@
   font-weight: 700;
   color: var(--ink);
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
 }
 
 .time {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
   margin-top: 10px;
 }

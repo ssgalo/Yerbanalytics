@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: rgba(12, 35, 25, 0.62);
+  background: rgba(21, 35, 27, 0.62);
   backdrop-filter: blur(2px);
   animation: fadeIn 0.16s ease-out;
 }
@@ -38,6 +38,7 @@
 
 .sectorId {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 19px;
   font-weight: 700;
   color: #fff;

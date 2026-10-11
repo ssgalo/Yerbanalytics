@@ -14,16 +14,16 @@ interface ZoneSummaryProps {
 
 /** Los cuatro estados, en el orden en que se degradan. */
 const ESTADOS: Array<{ status: Status; label: string; ink: string; bg: string; text: string }> = [
-  { status: 'ok', label: 'Saludables', ink: 'var(--ok)', bg: 'var(--ok-soft)', text: '#2E7A4F' },
+  { status: 'ok', label: 'Saludables', ink: 'var(--ok)', bg: 'var(--ok-soft)', text: 'var(--ok-ink)' },
   {
     status: 'warning',
     label: 'Observación',
     ink: 'var(--warn)',
     bg: 'var(--warn-soft)',
-    text: '#A66A12',
+    text: 'var(--warn-ink)',
   },
-  { status: 'critical', label: 'Críticos', ink: 'var(--crit)', bg: 'var(--crit-soft)', text: '#A8331C' },
-  { status: 'offline', label: 'Sin señal', ink: 'var(--off)', bg: '#EEEDE5', text: '#6A776E' },
+  { status: 'critical', label: 'Críticos', ink: 'var(--crit)', bg: 'var(--crit-soft)', text: 'var(--crit-ink)' },
+  { status: 'offline', label: 'Sin señal', ink: 'var(--off)', bg: 'var(--off-soft)', text: 'var(--off-ink)' },
 ];
 
 export function ZoneSummary({ zona }: ZoneSummaryProps) {

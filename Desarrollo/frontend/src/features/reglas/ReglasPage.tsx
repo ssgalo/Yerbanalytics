@@ -87,7 +87,7 @@ export function ReglasPage() {
             valor: editarlo en una lo cambia en todas.
           </p>
           {error ? (
-            <div className={styles.state} style={{ color: 'var(--crit)' }}>
+            <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
               No se pudieron cargar los parámetros: {error.message}
             </div>
           ) : loading || !catalogo ? (

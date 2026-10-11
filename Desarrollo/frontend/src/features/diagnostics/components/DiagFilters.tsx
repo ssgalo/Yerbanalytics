@@ -49,7 +49,7 @@ export function DiagFilters({ diagEstado, diagSev, diagCount, onEstado, onSev }:
 
       {/* Contador alineado a la derecha */}
       <div className={styles.count}>
-        <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{diagCount}</b> diagnósticos
+        <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)', fontStretch: 'var(--w-exp)' }}>{diagCount}</b> diagnósticos
       </div>
     </div>
   );

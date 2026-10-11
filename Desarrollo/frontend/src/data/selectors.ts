@@ -62,12 +62,12 @@ export function selectSensadoTiles(zona: Zona): MetricTile[] {
       ideal: m.spec.ideal[0] + '–' + m.spec.ideal[1] + (m.unit === '%' ? '%' : ' ' + m.unit),
       soft:
         m.status === 'ok'
-          ? '#E7F1EA'
+          ? '#E3F2E8'
           : m.status === 'warning'
-            ? '#FBF0DC'
+            ? '#FBF0D9'
             : m.status === 'critical'
-              ? '#FBE6E0'
-              : '#EEEDE5',
+              ? '#FBE3DD'
+              : '#ECEEEB',
       grupo: m.spec.grupo,
       provisional: !m.spec.afectaEstado,
     };

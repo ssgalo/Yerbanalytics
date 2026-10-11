@@ -157,7 +157,7 @@ export function AuditoriaTab() {
       </Card>
 
       {error ? (
-        <div className={styles.state} style={{ color: 'var(--crit)' }}>
+        <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
           No se pudo cargar la auditoría: {error}
         </div>
       ) : !datos ? (

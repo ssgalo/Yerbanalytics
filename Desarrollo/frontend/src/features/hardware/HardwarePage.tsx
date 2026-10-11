@@ -50,7 +50,7 @@ export function HardwarePage() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit)' }}>
+      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
         No se pudo cargar el hardware: {error.message}
       </div>
     );

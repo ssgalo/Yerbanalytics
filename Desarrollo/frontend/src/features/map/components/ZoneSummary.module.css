@@ -21,6 +21,7 @@
 
 .count {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 17px;
   font-weight: 700;
   line-height: 1.05;

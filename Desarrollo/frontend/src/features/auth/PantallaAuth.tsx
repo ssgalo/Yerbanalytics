@@ -10,7 +10,7 @@ export function PantallaAuth({ children }: { children: ReactNode }) {
       <aside className={styles.marca}>
         <div className={styles.marcaLogo}>
           <div className={styles.logo}>
-            <Icon name="leaf" size={23} stroke="#EBFBF1" strokeWidth={1.9} />
+            <Icon name="leaf" size={23} stroke="var(--on-brand)" strokeWidth={1.9} />
           </div>
           <div>
             <div className={styles.marcaNombre}>Yerbanalytics</div>

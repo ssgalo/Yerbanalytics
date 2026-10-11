@@ -32,7 +32,7 @@ export function PostActionCard({ evo }: PostActionCardProps) {
             {/* Ahora — fondo ok-soft */}
             <div className={`${styles.box} ${styles.boxOk}`}>
               <div className={`${styles.boxLabel} ${styles.boxLabelOk}`}>Ahora</div>
-              <div className={styles.boxValue} style={{ color: 'var(--ok)' }}>
+              <div className={styles.boxValue} style={{ color: 'var(--ok-ink)' }}>
                 {evo.ahora}%
               </div>
             </div>
