@@ -184,6 +184,11 @@ public class UsuarioService {
         sesiones.revocarDeUsuario(u.getId(), null);
     }
 
+    /** Si hay al menos un Administrador activo. */
+    public boolean hayAdministradorActivo() {
+        return usuarios.existsByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO);
+    }
+
     /**
      * Administrador inicial (design D9): si no hay ningún Administrador activo, crea uno marcado
      * para cambiar la contraseña en el primer ingreso. Si el nombre ya lo usa otro usuario (sólo
@@ -192,10 +197,6 @@ public class UsuarioService {
      * @return el usuario creado, o vacío si ya había un Administrador activo
      */
     @Transactional
-    public boolean hayAdministradorActivo() {
-        return usuarios.existsByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO);
-    }
-
     public Optional<UsuarioDto> crearAdministradorInicialSiFalta(String username, String clave) {
         if (hayAdministradorActivo()) {
             return Optional.empty();
