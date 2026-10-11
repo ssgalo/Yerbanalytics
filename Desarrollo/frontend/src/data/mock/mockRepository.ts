@@ -2,7 +2,7 @@
    Repositorio mock: genera el vivero determinístico una sola vez
    y lo cachea. Implementa el mismo contrato que el backend real.
    ============================================================ */
-import type { DataRepository } from '@/data/repository';
+import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { SecuenciaRechazadaError } from '@/data/secuenciaError';
@@ -96,11 +96,15 @@ export class MockRepository implements DataRepository {
     return this.cache;
   }
 
-  async getHistory(): Promise<ActionRecord[]> {
+  async getHistory(filtro: FiltroHistorial = {}): Promise<ActionRecord[]> {
     if (!this.historyCache) {
       this.historyCache = buildHistory(this.seed);
     }
-    return this.historyCache;
+    const { tipo, desde } = filtro;
+    if (tipo == null && desde == null) return this.historyCache;
+    return this.historyCache.filter(
+      (h) => (tipo == null || h.tipo === tipo) && (desde == null || h.ts >= desde),
+    );
   }
 
   async getConfig(): Promise<Configuracion> {

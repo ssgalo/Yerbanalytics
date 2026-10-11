@@ -64,7 +64,7 @@ public final class RuleContextTestFactory {
         SectorEntity s = new SectorEntity();
         s.setId(id);
         s.setStatus("ok");
-        s.setColor("#3FA06A");
+        s.setColor("#2F9B62");
         s.setStatusLabel("Saludable");
         s.setTip(id + " · Saludable");
         s.setReason("Sin alerta");

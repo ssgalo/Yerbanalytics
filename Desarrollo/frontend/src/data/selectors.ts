@@ -2,19 +2,9 @@
    Selectores: derivaciones puras sobre el dataset del vivero.
    La UI consume estas funciones sin conocer su implementación.
    ============================================================ */
-import type {
-  MetricTile,
-  NurseryData,
-  Range,
-  SectorDetail,
-  SerieMetrica,
-  Zona,
-} from '@/types/domain';
-import { pathFrom, series } from './mock/generators';
+import type { MetricHistory, NurseryData, Range, SectorDetail, Zona } from '@/types/domain';
+import { series } from './mock/generators';
 import { buildSectorDetail } from './mock/sectorDetail';
-
-/** Cantidad de puntos de la serie según el rango temporal. */
-const PUNTOS_POR_RANGO: Record<Range, number> = { '24h': 24, '7d': 7, '30d': 30 };
 
 /** Detalle derivado de un sector (diagnóstico, actuadores, historial, seguimiento). */
 export function selectSectorDetail(data: NurseryData, sectorId: string): SectorDetail | null {
@@ -40,63 +30,41 @@ function seedDe(zonaId: string, metricKey: string): number {
   return h >>> 0;
 }
 
-/**
- * Tiles del panel de sensado: las 10 métricas de la zona con su sparkline.
- *
- * El histórico se deriva de la lectura actual (no hay series persistidas todavía), así que
- * la serie es sintética pero estable para una misma zona y métrica.
- */
-export function selectSensadoTiles(zona: Zona): MetricTile[] {
-  return zona.lectura.metrics.map((m) => {
-    const amp = m.spec.dec === 1 ? 0.6 : Math.max(1, (m.spec.ideal[1] - m.spec.ideal[0]) * 0.18);
-    const puntos = m.raw != null ? series(seedDe(zona.id, m.key), m.raw, 14, amp) : [];
-    const line = puntos.length > 0 ? pathFrom(puntos, 120, 34).line : '';
-    return {
-      key: m.key,
-      label: m.label,
-      value: m.value,
-      unit: m.unit,
-      status: m.status,
-      color: m.color,
-      line,
-      ideal: m.spec.ideal[0] + '–' + m.spec.ideal[1] + (m.unit === '%' ? '%' : ' ' + m.unit),
-      soft:
-        m.status === 'ok'
-          ? '#E7F1EA'
-          : m.status === 'warning'
-            ? '#FBF0DC'
-            : m.status === 'critical'
-              ? '#FBE6E0'
-              : '#EEEDE5',
-      grupo: m.spec.grupo,
-      provisional: !m.spec.afectaEstado,
-    };
-  });
-}
+/** Puntos y paso de cada ventana del histórico: horario en 24 h, cada 4 h en 7 días, diario en 30. */
+const HOUR = 3_600_000;
+const HISTORY_WINDOWS: Record<Range, { count: number; stepMs: number }> = {
+  '24h': { count: 25, stepMs: HOUR },
+  '7d': { count: 43, stepMs: 4 * HOUR },
+  '30d': { count: 31, stepMs: 24 * HOUR },
+};
 
 /**
- * Serie histórica de una métrica de la macro-zona para el gráfico del panel.
- * Devuelve `null` si la métrica no existe o el nodo no la reportó.
+ * Histórico de una métrica del nodo testigo de la macro-zona, en valores reales (no en paths),
+ * para dibujarlo contra las bandas de la métrica. Devuelve `null` si el nodo no la reportó.
+ *
+ * No hay series persistidas todavía: la serie se deriva de la lectura actual, sintética pero
+ * estable para una misma zona, métrica y ventana. El último punto es la lectura actual.
  */
-export function selectSerieMetrica(
+export function selectMetricHistory(
   zona: Zona,
   metricKey: string,
   range: Range,
-): SerieMetrica | null {
+  now: number = Date.now(),
+): MetricHistory | null {
   const m = zona.lectura.metrics.find((x) => x.key === metricKey);
   if (!m || m.raw == null) return null;
 
-  const n = PUNTOS_POR_RANGO[range];
-  const amp = m.spec.dec === 1 ? 0.6 : Math.max(1, (m.spec.ideal[1] - m.spec.ideal[0]) * 0.18);
+  const { count, stepMs } = HISTORY_WINDOWS[range];
+  const base = m.spec.dec === 1 ? 0.6 : Math.max(1, (m.spec.ideal[1] - m.spec.ideal[0]) * 0.18);
+  // Paso más chico cuantos más puntos: la deriva total queda parecida entre ventanas.
+  const amp = base * Math.sqrt(7 / count);
   // El rango entra en la semilla para que cada ventana temporal tenga su propia serie.
-  const puntos = series(seedDe(zona.id, metricKey + '|' + range), m.raw, n, amp);
-  const path = pathFrom(puntos, 660, 150);
-  const unidad = m.unit === '%' ? '%' : ' ' + m.unit;
+  const values = series(seedDe(zona.id, metricKey + '|' + range), m.raw, count, amp);
+  const end = zona.lectura.ts ?? now;
 
   return {
-    line: path.line,
-    area: path.area,
-    min: Math.min(...puntos).toFixed(m.spec.dec) + unidad,
-    max: Math.max(...puntos).toFixed(m.spec.dec) + unidad,
+    points: values.map((value, i) => ({ ts: end - (count - 1 - i) * stepMs, value })),
+    min: Math.min(...values),
+    max: Math.max(...values),
   };
 }

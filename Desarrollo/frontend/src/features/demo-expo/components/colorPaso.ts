@@ -2,7 +2,7 @@ import type { EstadoPasada, EstadoPaso } from '@/types/domain';
 
 /** Color de cada estado, con los tokens del sistema. */
 export const COLOR: Record<EstadoPaso, { fg: string; bg: string }> = {
-  PENDIENTE: { fg: 'var(--faint)', bg: 'var(--off-soft)' },
+  PENDIENTE: { fg: 'var(--muted)', bg: 'var(--off-soft)' },
   EN_CURSO: { fg: 'var(--info)', bg: 'var(--info-soft)' },
   OK: { fg: 'var(--ok)', bg: 'var(--ok-soft)' },
   ERROR: { fg: 'var(--crit)', bg: 'var(--crit-soft)' },

@@ -1,0 +1,163 @@
+/* SystemActivity — línea de tiempo de las acciones del día */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  padding: 18px 22px 8px;
+  /* Que el scroll desde "Acciones del sistema hoy" no la deje pegada al borde */
+  scroll-margin-top: 16px;
+}
+
+/* Recibe el foco sólo por programa (al llegar desde el resumen): no es un control, sin anillo */
+.card:focus,
+.card:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-radius: var(--r-l);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-18);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.link {
+  margin-left: auto;
+  font-size: var(--t-13);
+  font-weight: 600;
+  font-stretch: var(--w-cond);
+  color: var(--brand);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.link:hover {
+  color: var(--ink);
+}
+
+.more .link {
+  margin-left: 0;
+}
+
+/* Un día puede traer muchos eventos: la lista se desplaza sin estirar la página */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 28px minmax(0, 1fr);
+  gap: 0 10px;
+}
+
+/* Línea que une un evento con el siguiente, bajo el ícono */
+.item::before {
+  content: '';
+  position: absolute;
+  left: 79px;
+  top: 28px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--line);
+}
+
+.item:last-child::before {
+  display: none;
+}
+
+.time {
+  padding-top: 4px;
+  text-align: right;
+  font-size: var(--t-13);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+/* Agua: el sistema actuó. Las alertas, en ámbar. */
+.icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--info-soft);
+  color: var(--info-ink);
+}
+
+.icon[data-kind='alert'] {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.body {
+  min-width: 0;
+  padding-bottom: 18px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.itemTitle {
+  font-size: var(--t-15);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.detail {
+  margin: 2px 0 0;
+  max-width: 62ch;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.loading {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 14px;
+}
+
+.more {
+  margin: 0;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--line2);
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 14px 16px 6px;
+  }
+  .item {
+    grid-template-columns: 40px 28px minmax(0, 1fr);
+    gap: 0 8px;
+  }
+  .item::before {
+    left: 61px;
+  }
+}

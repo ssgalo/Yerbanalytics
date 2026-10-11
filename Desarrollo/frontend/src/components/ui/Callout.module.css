@@ -1,0 +1,38 @@
+.callout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--r-m);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  font-size: var(--t-13);
+  color: var(--ink-2);
+}
+.callout svg {
+  flex: none;
+  margin-top: 1px;
+}
+.body {
+  min-width: 0;
+}
+.warn {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: #5a3d0b;
+}
+.crit {
+  background: var(--crit-soft);
+  border-color: var(--crit-line);
+  color: #7c2312;
+}
+.info {
+  background: var(--info-soft);
+  border-color: var(--info-line);
+  color: #1b416d;
+}
+.ok {
+  background: var(--ok-soft);
+  border-color: var(--ok-line);
+  color: #18532f;
+}

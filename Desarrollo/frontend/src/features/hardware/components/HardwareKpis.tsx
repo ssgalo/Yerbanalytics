@@ -10,10 +10,10 @@ interface HardwareKpisProps {
 export function HardwareKpis({ data }: HardwareKpisProps) {
   const items: { label: string; value: number; color?: string }[] = [
     { label: 'Dispositivos', value: data.total },
-    { label: 'Operativos', value: data.operativos, color: 'var(--ok)' },
-    { label: 'Batería baja', value: data.bateriaBaja, color: 'var(--warn)' },
-    { label: 'Fuera de servicio', value: data.fueraDeServicio, color: 'var(--crit)' },
-    { label: 'Averiados', value: data.averiados, color: 'var(--crit)' },
+    { label: 'Operativos', value: data.operativos, color: 'var(--ok-ink)' },
+    { label: 'Batería baja', value: data.bateriaBaja, color: 'var(--warn-ink)' },
+    { label: 'Fuera de servicio', value: data.fueraDeServicio, color: 'var(--crit-ink)' },
+    { label: 'Averiados', value: data.averiados, color: 'var(--crit-ink)' },
   ];
 
   return (

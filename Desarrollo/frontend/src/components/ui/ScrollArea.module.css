@@ -1,0 +1,102 @@
+/* ScrollArea — desplazamiento sin barra, con fade y flecha en cada borde que oculta contenido.
+   Se ajusta desde afuera con:
+   --scroll-max-h   alto máximo visible (por defecto, sin tope)
+   --scroll-fade    largo del fundido
+   --scroll-fade-bg color hacia el que se funde (el fondo de la superficie: la bandeja) */
+
+.frame {
+  position: relative;
+  min-width: 0;
+}
+
+/* El respiro interno deja ver el contorno de las celdas al pasar el mouse o enfocarlas */
+.viewport {
+  max-height: var(--scroll-max-h, none);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  scrollbar-width: none;
+}
+
+.viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.fade {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.left,
+.right {
+  top: 0;
+  bottom: 0;
+  width: var(--scroll-fade, 48px);
+}
+
+.top,
+.bottom {
+  left: 0;
+  right: 0;
+  height: var(--scroll-fade, 48px);
+}
+
+.left {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(to right, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+}
+
+.right {
+  right: 0;
+  justify-content: flex-end;
+  background: linear-gradient(to left, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+}
+
+.top {
+  top: 0;
+  align-items: flex-start;
+  background: linear-gradient(to bottom, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+}
+
+.bottom {
+  bottom: 0;
+  align-items: flex-end;
+  background: linear-gradient(to top, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+}
+
+/* Flecha chica sobre el fundido: clara, para que se distinga sobre la bandeja oscura */
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 2px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.arrow:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow {
+    transition: none;
+  }
+}

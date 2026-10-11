@@ -66,7 +66,7 @@ export function Sidebar() {
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
         <div className={styles.logo}>
-          <Icon name="leaf" size={22} stroke="#EBFBF1" strokeWidth={1.9} />
+          <Icon name="leaf" size={22} stroke="var(--on-brand)" strokeWidth={1.9} />
         </div>
         <div style={{ lineHeight: 1.05 }}>
           <div className={styles.brandName}>Yerbanalytics</div>

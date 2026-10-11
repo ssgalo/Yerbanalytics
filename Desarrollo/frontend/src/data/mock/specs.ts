@@ -6,10 +6,10 @@ import type { ColorPair, MetricSpec, Severity, Status } from '@/types/domain';
 
 /** Colores por estado. */
 export const C: Record<Status, string> = {
-  ok: '#3FA06A',
-  warning: '#E0972C',
-  critical: '#DD5238',
-  offline: '#A9B2AB',
+  ok: '#2F9B62',
+  warning: '#E2A230',
+  critical: '#D2462E',
+  offline: '#9BA39E',
 };
 
 /** Etiquetas por estado. */
@@ -22,10 +22,10 @@ export const LAB: Record<Status, string> = {
 
 /** Pares soft/ink por severidad. */
 export const sevMap: Record<Severity, ColorPair> = {
-  Alta: { soft: '#FBE6E0', ink: '#A8331C' },
-  Media: { soft: '#FBF0DC', ink: '#A66A12' },
-  Baja: { soft: '#E7F1EA', ink: '#2E7A4F' },
-  '—': { soft: '#EEEDE5', ink: '#6A776E' },
+  Alta: { soft: '#FBE3DD', ink: '#9A2B17' },
+  Media: { soft: '#FBF0D9', ink: '#7A5310' },
+  Baja: { soft: '#E3F2E8', ink: '#1E6B41' },
+  '—': { soft: '#ECEEEB', ink: '#545C57' },
 };
 
 /**
@@ -201,34 +201,34 @@ export const tints: Record<string, string> = {
 /** Metadatos visuales de cada tipo de acción autónoma. */
 export const ACT: Record<string, { tint: string; ink: string; path: string }> = {
   Riego: {
-    tint: '#E2EEF3',
-    ink: '#2A6E8C',
+    tint: '#E2ECF8',
+    ink: '#1F4F86',
     path: 'M12 2.7s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11Z',
   },
   Insumo: {
-    tint: '#EDEAF6',
-    ink: '#5A4B9E',
+    tint: '#ECEBF6',
+    ink: '#4B3F8F',
     path: 'M9 2h6M10 2v4l-4.5 9A2 2 0 0 0 7.3 18h9.4a2 2 0 0 0 1.8-3L14 6V2',
   },
   Mediasombra: {
-    tint: '#F3ECDD',
-    ink: '#8A6A22',
+    tint: '#EFEDE6',
+    ink: '#5F5640',
     path: 'M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z',
   },
   Alerta: {
-    tint: '#FBF0DC',
-    ink: '#8A5A10',
+    tint: '#FBF0D9',
+    ink: '#7A5310',
     path: 'M12 3 2.5 20h19L12 3ZM12 10v4M12 17h.01',
   },
 };
 
 /** Pares soft/ink por resultado de acción. */
 export const resMap: Record<string, ColorPair> = {
-  Efectiva: { soft: '#E7F1EA', ink: '#2E7A4F' },
-  'En seguimiento': { soft: '#F3ECDD', ink: '#8A6A22' },
-  Pospuesta: { soft: '#FBE7D7', ink: '#9A4410' },
-  Abortada: { soft: '#FBE6E0', ink: '#A8331C' },
-  Informativo: { soft: '#EEEDE5', ink: '#6A776E' },
+  Efectiva: { soft: '#E3F2E8', ink: '#1E6B41' },
+  'En seguimiento': { soft: '#E2ECF8', ink: '#1F4F86' },
+  Pospuesta: { soft: '#FBF0D9', ink: '#7A5310' },
+  Abortada: { soft: '#FBE3DD', ink: '#9A2B17' },
+  Informativo: { soft: '#ECEEEB', ink: '#545C57' },
 };
 
 /** Plantillas del feed de actividad del sistema. */

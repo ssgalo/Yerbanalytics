@@ -1,0 +1,116 @@
+.field {
+  display: grid;
+  gap: 6px;
+}
+.label {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.optional {
+  font-weight: 400;
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+}
+.hint {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+.error {
+  font-size: var(--t-12);
+  color: var(--crit-ink);
+  font-weight: 600;
+}
+
+.input,
+.select {
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line-field);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-15);
+  width: 100%;
+  min-width: 0;
+}
+textarea.input {
+  height: auto;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.select {
+  appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2315231b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+}
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: var(--field-focus);
+}
+/* Modificado y sin guardar: borde agua. */
+.mod {
+  border-color: var(--info);
+  background-color: #f6f9fe;
+}
+.err {
+  border-color: var(--crit);
+  background-color: #fff8f6;
+}
+
+/* Campo con unidad (o prefijo) pegada. */
+.unit {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line-field);
+  border-radius: 8px;
+  background: var(--card);
+  height: 38px;
+  overflow: hidden;
+}
+.unit input {
+  border: 0;
+  height: 100%;
+  padding: 0 10px;
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-15);
+}
+.unit input:focus-visible {
+  box-shadow: none;
+}
+.unitText {
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: var(--t-13);
+  border-left: 1px solid var(--line2);
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--card-2);
+  white-space: nowrap;
+}
+.prefix {
+  border-left: 0;
+  border-right: 1px solid var(--line2);
+}
+.unit:focus-within {
+  border-color: var(--ink);
+  box-shadow: var(--field-focus);
+}
+.unit.mod {
+  border-color: var(--info);
+}
+.unit.err {
+  border-color: var(--crit);
+  background: #fff8f6;
+}

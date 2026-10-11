@@ -1,0 +1,56 @@
+/* SectorsCard — grilla de sectores de la macro-zona sobre la bandeja */
+
+/* La cabecera no define el ancho de la tarjeta: lo define la grilla, y los conteos pasan
+   abajo si no entran al lado del título */
+.head {
+  contain: inline-size;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.count b {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+/* Lado mínimo de celda: por debajo el número deja de entrar en el sector.
+   Tope de alto: lo que deja la pantalla debajo de la cabecera, con un piso razonable. */
+.tray {
+  --cell-min: 34px;
+  --cell: 38px;
+  --viewport-max-h: max(300px, calc(100vh - 250px));
+  width: max-content;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.trayWide {
+  width: auto;
+}
+
+/* Tope de alto y largo del fundido del área desplazable */
+.scroll {
+  --scroll-max-h: var(--viewport-max-h);
+  --scroll-fade: 64px;
+}
+
+/* Zona alta: celdas de lado fijo, la tarjeta mide lo que su grilla */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), var(--cell));
+  gap: 6px;
+  width: max-content;
+}
+
+/* Zona ancha: las celdas se estiran a todo el ancho con un tope, y nunca bajan del mínimo:
+   si no entran, la grilla desborda (con celdas del lado mínimo) y se desplaza a lo ancho */
+.trayWide .grid {
+  grid-template-columns: repeat(var(--columns), minmax(var(--cell-min), 46px));
+  width: auto;
+  min-width: min-content;
+  justify-content: center;
+}

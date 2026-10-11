@@ -63,7 +63,7 @@ export function UsuariosTab() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit)' }}>
+      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
         No se pudieron cargar los usuarios: {error}
       </div>
     );

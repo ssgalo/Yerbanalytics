@@ -6,7 +6,7 @@
    Todas las llamadas pasan por `apiFetch`: llevan la cookie de sesión y un 401/403 se
    convierte en un error tipado y en un aviso a la capa de sesión, igual en todos lados.
    ============================================================ */
-import type { DataRepository } from '@/data/repository';
+import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
@@ -71,8 +71,11 @@ export class HttpRepository implements DataRepository {
     };
   }
 
-  async getHistory(): Promise<ActionRecord[]> {
-    const res = await apiFetch(`${this.baseUrl}/historial?t=${Date.now()}`);
+  async getHistory(filtro: FiltroHistorial = {}): Promise<ActionRecord[]> {
+    const params = new URLSearchParams({ t: String(Date.now()) });
+    if (filtro.tipo) params.set('tipo', filtro.tipo);
+    if (filtro.desde != null) params.set('desde', String(filtro.desde));
+    const res = await apiFetch(`${this.baseUrl}/historial?${params}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el historial desde ${this.baseUrl}`);
     }

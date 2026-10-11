@@ -55,9 +55,9 @@ const ESTADO_LABEL: Record<EstadoHardware, string> = {
   fuera_de_servicio: 'Fuera de servicio',
 };
 const ESTADO_COLOR: Record<EstadoHardware, { soft: string; ink: string }> = {
-  operativo: { soft: '#E7F1EA', ink: '#2E7A4F' },
-  intermitente: { soft: '#FBF0DC', ink: '#A66A12' },
-  fuera_de_servicio: { soft: '#FBE6E0', ink: '#A8331C' },
+  operativo: { soft: '#E3F2E8', ink: '#1E6B41' },
+  intermitente: { soft: '#FBF0D9', ink: '#7A5310' },
+  fuera_de_servicio: { soft: '#FBE3DD', ink: '#9A2B17' },
 };
 
 /** Registro crudo de un dispositivo (lo que persistiría el backend). */

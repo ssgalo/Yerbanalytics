@@ -9,9 +9,9 @@ import { ACT, resMap, zonaDefs } from './specs';
 
 /** Colores del veredicto del seguimiento post-acción. */
 const VERDICT: Record<string, { soft: string; ink: string }> = {
-  Efectiva: { soft: '#E7F1EA', ink: '#2E7A4F' },
-  'En seguimiento': { soft: '#F3ECDD', ink: '#8A6A22' },
-  'Sin efectividad': { soft: '#FBE6E0', ink: '#A8331C' },
+  Efectiva: { soft: '#E3F2E8', ink: '#1E6B41' },
+  'En seguimiento': { soft: '#E2ECF8', ink: '#1F4F86' },
+  'Sin efectividad': { soft: '#FBE3DD', ink: '#9A2B17' },
 };
 
 type EvoKind = 'efectiva' | 'sin' | 'seguimiento' | null;
@@ -283,7 +283,7 @@ export function buildHistory(seed: number): ActionRecord[] {
     const ts = Date.now() - cursorMs;
     cursorMs += Math.round(rr(r, 18, 75)) * 60 * 1000; // separa los eventos en el tiempo
 
-    const rm = resMap[sc.res] ?? { soft: '#EEEDE5', ink: '#6A776E' };
+    const rm = resMap[sc.res] ?? { soft: '#ECEEEB', ink: '#545C57' };
     const meta = ACT[sc.tipo] ?? ACT.Riego;
 
     out.push({

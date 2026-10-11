@@ -71,7 +71,7 @@ export function HardwareFilters({ value, count, onChange }: HardwareFiltersProps
       </div>
 
       <span className={styles.count}>
-        <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{count}</b> dispositivos
+        <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)', fontStretch: 'var(--w-exp)' }}>{count}</b> dispositivos
       </span>
     </>
   );

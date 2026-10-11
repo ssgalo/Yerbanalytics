@@ -10,6 +10,7 @@
 .title {
   margin: 0 0 4px;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 16px;
   font-weight: 600;
 }
@@ -46,11 +47,12 @@
 }
 
 .boxLabelOk {
-  color: #2e7a4f;
+  color: var(--ok-ink);
 }
 
 .boxValue {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 21px;
   font-weight: 700;
   margin-top: 3px;

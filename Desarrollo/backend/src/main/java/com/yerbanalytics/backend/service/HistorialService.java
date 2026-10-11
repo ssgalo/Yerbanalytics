@@ -34,9 +34,9 @@ public class HistorialService {
 
     private static final String EMDASH = "—";
 
-    private static final ColorPair VERDICT_EFECTIVA = new ColorPair("#E7F1EA", "#2E7A4F");
-    private static final ColorPair VERDICT_SEGUIMIENTO = new ColorPair("#F3ECDD", "#8A6A22");
-    private static final ColorPair VERDICT_SIN = new ColorPair("#FBE6E0", "#A8331C");
+    private static final ColorPair VERDICT_EFECTIVA = new ColorPair("#E3F2E8", "#1E6B41");
+    private static final ColorPair VERDICT_SEGUIMIENTO = new ColorPair("#E2ECF8", "#1F4F86");
+    private static final ColorPair VERDICT_SIN = new ColorPair("#FBE3DD", "#9A2B17");
 
     private static final DateTimeFormatter FECHA_FMT =
             DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZonaHorariaVivero.ZONA);
@@ -320,7 +320,7 @@ public class HistorialService {
         return historialRepository.findRecentActions(limit)
                 .stream()
                 .map(e -> {
-                    ColorPair rm = RES_MAP.getOrDefault(e.getRes(), new ColorPair("#EEEDE5", "#6A776E"));
+                    ColorPair rm = RES_MAP.getOrDefault(e.getRes(), new ColorPair("#ECEEEB", "#545C57"));
                     ActMeta meta = ACT.getOrDefault(e.getTipo(), ACT.get("Info"));
                     String titulo = e.getTipo() + " · " + e.getSectorId();
                     return new ActionEvent(
@@ -369,7 +369,7 @@ public class HistorialService {
     }
 
     private HistorialEvento toDto(HistorialEventoEntity e) {
-        ColorPair rm = RES_MAP.getOrDefault(e.getRes(), new ColorPair("#EEEDE5", "#6A776E"));
+        ColorPair rm = RES_MAP.getOrDefault(e.getRes(), new ColorPair("#ECEEEB", "#545C57"));
         ActMeta meta = ACT.getOrDefault(e.getTipo(), ACT.get("Riego"));
 
         Evolution evo = null;

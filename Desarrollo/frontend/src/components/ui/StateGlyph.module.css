@@ -1,0 +1,35 @@
+/* Forma de cada estado: el segundo canal además del color. */
+.g {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  position: relative;
+}
+.g::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.lg {
+  width: 16px;
+  height: 16px;
+}
+.ok::before {
+  background: var(--ok);
+}
+/* Contorno en tinta: el ámbar y el gris solos no llegan a 3:1 contra el fondo claro. */
+.warn::before {
+  background: linear-gradient(to top, var(--warn) 50%, transparent 50%);
+  box-shadow: inset 0 0 0 1.5px var(--warn-ink);
+}
+.crit::before {
+  inset: 1.5px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: var(--crit);
+}
+.off::before {
+  box-shadow: inset 0 0 0 2px var(--off-ink);
+}

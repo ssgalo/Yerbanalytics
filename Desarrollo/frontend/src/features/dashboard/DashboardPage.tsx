@@ -1,69 +1,48 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useNurseryData } from '@/hooks/NurseryContext';
-import { KpiRow } from './components/KpiRow';
-import { PlanoVivero } from './components/PlanoVivero';
-import { EstadoVivero } from './components/EstadoVivero';
-import type { FocoZona } from './components/ZonaBlock';
-import { PriorityCard } from './components/PriorityCard';
-import { WeatherCard } from './components/WeatherCard';
-import { ActivityFeed } from './components/ActivityFeed';
-import { RecentDiagnostics } from './components/RecentDiagnostics';
+import { useAuth } from '@/hooks/AuthContext';
+import { puedeVer, VISTAS } from '@/lib/vistas';
+import { NurserySummary } from './components/NurserySummary';
+import { NurseryMap } from './components/NurseryMap';
+import { SystemActivity } from './components/SystemActivity';
+import { useActividadHoy } from './useActividadHoy';
+import { useEquipmentSummary } from './useEquipmentSummary';
+import styles from './DashboardPage.module.css';
 
 /** Vista principal del panel de control del vivero. */
 export function DashboardPage() {
   usePageTitle('Panel general', 'Vivero San Ignacio · Misiones, AR');
 
-  const { stats, zonas, priority, weather, actions, recentDiag, layout } = useNurseryData();
+  const { stats, zonas, layout } = useNurseryData();
+  const { puede } = useAuth();
+  /* La actividad sale del historial y los equipos, del estado técnico: sin permiso, no se muestran. */
+  const canSeeActivity = puedeVer(VISTAS.historial, puede);
+  const activity = useActividadHoy(canSeeActivity);
+  const equipment = useEquipmentSummary(puedeVer(VISTAS.hardware, puede));
+  const activityRef = useRef<HTMLElement>(null);
 
-  /* Zona a la que se llegó tocando su parcela del plano (el tick re-dispara el destello). */
-  const [foco, setFoco] = useState<FocoZona | null>(null);
+  function showActivity() {
+    const section = activityRef.current;
+    if (!section) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    /* El foco acompaña al scroll: el lector de pantalla y el teclado siguen desde ahí. */
+    section.focus({ preventScroll: true });
+  }
 
   return (
-    <div style={{ animation: 'ybFade .4s both' }}>
+    <div className={styles.page}>
+      <NurserySummary
+        stats={stats}
+        zonas={zonas}
+        equipment={equipment}
+        onShowActivity={canSeeActivity ? showActivity : undefined}
+      />
 
-      {/* Fila de KPIs */}
-      <KpiRow stats={stats} />
+      <NurseryMap zonas={zonas} layout={layout} />
 
-      {/* Grilla media: vivero overview + rail derecho */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 360px',
-          gap: 16,
-          marginTop: 16,
-          alignItems: 'start',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <PlanoVivero
-            zonas={zonas}
-            onSelectZona={(zonaId) => setFoco((f) => ({ zonaId, tick: (f?.tick ?? 0) + 1 }))}
-          />
-          <EstadoVivero zonas={zonas} layout={layout} foco={foco} />
-        </div>
-
-        {/* Rail derecho: prioridad + clima */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <PriorityCard priority={priority} alerta={stats.alerta} />
-          <WeatherCard weather={weather} />
-        </div>
-      </div>
-
-      {/* Grilla inferior: actividad + diagnósticos */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 360px',
-          gap: 16,
-          marginTop: 16,
-          alignItems: 'start',
-        }}
-      >
-        <ActivityFeed actions={actions} />
-        <RecentDiagnostics recentDiag={recentDiag} />
-      </div>
-
+      {canSeeActivity && <SystemActivity ref={activityRef} {...activity} />}
     </div>
   );
 }

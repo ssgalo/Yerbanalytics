@@ -10,6 +10,7 @@
 .titulo {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 24px;
   font-weight: 700;
   color: var(--ink);
@@ -38,6 +39,7 @@
 .tarjetaTitulo {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 20px;
   font-weight: 600;
   color: var(--ink);
@@ -77,6 +79,7 @@
   background: var(--card);
   color: var(--ink);
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 16px;
 }
 

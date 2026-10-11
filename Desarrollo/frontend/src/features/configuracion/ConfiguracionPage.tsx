@@ -55,7 +55,7 @@ export function ConfiguracionPage() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit)' }}>
+      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
         No se pudo cargar la configuración: {error.message}
       </div>
     );
@@ -133,7 +133,7 @@ export function ConfiguracionPage() {
         ) : catalogoCargando && !catalogoError ? (
           <div className={styles.state}>Cargando la apertura máxima del motor…</div>
         ) : (
-          <div className={styles.state} style={{ color: 'var(--crit)' }}>
+          <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
             No se pudo obtener la apertura máxima de la mediasombra
             {catalogoError ? ` (${catalogoError.message})` : ''}. Sin ese tope no se puede validar el plan de
             rustificación ni guardar la configuración.{' '}

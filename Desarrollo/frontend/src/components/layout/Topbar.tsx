@@ -1,7 +1,7 @@
 import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
 import { usePageMeta } from '@/hooks/PageMeta';
-import { Icon } from '@/components/ui/Icon';
 import { AlertsDropdown } from './AlertsDropdown';
+import { ClimaDropdown } from './ClimaDropdown';
 import { UserMenu } from './UserMenu';
 import styles from './Topbar.module.css';
 
@@ -20,15 +20,7 @@ export function Topbar() {
       <div className={styles.right}>
         {vivero && (
           <>
-            <div className={styles.weather}>
-              <Icon name="sun" size={18} stroke="var(--warn)" />
-              <div style={{ lineHeight: 1.1 }}>
-                <div className={styles.weatherTemp}>{vivero.weather.tempC}°C</div>
-                <div className={styles.weatherSub}>
-                  UV {vivero.weather.uv} · {vivero.weather.cond}
-                </div>
-              </div>
-            </div>
+            <ClimaDropdown />
 
             <AlertsDropdown />
 

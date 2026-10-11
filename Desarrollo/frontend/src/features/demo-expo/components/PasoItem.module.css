@@ -23,6 +23,7 @@
 
 .numero {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 18px;
   font-weight: 700;
 }
@@ -64,6 +65,7 @@
 
 .titulo {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 20px;
   font-weight: 600;
   color: var(--ink);
@@ -71,8 +73,9 @@
 
 .tiempo {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 14px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .estado {
@@ -114,12 +117,14 @@
 
 .diagEstado {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 18px;
   font-weight: 700;
 }
 
 .diagConf {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 16px;
   color: var(--muted);
 }

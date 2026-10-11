@@ -1,60 +1,94 @@
 /* ============================================================
-   Design tokens — portados EXACTOS desde Yerbanalytics.dc.html
-   Cualquier cambio de color de marca empieza acá.
+   Design tokens — sistema de diseño del rediseño
+   (openspec/changes/add-sistema-diseno; catálogo en /sistema-diseno, sólo en dev).
+
+   Todo color de la interfaz sale de acá. Los nombres son los de siempre;
+   los valores son los del sistema nuevo. Espejo en JS: theme.ts.
    ============================================================ */
 :root {
   /* superficies */
-  --bg: #f3f2ea;
-  --card: #ffffff;
+  --bg: #f1f3ee; /* fondo de la app: gris verdoso frío */
+  --card: #ffffff; /* superficies */
+  --card-2: #f7f8f5; /* filas alternas, cabeceras de tabla, hover */
 
-  /* texto */
-  --ink: #16241d;
-  --muted: #6a776e;
-  --faint: #97a299;
+  /* tinta */
+  --ink: #15231b; /* texto principal, botón primario, foco (16:1 sobre blanco) */
+  --ink-2: #2b3b32; /* texto de controles y etiquetas */
+  --muted: #5b6a61; /* texto secundario (5,7:1) */
+  --faint: #7d8a82; /* SÓLO íconos y decoración (3,6:1): no alcanza para texto */
 
   /* líneas / bordes */
-  --line: #e7e5d9;
-  --line2: #f0efe7;
+  --line: #dde2da; /* separadores de paneles */
+  --line2: #e9ece6; /* separadores dentro de un panel */
+  --line-field: #8d978f; /* borde de campos (3:1): se distinguen al sol */
 
-  /* verdes de marca (oscuros → claro) */
-  --g900: #0c2319;
-  --g800: #11352a;
-  --g700: #1a4d3b;
-  --brand: #1e6a4e;
+  /* marca */
+  --brand: #2c6a4f; /* marca, ítem activo, links */
+  --brand-soft: #e6efe9;
 
-  /* estados */
-  --ok: #3fa06a;
-  --ok-soft: #e7f1ea;
-  --warn: #e0972c;
-  --warn-soft: #fbf0dc;
-  --crit: #dd5238;
-  --crit-soft: #fbe6e0;
-  --off: #a9b2ab;
-  --off-soft: #eef0ec;
+  /* acento: naranja de la marca original. SÓLO detalles decorativos (barra del ítem activo,
+     avatar, subrayados); nunca para estado, que ya tiene --crit/--warn. */
+  --accent: #ec6a1e;
+  --accent-soft: #fdeadd;
+  --accent-ink: #a8470f; /* texto naranja sobre blanco (5,2:1) */
+  --accent-line: #f5b48c;
+  --accent-glow: 0 0 0 3px rgba(236, 106, 30, 0.16), 0 4px 14px -4px rgba(236, 106, 30, 0.45);
 
-  /* información / acción ejecutada (el azul del DAG del motor) */
-  --info: #3b82f6;
-  --info-soft: #e3edfd;
+  /* estados: los únicos colores saturados. Relleno = --x; texto = --x-ink. */
+  --ok: #2f9b62;
+  --ok-soft: #e3f2e8;
+  --ok-ink: #1e6b41;
+  --ok-line: #c4e2cf;
 
-  /* texto sobre los fondos *-soft: la variante oscura de cada estado, con contraste de lectura */
-  --ok-ink: #2e7a4f;
-  --warn-ink: #8a5a10;
-  --crit-ink: #8f2b18;
-  --info-ink: #1f4fa8;
+  --warn: #e2a230; /* ámbar: nunca como color de texto (2,4:1) */
+  --warn-soft: #fbf0d9;
+  --warn-ink: #7a5310;
+  --warn-line: #f0dcae;
+
+  --crit: #d2462e;
+  --crit-soft: #fbe3dd;
+  --crit-ink: #9a2b17;
+  --crit-line: #f1c4b9;
+
+  --off: #9ba39e;
+  --off-soft: #eceeeb;
+  --off-ink: #545c57;
+
+  /* agua: "el sistema actuó" (riego, acciones, traza) */
+  --info: #2d6fb5;
+  --info-soft: #e2ecf8;
+  --info-ink: #1f4f86;
+  --info-line: #c4d7ef;
 
   /* texto sobre un fondo de marca / acción primaria */
   --on-brand: #ffffff;
 
-  /* acentos */
-  --orange: #ec6a1e;
-  --orange-soft: #fbe7d7;
+  /* bandeja: el único oscuro. Sólo plano, grillas de sectores y superficies de arte. */
+  --tray: #1c2420;
+  --tray-2: #2a332e; /* hueco vacío dentro de la bandeja */
+  --tray-line: #39433d;
+  --on-tray: #ffffff;
+  --on-tray-muted: #a9b5ae;
 
-  /* crema (texto/elementos sobre fondos oscuros) */
-  --cream: #ecf1e9;
-  --cdim: rgba(236, 241, 233, 0.62);
-  --cfaint: rgba(236, 241, 233, 0.4);
+  /* tipografía: Archivo, una familia variable en tres anchos */
+  --font-display: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --w-exp: 118%; /* expandida: títulos, códigos, cifras (va con --font-display) */
+  --w-cond: 86%; /* semicondensada: tablas, metadatos */
 
-  /* tipografías */
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
+  --t-12: 0.75rem;
+  --t-13: 0.8125rem;
+  --t-15: 0.9375rem;
+  --t-18: 1.125rem;
+  --t-24: 1.5rem;
+  --t-32: 2rem;
+  --t-48: 3rem;
+
+  /* forma */
+  --r-s: 6px;
+  --r-m: 10px;
+  --r-l: 14px;
+  --shadow-overlay: 0 24px 60px -12px rgba(21, 35, 27, 0.35), 0 2px 6px rgba(21, 35, 27, 0.08);
+  --focus-ring: 0 0 0 2px var(--card), 0 0 0 4px var(--ink);
+  --field-focus: 0 0 0 3px rgba(21, 35, 27, 0.12);
 }

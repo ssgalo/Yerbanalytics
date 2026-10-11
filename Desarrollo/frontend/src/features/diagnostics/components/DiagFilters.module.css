@@ -23,7 +23,7 @@
 /* SVG de la flecha codificado para usar en background-image */
 .select {
   appearance: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-field);
   background-color: var(--card);
   border-radius: 10px;
   padding: 9px 32px 9px 13px;

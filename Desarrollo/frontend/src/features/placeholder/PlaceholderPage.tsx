@@ -42,6 +42,7 @@ export function PlaceholderPage({ title }: PlaceholderPageProps) {
         style={{
           margin: '20px 0 6px',
           fontFamily: 'var(--font-display)',
+          fontStretch: 'var(--w-exp)',
           fontSize: 22,
           fontWeight: 600,
         }}

@@ -1,0 +1,155 @@
+/* SensingCard — métricas del nodo testigo; cada fila abre su detalle en un modal */
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metaWarn {
+  color: var(--warn-ink);
+  font-weight: 600;
+}
+
+.stale {
+  margin-bottom: 14px;
+}
+
+.groups {
+  display: grid;
+  gap: 22px;
+}
+
+/* A todo el ancho los grupos van lado a lado, mientras cada uno tenga lugar para sus filas */
+.groupsWide {
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+  gap: 22px 36px;
+}
+
+.group {
+  min-width: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  border-bottom: 1px solid var(--line2);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.itemOpen {
+  background: var(--card-2);
+  border-radius: var(--r-m);
+  border-bottom-color: transparent;
+}
+
+/* Fila: nombre y estado · valor · barra de rango */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(120px, 1.1fr);
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 8px;
+  border: 0;
+  border-radius: var(--r-m);
+  background: none;
+  text-align: left;
+  font-family: var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--card-2);
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.name {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--t-15);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-13);
+}
+
+.ok {
+  color: var(--ok-ink);
+}
+.warn {
+  color: var(--warn-ink);
+}
+.crit {
+  color: var(--crit-ink);
+}
+.off {
+  color: var(--off-ink);
+}
+
+.value {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.number {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-weight: 650;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.unit {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+
+.bar {
+  min-width: 0;
+}
+
+/* Sin lectura: el riel vacío, sin bandas ni marca, para no fingir un dato */
+.barEmpty {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line2);
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+  .bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

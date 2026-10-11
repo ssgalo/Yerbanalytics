@@ -1,0 +1,100 @@
+/* control segmentado */
+.seg {
+  display: inline-flex;
+  justify-self: start; /* dentro de un grid no se estira */
+  width: max-content;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 9px;
+  background: #e4e8e1;
+}
+.seg button {
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.seg [aria-pressed='true'] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(21, 35, 27, 0.12);
+}
+
+/* filtro como chip seleccionable */
+.fchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fchip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.n {
+  color: var(--muted);
+  font-weight: 500;
+  font-stretch: var(--w-cond);
+}
+.fchip[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-brand);
+}
+.fchip[aria-pressed='true'] .n {
+  color: #c9d3cd;
+}
+
+/* interruptor */
+.switch {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  flex: none;
+  border-radius: 12px;
+  background: #c9d0c8;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+.switch[aria-checked='true'] {
+  background: var(--brand);
+}
+.switch[aria-checked='true']::after {
+  transform: translateX(16px);
+}
+.switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

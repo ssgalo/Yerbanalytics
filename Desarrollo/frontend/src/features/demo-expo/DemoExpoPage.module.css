@@ -22,6 +22,7 @@
 .avisoTitulo {
   margin: 0 0 6px;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 18px;
   font-weight: 600;
   color: var(--ink);
@@ -60,6 +61,7 @@
 
 .titular {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 30px;
   line-height: 1.15;
   font-weight: 700;

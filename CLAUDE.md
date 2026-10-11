@@ -115,8 +115,9 @@ spec-driven development) ANTES de implementar. Es el estándar del repo.
 
 ## 4. Frontend (`Desarrollo/frontend/`)
 
-Dashboard de monitoreo. **React 18 + TypeScript + Vite.** Replica el diseño
-`Yerbanalytics.dc.html` (Claude Design) de forma exacta.
+Dashboard de monitoreo. **React 18 + TypeScript + Vite.** Nació replicando `Yerbanalytics.dc.html`
+(Claude Design); el rediseño en curso lo reemplaza pantalla por pantalla, siempre sobre el
+**sistema de diseño** (ver "Convenciones de estilo").
 
 ### Arranque rápido
 ```bash
@@ -138,8 +139,11 @@ npm run dev          # http://localhost:5173
   > `.env.demo`). Se resuelve al arrancar: cambiar de modo exige reiniciar el dashboard.
   > Ninguna vista consulta el modo al backend — el backend no tiene modos.
 - **Tipos de dominio** (`src/types/domain.ts`): contratos compartidos.
-- **Átomos UI** (`src/components/ui/`): Card, Badge, StatusDot, ProgressBar,
-  Sparkline, Icon.
+- **Componentes del sistema de diseño** (`src/components/ui/`): Button, Chip, StateGlyph, Callout,
+  Field/Input/Select/InputUnit, Segmented, FilterChip, Switch, SaveBar, Skeleton, EmptyState,
+  OfflineBanner, CompositionBar, RangeBar, ConfidenceBar, SectorCell, ScrollArea (grilla desplazable
+  sin barra, con fade y flechas en los bordes); y los previos Card, Badge,
+  StatusDot, ProgressBar, Sparkline, Icon.
 - **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown.
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
   diagnostics, reglas, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
@@ -148,12 +152,23 @@ npm run dev          # http://localhost:5173
   se ve u oculta con un interruptor en Configuración.
 - **Routing**: react-router (`src/router.tsx`).
 
-### Convenciones de estilo
-- Design tokens en `src/styles/tokens.css` (CSS custom properties).
+### Convenciones de estilo (sistema de diseño)
+Spec: `openspec/changes/add-sistema-diseno/`. Catálogo vivo en `/sistema-diseno` (sólo `npm run dev`).
+Toda pantalla nueva o rediseñada lo respeta; **si cambia algo del sistema, se actualiza todo lo
+que lo usa** (`src/styles/tokens.test.ts` falla si vuelve un token retirado o un hex viejo).
+- **Todo color sale de un token** de `src/styles/tokens.css` (espejo JS: `theme.ts`). Nada de hex
+  sueltos en los módulos. Los únicos saturados son los de estado (`--ok/--warn/--crit/--off`) y
+  `--info` ("el sistema actuó"). El único oscuro es `--tray`, sólo para plano, grillas y arte.
+- **Texto de estado con su tinta** (`--x-ink`), nunca con el relleno; `--faint` no es para texto;
+  bordes de campo con `--line-field`.
+- **El estado tiene forma además de color** (`StateGlyph`, `SectorCell`): círculo, medio círculo,
+  rombo, aro.
+- **Tipografía**: Archivo en tres anchos. Toda regla con `--font-display` lleva
+  `font-stretch: var(--w-exp)`; tablas y metadatos, `var(--w-cond)`.
 - Estilos estáticos → **CSS Modules**. Valores dinámicos (color por estado, ancho
-  por %) → inline `style={{}}` (dependen de datos en runtime).
-- Tipografías: Space Grotesk (`--font-display`, títulos/números) + Hanken Grotesk
-  (`--font-body`, cuerpo).
+  por %) → inline `style={{}}` (dependen de datos en runtime), siempre con `var(--token)`.
+- Los colores que manda el backend en los DTO (`NurseryConstants` y servicios) son copia de estos
+  tokens: si cambia un valor acá, cambia allá.
 
 ### Scripts
 `npm run dev` (sistema real) · `dev:demo` (demo estática) · `build` · `build:demo` ·
@@ -373,6 +388,9 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 - **Cambios grandes pasan por OpenSpec** antes de codear.
 - **Archivos `.env`** no se versionan; usar `env.example` como plantilla.
 - **Idioma**: español (Rioplatense) en docs y comentarios.
+- **El código va en inglés** (identificadores, nombres de archivos, componentes, funciones, tipos y
+  clases nuevos); todo lo demás —comentarios, docs, textos de la interfaz, commits— en español. El
+  código existente en español se migra cuando se reescribe, no en cambios aparte.
 
 ---
 
@@ -380,7 +398,8 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 
 | Tema | Dónde |
 |------|-------|
-| Diseño del dashboard | `Desarrollo/frontend/Yerbanalytics.dc.html` |
+| Diseño del dashboard | Sistema de diseño (fila siguiente) · `Desarrollo/frontend/Yerbanalytics.dc.html` (diseño original) |
+| Sistema de diseño | `openspec/changes/add-sistema-diseno/`, `src/styles/tokens.css`, `/sistema-diseno` en dev |
 | Cómo correr el simulador | `Desarrollo/simulador/README.md` |
 | Cómo correr el frontend | `Desarrollo/frontend/README.md` |
 | Plan del frontend (SDD) | `openspec/changes/add-monitoring-frontend/` |

@@ -152,7 +152,7 @@ los datos**, solo consume la capa de datos.
 
 ```
 src/
-├── styles/        tokens.css (design tokens), global.css (reset, fuentes, animaciones)
+├── styles/        tokens.css (design tokens), theme.ts (espejo JS), global.css (reset, foco, animaciones)
 ├── types/         domain.ts — contratos del dominio (Sector, Diagnosis, Metric, ...); seguridad.ts — sesión, usuarios, roles, auditoría
 ├── lib/           rng.ts — RNG determinístico (mulberry32)
 ├── data/          ← CAPA DE DATOS (patrón Repository)
@@ -192,9 +192,25 @@ detrás de `MockRepository`. Cuando el backend exista:
 
 ## Sistema de diseño
 
-Los tokens del diseño viven en `src/styles/tokens.css` como CSS custom properties.
+Está especificado en `openspec/changes/add-sistema-diseno/`. Con `npm run dev`, **`/sistema-diseno`** muestra
+el catálogo: tokens, tipografía, estados y todos los componentes. No existe en el build de producción.
+
+- **Tokens** en `src/styles/tokens.css` (espejo JS en `theme.ts`). Se conservaron los nombres de
+  siempre (`--ink`, `--muted`, `--warn-soft`…) con los valores nuevos. Se retiraron `--g900/800/700`,
+  `--orange*` y `--cream/--cdim/--cfaint`; `src/styles/tokens.test.ts` falla si alguien los vuelve a
+  usar, o si aparece un hex de la paleta anterior.
+- **Reglas**: todo color sale de un token; el texto de un estado va con su tinta (`--warn-ink`, no
+  `--warn`); `--faint` es sólo decoración; los campos tienen borde `--line-field`; el único oscuro es
+  `--tray` (plano, grillas, arte).
+- **Tipografía**: Archivo (Google Fonts, ejes `wdth` y `wght`). Expandida (`--w-exp`) para títulos y
+  cifras —va junto a `--font-display`—, normal para el cuerpo, semicondensada (`--w-cond`) para tablas.
+- **Componentes** en `src/components/ui/`: `Button` (y `buttonClass` para links), `Chip`, `StateGlyph`,
+  `Callout`, `Field`/`Input`/`Select`/`InputUnit`, `Segmented`, `FilterChip`, `Switch`, `SaveBar`,
+  `Skeleton`, `EmptyState`, `OfflineBanner`, `CompositionBar`, `RangeBar`, `ConfidenceBar`,
+  `TrayCell`/`GridCell`/`Bandeja`. Una vista nueva los usa en vez de reimplementar el control.
+
 Los estilos estáticos van en CSS Modules; los valores dinámicos (color de un sector,
-ancho de una barra) se aplican inline porque dependen de datos en runtime.
+ancho de una barra) se aplican inline porque dependen de datos en runtime, siempre con `var(--token)`.
 
 ## Documentación de cambios
 

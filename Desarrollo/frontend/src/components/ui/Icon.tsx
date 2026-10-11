@@ -30,12 +30,14 @@ export type IconName =
   | 'camera'
   | 'calendar'
   | 'chevron-down'
+  | 'chevron-right'
   | 'map-pin'
   | 'rules'
   | 'users'
   | 'lock'
   | 'key'
-  | 'logout';
+  | 'logout'
+  | 'info';
 
 const PATHS: Record<IconName, JSX.Element> = {
   // Seguridad: personas, candado, llave y salida.
@@ -146,6 +148,12 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
   check: <path d="M20 6 9 17l-5-5" />,
   'chevron-left': <path d="M15 18l-6-6 6-6" />,
   'arrow-right': <path d="M5 12h14M13 6l6 6-6 6" />,
@@ -193,6 +201,7 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
+  'chevron-right': <path d="M9 18l6-6-6-6" />,
   'map-pin': (
     <>
       <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" />

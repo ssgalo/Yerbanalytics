@@ -23,3 +23,13 @@ describe('SectorPage · enlace al motor (8.6)', () => {
     expect(enlace.getAttribute('href')).toBe('/reglas?tab=inspector&sector=MZ-2-006');
   });
 });
+
+describe('SectorPage · diagnósticos anteriores', () => {
+  it('enlaza a Diagnósticos de IA filtrado por el sector', async () => {
+    montarApp('/sector/MZ-2-006');
+
+    const enlace = await screen.findByRole('link', { name: /Ver anteriores/ });
+
+    expect(enlace.getAttribute('href')).toBe('/diagnosticos?sector=MZ-2-006');
+  });
+});

@@ -160,7 +160,9 @@ public class NurseryService {
                     actuators = new Actuadores("Cerrada", "En espera", se.getActuadorShade());
                 } else {
                     finalStatus = se.getStatus();
-                    finalColor = se.getColor();
+                    // El color sale del estado, no de la columna: así una fila guardada con la paleta
+                    // anterior se ve con la del sistema de diseño vigente sin esperar a la próxima lectura.
+                    finalColor = C.getOrDefault(se.getStatus(), se.getColor());
                     finalStatusLabel = se.getStatusLabel();
                     finalTip = se.getTip();
                     diagnosis = new Diagnosis(

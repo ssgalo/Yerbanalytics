@@ -55,7 +55,7 @@ export function RolesTab() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit)' }}>
+      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
         No se pudo cargar la matriz de permisos: {error}
       </div>
     );

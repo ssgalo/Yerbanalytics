@@ -25,7 +25,7 @@ export {
 export { escucharSesion, type OyenteSesion } from './sesionEventos';
 
 export { SecuenciaRechazadaError } from './secuenciaError';
-export { selectSectorDetail, selectSensadoTiles, selectSerieMetrica } from './selectors';
+export { selectSectorDetail, selectMetricHistory } from './selectors';
 
 let instancia: DataRepository | null = null;
 let seguridad: SeguridadRepository | null = null;

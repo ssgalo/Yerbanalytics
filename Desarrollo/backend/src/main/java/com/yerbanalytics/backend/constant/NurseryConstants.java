@@ -12,10 +12,10 @@ public final class NurseryConstants {
     public static final String EMDASH = "\u2014";
 
     public static final Map<String, String> C = Map.of(
-            "ok", "#3FA06A",
-            "warning", "#E0972C",
-            "critical", "#DD5238",
-            "offline", "#A9B2AB"
+            "ok", "#2F9B62",
+            "warning", "#E2A230",
+            "critical", "#D2462E",
+            "offline", "#9BA39E"
     );
 
     public static final Map<String, String> LAB = Map.of(
@@ -26,10 +26,10 @@ public final class NurseryConstants {
     );
 
     public static final Map<String, ColorPair> SEV_MAP = Map.of(
-            "Alta", new ColorPair("#FBE6E0", "#A8331C"),
-            "Media", new ColorPair("#FBF0DC", "#A66A12"),
-            "Baja", new ColorPair("#E7F1EA", "#2E7A4F"),
-            EMDASH, new ColorPair("#EEEDE5", "#6A776E")
+            "Alta", new ColorPair("#FBE3DD", "#9A2B17"),
+            "Media", new ColorPair("#FBF0D9", "#7A5310"),
+            "Baja", new ColorPair("#E3F2E8", "#1E6B41"),
+            EMDASH, new ColorPair("#ECEEEB", "#545C57")
     );
 
     /** Agrupaci\u00f3n visual del panel de sensado. */
@@ -100,18 +100,18 @@ public final class NurseryConstants {
     );
 
     public static final Map<String, ActMeta> ACT = Map.of(
-            "Riego", new ActMeta("#E2EEF3", "#2A6E8C", "M12 2.7s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11Z"),
-            "Insumo", new ActMeta("#EDEAF6", "#5A4B9E", "M9 2h6M10 2v4l-4.5 9A2 2 0 0 0 7.3 18h9.4a2 2 0 0 0 1.8-3L14 6V2"),
-            "Mediasombra", new ActMeta("#F3ECDD", "#8A6A22", "M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z"),
-            "Info", new ActMeta("#EEEDE5", "#6A776E", "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-6v-4m0-4h.01")
+            "Riego", new ActMeta("#E2ECF8", "#1F4F86", "M12 2.7s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11Z"),
+            "Insumo", new ActMeta("#ECEBF6", "#4B3F8F", "M9 2h6M10 2v4l-4.5 9A2 2 0 0 0 7.3 18h9.4a2 2 0 0 0 1.8-3L14 6V2"),
+            "Mediasombra", new ActMeta("#EFEDE6", "#5F5640", "M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z"),
+            "Info", new ActMeta("#ECEEEB", "#545C57", "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-6v-4m0-4h.01")
     );
 
     public static final Map<String, ColorPair> RES_MAP = Map.of(
-            "Efectiva", new ColorPair("#E7F1EA", "#2E7A4F"),
-            "En seguimiento", new ColorPair("#F3ECDD", "#8A6A22"),
-            "Pospuesta", new ColorPair("#FBE7D7", "#9A4410"),
-            "Abortada", new ColorPair("#FBE6E0", "#A8331C"),
-            "Informativo", new ColorPair("#EEEDE5", "#6A776E")
+            "Efectiva", new ColorPair("#E3F2E8", "#1E6B41"),
+            "En seguimiento", new ColorPair("#E2ECF8", "#1F4F86"),
+            "Pospuesta", new ColorPair("#FBF0D9", "#7A5310"),
+            "Abortada", new ColorPair("#FBE3DD", "#9A2B17"),
+            "Informativo", new ColorPair("#ECEEEB", "#545C57")
     );
 
     public static final List<ActTemplate> ACT_TPL = List.of(

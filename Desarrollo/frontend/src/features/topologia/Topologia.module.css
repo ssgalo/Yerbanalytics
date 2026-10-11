@@ -30,6 +30,7 @@
 
 .sectionTitle {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
@@ -61,7 +62,7 @@
 
 .input {
   appearance: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-field);
   background-color: var(--card);
   border-radius: 10px;
   padding: 9px 13px;
@@ -75,6 +76,7 @@
 
 .fixedValue {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-variant-numeric: tabular-nums;
   font-size: 16px;
   font-weight: 700;
@@ -135,7 +137,7 @@
   margin-top: 12px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--ok);
+  color: var(--ok-ink);
 }
 
 /* ---- Popup de guardado (aparece solo si hay cambios) ---- */
@@ -177,6 +179,7 @@
 
 .savebarTitle {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
@@ -191,7 +194,7 @@
   margin-top: 2px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 
 .savebarActions {

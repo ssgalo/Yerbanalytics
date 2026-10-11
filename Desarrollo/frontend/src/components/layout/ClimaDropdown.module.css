@@ -1,0 +1,165 @@
+/* ClimaDropdown — clima de la topbar y su desplegable de clima y riesgo */
+
+.wrap {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 13px;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.trigger:hover {
+  background: var(--line2);
+}
+
+.triggerTemp {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+}
+
+.triggerSub {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* Panel desplegable: mismo marco que el de alertas */
+.panel {
+  position: absolute;
+  right: 0;
+  top: 52px;
+  width: 380px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line2);
+}
+
+.headerTitle {
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: 15px;
+}
+
+.body {
+  padding: 16px;
+}
+
+.currentRow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.sunIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tempNumber {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.condText {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.uvBlock {
+  margin-left: auto;
+  text-align: right;
+}
+
+.uvLabel {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.uvValue {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--warn-ink);
+}
+
+/* Banner de alerta de lluvia */
+.rainBanner {
+  display: flex;
+  gap: 11px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  background: var(--info-soft);
+  border: 1px solid var(--info-line);
+  border-radius: var(--r-m);
+}
+
+.rainText {
+  font-size: 12.5px;
+  color: var(--info-ink);
+  line-height: 1.4;
+}
+
+/* Pronóstico por franjas */
+.forecastGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.forecastSlot {
+  text-align: center;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 9px 4px;
+}
+
+.forecastTime {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.forecastRain {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: var(--brand);
+}
+
+.forecastUv {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}

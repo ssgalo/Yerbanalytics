@@ -48,12 +48,12 @@
 }
 
 .tabActive {
-  background: var(--g800);
-  color: var(--cream);
+  background: var(--ink);
+  color: var(--on-brand);
 }
 
 .tabActive:hover {
-  color: var(--cream);
+  color: var(--on-brand);
 }
 
 /* --- Barra de herramientas --- */
@@ -93,6 +93,7 @@
 .sectionTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
@@ -160,11 +161,12 @@
 }
 
 .muted {
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .mono {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -215,7 +217,7 @@
 .input,
 .select {
   appearance: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-field);
   background-color: var(--card);
   border-radius: 10px;
   padding: 9px 13px;
@@ -287,13 +289,13 @@
 .feedbackOk {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ok);
+  color: var(--ok-ink);
 }
 
 .feedbackErr {
   font-size: 13px;
   font-weight: 600;
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 
 /* --- Botones --- */
@@ -395,13 +397,14 @@
 
 .codigo {
   font-family: var(--font-display);
+  font-stretch: var(--w-exp);
   font-size: 12.5px;
   font-weight: 600;
 }
 
 .dependeDe {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .celda input {
