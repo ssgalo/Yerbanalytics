@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.service.CapturaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.yerbanalytics.backend.seguridad.ConTodosLosPermisos;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@ConTodosLosPermisos
 class DiagnosticoControllerTest {
 
     @Autowired private MockMvc mvc;

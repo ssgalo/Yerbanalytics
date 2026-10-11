@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useDemoExpo } from '@/hooks/DemoExpoContext';
+import { useAuth } from '@/hooks/AuthContext';
 import { usePasada } from '@/hooks/usePasada';
 import { PasoItem } from './components/PasoItem';
 import { COLOR_ESTADO } from './components/colorPaso';
@@ -28,8 +29,10 @@ function Desactivada() {
 
 function PasadaView() {
   const { pasada, cargando, error, iniciando, iniciar, cancelar } = usePasada();
+  // Sin `pasadas.operar` (el Operario, por defecto) se sigue la pasada sin poder iniciarla ni cancelarla.
+  const operar = useAuth().puede('pasadas.operar');
   const enCurso = pasada?.estado === 'EN_CURSO';
-  const puedeCancelar = enCurso && !pasada.cancelacionSolicitada;
+  const puedeCancelar = operar && enCurso && !pasada.cancelacionSolicitada;
   const terminados = pasada?.pasos.filter((s) => s.estado === 'OK' || s.estado === 'OMITIDO' || s.estado === 'ERROR').length ?? 0;
   const total = pasada?.pasos.length ?? 0;
   const ahoraMs = Date.now();
@@ -43,7 +46,7 @@ function PasadaView() {
             <div role="status" className={styles.titular}>
               {pasada ? titularPasada(pasada) : cargando ? 'Consultando el riel…' : 'Todavía no hubo ninguna pasada'}
             </div>
-            {!pasada && !cargando && (
+            {!pasada && !cargando && operar && (
               <p className={styles.vacio}>
                 Iniciá una pasada: el riel va a recorrer dos sectores, el celular va a sacar una foto en cada uno
                 y la IA los va a diagnosticar.
@@ -62,14 +65,16 @@ function PasadaView() {
                 Cancelar
               </button>
             )}
-            <button
-              type="button"
-              className={styles.btnIniciar}
-              disabled={enCurso || iniciando}
-              onClick={() => void iniciar()}
-            >
-              {iniciando ? 'Iniciando…' : 'Iniciar pasada'}
-            </button>
+            {operar && (
+              <button
+                type="button"
+                className={styles.btnIniciar}
+                disabled={enCurso || iniciando}
+                onClick={() => void iniciar()}
+              >
+                {iniciando ? 'Iniciando…' : 'Iniciar pasada'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -102,7 +107,7 @@ function PasadaView() {
         </ol>
       )}
 
-      <SecuenciasPanel pasadaEnCurso={enCurso} />
+      <SecuenciasPanel pasadaEnCurso={enCurso} operar={operar} />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { contar } from '@/lib/plural';
 import { usePageTitle } from '@/hooks/PageMeta';
+import { useAuth } from '@/hooks/AuthContext';
 import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
 import { cambiosDelBorrador, type Borrador } from './borrador';
 import { ParametrosTab } from './ParametrosTab';
@@ -22,6 +23,8 @@ export function ReglasPage() {
   const [params, setParams] = useSearchParams();
   const tab: Pestania = params.get('tab') === 'inspector' ? 'inspector' : 'parametros';
   const { catalogo, loading, error, saving, save } = useCatalogoReglas();
+  // Sin `reglas.editar` el catálogo se ve en sólo lectura, sin botón para guardar.
+  const soloLectura = !useAuth().puede('reglas.editar');
 
   // El borrador de Parámetros vive acá, no en la pestaña: ésta se desmonta al ir al Inspector.
   const [borrador, setBorrador] = useState<Borrador>(new Map());
@@ -80,8 +83,8 @@ export function ReglasPage() {
         <>
           <p className={styles.intro}>
             Cada regla del motor decide comparando lo que recibe contra uno o más umbrales. Acá ves cuánto
-            vale cada uno y podés cambiarlo. Un umbral que usan varias reglas es un solo valor: editarlo en
-            una lo cambia en todas.
+            vale cada uno{soloLectura ? '' : ' y podés cambiarlo'}. Un umbral que usan varias reglas es un solo
+            valor: editarlo en una lo cambia en todas.
           </p>
           {error ? (
             <div className={styles.state} style={{ color: 'var(--crit)' }}>
@@ -97,6 +100,7 @@ export function ReglasPage() {
               borrador={borrador}
               onBorradorChange={setBorrador}
               reglaInicial={params.get('regla')}
+              soloLectura={soloLectura}
             />
           )}
         </>

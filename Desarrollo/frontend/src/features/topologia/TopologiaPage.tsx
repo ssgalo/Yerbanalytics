@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { usePageTitle } from '@/hooks/PageMeta';
+import { useAuth } from '@/hooks/AuthContext';
 import { useTopologia } from '@/hooks/useTopologia';
 import {
   clampDisposicion,
@@ -18,6 +19,8 @@ type Feedback = { kind: 'ok'; msg: string } | null;
 
 export function TopologiaPage() {
   const { data, loading, error, generating, generar, guardarDisposicion } = useTopologia();
+  // Sin `topologia.gestionar` se ve la topología cargada, sin poder regenerarla ni reordenarla.
+  const gestionar = useAuth().puede('topologia.gestionar');
   const [macroZonas, setMacroZonas] = useState('6');
   const [sectores, setSectores] = useState('100');
   const [mzPorFila, setMzPorFila] = useState(DEFAULT_MACRO_ZONAS_POR_FILA);
@@ -166,88 +169,97 @@ export function TopologiaPage() {
           </span>
         </div>
 
-        <div className={styles.formGrid}>
-          <div className={styles.group}>
-            <label className={styles.label} htmlFor="macroZonas">
-              Macro-zonas
-            </label>
-            <input
-              id="macroZonas"
-              className={styles.input}
-              type="number"
-              min={1}
-              max={MAX_MACRO_ZONAS}
-              value={macroZonas}
-              onChange={(e) => {
-                setMacroZonas(e.target.value);
-                setConfirming(false);
-                const n = Number(e.target.value);
-                if (n > 0) setMzPorFila((p) => clampDisposicion(p, n));
-              }}
-            />
+        {!gestionar && (
+          <p className={styles.soloLectura}>
+            Sólo lectura: tu rol puede ver la topología pero no generarla ni cambiar su disposición.
+          </p>
+        )}
+
+        <fieldset className={styles.fieldset} disabled={!gestionar}>
+          <div className={styles.formGrid}>
+            <div className={styles.group}>
+              <label className={styles.label} htmlFor="macroZonas">
+                Macro-zonas
+              </label>
+              <input
+                id="macroZonas"
+                className={styles.input}
+                type="number"
+                min={1}
+                max={MAX_MACRO_ZONAS}
+                value={macroZonas}
+                onChange={(e) => {
+                  setMacroZonas(e.target.value);
+                  setConfirming(false);
+                  const n = Number(e.target.value);
+                  if (n > 0) setMzPorFila((p) => clampDisposicion(p, n));
+                }}
+              />
+            </div>
+
+            <div className={styles.group}>
+              <label className={styles.label} htmlFor="sectores">
+                Sectores por macro-zona
+              </label>
+              <input
+                id="sectores"
+                className={styles.input}
+                type="number"
+                min={1}
+                max={MAX_SECTORES_POR_ZONA}
+                value={sectores}
+                onChange={(e) => {
+                  setSectores(e.target.value);
+                  setConfirming(false);
+                  const n = Number(e.target.value);
+                  if (n > 0) setSecPorFila((p) => clampDisposicion(p, n));
+                }}
+              />
+            </div>
+
+            <div className={styles.group}>
+              <label className={styles.label} htmlFor="mzPorFila">
+                Macro-zonas por fila
+              </label>
+              <input
+                id="mzPorFila"
+                className={styles.input}
+                type="number"
+                min={1}
+                max={mzNum || 1}
+                value={mzPorFila}
+                onChange={(e) => {
+                  setMzPorFila(clampDisposicion(Number(e.target.value) || 1, mzNum));
+                  setFeedback(null);
+                }}
+              />
+            </div>
+
+            <div className={styles.group}>
+              <label className={styles.label} htmlFor="secPorFila">
+                Sectores por fila
+              </label>
+              <input
+                id="secPorFila"
+                className={styles.input}
+                type="number"
+                min={1}
+                max={spzNum || 1}
+                value={secPorFila}
+                onChange={(e) => {
+                  setSecPorFila(clampDisposicion(Number(e.target.value) || 1, spzNum));
+                  setFeedback(null);
+                }}
+              />
+            </div>
+
+            <div className={styles.group}>
+              <label className={styles.label}>Sectores totales</label>
+              <span className={styles.fixedValue}>{totalPrevisto}</span>
+            </div>
           </div>
 
-          <div className={styles.group}>
-            <label className={styles.label} htmlFor="sectores">
-              Sectores por macro-zona
-            </label>
-            <input
-              id="sectores"
-              className={styles.input}
-              type="number"
-              min={1}
-              max={MAX_SECTORES_POR_ZONA}
-              value={sectores}
-              onChange={(e) => {
-                setSectores(e.target.value);
-                setConfirming(false);
-                const n = Number(e.target.value);
-                if (n > 0) setSecPorFila((p) => clampDisposicion(p, n));
-              }}
-            />
-          </div>
-
-          <div className={styles.group}>
-            <label className={styles.label} htmlFor="mzPorFila">
-              Macro-zonas por fila
-            </label>
-            <input
-              id="mzPorFila"
-              className={styles.input}
-              type="number"
-              min={1}
-              max={mzNum || 1}
-              value={mzPorFila}
-              onChange={(e) => {
-                setMzPorFila(clampDisposicion(Number(e.target.value) || 1, mzNum));
-                setFeedback(null);
-              }}
-            />
-          </div>
-
-          <div className={styles.group}>
-            <label className={styles.label} htmlFor="secPorFila">
-              Sectores por fila
-            </label>
-            <input
-              id="secPorFila"
-              className={styles.input}
-              type="number"
-              min={1}
-              max={spzNum || 1}
-              value={secPorFila}
-              onChange={(e) => {
-                setSecPorFila(clampDisposicion(Number(e.target.value) || 1, spzNum));
-                setFeedback(null);
-              }}
-            />
-          </div>
-
-          <div className={styles.group}>
-            <label className={styles.label}>Sectores totales</label>
-            <span className={styles.fixedValue}>{totalPrevisto}</span>
-          </div>
-        </div>
+        </fieldset>
 
         <TopologiaPreview
           macroZonas={mzNum}
@@ -255,6 +267,7 @@ export function TopologiaPage() {
           macroZonasPorFila={mzPorFila}
           sectoresPorFila={secPorFila}
           onChange={({ macroZonasPorFila, sectoresPorFila }) => {
+            if (!gestionar) return;
             setMzPorFila(macroZonasPorFila);
             setSecPorFila(sectoresPorFila);
             setFeedback(null);
@@ -265,7 +278,7 @@ export function TopologiaPage() {
       </Card>
 
       {/* Popup de guardado: aparece solo si hay cambios, fuera del área de edición. */}
-      {hayCambios && (
+      {hayCambios && gestionar && (
         <div className={styles.savebar} role="dialog" aria-live="polite">
           <div className={styles.savebarBody}>
             <span className={styles.savebarTitle}>

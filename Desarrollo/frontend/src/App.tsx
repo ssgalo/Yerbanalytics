@@ -1,11 +1,15 @@
 import { RouterProvider } from 'react-router-dom';
-import { NurseryProvider } from '@/hooks/NurseryContext';
+import { AuthProvider } from '@/hooks/AuthContext';
 import { router } from './router';
 
+/**
+ * La sesión envuelve a todo: el vivero (`NurseryProvider`) y la preferencia de Demo Expo se
+ * montan dentro del shell, que sólo existe con sesión.
+ */
 export function App() {
   return (
-    <NurseryProvider>
+    <AuthProvider>
       <RouterProvider router={router} />
-    </NurseryProvider>
+    </AuthProvider>
   );
 }

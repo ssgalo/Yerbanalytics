@@ -31,9 +31,39 @@ export type IconName =
   | 'calendar'
   | 'chevron-down'
   | 'map-pin'
-  | 'rules';
+  | 'rules'
+  | 'users'
+  | 'lock'
+  | 'key'
+  | 'logout';
 
 const PATHS: Record<IconName, JSX.Element> = {
+  // Seguridad: personas, candado, llave y salida.
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-4-6" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="M10.7 12.3 21 2M16 7l3 3M19 4l2 2" />
+    </>
+  ),
+  logout: (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5M21 12H9" />
+    </>
+  ),
   // Motor de reglas: un nodo que se bifurca (el DAG de decisión).
   rules: (
     <>

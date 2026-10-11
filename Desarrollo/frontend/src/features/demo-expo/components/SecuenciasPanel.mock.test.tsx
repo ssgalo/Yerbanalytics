@@ -24,7 +24,7 @@ afterEach(() => {
 const montar = async () => {
   render(
     <MemoryRouter>
-      <SecuenciasPanel pasadaEnCurso={false} />
+      <SecuenciasPanel pasadaEnCurso={false} operar />
     </MemoryRouter>,
   );
   await act(async () => vi.advanceTimersByTimeAsync(0));

@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.CatalogoReglasDto;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ErrorParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosInvalidosException;
+import com.yerbanalytics.backend.seguridad.UsuarioSesion;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -43,7 +44,7 @@ public class ReglasParametrosController {
     public ResponseEntity<CatalogoReglasDto> putParametros(
             @RequestBody CambiosParametrosRequest request,
             @RequestHeader(value = "X-Usuario", required = false) String usuario) {
-        return ResponseEntity.ok(service.guardar(request.cambios(), usuario));
+        return ResponseEntity.ok(service.guardar(request.cambios(), UsuarioSesion.autorDelCambio(usuario)));
     }
 
     /** Lote inválido → 400 con un error por parámetro; no se persistió nada. */

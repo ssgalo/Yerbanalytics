@@ -51,6 +51,8 @@ interface ParametrosTabProps {
   onBorradorChange: Dispatch<SetStateAction<Borrador>>;
   /** Regla que arranca abierta (viene de "Editar parámetro" en el Inspector). */
   reglaInicial?: string | null;
+  /** El rol no tiene `reglas.editar`: campos deshabilitados y sin barra de guardado. */
+  soloLectura?: boolean;
 }
 
 type Vista = 'regla' | 'parametro';
@@ -62,7 +64,9 @@ export function ParametrosTab({
   borrador,
   onBorradorChange: setBorrador,
   reglaInicial,
+  soloLectura = false,
 }: ParametrosTabProps) {
+  const bloqueado = saving || soloLectura;
   const [filtros, setFiltros] = useState<Filtros>(SIN_FILTROS);
   const [vista, setVista] = useState<Vista>('regla');
   const [abiertas, setAbiertas] = useState<Set<string>>(new Set(reglaInicial ? [reglaInicial] : []));
@@ -197,7 +201,8 @@ export function ParametrosTab({
             errorServidor={erroresServidor.get(p.clave) ?? null}
             nombresReglas={nombresReglas}
             reglaActual={g.id}
-            disabled={saving}
+            disabled={bloqueado}
+            soloLectura={soloLectura}
             onChange={(texto) => onEditar(p, texto)}
             onRestablecer={() => onRestablecer(p)}
           />
@@ -293,7 +298,8 @@ export function ParametrosTab({
                       erroresCliente={erroresCliente}
                       erroresServidor={erroresServidor}
                       abierta={abiertas.has(r.id)}
-                      disabled={saving}
+                      disabled={bloqueado}
+                      soloLectura={soloLectura}
                       onToggle={() => alternar(r.id)}
                       onEditar={onEditar}
                       onRestablecer={onRestablecer}
@@ -328,7 +334,8 @@ export function ParametrosTab({
                 errorCliente={erroresCliente.get(p.clave) ?? null}
                 errorServidor={erroresServidor.get(p.clave) ?? null}
                 nombresReglas={nombresReglas}
-                disabled={saving}
+                disabled={bloqueado}
+                soloLectura={soloLectura}
                 onChange={(texto) => onEditar(p, texto)}
                 onRestablecer={() => onRestablecer(p)}
               />
@@ -337,38 +344,46 @@ export function ParametrosTab({
         </section>
       )}
 
-      <div className={styles.acciones}>
-        <span className={hayErroresCliente || ocultosConError > 0 ? styles.avisoErr : styles.aviso}>
-          {hayErroresCliente
-            ? 'Corregí los valores marcados para poder guardar.'
-            : cambios.length === 0
-              ? 'Sin cambios pendientes.'
-              : `${contar(cambios.length, 'cambio', 'cambios')} sin guardar`}
-          {ocultosConError > 0 && (
-            <>
-              {' '}
-              {ocultosConError === 1
-                ? '1 parámetro con error queda oculto por los filtros.'
-                : `${ocultosConError} parámetros con error quedan ocultos por los filtros.`}{' '}
-              <button type="button" className={styles.btnLink} onClick={verConError}>
-                Ver los que tienen error
-              </button>
-            </>
-          )}
-        </span>
-        <span className={styles.spacer} />
-        <button
-          type="button"
-          className={styles.btnSecondary}
-          disabled={saving || (borrador.size === 0 && erroresServidor.size === 0)}
-          onClick={onDescartar}
-        >
-          Descartar
-        </button>
-        <button type="button" className={styles.btnPrimary} disabled={!puedeGuardar} onClick={onGuardarClick}>
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
-      </div>
+      {soloLectura ? (
+        <div className={styles.acciones}>
+          <span className={styles.aviso}>
+            Sólo lectura: tu rol puede ver los parámetros del motor pero no modificarlos.
+          </span>
+        </div>
+      ) : (
+        <div className={styles.acciones}>
+          <span className={hayErroresCliente || ocultosConError > 0 ? styles.avisoErr : styles.aviso}>
+            {hayErroresCliente
+              ? 'Corregí los valores marcados para poder guardar.'
+              : cambios.length === 0
+                ? 'Sin cambios pendientes.'
+                : `${contar(cambios.length, 'cambio', 'cambios')} sin guardar`}
+            {ocultosConError > 0 && (
+              <>
+                {' '}
+                {ocultosConError === 1
+                  ? '1 parámetro con error queda oculto por los filtros.'
+                  : `${ocultosConError} parámetros con error quedan ocultos por los filtros.`}{' '}
+                <button type="button" className={styles.btnLink} onClick={verConError}>
+                  Ver los que tienen error
+                </button>
+              </>
+            )}
+          </span>
+          <span className={styles.spacer} />
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            disabled={saving || (borrador.size === 0 && erroresServidor.size === 0)}
+            onClick={onDescartar}
+          >
+            Descartar
+          </button>
+          <button type="button" className={styles.btnPrimary} disabled={!puedeGuardar} onClick={onGuardarClick}>
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
+      )}
     </>
   );
 }

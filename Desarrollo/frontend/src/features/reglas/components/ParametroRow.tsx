@@ -19,6 +19,8 @@ interface ParametroRowProps {
   reglaActual?: string;
   /** Hay un guardado en vuelo: no se edita hasta que vuelva la respuesta. */
   disabled?: boolean;
+  /** Sin permiso de edición: el campo se ve deshabilitado y no se ofrece "Restablecer fábrica". */
+  soloLectura?: boolean;
   onChange: (texto: string) => void;
   onRestablecer: () => void;
 }
@@ -38,6 +40,7 @@ export function ParametroRow({
   nombresReglas,
   reglaActual,
   disabled,
+  soloLectura,
   onChange,
   onRestablecer,
 }: ParametroRowProps) {
@@ -98,7 +101,7 @@ export function ParametroRow({
 
       <div className={styles.filaCampo}>
         <ParametroField parametro={p} valor={valor} invalid={error !== null} disabled={disabled} onChange={onChange} />
-        {(p.modificado || editado) && (
+        {(p.modificado || editado) && !soloLectura && (
           <button type="button" className={styles.btnLink} disabled={disabled} onClick={onRestablecer}>
             Restablecer fábrica
           </button>

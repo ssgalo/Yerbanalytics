@@ -82,7 +82,7 @@ const hook = (s: Secuencia | null, over: Record<string, unknown> = {}) => {
 
 const tree = (pasadaEnCurso: boolean) => (
   <MemoryRouter>
-    <SecuenciasPanel pasadaEnCurso={pasadaEnCurso} />
+    <SecuenciasPanel pasadaEnCurso={pasadaEnCurso} operar />
   </MemoryRouter>
 );
 const montar = (pasadaEnCurso = false) => render(tree(pasadaEnCurso));

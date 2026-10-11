@@ -83,6 +83,15 @@ hardware real.
   registra aparte.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante
   (plan por días, regula mediasombra).
+- **Roles** (fijos): Administrador, Ingeniero Agrónomo, Productor Viverista, Operario y
+  **Servicio** (cuentas de integraciones: simulador, servicio de inferencia; no para personas).
+- **Permiso**: código del catálogo fijo en `seguridad/Permiso.java` (`reglas.ver`,
+  `reglas.editar`, `usuarios.gestionar`…). Uno de edición no implica el de lectura.
+- **Matriz de permisos**: qué permisos tiene cada rol. La edita el Administrador desde la vista
+  Usuarios; se siembra con la matriz por defecto sólo si está vacía.
+- **Auditoría de seguridad**: registro append-only y encadenado por hash de los cambios sobre
+  usuarios, matriz y política de sesión. No confundir con el **historial** (HU-11), que registra
+  las acciones agronómicas.
 
 ---
 
@@ -205,6 +214,10 @@ cd Desarrollo/backend
   → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
 - `POST /api/pasadas`, `GET /api/pasadas/actual`, `POST /api/pasadas/actual/cancelar` → pasada del
   riel; `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
+- `POST /api/auth/login`, `GET /api/auth/perfil`, `POST /api/auth/actividad|logout`,
+  `PUT /api/auth/clave` → sesión. `/api/usuarios/**`, `/api/roles/**`, `/api/seguridad/politica`,
+  `GET /api/auditoria` → gestión de seguridad (HU-01 / HU-20). Ver "Autenticación y permisos" en
+  el README del backend.
 - `POST /api/secuencias`, `GET /api/secuencias/actual`, `POST /api/secuencias/actual/cancelar` →
   secuencias guionadas de Demo Expo (riego, mediasombra, lectura): comandan el actuador directo, sin
   pasar por el motor, y no corren a la vez que una pasada. Ver README del backend y
@@ -234,6 +247,19 @@ cd Desarrollo/backend
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y
   `docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md`.
+- **Toda la API exige sesión de usuario y permiso** (HU-01 / HU-20), salvo el login, `/ca.pem` y el
+  contrato de cámara. Es *deny-by-default*: una ruta nueva queda cerrada hasta que se le declara el
+  permiso en **`seguridad/MapaPermisos`**, que es el único lugar donde se asignan (nada de
+  `@PreAuthorize` desperdigado); `MapaPermisosCoberturaTest` falla si falta. Sesiones opacas en
+  tabla, no JWT: así la revocación y el cierre por inactividad son inmediatos y los decide el
+  servidor. **Los `GET` no cuentan como actividad** (los sondeos no mantienen viva la sesión): no
+  revertir sin leer el design de `add-login-y-permisos`.
+- **Las cuentas iniciales salen de `Desarrollo/backend/.env`** (plantilla `env.example`, importado con
+  `spring.config.import`): el Administrador (`YERBANALYTICS_ADMIN_*`) y una lista genérica
+  `YERBANALYTICS_USUARIOS_INICIALES` (`usuario:ROL:clave,…`). Se crean si no existen y nunca se pisan.
+  Sus claves de desarrollo coinciden con los `env.example` del simulador y de la inferencia.
+- **La auditoría de seguridad es append-only también en la base** (triggers que instala la app al
+  arrancar). No la toques con `UPDATE`/`DELETE` ni le agregues endpoints de escritura.
 - **El backend no tiene modos de operación.** Ningún endpoint, tabla ni propiedad depende de
   que el sistema esté "en simulación": se comporta siempre como en producción.
 
@@ -275,6 +301,11 @@ Invariantes a respetar al tocar esta área:
 - **Los JPEG van al filesystem, no a `bytea`.**
 - **La tabla `diagnostico` no tiene columna de origen** y `captura_id` es `NOT NULL`: un
   diagnóstico manual y uno del modelo son la misma fila porque son la misma operación.
+- **La API de plataforma de cámara y captura exige sesión de usuario** (vinculación, dispositivos,
+  órdenes, imágenes, diagnósticos), con permiso (`camara.gestionar`, `capturas.ordenar`,
+  `capturas.ver`, `diagnosticos.registrar`). El contrato `/api/camara/v1/**` sigue con su token de
+  dispositivo, en su propia cadena de Spring Security: las credenciales no se cruzan. La suite de
+  conformidad prepara sus casos con una cuenta de plataforma (`PLATAFORMA_USUARIO`/`PLATAFORMA_CLAVE`).
 - **El simulador no tiene ni un endpoint propio**: usa el de emisión de órdenes (el que también usa
   el planificador de pasadas) y el de alta de diagnósticos (el de la futura inferencia).
 - **HTTPS no es opcional para la PWA**, y sí lo es para la app nativa. La restricción es del
@@ -309,6 +340,11 @@ Invariantes a respetar al tocar esta área:
   Se descartó pasar por un endpoint del backend: ése era el acoplamiento que se vino a sacar.
 - **La UI habla con el backend a través de `/backend/**`**, el proxy de su propio servidor. Si
   llamara directo, el backend tendría que permitir su origen por CORS — y eso sería un rastro.
+- **Entra con una cuenta de rol Servicio** (`BACKEND_USUARIO`/`BACKEND_CLAVE` en su `.env`). En
+  desarrollo la crea el backend al arrancar porque figura en `YERBANALYTICS_USUARIOS_INICIALES` de
+  su `.env` —una lista de configuración genérica—; el backend no tiene usuario, rol ni permiso
+  programado para él. Su servidor inicia sesión y adjunta la cookie en el proxy. Sin credenciales, la
+  telemetría MQTT sigue saliendo y su UI avisa que el backend rechaza el resto.
 - **Su estado vive en `simulador/data/`**, nunca en la base del vivero.
 - **No tiene superficie de API propia en el sistema**: topología, órdenes de captura,
   dispositivos y diagnósticos son endpoints públicos, los mismos que usan el planificador de

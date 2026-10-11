@@ -38,7 +38,14 @@ function Tarjeta({
   );
 }
 
-export function SecuenciasPanel({ pasadaEnCurso }: { pasadaEnCurso: boolean }) {
+// Sin `operar` (sin `pasadas.operar`) se sigue la secuencia en curso, sin las tarjetas para lanzarlas.
+export function SecuenciasPanel({
+  pasadaEnCurso,
+  operar,
+}: {
+  pasadaEnCurso: boolean;
+  operar: boolean;
+}) {
   const { secuencia, error, iniciando, iniciar, cancelar, descartarError } = useSecuencia();
   const [riegoTxt, setRiegoTxt] = useState(String(RIEGO.defecto));
   const [esperaTxt, setEsperaTxt] = useState(String(ESPERA.defecto));
@@ -63,65 +70,67 @@ export function SecuenciasPanel({ pasadaEnCurso }: { pasadaEnCurso: boolean }) {
         riel.
       </p>
 
-      <div className={styles.tarjetas}>
-        <Tarjeta titulo="Riego" descripcion="Abre la válvula, espera y la cierra.">
-          <label className={styles.campo}>
-            <span>Segundos</span>
-            <input
-              type="number"
-              className={styles.input}
-              min={RIEGO.min}
-              max={RIEGO.max}
-              value={riegoTxt}
-              onChange={(e) => setRiegoTxt(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className={styles.btn}
-            disabled={ocupado || duracion === null}
-            onClick={() => duracion !== null && void iniciar('RIEGO', { duracionSeg: duracion })}
-          >
-            Regar
-          </button>
-        </Tarjeta>
+      {operar && (
+        <div className={styles.tarjetas}>
+          <Tarjeta titulo="Riego" descripcion="Abre la válvula, espera y la cierra.">
+            <label className={styles.campo}>
+              <span>Segundos</span>
+              <input
+                type="number"
+                className={styles.input}
+                min={RIEGO.min}
+                max={RIEGO.max}
+                value={riegoTxt}
+                onChange={(e) => setRiegoTxt(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.btn}
+              disabled={ocupado || duracion === null}
+              onClick={() => duracion !== null && void iniciar('RIEGO', { duracionSeg: duracion })}
+            >
+              Regar
+            </button>
+          </Tarjeta>
 
-        <Tarjeta titulo="Mediasombra" descripcion="La despliega, espera y la enrolla.">
-          <label className={styles.campo}>
-            <span>Espera desplegada (s)</span>
-            <input
-              type="number"
-              className={styles.input}
-              min={ESPERA.min}
-              max={ESPERA.max}
-              value={esperaTxt}
-              onChange={(e) => setEsperaTxt(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className={styles.btn}
-            disabled={ocupado || espera === null}
-            onClick={() => espera !== null && void iniciar('MEDIASOMBRA', { esperaSeg: espera })}
-          >
-            Desplegar y enrollar
-          </button>
-        </Tarjeta>
+          <Tarjeta titulo="Mediasombra" descripcion="La despliega, espera y la enrolla.">
+            <label className={styles.campo}>
+              <span>Espera desplegada (s)</span>
+              <input
+                type="number"
+                className={styles.input}
+                min={ESPERA.min}
+                max={ESPERA.max}
+                value={esperaTxt}
+                onChange={(e) => setEsperaTxt(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.btn}
+              disabled={ocupado || espera === null}
+              onClick={() => espera !== null && void iniciar('MEDIASOMBRA', { esperaSeg: espera })}
+            >
+              Desplegar y enrollar
+            </button>
+          </Tarjeta>
 
-        <Tarjeta
-          titulo="Lectura"
-          descripcion="Le pide una lectura ahora al nodo testigo de la zona."
-        >
-          <button
-            type="button"
-            className={styles.btn}
-            disabled={ocupado}
-            onClick={() => void iniciar('LECTURA')}
+          <Tarjeta
+            titulo="Lectura"
+            descripcion="Le pide una lectura ahora al nodo testigo de la zona."
           >
-            Leer sensores ahora
-          </button>
-        </Tarjeta>
-      </div>
+            <button
+              type="button"
+              className={styles.btn}
+              disabled={ocupado}
+              onClick={() => void iniciar('LECTURA')}
+            >
+              Leer sensores ahora
+            </button>
+          </Tarjeta>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className={styles.error}>
@@ -129,7 +138,7 @@ export function SecuenciasPanel({ pasadaEnCurso }: { pasadaEnCurso: boolean }) {
         </div>
       )}
 
-      {secuencia && <SecuenciaProgreso secuencia={secuencia} onCancelar={() => void cancelar()} />}
+      {secuencia && <SecuenciaProgreso secuencia={secuencia} onCancelar={operar ? () => void cancelar() : undefined} />}
     </section>
   );
 }

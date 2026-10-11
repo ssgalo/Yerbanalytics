@@ -81,7 +81,8 @@ function TablaLectura({ secuencia }: { secuencia: Secuencia }) {
 
 interface Props {
   secuencia: Secuencia;
-  onCancelar: () => void;
+  // Sin él (sin `pasadas.operar`) se sigue la secuencia sin poder cancelarla.
+  onCancelar?: () => void;
 }
 
 export function SecuenciaProgreso({ secuencia, onCancelar }: Props) {
@@ -96,7 +97,7 @@ export function SecuenciaProgreso({ secuencia, onCancelar }: Props) {
           {ETIQUETA_ESTADO[secuencia.estado]}
           {enCurso && secuencia.cancelacionSolicitada ? ' · cancelando…' : ''}
         </Badge>
-        {enCurso && !secuencia.cancelacionSolicitada && (
+        {onCancelar && enCurso && !secuencia.cancelacionSolicitada && (
           <button type="button" className={styles.btnCancelar} onClick={onCancelar}>
             Cancelar
           </button>

@@ -199,3 +199,18 @@
   gap: 10px;
   flex-shrink: 0;
 }
+
+/* Envuelve los campos: `disabled` los deshabilita a todos en sólo lectura. */
+.fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.soloLectura {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}

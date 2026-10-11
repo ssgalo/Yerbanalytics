@@ -8,7 +8,7 @@
    escribir el estado (mismo criterio que `useTrazaEvaluacion`).
    ============================================================ */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getRepository, PasadaRechazadaError } from '@/data';
+import { getRepository, PasadaRechazadaError, PermisoDenegadoError } from '@/data';
 import type { Pasada } from '@/types/domain';
 
 const INTERVALO_EN_CURSO_MS = 1000;
@@ -37,7 +37,9 @@ interface UsePasadaResult {
   cancelar: () => Promise<void>;
 }
 
-const mensajeDe = (e: unknown) => (e instanceof PasadaRechazadaError ? e.message : SIN_BACKEND);
+// Un 403 (la matriz cambió mientras se miraba la vista) se dice tal cual, no como "sin backend".
+const mensajeDe = (e: unknown) =>
+  e instanceof PasadaRechazadaError || e instanceof PermisoDenegadoError ? e.message : SIN_BACKEND;
 
 export function usePasada(): UsePasadaResult {
   const [pasada, setPasada] = useState<Pasada | null>(null);

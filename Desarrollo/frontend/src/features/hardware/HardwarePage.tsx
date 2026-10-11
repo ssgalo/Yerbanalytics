@@ -1,6 +1,7 @@
 /* Vista principal: Estado técnico del hardware (HU-18 / HU-21) */
 import { useMemo, useState } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
+import { useAuth } from '@/hooks/AuthContext';
 import { useHardware } from '@/hooks/useHardware';
 import type { Dispositivo, NuevoDispositivo } from '@/types/domain';
 import { HardwareKpis } from './components/HardwareKpis';
@@ -27,6 +28,8 @@ function zonaDe(d: Dispositivo): string {
 
 export function HardwarePage() {
   const { data, loading, error, mutating, register, replace } = useHardware();
+  // Alta y recambio sólo con `hardware.gestionar`; sin él, la flota se ve igual pero sin acciones.
+  const gestionar = useAuth().puede('hardware.gestionar');
   const [filters, setFilters] = useState<HardwareFilterState>(INITIAL);
   const [panel, setPanel] = useState<Panel>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -83,19 +86,21 @@ export function HardwarePage() {
         <HardwareFilters value={filters} count={filtered.length} onChange={patch} />
         <span className={styles.toolbarSpacer} />
         {feedback && <span className={styles.feedbackOk}>{feedback.msg}</span>}
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => {
-            setFeedback(null);
-            setPanel({ mode: 'alta' });
-          }}
-        >
-          Registrar dispositivo
-        </button>
+        {gestionar && (
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => {
+              setFeedback(null);
+              setPanel({ mode: 'alta' });
+            }}
+          >
+            Registrar dispositivo
+          </button>
+        )}
       </div>
 
-      {panel && (
+      {panel && gestionar && (
         <AltaHardwareForm
           mode={panel.mode}
           device={panel.mode === 'recambio' ? panel.device : undefined}
@@ -109,10 +114,14 @@ export function HardwarePage() {
 
       <HardwareTable
         dispositivos={filtered}
-        onRecambiar={(device) => {
-          setFeedback(null);
-          setPanel({ mode: 'recambio', device });
-        }}
+        onRecambiar={
+          gestionar
+            ? (device) => {
+                setFeedback(null);
+                setPanel({ mode: 'recambio', device });
+              }
+            : undefined
+        }
       />
     </div>
   );

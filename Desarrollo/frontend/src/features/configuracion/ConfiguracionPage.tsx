@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { usePageTitle } from '@/hooks/PageMeta';
+import { useAuth } from '@/hooks/AuthContext';
 import { useConfig } from '@/hooks/useConfig';
 import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
 import { validateConfig } from '@/lib/configValidation';
@@ -26,6 +27,10 @@ function formatTs(ts: number | null): string {
 
 export function ConfiguracionPage() {
   const { config, loading, error, saving, save } = useConfig();
+  const { puede } = useAuth();
+  // Sin `configuracion.editar` la página es de sólo lectura: los campos quedan deshabilitados
+  // y no hay botones de guardar. El interruptor de Demo Expo depende de otro permiso.
+  const editable = puede('configuracion.editar');
   // El tope del plan de rustificación es un parámetro del motor de reglas, no de esta página.
   const { catalogo, loading: catalogoCargando, error: catalogoError, reload: recargarCatalogo } = useCatalogoReglas();
   // Sin el catálogo no hay tope: no se supone ninguno (100 % daría por válido un plan que el
@@ -101,7 +106,9 @@ export function ConfiguracionPage() {
           <span className={styles.sectionTitle}>Umbrales de métricas</span>
           <span className={styles.sectionHint}>Bandas ideal · advertencia · crítico por variable</span>
         </div>
-        <UmbralesForm value={draft.umbrales} onChange={patchUmbral} />
+        <fieldset className={styles.fieldset} disabled={!editable}>
+          <UmbralesForm value={draft.umbrales} onChange={patchUmbral} />
+        </fieldset>
       </Card>
 
       <Card className={styles.section}>
@@ -109,7 +116,9 @@ export function ConfiguracionPage() {
           <span className={styles.sectionTitle}>Límites de riego e insumos</span>
           <span className={styles.sectionHint}>Topes informativos de volumen y dosis</span>
         </div>
-        <LimitesActuadoresForm value={draft.operativa} onChange={patchOperativa} />
+        <fieldset className={styles.fieldset} disabled={!editable}>
+          <LimitesActuadoresForm value={draft.operativa} onChange={patchOperativa} />
+        </fieldset>
       </Card>
 
       <Card className={styles.section}>
@@ -118,7 +127,9 @@ export function ConfiguracionPage() {
           <span className={styles.sectionHint}>Cronograma de exposición gradual de la mediasombra</span>
         </div>
         {aperturaMax !== null ? (
-          <RustificacionPlanForm value={draft.rustificacion} aperturaMax={aperturaMax} onChange={setEtapas} />
+          <fieldset className={styles.fieldset} disabled={!editable}>
+            <RustificacionPlanForm value={draft.rustificacion} aperturaMax={aperturaMax} onChange={setEtapas} />
+          </fieldset>
         ) : catalogoCargando && !catalogoError ? (
           <div className={styles.state}>Cargando la apertura máxima del motor…</div>
         ) : (
@@ -138,7 +149,9 @@ export function ConfiguracionPage() {
           <span className={styles.sectionTitle}>Seguimiento post-acción</span>
           <span className={styles.sectionHint}>Latencia y mejora mínima para evaluar efectividad</span>
         </div>
-        <SeguimientoForm value={draft.operativa} onChange={patchOperativa} />
+        <fieldset className={styles.fieldset} disabled={!editable}>
+          <SeguimientoForm value={draft.operativa} onChange={patchOperativa} />
+        </fieldset>
       </Card>
 
       <Card className={styles.section}>
@@ -146,7 +159,9 @@ export function ConfiguracionPage() {
           <span className={styles.sectionTitle}>Frecuencia Operativa</span>
           <span className={styles.sectionHint}>Intervalos de sensado (IoT) y ejecución de inferencia (IA)</span>
         </div>
-        <IntervalosForm value={draft.operativa} onChange={patchOperativa} />
+        <fieldset className={styles.fieldset} disabled={!editable}>
+          <IntervalosForm value={draft.operativa} onChange={patchOperativa} />
+        </fieldset>
       </Card>
 
       <Card className={styles.section}>
@@ -154,7 +169,7 @@ export function ConfiguracionPage() {
           <span className={styles.sectionTitle}>Demo Expo</span>
           <span className={styles.sectionHint}>Preferencia de visualización · se guarda al instante</span>
         </div>
-        <DemoExpoSwitch />
+        <DemoExpoSwitch editable={puede('demo-expo.configurar')} />
       </Card>
 
       <div className={styles.actions}>
@@ -170,12 +185,18 @@ export function ConfiguracionPage() {
           </span>
         )}
         <span className={styles.spacer} />
-        <button type="button" className={styles.btnSecondary} onClick={onReset}>
-          Restablecer valores de fábrica
-        </button>
-        <button type="button" className={styles.btnPrimary} disabled={!canSave} onClick={onSave}>
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        {editable ? (
+          <>
+            <button type="button" className={styles.btnSecondary} onClick={onReset}>
+              Restablecer valores de fábrica
+            </button>
+            <button type="button" className={styles.btnPrimary} disabled={!canSave} onClick={onSave}>
+              {saving ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </>
+        ) : (
+          <span className={styles.soloLectura}>Sólo lectura: tu rol puede ver la configuración pero no modificarla.</span>
+        )}
       </div>
     </div>
   );

@@ -117,6 +117,7 @@ public class CapturaController {
     /**
      * Sirve el JPEG. El contenido de una captura no cambia nunca, así que se declara
      * inmutable y se valida por ETag (el sha256): el dashboard no vuelve a descargarla.
+     * {@code private} porque exige sesión: un caché compartido no debe servirla a otro.
      */
     @GetMapping("/api/capturas/{capturaId}/imagen")
     public ResponseEntity<byte[]> imagen(@PathVariable String capturaId) {
@@ -135,7 +136,7 @@ public class CapturaController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG)
                 .eTag("\"" + c.getSha256() + "\"")
-                .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable())
+                .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable())
                 .body(bytes);
     }
 

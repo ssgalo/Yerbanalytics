@@ -1,0 +1,469 @@
+/* Vista Usuarios (HU-20): pestañas, tablas, formularios y matriz de permisos */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.state {
+  padding: 40px;
+  font-family: var(--font-body);
+  color: var(--muted);
+}
+
+.intro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 760px;
+  line-height: 1.5;
+}
+
+/* --- Pestañas (mismo patrón que Motor de reglas) --- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  width: fit-content;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tabActive {
+  background: var(--g800);
+  color: var(--cream);
+}
+
+.tabActive:hover {
+  color: var(--cream);
+}
+
+/* --- Barra de herramientas --- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* --- Tarjetas y tablas --- */
+.section {
+  padding: 18px 20px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sectionHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tableHead {
+  padding: 14px 18px 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.username {
+  font-weight: 700;
+}
+
+.sub {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--faint);
+}
+
+.mono {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.acciones {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.yo {
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--info-ink);
+  background: var(--info-soft);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+/* --- Formularios --- */
+.formGrid {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.input,
+.select {
+  appearance: none;
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+  min-width: 0;
+}
+
+.input:disabled {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.select {
+  padding-right: 32px;
+  cursor: pointer;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%236A776E" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.inputCorto {
+  width: 110px;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: center;
+}
+
+/* --- Avisos --- */
+.advertencia,
+.info,
+.errorBox,
+.okBox {
+  margin-top: 12px;
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.advertencia {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.info {
+  background: var(--info-soft);
+  color: var(--info-ink);
+}
+
+.errorBox {
+  background: var(--crit-soft);
+  color: var(--crit-ink);
+}
+
+.okBox {
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.feedbackOk {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.feedbackErr {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--crit);
+}
+
+/* --- Botones --- */
+.btnPrimary {
+  border: none;
+  background-color: var(--brand);
+  color: var(--on-brand);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled {
+  background-color: var(--line);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary:hover {
+  border-color: var(--muted);
+}
+
+.btnSecondary:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  border: none;
+  background: var(--crit);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnLink {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btnLink:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.btnLink:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.btnLinkDanger {
+  composes: btnLink;
+  color: var(--crit-ink);
+}
+
+/* --- Matriz rol × permiso --- */
+.matriz th.rolCol,
+.matriz td.celda {
+  text-align: center;
+  width: 118px;
+}
+
+.grupoFila td {
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.codigo {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dependeDe {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.celda input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--brand);
+}
+
+.celda input:disabled {
+  cursor: not-allowed;
+}
+
+.celdaCambio {
+  background: var(--warn-soft);
+}
+
+.rolModificado {
+  color: var(--warn-ink);
+}
+
+/* --- Auditoría --- */
+.filtros {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.integridad {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.integra {
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.rota {
+  background: var(--crit-soft);
+  color: var(--crit-ink);
+}
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line2);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.detalle {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 420px;
+  word-break: break-word;
+}

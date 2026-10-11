@@ -7,11 +7,15 @@
    among its allowed ones. That line in the backend configuration was the last trace of the
    simulator in the system.
 
+   Every forwarded call carries the simulator's own session (`backend-session.ts`): the backend
+   sees the Servicio account from the `.env`, never whatever the browser happens to carry.
+
    Side effect worth remembering: the backend returns a capture's image as a relative path
    (`/api/capturas/{id}/imagen`), so the UI has to prefix it with `/backend` or the browser
    looks for it on the page's own origin. That is handled in `src/api.ts`.
    ============================================================ */
 import type { Request, Response } from 'express';
+import { backendSession, type SessionState } from './backend-session.ts';
 import { config } from './config.ts';
 
 /* Headers not forwarded: `fetch` recomputes them, or they belong to the browser connection.
@@ -21,7 +25,10 @@ import { config } from './config.ts';
    call into a CORS request in the backend's eyes, rejected with a 403 because the simulator's
    origin is not (and must not be) among the allowed ones. Stripping them here is what keeps
    the promise of the proxy: the backend sees a plain server call and stays unaware of who
-   made it. */
+   made it.
+
+   `cookie` goes for the same reason: the backend has to see the simulator's session and
+   nothing else. Browser cookies are not port-scoped, so `localhost` ones could tag along. */
 const SKIPPED_HEADERS = new Set([
   'host',
   'connection',
@@ -29,10 +36,30 @@ const SKIPPED_HEADERS = new Set([
   'accept-encoding',
   'origin',
   'referer',
+  'cookie',
 ]);
+
+/**
+ * The camera device contract (`/api/camara/v1/**`) authenticates the DEVICE with its own
+ * tokens, not a user session. There the session is not attached and a `401` is not
+ * retried: it belongs to the device, and signing in again would not fix it.
+ */
+function usesUserSession(path: string): boolean {
+  return path.startsWith('/api/') && !path.startsWith('/api/camara/v1/');
+}
 
 /** Response headers worth passing back upstream. */
 const FORWARDED_HEADERS = ['content-type', 'etag', 'cache-control', 'content-disposition'];
+
+/** User-facing reasons (Spanish) for a `401` that signing in again cannot fix. */
+const AUTH_PROBLEM: Partial<Record<SessionState, string>> = {
+  'no-credentials':
+    'El backend rechaza la petición: el simulador no tiene credenciales. ' +
+    'Configurá BACKEND_USUARIO y BACKEND_CLAVE en su .env (una cuenta de rol Servicio).',
+  rejected:
+    'El backend rechazó las credenciales del simulador (BACKEND_USUARIO/BACKEND_CLAVE). ' +
+    'Revisá que la cuenta exista, esté activa y que la clave sea la vigente.',
+};
 
 /** Forwards the request to the backend and returns its response as-is. */
 export async function proxyBackend(req: Request, res: Response): Promise<void> {
@@ -46,16 +73,24 @@ export async function proxyBackend(req: Request, res: Response): Promise<void> {
   }
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
-  // `Uint8Array` rather than `Buffer`: the global `fetch` types reject Node's Buffer.
+  // `Uint8Array` rather than `Buffer`: the global `fetch` types reject Node's Buffer. It is
+  // already fully buffered by `express.raw`, which is what lets a `401` resend it as-is.
   const body =
     Buffer.isBuffer(req.body) && req.body.length > 0 ? new Uint8Array(req.body) : undefined;
 
   try {
-    const response = await fetch(target, {
-      method: req.method,
-      headers,
-      body: hasBody ? body : undefined,
-    });
+    const init: RequestInit = { method: req.method, headers, body: hasBody ? body : undefined };
+    const response = usesUserSession(req.url)
+      ? await backendSession.request(req.url, init)
+      : await fetch(target, init);
+
+    // A `401` caused by the simulator's own configuration is explained in its terms: the
+    // backend's generic "no session" would send the user to look in the wrong place.
+    const explanation = response.status === 401 ? AUTH_PROBLEM[backendSession.state()] : undefined;
+    if (explanation && usesUserSession(req.url)) {
+      res.status(401).json({ error: explanation });
+      return;
+    }
 
     for (const name of FORWARDED_HEADERS) {
       const value = response.headers.get(name);
@@ -77,7 +112,7 @@ export async function proxyBackend(req: Request, res: Response): Promise<void> {
 /** One-off backend call from the simulator server. `null` when it is unavailable. */
 export async function fetchFromBackend<T>(path: string): Promise<T | null> {
   try {
-    const response = await fetch(`${config.backendUrl}${path}`);
+    const response = await backendSession.request(path);
     if (!response.ok) return null;
     return (await response.json()) as T;
   } catch {
