@@ -18,7 +18,7 @@ interface NurseryMapProps {
 }
 
 /**
- * Plano del vivero: cada macro-zona es una bandeja con sus sectores, en su disposición física
+ * Plano del vivero, en una card: cada macro-zona es una bandeja con sus sectores, en su disposición física
  * (macro-zonas por fila y sectores por fila de la topología configurada). Sin leyenda propia:
  * los estados ya se nombran en el resumen y al pie de cada bandeja.
  */
