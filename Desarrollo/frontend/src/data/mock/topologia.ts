@@ -13,9 +13,9 @@ export const MAX_SECTORES_POR_ZONA = 500;
 export const DEFAULT_MACRO_ZONAS = 6;
 export const DEFAULT_SECTORES_POR_MACRO_ZONA = 100;
 
-/** Disposición visual por defecto (reproduce la presentación previa al cambio). */
-export const DEFAULT_MACRO_ZONAS_POR_FILA = 3;
-export const DEFAULT_SECTORES_POR_FILA = 10;
+/** Disposición visual por defecto: una macro-zona por fila, sus sectores en una sola hilera. */
+export const DEFAULT_MACRO_ZONAS_POR_FILA = 1;
+export const DEFAULT_SECTORES_POR_FILA = 100;
 
 /** Acota un valor de disposición al rango válido [1, max]; con grilla vacía deja el valor. */
 export function clampDisposicion(value: number, max: number): number {
