@@ -32,7 +32,7 @@ matriz de permisos sin login no tiene a quién aplicarse.
   de cada HU. Salvaguardas contra quedarse afuera: el Administrador no puede perder la gestión
   de usuarios, ni puede quedar el sistema sin un Administrador activo.
 - **Gestión de usuarios** (HU-20 CA-01/CA-02): alta, edición, cambio de rol, suspensión
-  (reversible), baja (definitiva, lógica) y blanqueo de contraseña. Cualquier cambio de rol,
+  (reversible), baja (definitiva, lógica) y restablecimiento de contraseña. Cualquier cambio de rol,
   suspensión o baja **invalida en el acto** las sesiones vigentes del usuario afectado; editar la
   matriz de un rol invalida las de quienes tienen ese rol.
 - **Registro de auditoría inalterable** (HU-20 CA-03): toda alta, baja o modificación sobre
@@ -40,7 +40,7 @@ matriz de permisos sin login no tiene a quién aplicarse.
   cambió y el timestamp. Append-only a nivel aplicación y base, con encadenamiento por hash para
   que una alteración por fuera del sistema sea detectable.
 - **Cambio de contraseña propio** y contraseña temporal obligatoria de cambiar en el primer
-  ingreso (las asigna el Administrador al dar de alta o blanquear).
+  ingreso (las asigna el Administrador al dar de alta o restablecer).
 - **Administrador inicial**: si no hay ningún Administrador activo, el backend crea uno al
   arrancar con credenciales tomadas de la configuración.
 - **BREAKING (API)**: toda `/api/**` que no sea el contrato de cámara (`/api/camara/v1/**`),
@@ -66,7 +66,7 @@ matriz de permisos sin login no tiene a quién aplicarse.
   salvaguardas, y su aplicación en el backend (por endpoint) y en el dashboard (rutas, menú y
   acciones).
 - `gestion-usuarios`: ABM de usuarios por el Administrador, estados (activo, suspendido, baja),
-  blanqueo de contraseña e invalidación de sesiones ante cambios de rol, permisos o estado.
+  restablecimiento de contraseña e invalidación de sesiones ante cambios de rol, permisos o estado.
 - `auditoria-seguridad`: registro append-only y verificable de los cambios sobre usuarios, roles,
   permisos y política de sesión, y su consulta por el Administrador.
 

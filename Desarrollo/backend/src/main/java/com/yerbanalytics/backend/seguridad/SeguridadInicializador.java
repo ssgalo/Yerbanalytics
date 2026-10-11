@@ -13,10 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 
 /**
@@ -95,29 +93,20 @@ public class SeguridadInicializador implements ApplicationRunner {
     }
 
     private void crearAdministradorInicial() {
-        boolean generada = adminClave == null || adminClave.isBlank();
-        String clave = generada ? claveAleatoria() : adminClave;
-        if (!generada) {
-            ReglasClave.validar(adminUsuario, clave);
+        if (usuarios.hayAdministradorActivo()) {
+            return;
         }
-        usuarios.crearAdministradorInicialSiFalta(adminUsuario, clave).ifPresent(u -> {
-            if (generada) {
-                // Única vez que esta contraseña existe en claro. Va al log a propósito (design D9).
-                log.warn("""
-
-                        ================================================================
-                          Administrador inicial creado
-                            usuario: {}
-                            contraseña temporal: {}
-                          No se configuró YERBANALYTICS_ADMIN_CLAVE: esta contraseña se
-                          muestra UNA sola vez. Se pide cambiarla en el primer ingreso.
-                        ================================================================""",
-                        u.username(), clave);
-            } else {
+        // Sin clave configurada no se inventa una: la única fuente del Administrador inicial es el
+        // .env (design D9). Frenar el arranque es preferible a una contraseña que nadie conoce.
+        if (adminClave == null || adminClave.isBlank()) {
+            throw new IllegalStateException("No hay ningún Administrador activo y YERBANALYTICS_ADMIN_CLAVE no "
+                    + "está definida. Copiá Desarrollo/backend/env.example a .env (o definí la variable) "
+                    + "y volvé a arrancar.");
+        }
+        ReglasClave.validar(adminUsuario, adminClave);
+        usuarios.crearAdministradorInicialSiFalta(adminUsuario, adminClave).ifPresent(u ->
                 log.warn("Administrador inicial '{}' creado con la contraseña configurada; se pide cambiarla "
-                        + "en el primer ingreso", u.username());
-            }
-        });
+                        + "en el primer ingreso", u.username()));
     }
 
     /** Una entrada de {@code yerbanalytics.auth.usuarios-iniciales}. */
@@ -160,11 +149,5 @@ public class SeguridadInicializador implements ApplicationRunner {
             lista.add(new UsuarioInicial(partes[0].trim(), rol, partes[2]));
         }
         return lista;
-    }
-
-    private static String claveAleatoria() {
-        byte[] bytes = new byte[12];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

@@ -22,7 +22,7 @@ La API quedará escuchando en `http://localhost:8000`.
 falta). El backend lo lee al arrancar y crea el Administrador inicial (`admin` / `admin-yerba-2026`,
 con cambio de clave en el primer ingreso) y las cuentas de servicio que esperan el simulador y la
 inferencia, con las mismas claves de desarrollo que sus `env.example`. Sin `YERBANALYTICS_ADMIN_CLAVE`,
-la clave del admin se genera y aparece **una sola vez** en el log de arranque. Detalle en [Autenticación y permisos](#autenticación-y-permisos-hu-01--hu-20).
+el backend **no arranca** si tiene que crear el admin: la clave no se genera. Detalle en [Autenticación y permisos](#autenticación-y-permisos-hu-01--hu-20).
 
 ## Configuración
 
@@ -173,7 +173,7 @@ Se apagan a propósito, documentado en el código: CSRF (la cookie es `SameSite=
   inexistente, clave errónea, suspendido o dado de baja son indistinguibles, también en el tiempo
   de respuesta (hash de relleno; el estado se evalúa después de la clave).
 - La sesión es opaca y vive en la tabla `sesion` (se guarda su SHA-256, nunca el valor). Por eso
-  revocar es inmediato: un cambio de rol, una suspensión, una baja, un blanqueo o un cambio de la
+  revocar es inmediato: un cambio de rol, una suspensión, una baja, un restablecimiento o un cambio de la
   matriz del rol cortan las sesiones en el acto (`401 SESION_REVOCADA` en la próxima petición).
 - **Inactividad:** el backend decide. Si `ahora − ultima_actividad` supera el tiempo máximo
   (60 min por defecto, editable 5–480 desde `PUT /api/seguridad/politica`) responde
@@ -182,7 +182,7 @@ Se apagan a propósito, documentado en el código: CSRF (la cookie es `SameSite=
   sondeos (`GET`) no mantienen viva la sesión.
 - `GET /api/auth/perfil`, `POST /api/auth/logout`, `PUT /api/auth/clave` (`{"actual","nueva"}`,
   cierra las demás sesiones del usuario).
-- Contraseña temporal (alta, blanqueo, admin inicial): mientras no se cambie, todo lo demás
+- Contraseña temporal (alta, restablecimiento, admin inicial): mientras no se cambie, todo lo demás
   responde `403 {"motivo":"CAMBIO_CLAVE_REQUERIDO"}`.
 - Un barrido diario (`yerbanalytics.auth.barrido-cron`) borra las sesiones cerradas o inactivas
   hace más de 7 días.
@@ -235,7 +235,7 @@ invalida al guardar): un cambio rige en la petición siguiente.
 
 Alta (`username` de 3–40 caracteres `[a-z0-9._-]`, único sin distinguir mayúsculas e incluso
 frente a bajas; contraseña temporal ≥ 8 y distinta del username), edición de nombre y rol,
-`/suspender`, `/reactivar`, `/baja` (lógica y definitiva) y `PUT /{id}/clave` (blanqueo). Nadie
+`/suspender`, `/reactivar`, `/baja` (lógica y definitiva) y `PUT /{id}/clave` (restablecimiento). Nadie
 puede suspenderse ni darse de baja a sí mismo.
 
 ### Auditoría de seguridad (`auditoria_seguridad`)
@@ -263,7 +263,7 @@ base podría recalcularla entera.
 | Propiedad | Default | Para qué |
 |---|---|---|
 | `yerbanalytics.auth.admin-inicial.usuario` | `${YERBANALYTICS_ADMIN_USUARIO:admin}` | Nombre del Administrador que se crea si no hay ninguno activo |
-| `yerbanalytics.auth.admin-inicial.clave` | `${YERBANALYTICS_ADMIN_CLAVE:}` | Su contraseña temporal. Vacía → se genera y se loguea una vez |
+| `yerbanalytics.auth.admin-inicial.clave` | `${YERBANALYTICS_ADMIN_CLAVE:}` | Su contraseña temporal. Obligatoria si hay que crearlo: vacía → el arranque se frena |
 | `yerbanalytics.auth.usuarios-iniciales` | `${YERBANALYTICS_USUARIOS_INICIALES:}` | Cuentas `usuario:ROL:clave,…` que se crean si su usuario no existe |
 | `yerbanalytics.auth.cookie-secure` | `false` | Atributo `Secure` de la cookie. Encendelo si todo va por HTTPS |
 | `yerbanalytics.auth.barrido-cron` | `0 30 3 * * *` | Barrido de sesiones viejas |

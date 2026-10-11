@@ -144,7 +144,7 @@ export class HttpSeguridadRepository implements SeguridadRepository {
   }
 
   blanquearClave(id: number, clave: string): Promise<void> {
-    return this.vacio(`${this.baseUrl}/usuarios/${id}/clave`, 'blanquear la contraseña', {
+    return this.vacio(`${this.baseUrl}/usuarios/${id}/clave`, 'restablecer la contraseña', {
       method: 'PUT',
       headers: JSON_HEADERS,
       body: JSON.stringify({ clave }),

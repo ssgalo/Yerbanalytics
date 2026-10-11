@@ -49,7 +49,7 @@ export interface PerfilSesion {
   permisos: string[];
   /** Tiempo máximo de inactividad vigente, en minutos. */
   inactividadMin: number;
-  /** Clave temporal (alta o blanqueo): hasta cambiarla, sólo se puede cambiar la clave. */
+  /** Clave temporal (alta o restablecimiento): hasta cambiarla, sólo se puede cambiar la clave. */
   debeCambiarClave: boolean;
 }
 

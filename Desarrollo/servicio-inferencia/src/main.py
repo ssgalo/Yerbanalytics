@@ -133,7 +133,7 @@ def main() -> None:
     logger.info("=== Servicio de Inferencia Yerbanalytics ===")
     logger.info("  CAPTURAS_DIR          : %s", capturas_dir)
     logger.info("  POLLING_INTERVAL (FB) : %d s (%.1f h)", fallback_intervalo, fallback_intervalo / 3600)
-    logger.info("  BACKEND_URL           : %s", os.environ.get("BACKEND_URL", "http://localhost:8080"))
+    logger.info("  BACKEND_URL           : %s", os.environ.get("BACKEND_URL", "http://localhost:8000"))
 
     # Cargar el modelo una única vez al arranque.
     try:

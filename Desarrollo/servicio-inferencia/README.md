@@ -65,7 +65,7 @@ cp .env.example .env
 |---|---|---|
 | `MODEL_PATH` | — | **Obligatoria.** Ruta absoluta al archivo `.pt`. |
 | `MODEL_CLASSES` | — | **Obligatoria.** Orden de clases del modelo, separadas por coma. |
-| `BACKEND_URL` | `http://localhost:8080` | URL base del backend. |
+| `BACKEND_URL` | `http://localhost:8000` | URL base del backend. |
 | `BACKEND_USUARIO` | — | Usuario de la cuenta de rol Servicio (ver "Cuenta de servicio"). |
 | `BACKEND_CLAVE` | — | Su clave. Sin ella, el backend rechaza las llamadas. |
 | `CAPTURAS_DIR` | `/capturas` | Directorio raíz del volumen de imágenes. |

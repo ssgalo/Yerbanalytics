@@ -170,7 +170,7 @@ public class UsuarioService {
     @Transactional
     public void blanquearClave(Long id, String clave) {
         UsuarioEntity u = buscar(id);
-        exigirQueNoSeaElAutor(u, "blanquear tu propia contraseña (usá \"Cambiar contraseña\")");
+        exigirQueNoSeaElAutor(u, "restablecer tu propia contraseña (usá \"Cambiar contraseña\")");
         if (u.getEstado() == EstadoUsuario.BAJA) {
             throw new SeguridadExceptions.Conflicto("El usuario '" + u.getUsername() + "' está dado de baja.");
         }
@@ -192,8 +192,12 @@ public class UsuarioService {
      * @return el usuario creado, o vacío si ya había un Administrador activo
      */
     @Transactional
+    public boolean hayAdministradorActivo() {
+        return usuarios.existsByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO);
+    }
+
     public Optional<UsuarioDto> crearAdministradorInicialSiFalta(String username, String clave) {
-        if (usuarios.existsByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO)) {
+        if (hayAdministradorActivo()) {
             return Optional.empty();
         }
         String nombre = username.trim().toLowerCase();

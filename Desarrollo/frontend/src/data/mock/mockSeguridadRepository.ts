@@ -387,7 +387,7 @@ export class MockSeguridadRepository implements SeguridadRepository {
   async blanquearClave(id: number, clave: string): Promise<void> {
     const autor = this.exigir({ permiso: 'usuarios.gestionar', actividad: true });
     const u = this.buscar(id);
-    if (u.estado === 'BAJA') throw new OperacionRechazadaError(409, 'No se puede blanquear la contraseña de una baja.');
+    if (u.estado === 'BAJA') throw new OperacionRechazadaError(409, 'No se puede restablecer la contraseña de una baja.');
     this.validarClave(clave, u.username);
     u.clave = clave;
     u.debeCambiarClave = true;

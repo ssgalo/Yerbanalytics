@@ -80,15 +80,15 @@ SHALL poder darse de baja a sí mismo. (HU-20 CA-02)
 - **WHEN** se consulta la auditoría de un usuario dado de baja
 - **THEN** sus registros siguen mostrando su nombre de usuario
 
-### Requirement: Blanqueo de contraseña
-El Administrador SHALL poder asignar una contraseña temporal a otro usuario. El blanqueo SHALL
+### Requirement: Restablecimiento de contraseña
+El Administrador SHALL poder asignar una contraseña temporal a otro usuario. El restablecimiento SHALL
 invalidar las sesiones del usuario y obligarlo a cambiarla en el próximo ingreso. La contraseña
 asignada NO SHALL quedar registrada en ningún lado más que su hash.
 
-#### Scenario: Blanqueo
-- **WHEN** el Administrador blanquea la contraseña de un usuario
+#### Scenario: Restablecimiento
+- **WHEN** el Administrador restablece la contraseña de un usuario
 - **THEN** el usuario debe usar la temporal y cambiarla al ingresar
-- **AND** la auditoría registra el blanqueo sin la contraseña
+- **AND** la auditoría registra el restablecimiento sin la contraseña
 
 ### Requirement: Cambios de matriz invalidan sesiones del rol
 Al guardar un cambio en los permisos de un rol, el sistema SHALL invalidar las sesiones vigentes

@@ -115,7 +115,7 @@ no SHALL ser igual al nombre de usuario.
 
 ### Requirement: Cambio de contraseña propio y obligatorio en el primer ingreso
 Todo usuario autenticado SHALL poder cambiar su contraseña indicando la actual. Cuando el
-Administrador asigna una contraseña (alta o blanqueo), el usuario SHALL quedar marcado para
+Administrador asigna una contraseña (alta o restablecimiento), el usuario SHALL quedar marcado para
 cambiarla; mientras lo esté, el backend SHALL rechazar con `403` y motivo `CAMBIO_CLAVE_REQUERIDO`
 toda petición que no sea cambiar la contraseña, consultar el perfil propio o cerrar sesión.
 
@@ -136,12 +136,16 @@ toda petición que no sea cambiar la contraseña, consultar el perfil propio o c
 Al arrancar, si no existe ningún usuario activo con rol Administrador, el backend SHALL crear uno
 con el nombre y la contraseña definidos en la configuración, marcado para cambiar la contraseña
 en el primer ingreso, y SHALL asentarlo en la auditoría con el sistema como autor. Si la
-contraseña no está configurada, SHALL generar una aleatoria y mostrarla una única vez en el log de
-arranque.
+contraseña no está configurada, SHALL frenar el arranque con un mensaje que lo indique; no SHALL
+generar una contraseña.
 
 #### Scenario: Base vacía
 - **WHEN** el backend arranca contra una base sin usuarios
 - **THEN** existe un Administrador activo que debe cambiar la contraseña al primer ingreso
+
+#### Scenario: Falta la contraseña configurada
+- **WHEN** el backend arranca sin Administrador activo y sin contraseña configurada
+- **THEN** el arranque falla indicando que hay que definir `YERBANALYTICS_ADMIN_CLAVE`
 
 #### Scenario: Ya hay un Administrador
 - **WHEN** el backend arranca y existe al menos un Administrador activo

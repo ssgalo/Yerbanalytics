@@ -2,7 +2,7 @@
 
 ### Requirement: Registro de cambios de seguridad
 El sistema SHALL asentar en el registro de auditoría, en la misma transacción que el cambio,
-toda alta, edición, cambio de rol, suspensión, reactivación, baja y blanqueo de contraseña de un
+toda alta, edición, cambio de rol, suspensión, reactivación, baja y restablecimiento de contraseña de un
 usuario, todo cambio en la matriz de permisos y todo cambio del tiempo máximo de inactividad.
 Cada registro SHALL indicar quién lo hizo (usuario autor, o "sistema" para el Administrador
 inicial y la siembra), sobre qué usuario o rol, el tipo de cambio, el detalle (valores anterior y

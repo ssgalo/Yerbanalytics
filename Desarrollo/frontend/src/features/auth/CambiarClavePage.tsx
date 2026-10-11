@@ -1,6 +1,6 @@
 /* ============================================================
    Cambio de contraseña propio. Dos entradas:
-   - Obligatoria: la clave es temporal (alta o blanqueo). El backend rechaza todo lo demás con
+   - Obligatoria: la clave es temporal (alta o restablecimiento). El backend rechaza todo lo demás con
      `CAMBIO_CLAVE_REQUERIDO` hasta que se cambie, así que acá no hay "volver": sólo cambiarla o
      cerrar sesión.
    - Voluntaria: desde el menú de usuario de la topbar.

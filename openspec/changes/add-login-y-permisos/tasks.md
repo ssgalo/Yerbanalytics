@@ -6,7 +6,7 @@
 - [x] 1.4 Entidad `AuditoriaSeguridad` `@Immutable` con columnas `updatable=false` y repositorio sólo de alta y consulta (D7)
 - [x] 1.5 `ApplicationRunner` que siembra la matriz por defecto si `rol_permiso` está vacía y la política de sesión si no existe (audita `MATRIZ_SEMBRADA` con autor sistema)
 - [x] 1.6 `ApplicationRunner` que instala, de forma idempotente, los triggers que rechazan `UPDATE`/`DELETE`/`TRUNCATE` sobre `auditoria_seguridad`; dejar el mismo SQL en `resources/auditoria-triggers.sql` para correrlo a mano si el usuario de la base no puede crear funciones
-- [x] 1.7 Administrador inicial (D9): propiedades `yerbanalytics.auth.admin-inicial.*`, creación si no hay Administrador activo, clave aleatoria logueada una vez si falta, auditado `ADMIN_INICIAL_CREADO`
+- [x] 1.7 Administrador inicial (D9): propiedades `yerbanalytics.auth.admin-inicial.*`, creación si no hay Administrador activo, arranque frenado si falta la clave, auditado `ADMIN_INICIAL_CREADO`
 
 ## 2. Backend — sesiones y autenticación (HU-01)
 
@@ -28,7 +28,7 @@
 
 ## 4. Backend — gestión de usuarios, matriz y política (HU-20 CA-01/CA-02)
 
-- [x] 4.1 `UsuarioService`: alta (username único sin distinguir mayúsculas, incluso bajas; formato), edición de nombre, cambio de rol, suspensión, reactivación, baja y blanqueo; cada operación revoca las sesiones que correspondan
+- [x] 4.1 `UsuarioService`: alta (username único sin distinguir mayúsculas, incluso bajas; formato), edición de nombre, cambio de rol, suspensión, reactivación, baja y restablecimiento; cada operación revoca las sesiones que correspondan
 - [x] 4.2 Salvaguardas: no autosuspensión ni autobaja; nunca menos de un Administrador activo (bloqueo `FOR UPDATE` sobre administradores activos); `409` con mensaje explicativo
 - [x] 4.3 `RolPermisoService`: guardar la matriz de un rol validando par de lectura y permisos intocables del Administrador; revoca sesiones del rol salvo la del autor; invalida la caché
 - [x] 4.4 `PoliticaSesionService`: leer y cambiar `inactividad_min` (rango 5–480)
@@ -63,7 +63,7 @@
 ## 8. Frontend — vista Usuarios
 
 - [x] 8.1 Ruta `/usuarios` con pestañas Usuarios · Roles y permisos · Auditoría · Seguridad
-- [x] 8.2 Pestaña Usuarios: tabla (personas y cuentas de servicio separadas, bajas a pedido), alta, edición, cambio de rol (con advertencia para Servicio), suspender/reactivar, baja con confirmación, blanqueo de contraseña
+- [x] 8.2 Pestaña Usuarios: tabla (personas y cuentas de servicio separadas, bajas a pedido), alta, edición, cambio de rol (con advertencia para Servicio), suspender/reactivar, baja con confirmación, restablecimiento de contraseña
 - [x] 8.3 Pestaña Roles y permisos: matriz rol × permiso agrupada, casillas bloqueadas para las salvaguardas, regla de par de lectura en la UI, aviso de que guardar cierra las sesiones del rol
 - [x] 8.4 Pestaña Auditoría: tabla paginada con filtros y estado de integridad de la cadena
 - [x] 8.5 Pestaña Seguridad: tiempo máximo de inactividad con validación de rango

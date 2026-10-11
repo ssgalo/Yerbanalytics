@@ -168,7 +168,7 @@ interface BlanqueoProps {
   onCancel: () => void;
 }
 
-/** Blanqueo: una clave temporal nueva. Cierra sus sesiones y lo obliga a cambiarla. */
+/** Restablecimiento: una clave temporal nueva. Cierra sus sesiones y lo obliga a cambiarla. */
 export function BlanqueoForm({ usuario, onSubmit, onCancel }: BlanqueoProps) {
   const [clave, setClave] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +195,7 @@ export function BlanqueoForm({ usuario, onSubmit, onCancel }: BlanqueoProps) {
   return (
     <Card className={styles.section}>
       <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>Blanquear la contraseña de «{usuario.username}»</h2>
+        <h2 className={styles.sectionTitle}>Restablecer la contraseña de «{usuario.username}»</h2>
         <span className={styles.sectionHint}>
           Se cierran sus sesiones y tiene que cambiarla al ingresar. La contraseña no queda registrada.
         </span>

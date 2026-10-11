@@ -101,7 +101,7 @@ export const ETIQUETA_TIPO_AUDITORIA: Record<TipoAuditoria, string> = {
   USUARIO_SUSPENDIDO: 'Suspensión',
   USUARIO_REACTIVADO: 'Reactivación',
   USUARIO_BAJA: 'Baja',
-  USUARIO_CLAVE_BLANQUEADA: 'Blanqueo de contraseña',
+  USUARIO_CLAVE_BLANQUEADA: 'Restablecimiento de contraseña',
   ROL_PERMISOS_CAMBIADOS: 'Cambio de permisos',
   POLITICA_SESION_CAMBIADA: 'Cambio de política de sesión',
   ADMIN_INICIAL_CREADO: 'Administrador inicial',

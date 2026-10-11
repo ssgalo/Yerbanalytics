@@ -31,7 +31,7 @@ _HTTP_TIMEOUT = 30
 
 
 def _base_url() -> str:
-    return os.environ.get("BACKEND_URL", "http://localhost:8080").rstrip("/")
+    return os.environ.get("BACKEND_URL", "http://localhost:8000").rstrip("/")
 
 
 # ---------------------------------------------------------------------------

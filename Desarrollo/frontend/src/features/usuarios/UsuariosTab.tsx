@@ -1,7 +1,7 @@
 /* ============================================================
    Pestaña Usuarios (HU-20 CA-01/CA-02): personas y cuentas de servicio por separado, bajas a
    pedido, alta, edición y cambio de rol, suspensión/reactivación, baja con confirmación y
-   blanqueo de contraseña. Cada operación que corresponde cierra las sesiones del usuario: eso
+   restablecimiento de contraseña. Cada operación que corresponde cierra las sesiones del usuario: eso
    lo hace el backend; la UI sólo lo avisa.
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
@@ -138,7 +138,7 @@ export function UsuariosTab() {
                           disabled={deshabilitado}
                           onClick={() => setPanel({ modo: 'clave', usuario: u })}
                         >
-                          Blanquear contraseña
+                          Restablecer contraseña
                         </button>
                         {u.estado === 'ACTIVO' ? (
                           <button

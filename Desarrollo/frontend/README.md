@@ -77,10 +77,10 @@ sin sesión o sin permiso recibe `401`/`403` igual.
   vivero (`NurseryProvider` y `DemoExpoProvider` se montan recién con sesión).
 - Error genérico "Credenciales incorrectas", sin marcar campos y limpiando la clave.
 - Al entrar se vuelve a la ruta que se había pedido, si el rol todavía puede verla.
-- Con clave temporal (alta o blanqueo) sólo se puede cambiar la contraseña.
+- Con clave temporal (alta o restablecimiento) sólo se puede cambiar la contraseña.
 - Si la sesión se cerró sola, el login dice por qué: *"Tu sesión se cerró por inactividad"*
   (`SESION_EXPIRADA`) o *"Tu cuenta cambió; volvé a iniciar sesión"* (`SESION_REVOCADA`: cambio
-  de rol, suspensión, baja, blanqueo o cambio de la matriz del rol).
+  de rol, suspensión, baja, restablecimiento o cambio de la matriz del rol).
 - Topbar: nombre, rol e iniciales del usuario, con "Cambiar contraseña" y "Cerrar sesión".
 
 ### Inactividad

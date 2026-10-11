@@ -195,7 +195,7 @@ sistema), `objetivo_tipo` (`USUARIO|ROL|POLITICA`), `objetivo_ref`, `tipo` (enum
 usuario.
 
 El cambio de contraseña **propio** no se audita (no es una modificación hecha por el
-Administrador sobre otro usuario, que es lo que pide CA-03); el blanqueo sí.
+Administrador sobre otro usuario, que es lo que pide CA-03); el restablecimiento sí.
 
 ### D8. Login resistente a enumeración
 
@@ -207,8 +207,8 @@ verificar la contraseña, por la misma razón.
 ### D9. Administrador inicial por propiedad
 
 `yerbanalytics.auth.admin-inicial.usuario` (default `admin`) y `…clave` (sin default; se espera por
-variable de entorno `YERBANALYTICS_ADMIN_CLAVE`). Si falta, se genera una aleatoria y se escribe
-**una vez** en el log de arranque con un aviso visible. Queda con `debe_cambiar_clave=true`.
+variable de entorno `YERBANALYTICS_ADMIN_CLAVE`). Si falta y hay que crearlo, el arranque se
+frena con un mensaje: no se genera una clave, así la única fuente del admin inicial es el `.env`. Queda con `debe_cambiar_clave=true`.
 Nunca se crea un segundo si ya hay un Administrador activo.
 
 ### D10. Frontend
@@ -230,7 +230,7 @@ Nunca se crea un segundo si ya hay un Administrador activo.
 - `useInactividad()`: listeners de interacción, ping throttled, `BroadcastChannel`, temporizador
   local y aviso previo.
 - Vista `features/usuarios/` con pestañas: **Usuarios** (tabla + alta/edición/suspensión/baja/
-  blanqueo), **Roles y permisos** (matriz rol×permiso con casillas; deshabilita las salvaguardas),
+  restablecimiento), **Roles y permisos** (matriz rol×permiso con casillas; deshabilita las salvaguardas),
   **Auditoría** (tabla filtrable + estado de la cadena) y **Seguridad** (tiempo de inactividad).
 - Mock: usuarios demo `admin`, `agronomo`, `productor`, `operario` (contraseña `demo`), matriz por
   defecto importada de una constante espejo del `enum` del backend; inactividad simulada igual.
