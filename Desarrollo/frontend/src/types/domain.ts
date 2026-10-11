@@ -212,31 +212,12 @@ export interface Weather {
   forecast: ForecastSlot[];
 }
 
-/** Tile de una métrica en el panel de sensado de la macro-zona (con sparkline). */
-export interface MetricTile {
-  key: string;
-  label: string;
-  value: string;
-  unit: string;
-  status: Status;
-  color: string;
-  line: string;
-  ideal: string;
-  soft: string;
-  grupo: GrupoMetrica;
-  /** Rango provisional, pendiente de validación agronómica. */
-  provisional: boolean;
-}
-
-/** Serie histórica de una métrica de macro-zona para el gráfico del panel. */
-export interface SerieMetrica {
-  /** Path SVG de la línea. */
-  line: string;
-  /** Path SVG del área bajo la línea. */
-  area: string;
-  /** Extremos de la serie, ya formateados con la unidad. */
-  min: string;
-  max: string;
+/** Histórico de una métrica del nodo testigo de una macro-zona, en valores de la métrica. */
+export interface MetricHistory {
+  /** Puntos en orden cronológico; el último es la lectura actual. */
+  points: { ts: number; value: number }[];
+  min: number;
+  max: number;
 }
 
 /** Fila de actuador en el detalle. */

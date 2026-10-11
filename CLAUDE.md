@@ -141,7 +141,8 @@ npm run dev          # http://localhost:5173
 - **Tipos de dominio** (`src/types/domain.ts`): contratos compartidos.
 - **Componentes del sistema de diseño** (`src/components/ui/`): Button, Chip, StateGlyph, Callout,
   Field/Input/Select/InputUnit, Segmented, FilterChip, Switch, SaveBar, Skeleton, EmptyState,
-  OfflineBanner, CompositionBar, RangeBar, ConfidenceBar, SectorCell; y los previos Card, Badge,
+  OfflineBanner, CompositionBar, RangeBar, ConfidenceBar, SectorCell, ScrollArea (grilla desplazable
+  sin barra, con fade y flechas en los bordes); y los previos Card, Badge,
   StatusDot, ProgressBar, Sparkline, Icon.
 - **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown.
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,

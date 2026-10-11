@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { Status, Zona } from '@/types/domain';
 import { Icon } from '@/components/ui/Icon';
 import { TrayCell } from '@/components/ui/SectorCell';
+import { ScrollArea } from '@/components/ui/ScrollArea';
 import { cx } from '@/components/ui/estado';
 import { WEAK_SIGNAL_DBM, countByStatus, gridColumns } from '../dashboardSummary';
 import styles from './ZoneTray.module.css';
@@ -47,8 +48,17 @@ function NodeStatus({ zona }: { zona: Zona }) {
   return <span>nodo: {ago}</span>;
 }
 
-/** Una macro-zona en el plano: la bandeja con sus sectores, en su disposición física. Lleva al detalle. */
+/**
+ * Una macro-zona en el plano: la bandeja con sus sectores, en su disposición física. Lleva al detalle.
+ *
+ * Si los sectores no entran sin achicarse de más, la grilla se desplaza dentro de la bandeja (con
+ * flechas en los bordes). Las flechas son botones y no pueden ir dentro de un enlace, así que la
+ * bandeja es un `div` y el enlace la cubre entera; la grilla, que queda por encima para recibir la
+ * ruedita y las flechas, navega por su cuenta.
+ */
 export function ZoneTray({ zona, sectorsPerRow }: ZoneTrayProps) {
+  const navigate = useNavigate();
+  const to = `/mapa?zona=${zona.id}`;
   const stale = zona.lectura.stale;
   const counts = FOOT.map((f) => ({ ...f, n: countByStatus(zona, f.status) })).filter((f) => f.n > 0);
   const label = [
@@ -60,27 +70,28 @@ export function ZoneTray({ zona, sectorsPerRow }: ZoneTrayProps) {
     .join(': ');
 
   return (
-    <Link
-      to={`/mapa?zona=${zona.id}`}
-      className={cx(styles.tray, stale && styles.stale)}
-      aria-label={`${label}. Ver detalle de la macro-zona`}
-    >
+    <div className={cx(styles.tray, stale && styles.stale)}>
       <div className={styles.head}>
-        <span className={styles.code}>{zona.id}</span>
+        <Link to={to} className={styles.code} aria-label={`${label}. Ver detalle de la macro-zona`}>
+          {zona.id}
+        </Link>
         <span className={styles.sub}>{zona.sub}</span>
         <span className={styles.node} title="Nodo testigo: habla por todos los sectores de la macro-zona">
           <NodeStatus zona={zona} />
         </span>
       </div>
 
-      <div
-        className={styles.grid}
-        style={{ '--columns': gridColumns(zona.sectors.length, sectorsPerRow) } as CSSProperties}
-        aria-hidden="true"
-      >
-        {zona.sectors.map((s) => (
-          <TrayCell key={s.id} status={s.status} />
-        ))}
+      <div className={styles.sectors} onClick={() => navigate(to)} aria-hidden="true">
+        <ScrollArea className={styles.scroll}>
+          <div
+            className={styles.grid}
+            style={{ '--columns': gridColumns(zona.sectors.length, sectorsPerRow) } as CSSProperties}
+          >
+            {zona.sectors.map((s) => (
+              <TrayCell key={s.id} status={s.status} />
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
       {stale && (
@@ -101,6 +112,6 @@ export function ZoneTray({ zona, sectorsPerRow }: ZoneTrayProps) {
           ))}
         </div>
       )}
-    </Link>
+    </div>
   );
 }

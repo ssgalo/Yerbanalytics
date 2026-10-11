@@ -1,6 +1,7 @@
 /* ZoneTray — una macro-zona como bandeja oscura con sus sectores */
 
 .tray {
+  position: relative;
   display: block;
   min-width: 0;
   padding: 12px;
@@ -26,9 +27,22 @@
   text-decoration-thickness: 2px;
 }
 
-.tray:focus-visible {
-  outline: none;
+/* El foco está en el enlace del código, pero el anillo se dibuja en toda la bandeja */
+.tray:has(.code:focus-visible) {
   box-shadow: var(--focus-ring);
+}
+
+.code:focus-visible {
+  outline: none;
+}
+
+/* El enlace cubre la bandeja entera: cualquier clic lleva al detalle */
+.code::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
 }
 
 .head {
@@ -47,6 +61,7 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
   color: var(--on-tray);
+  text-decoration: none;
 }
 
 .sub {
@@ -77,11 +92,31 @@
   font-weight: 600;
 }
 
-/* `--columns` = sectoresPorFila de la topología; `--cell-max` y `--cell-gap` los fija el plano */
+/* La grilla queda por encima del enlace para recibir la ruedita y las flechas; navega por su
+   cuenta al hacer clic (ver ZoneTray.tsx). El margen negativo compensa el respiro interno del
+   área desplazable, para que los puntos sigan alineados con el encabezado. */
+.sectors {
+  position: relative;
+  z-index: 2;
+  margin: -4px;
+  cursor: pointer;
+}
+
+/* Tope de alto según la pantalla; lo que no entra se desplaza */
+.scroll {
+  --scroll-max-h: max(220px, 55vh);
+  --scroll-fade: 36px;
+}
+
+/* `--columns` = sectoresPorFila de la topología; `--cell-max` y `--cell-gap` los fija el plano.
+   Un punto nunca baja de `--cell-min` (más chico se pierde su forma y cuesta apuntarle): si no entran,
+   la grilla desborda y se desplaza */
 .grid {
+  --cell-min: 22px;
   display: grid;
-  grid-template-columns: repeat(var(--columns, 10), minmax(0, var(--cell-max, 1fr)));
+  grid-template-columns: repeat(var(--columns, 10), minmax(var(--cell-min), var(--cell-max, 1fr)));
   gap: var(--cell-gap, 4px);
+  min-width: min-content;
 }
 
 /* Sin lectura vigente: los sectores se ven apagados, con el último estado conocido */
