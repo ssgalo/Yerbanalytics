@@ -1,8 +1,4 @@
-/* Layout de la página de detalle de sector.
-
-   Las tarjetas ajustan a su contenido en vez de estirarse: el sector tiene poca
-   información (un diagnóstico, tres actuadores, unas pocas acciones) y forzarlas
-   a ocupar la pantalla sólo produce cajas medio vacías. */
+/* Layout de la página de detalle de sector. */
 
 .page {
   display: flex;
@@ -94,73 +90,17 @@
   border-color: var(--brand);
 }
 
-/* Diagnóstico e historial a la izquierda; actuadores y seguimiento a la derecha.
-   `align-items: start` evita que las columnas se igualen en alto estirando cajas. */
+/* Diagnóstico a la izquierda y seguimiento a la derecha, con el mismo alto para no dejar
+   huecos; el historial ocupa la fila de abajo a todo el ancho. */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
-.col {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-/* Dibujo del sector físico */
-.dibujo {
-  padding: 18px 20px;
-}
-
-.dibujoHead {
-  margin-bottom: 12px;
-}
-
-.dibujoTitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.dibujoSub {
-  margin: 3px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.sinSenal {
-  margin: 10px 0 0;
-  font-size: 11.5px;
-  font-style: italic;
-  color: var(--muted);
-}
-
-.que {
-  margin-top: 14px;
-}
-
-.que summary {
-  cursor: pointer;
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--brand);
-}
-
-.que p {
-  margin: 10px 0 0;
-  font-size: 12.5px;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.que b {
-  color: var(--ink);
+.full {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 860px) {

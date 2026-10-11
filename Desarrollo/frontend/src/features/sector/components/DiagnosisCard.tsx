@@ -1,9 +1,13 @@
 /* Tarjeta de diagnóstico de IA del plantín del sector */
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { buttonClass } from '@/components/ui/clases';
+import { useAuth } from '@/hooks/AuthContext';
+import { puedeVer, VISTAS } from '@/lib/vistas';
 import type { DiagnosisDetail } from '@/types/domain';
 import { CapturaModal } from './CapturaModal';
 import styles from './DiagnosisCard.module.css';
@@ -17,10 +21,22 @@ interface DiagnosisCardProps {
 
 export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardProps) {
   const [capturaAbierta, setCapturaAbierta] = useState(false);
+  const { puede } = useAuth();
 
   return (
     <Card className={styles.card}>
-      <h3 className={styles.title}>Diagnóstico de IA</h3>
+      <div className={styles.head}>
+        <h3 className={styles.title}>Diagnóstico de IA</h3>
+        {/* Los diagnósticos previos viven en su vista, ya filtrada por este sector */}
+        {puedeVer(VISTAS.diagnosticos, puede) && (
+          <Link
+            className={buttonClass('secondary', 'sm')}
+            to={`/diagnosticos?sector=${encodeURIComponent(sectorId)}`}
+          >
+            Ver anteriores
+          </Link>
+        )}
+      </div>
 
       <div className={styles.body}>
         {/* Miniatura cenital: abre la captura a tamaño completo */}
@@ -52,6 +68,7 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
         {capturaAbierta && (
           <CapturaModal
             thumb={diag.thumb}
+            imagenUrl={diag.imagenUrl}
             estado={diag.estado}
             ago={ago}
             sectorId={sectorId}
@@ -88,7 +105,7 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
                 style={{ flexShrink: 0, marginTop: 1 }}
               />
               <span className={styles.conclusionText}>
-                Confianza por encima del umbral (85%). El motor de reglas puede ejecutar acciones correctivas automáticas.
+                Supera el umbral (85%): habilita acciones automáticas.
               </span>
             </div>
           )}
@@ -104,7 +121,7 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
                 style={{ flexShrink: 0, marginTop: 1 }}
               />
               <span className={styles.warningText}>
-                El sector está fuera de servicio. Este fue el último diagnóstico antes de perder conexión y podría estar desactualizado.
+                Sin conexión: puede estar desactualizado.
               </span>
             </div>
           )}

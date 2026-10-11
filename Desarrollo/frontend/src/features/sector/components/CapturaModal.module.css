@@ -1,32 +1,21 @@
-/* Captura cenital a tamaño completo */
+/* Captura cenital a pantalla completa */
 
 .backdrop {
   position: fixed;
   inset: 0;
   z-index: 60;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  background: rgba(21, 35, 27, 0.62);
-  backdrop-filter: blur(2px);
-  animation: fadeIn 0.16s ease-out;
-}
-
-/* El ancho también se acota por el alto disponible: la captura es cuadrada y así
-   entra entera sin deformarse ni desbordar en pantallas bajas.
-   (64px = padding del backdrop, 66px = encabezado + separación) */
-.dialog {
-  display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: min(760px, 100%, calc(100vh - 64px - 66px));
+  background: var(--tray);
+  animation: fadeIn 0.16s ease-out;
 }
 
 .head {
   display: flex;
   align-items: center;
   gap: 14px;
+  padding: 14px 20px;
+  flex-shrink: 0;
 }
 
 .meta {
@@ -41,42 +30,64 @@
   font-stretch: var(--w-exp);
   font-size: 19px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-tray);
 }
 
 .sub {
   font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--on-tray-muted);
 }
 
 .close {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   margin-left: auto;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 10px;
+  border: 1px solid var(--tray-line);
+  border-radius: var(--r-m);
   background: transparent;
-  color: #fff;
+  color: var(--on-tray);
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .close:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--tray-2);
 }
 
-/* La captura es cuadrada, como la toma cenital del gantry */
-.imagen {
+/* Ocupa el resto de la pantalla; la imagen entra entera sin deformarse */
+.stage {
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 20px 20px;
+  cursor: zoom-out;
+  container-type: size;
+}
+
+.foto {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r-l);
+  cursor: default;
+}
+
+/* Sin foto: bloque cuadrado, como la toma cenital del gantry */
+.respaldo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100cqw, 100cqh);
   aspect-ratio: 1;
-  border-radius: 18px;
+  border-radius: var(--r-l);
   overflow: hidden;
+  cursor: default;
 }
 
 @keyframes fadeIn {

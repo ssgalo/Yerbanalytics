@@ -4,8 +4,16 @@
   padding: 18px 20px;
 }
 
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 .title {
-  margin: 0 0 14px;
+  margin: 0;
   font-family: var(--font-display);
   font-stretch: var(--w-exp);
   font-size: 16px;

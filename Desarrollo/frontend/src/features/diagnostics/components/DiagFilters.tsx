@@ -1,4 +1,6 @@
 /* Barra de filtros: Estado / anomalía + Severidad + contador */
+import { Icon } from '@/components/ui/Icon';
+import { FilterChip } from '@/components/ui/Seleccion';
 import styles from './DiagFilters.module.css';
 
 const ESTADO_OPTS = ['Todas', 'Estrés solar', 'Clorosis', 'Plaga foliar', 'Daño fúngico', 'No concluyente'];
@@ -10,11 +12,25 @@ interface DiagFiltersProps {
   diagCount: number;
   onEstado: (v: string) => void;
   onSev: (v: string) => void;
+  /** Sector por el que se filtra (viene en la URL), o null si se ven todos. */
+  sector?: string | null;
+  onQuitarSector?: () => void;
 }
 
-export function DiagFilters({ diagEstado, diagSev, diagCount, onEstado, onSev }: DiagFiltersProps) {
+export function DiagFilters({ diagEstado, diagSev, diagCount, onEstado, onSev, sector, onQuitarSector }: DiagFiltersProps) {
   return (
     <div className={styles.row}>
+      {/* Filtro por sector: un chip activo que se quita con un clic */}
+      {sector && onQuitarSector && (
+        <div className={styles.group}>
+          <span className={styles.label}>Sector</span>
+          <FilterChip pressed onClick={onQuitarSector}>
+            {sector}
+            <Icon name="close" size={13} />
+          </FilterChip>
+        </div>
+      )}
+
       {/* Filtro por estado / anomalía */}
       <div className={styles.group}>
         <label className={styles.label}>Estado / anomalía</label>
