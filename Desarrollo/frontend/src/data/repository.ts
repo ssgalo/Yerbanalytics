@@ -27,11 +27,21 @@ import type {
   TrazaEvaluacion,
 } from '@/types/domain';
 
+/** Filtros del historial que resuelve el origen de datos (los mismos que `GET /api/historial`). */
+export interface FiltroHistorial {
+  tipo?: string;
+  /** Epoch ms, inclusive. */
+  desde?: number;
+}
+
 export interface DataRepository {
   /** Devuelve el snapshot completo del vivero. */
   getNursery(): Promise<NurseryData>;
-  /** Devuelve el historial global de acciones (más recientes primero). */
-  getHistory(): Promise<ActionRecord[]>;
+  /**
+   * Devuelve el historial global de acciones (más recientes primero). Con `filtro`, el recorte se
+   * hace en el origen: el historial real puede tener cientos de miles de eventos.
+   */
+  getHistory(filtro?: FiltroHistorial): Promise<ActionRecord[]>;
   /** Devuelve la configuración agronómica vigente (HU-15). */
   getConfig(): Promise<Configuracion>;
   /** Persiste la configuración validada y devuelve la versión guardada (HU-15). */

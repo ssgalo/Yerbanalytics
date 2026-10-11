@@ -1,29 +1,53 @@
-import type { ActionEvent } from '@/types/domain';
+import { Link } from 'react-router-dom';
+import type { ActionRecord } from '@/types/domain';
 import { Glyph } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
+import { pluralizar } from '../resumenVivero';
 import styles from './ActivityFeed.module.css';
 
 interface ActivityFeedProps {
-  actions: ActionEvent[];
+  /** Historial del día en curso, más recientes primero. */
+  records: ActionRecord[];
+  /** Total de eventos de hoy; si supera a `records`, el resto está en el Historial. */
+  total: number;
+  loading: boolean;
+  error: Error | null;
 }
 
-/** Feed de decisiones autónomas del sistema con línea de tiempo. */
-export function ActivityFeed({ actions }: ActivityFeedProps) {
+/** Hora del registro ("HH:mm"); `fecha` llega como "dd/MM HH:mm". */
+function hora(r: ActionRecord): string {
+  return r.fecha.split(' ')[1] ?? r.time;
+}
+
+/** Feed de las decisiones autónomas del día, con línea de tiempo. Es el historial recortado a hoy. */
+export function ActivityFeed({ records, total, loading, error }: ActivityFeedProps) {
   return (
     <div className={styles.card}>
-      <h2 className={styles.title}>Actividad del sistema</h2>
-      <div className={styles.subtitle}>
-        Decisiones autónomas y sus condiciones desencadenantes
+      <div className={styles.head}>
+        <div>
+          <h2 className={styles.title}>Actividad del sistema</h2>
+          <div className={styles.subtitle}>
+            Decisiones autónomas de hoy y sus condiciones desencadenantes
+            {!loading && !error && ` · ${pluralizar(total, 'evento', 'eventos')}`}
+          </div>
+        </div>
+        <Link to="/historial" className={styles.verTodo}>
+          Ver historial completo
+        </Link>
       </div>
 
-      {actions.length === 0 ? (
+      {error ? (
+        <div className={styles.empty}>No se pudo cargar la actividad: {error.message}</div>
+      ) : loading ? (
+        <div className={styles.empty}>Cargando actividad…</div>
+      ) : records.length === 0 ? (
         <div className={styles.empty}>
-          Sin actividad registrada — el motor aún no ejecutó acciones en este ciclo.
+          Sin actividad registrada hoy — el motor aún no ejecutó acciones.
         </div>
       ) : (
         <div className={styles.feed}>
-          {actions.map((ev, i) => (
-            <div key={i} className={styles.entry}>
+          {records.map((ev, i) => (
+            <div key={ev.id} className={styles.entry}>
               {/* Columna izquierda: ícono + línea vertical */}
               <div className={styles.timeline}>
                 <span
@@ -33,7 +57,7 @@ export function ActivityFeed({ actions }: ActivityFeedProps) {
                   <Glyph path={ev.path} stroke="currentColor" size={16} />
                 </span>
                 {/* Línea solo entre entradas, no la última */}
-                {i < actions.length - 1 && (
+                {i < records.length - 1 && (
                   <span className={styles.connector} />
                 )}
               </div>
@@ -41,16 +65,26 @@ export function ActivityFeed({ actions }: ActivityFeedProps) {
               {/* Cuerpo del evento */}
               <div className={styles.body}>
                 <div className={styles.metaRow}>
-                  <span className={styles.evTitle}>{ev.title}</span>
-                  <span className={styles.evTime}>{ev.time}</span>
+                  <span className={styles.evTitle}>
+                    {ev.tipo} · {ev.sectorId}
+                  </span>
+                  <span className={styles.evTime} title={ev.time}>
+                    {hora(ev)}
+                  </span>
                   <Badge soft={ev.resSoft} ink={ev.resInk}>
-                    {ev.result}
+                    {ev.res}
                   </Badge>
                 </div>
-                <div className={styles.evDetail}>{ev.detail}</div>
+                <div className={styles.evDetail}>{ev.decision || ev.lectura}</div>
               </div>
             </div>
           ))}
+          {total > records.length && (
+            <div className={styles.mas}>
+              Mostrando los {records.length} más recientes —{' '}
+              <Link to="/historial">el resto está en el historial</Link>.
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -14,9 +14,12 @@ export function pluralizar(n: number, singular: string, plural: string): string 
 
 const cuenta = (zona: Zona, status: Status) => zona.sectors.filter((s) => s.status === status).length;
 
-/** Sectores que piden atención: en observación o críticos. */
+/**
+ * Sectores en alerta: todo lo que no está saludable. Incluye los sin señal, así saludables y en
+ * alerta suman la totalidad (igual que los KPIs del Panel general).
+ */
 function conAtencion(zona: Zona): number {
-  return cuenta(zona, 'warning') + cuenta(zona, 'critical');
+  return zona.sectors.length - cuenta(zona, 'ok');
 }
 
 /**
@@ -46,9 +49,16 @@ export function resumenVivero(zonas: Zona[]): { text: string; status: Status } {
   const atencion = zonas.reduce((acc, z) => acc + conAtencion(z), 0);
   const sinDatos = zonas.filter((z) => z.lectura.stale).length;
   const hayCriticos = zonas.some((z) => cuenta(z, 'critical') > 0);
+  const hayObservacion = zonas.some((z) => cuenta(z, 'warning') > 0);
 
-  const status: Status =
-    atencion > 0 ? (hayCriticos ? 'critical' : 'warning') : sinDatos > 0 ? 'offline' : 'ok';
+  /* El color lo pone el peor estado; si sólo falta señal, es gris y no ámbar. */
+  const status: Status = hayCriticos
+    ? 'critical'
+    : hayObservacion
+      ? 'warning'
+      : atencion > 0 || sinDatos > 0
+        ? 'offline'
+        : 'ok';
 
   if (atencion === 0 && sinDatos === 0) {
     return { text: `El vivero está saludable: los ${total} sectores están bien.`, status };

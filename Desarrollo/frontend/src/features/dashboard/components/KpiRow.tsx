@@ -6,8 +6,11 @@ interface KpiRowProps {
   stats: Stats;
 }
 
-/** Fila de 4 KPIs del panel principal. */
+/** Fila de 3 KPIs del panel principal. */
 export function KpiRow({ stats }: KpiRowProps) {
+  /* `stats.alerta` del snapshot no incluye los sectores sin señal: se cuenta acá. */
+  const alerta = stats.warning + stats.critical + stats.offline;
+
   return (
     <div className={styles.grid}>
 
@@ -31,14 +34,18 @@ export function KpiRow({ stats }: KpiRowProps) {
         </div>
       </div>
 
-      {/* KPI 2 — Sectores en alerta */}
+      {/* KPI 2 — Sectores en alerta: con los saludables suman la totalidad. Los sectores de una
+          macro-zona con el nodo testigo fuera de servicio también cuentan acá, como "sin señal". */}
       <div className={styles.card}>
         <div className={styles.label}>Sectores en alerta</div>
-        <div
-          className={styles.mainNumber}
-          style={{ color: 'var(--warn)' }}
-        >
-          {stats.alerta}
+        <div className={styles.baseline}>
+          <span
+            className={styles.mainNumber}
+            style={{ color: 'var(--warn)' }}
+          >
+            {alerta}
+          </span>
+          <span className={styles.total}>/ {stats.total}</span>
         </div>
         <div className={styles.chips}>
           <span
@@ -61,22 +68,20 @@ export function KpiRow({ stats }: KpiRowProps) {
             />
             {stats.critical} crítico
           </span>
+          <span
+            className={styles.chip}
+            style={{ background: 'var(--off-soft)', color: 'var(--muted)' }}
+          >
+            <span
+              className={styles.chipDot}
+              style={{ background: 'var(--off)' }}
+            />
+            {stats.offline} sin señal
+          </span>
         </div>
       </div>
 
-      {/* KPI 3 — Hardware fuera de servicio */}
-      <div className={styles.card}>
-        <div className={styles.label}>Hardware fuera de servicio</div>
-        <div
-          className={styles.mainNumber}
-          style={{ color: 'var(--off)' }}
-        >
-          {stats.offline}
-        </div>
-        <div className={styles.subTextHardware}>Nodos testigo sin reportar</div>
-      </div>
-
-      {/* KPI 4 — Acciones autónomas (fondo oscuro) */}
+      {/* KPI 3 — Acciones autónomas (fondo oscuro) */}
       <div
         className={styles.cardDark}
         style={{ background: 'linear-gradient(150deg,var(--g800),var(--g700))', border: '1px solid var(--g700)' }}

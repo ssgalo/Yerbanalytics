@@ -53,7 +53,10 @@ describe('estadoZona (peor estado)', () => {
 
 describe('resumenZona', () => {
   it('Todo bien', () => {
-    expect(resumenZona(zona(['ok', 'offline']))).toBe('Todo bien');
+    expect(resumenZona(zona(['ok', 'ok']))).toBe('Todo bien');
+  });
+  it('un sector sin señal también pide atención', () => {
+    expect(resumenZona(zona(['ok', 'offline']))).toBe('1 sector necesita atención');
   });
   it('concuerda número con 1 sector', () => {
     expect(resumenZona(zona(['warning', 'ok']))).toBe('1 sector necesita atención');
@@ -86,6 +89,10 @@ describe('resumenVivero', () => {
     const r = resumenVivero([zona(['ok'], true), zona(['ok'], true, 'MZ-2')]);
     expect(r.text).toBe('2 zonas sin datos del sensor.');
     expect(r.status).toBe('offline');
+  });
+  it('los sectores sin señal cuentan como en alerta, en gris', () => {
+    const r = resumenVivero([zona(['ok', 'offline', 'offline'])]);
+    expect(r).toEqual({ text: '2 de 3 sectores necesitan atención.', status: 'offline' });
   });
   it('un solo sector en atención', () => {
     expect(resumenVivero([zona(['warning'])]).text).toBe('1 de 1 sector necesita atención.');

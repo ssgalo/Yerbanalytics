@@ -1,69 +1,29 @@
-import { useState } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useNurseryData } from '@/hooks/NurseryContext';
+import { useAuth } from '@/hooks/AuthContext';
+import { puedeVer, VISTAS } from '@/lib/vistas';
 import { KpiRow } from './components/KpiRow';
 import { PlanoVivero } from './components/PlanoVivero';
-import { EstadoVivero } from './components/EstadoVivero';
-import type { FocoZona } from './components/ZonaBlock';
-import { PriorityCard } from './components/PriorityCard';
-import { WeatherCard } from './components/WeatherCard';
 import { ActivityFeed } from './components/ActivityFeed';
-import { RecentDiagnostics } from './components/RecentDiagnostics';
+import { useActividadHoy } from './useActividadHoy';
 
 /** Vista principal del panel de control del vivero. */
 export function DashboardPage() {
   usePageTitle('Panel general', 'Vivero San Ignacio · Misiones, AR');
 
-  const { stats, zonas, priority, weather, actions, recentDiag, layout } = useNurseryData();
-
-  /* Zona a la que se llegó tocando su parcela del plano (el tick re-dispara el destello). */
-  const [foco, setFoco] = useState<FocoZona | null>(null);
+  const { stats, zonas, layout } = useNurseryData();
+  const { puede } = useAuth();
+  /* La actividad sale del historial: sin permiso para verlo, la sección no se muestra. */
+  const verActividad = puedeVer(VISTAS.historial, puede);
+  const actividad = useActividadHoy(verActividad);
 
   return (
-    <div style={{ animation: 'ybFade .4s both' }}>
-
-      {/* Fila de KPIs */}
+    <div style={{ animation: 'ybFade .4s both', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <KpiRow stats={stats} />
 
-      {/* Grilla media: vivero overview + rail derecho */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 360px',
-          gap: 16,
-          marginTop: 16,
-          alignItems: 'start',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <PlanoVivero
-            zonas={zonas}
-            onSelectZona={(zonaId) => setFoco((f) => ({ zonaId, tick: (f?.tick ?? 0) + 1 }))}
-          />
-          <EstadoVivero zonas={zonas} layout={layout} foco={foco} />
-        </div>
+      <PlanoVivero zonas={zonas} layout={layout} />
 
-        {/* Rail derecho: prioridad + clima */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <PriorityCard priority={priority} alerta={stats.alerta} />
-          <WeatherCard weather={weather} />
-        </div>
-      </div>
-
-      {/* Grilla inferior: actividad + diagnósticos */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 360px',
-          gap: 16,
-          marginTop: 16,
-          alignItems: 'start',
-        }}
-      >
-        <ActivityFeed actions={actions} />
-        <RecentDiagnostics recentDiag={recentDiag} />
-      </div>
-
+      {verActividad && <ActivityFeed {...actividad} />}
     </div>
   );
 }

@@ -34,27 +34,6 @@
   gap: 14px;
 }
 
-.weather {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 7px 13px;
-}
-
-.weatherTemp {
-  font-size: 14px;
-  font-weight: 700;
-  font-family: var(--font-display);
-}
-
-.weatherSub {
-  font-size: 10.5px;
-  color: var(--muted);
-}
-
 .divider {
   width: 1px;
   height: 30px;

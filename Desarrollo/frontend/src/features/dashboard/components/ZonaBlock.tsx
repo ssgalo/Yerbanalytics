@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Zona } from '@/types/domain';
 import { Icon } from '@/components/ui/Icon';
@@ -12,36 +11,19 @@ import {
 import { NodoChip } from './NodoChip';
 import styles from './ZonaBlock.module.css';
 
-export interface FocoZona {
-  zonaId: string;
-  /** Cambia en cada toque, para volver a destacar una zona ya destacada. */
-  tick: number;
-}
-
 interface ZonaBlockProps {
   zona: Zona;
   sectoresPorFila: number;
-  foco: FocoZona | null;
 }
 
-/** Bloque de una macro-zona: resumen en palabras, nodo testigo y grilla de sectores. */
-export function ZonaBlock({ zona, sectoresPorFila, foco }: ZonaBlockProps) {
+/** Bandeja de una macro-zona en el plano: resumen en palabras, nodo testigo y grilla de sectores. */
+export function ZonaBlock({ zona, sectoresPorFila }: ZonaBlockProps) {
   const navigate = useNavigate();
-  const ref = useRef<HTMLElement>(null);
   const estado = estadoZona(zona);
   const sinDatos = zona.lectura.stale;
-  const enFoco = foco?.zonaId === zona.id ? foco.tick : null;
-
-  /* Al tocar su parcela en el plano: desplazar hasta acá. */
-  useEffect(() => {
-    if (enFoco !== null) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-  }, [enFoco]);
 
   return (
-    <section ref={ref} id={`zona-${zona.id}`} className={styles.block} data-status={estado}>
-      {/* Destello al llegar desde el plano; `key` reinicia la animación en cada toque */}
-      {enFoco !== null && <span key={enFoco} className={styles.flash} aria-hidden="true" />}
-
+    <section id={`zona-${zona.id}`} className={styles.block} data-status={estado}>
       <div className={styles.head}>
         <div className={styles.id}>
           <span className={styles.badge} data-status={estado}>

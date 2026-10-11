@@ -1,8 +1,8 @@
-/* KpiRow — fila de 4 tarjetas de indicadores clave */
+/* KpiRow — fila de 3 tarjetas de indicadores clave */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
@@ -13,7 +13,7 @@
   padding: 18px 19px;
 }
 
-/* La 4ta tarjeta (acciones) tiene fondo oscuro verde */
+/* La 3ra tarjeta (acciones) tiene fondo oscuro verde */
 .cardDark {
   border-radius: 16px;
   padding: 18px 19px;
@@ -56,6 +56,7 @@
 
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 11px;
 }
@@ -81,12 +82,6 @@
   font-size: 11.5px;
   color: var(--muted);
   margin-top: 7px;
-}
-
-.subTextHardware {
-  font-size: 11.5px;
-  color: var(--muted);
-  margin-top: 13px;
 }
 
 .actRow {

@@ -1,17 +1,65 @@
-/* WeatherCard — clima y riesgo actual */
+/* ClimaDropdown — clima de la topbar y su desplegable de clima y riesgo */
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px 19px;
+.wrap {
+  position: relative;
 }
 
-.title {
-  margin: 0 0 12px;
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 13px;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.trigger:hover {
+  background: var(--line2);
+}
+
+.triggerTemp {
+  font-size: 14px;
+  font-weight: 700;
   font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 600;
+}
+
+.triggerSub {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* Panel desplegable: mismo marco que el de alertas */
+.panel {
+  position: absolute;
+  right: 0;
+  top: 52px;
+  width: 380px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px -12px rgba(12, 35, 25, 0.32);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line2);
+}
+
+.headerTitle {
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.body {
+  padding: 16px;
 }
 
 .currentRow {
