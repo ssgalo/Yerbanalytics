@@ -156,11 +156,13 @@
   transform: translateX(-100%);
 }
 
+/* Las tres claves llevan sólo su nombre, con la misma separación entre sí; los números (rango
+   ideal y extremos) van aparte a la derecha, así la leyenda no se corre de una métrica a otra */
 .legend {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 18px;
+  gap: 6px 22px;
   margin-top: 10px;
   font-size: var(--t-13);
   color: var(--muted);
@@ -170,6 +172,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  white-space: nowrap;
 }
 
 .key i {
@@ -194,4 +197,5 @@
 .extremes {
   margin-left: auto;
   font-stretch: var(--w-cond);
+  white-space: nowrap;
 }

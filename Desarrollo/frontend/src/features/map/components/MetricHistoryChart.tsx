@@ -26,7 +26,12 @@ const TICK_EVERY: Record<Range, number> = { '24h': 6, '7d': 12, '30d': 7 };
 const fmtHour = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit' });
 const fmtWeekday = new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: 'numeric' });
 const fmtDay = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' });
-const fmtFull = new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const fmtFull = new Intl.DateTimeFormat('es-AR', {
+  weekday: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 function tickLabel(ts: number, range: Range, last: boolean): string {
   if (last) return range === '24h' ? 'ahora' : 'hoy';
@@ -41,8 +46,16 @@ interface MetricHistoryChartProps {
   onRangeChange: (r: Range) => void;
 }
 
-export function MetricHistoryChart({ zona, metric, range, onRangeChange }: MetricHistoryChartProps) {
-  const history = useMemo(() => selectMetricHistory(zona, metric.key, range), [zona, metric.key, range]);
+export function MetricHistoryChart({
+  zona,
+  metric,
+  range,
+  onRangeChange,
+}: MetricHistoryChartProps) {
+  const history = useMemo(
+    () => selectMetricHistory(zona, metric.key, range),
+    [zona, metric.key, range],
+  );
   const [hover, setHover] = useState<number | null>(null);
   const { spec, unit } = metric;
   const f = (v: number) => fmtNum(v, spec.dec);
@@ -51,7 +64,12 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
   const header = (
     <div className={styles.head}>
       <span className={styles.headTitle}>Histórico del nodo testigo</span>
-      <Segmented label="Ventana del histórico" options={RANGES} value={range} onChange={onRangeChange} />
+      <Segmented
+        label="Ventana del histórico"
+        options={RANGES}
+        value={range}
+        onChange={onRangeChange}
+      />
     </div>
   );
 
@@ -75,13 +93,19 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
 
   const { points } = history;
   const x = (i: number) => (i / (points.length - 1)) * 100;
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ');
+  const line = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`)
+    .join(' ');
   const band = (a: number, b: number) => ({ y: y(b), height: y(a) - y(b) });
   const edges = [spec.warn[0], spec.ideal[0], spec.ideal[1], spec.warn[1]];
 
   const ticks = points
     .map((p, i) => ({ i, ts: p.ts }))
-    .filter(({ i }) => i === points.length - 1 || (i % TICK_EVERY[range] === 0 && points.length - 1 - i >= TICK_EVERY[range] / 2));
+    .filter(
+      ({ i }) =>
+        i === points.length - 1 ||
+        (i % TICK_EVERY[range] === 0 && points.length - 1 - i >= TICK_EVERY[range] / 2),
+    );
 
   const current = hover ?? points.length - 1;
   const currentPoint = points[current];
@@ -112,10 +136,25 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
           onPointerMove={handleMove}
           onPointerLeave={() => setHover(null)}
         >
-          <svg className={styles.svg} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <svg
+            className={styles.svg}
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
             <rect className={styles.bandCrit} x="0" y="0" width="100" height="100" />
-            <rect className={styles.bandWarn} x="0" width="100" {...band(spec.warn[0], spec.warn[1])} />
-            <rect className={styles.bandIdeal} x="0" width="100" {...band(spec.ideal[0], spec.ideal[1])} />
+            <rect
+              className={styles.bandWarn}
+              x="0"
+              width="100"
+              {...band(spec.warn[0], spec.warn[1])}
+            />
+            <rect
+              className={styles.bandIdeal}
+              x="0"
+              width="100"
+              {...band(spec.ideal[0], spec.ideal[1])}
+            />
             {edges.map((v, i) => (
               <line key={i} className={styles.edge} x1="0" x2="100" y1={y(v)} y2={y(v)} />
             ))}
@@ -123,7 +162,10 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
           </svg>
 
           {hover !== null && <span className={styles.cursor} style={{ left: `${x(current)}%` }} />}
-          <span className={styles.dot} style={{ left: `${x(current)}%`, top: `${y(currentPoint.value)}%` }} />
+          <span
+            className={styles.dot}
+            style={{ left: `${x(current)}%`, top: `${y(currentPoint.value)}%` }}
+          />
 
           {hover !== null && (
             <span
@@ -139,7 +181,11 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
 
         <div className={styles.xAxis} aria-hidden="true">
           {ticks.map((t) => (
-            <span key={t.i} style={{ left: `${x(t.i)}%` }} data-last={t.i === points.length - 1 || undefined}>
+            <span
+              key={t.i}
+              style={{ left: `${x(t.i)}%` }}
+              data-last={t.i === points.length - 1 || undefined}
+            >
               {tickLabel(t.ts, range, t.i === points.length - 1)}
             </span>
           ))}
@@ -148,7 +194,7 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
 
       <div className={styles.legend}>
         <span className={styles.key}>
-          <i className={styles.swIdeal} /> Ideal {f(spec.ideal[0])}–{f(spec.ideal[1])}
+          <i className={styles.swIdeal} /> Ideal
         </span>
         <span className={styles.key}>
           <i className={styles.swWarn} /> Observación
@@ -157,7 +203,8 @@ export function MetricHistoryChart({ zona, metric, range, onRangeChange }: Metri
           <i className={styles.swCrit} /> Crítico
         </span>
         <span className={styles.extremes}>
-          Mín. {f(history.min)} · máx. {f(history.max)} {unit}
+          Ideal {f(spec.ideal[0])}–{f(spec.ideal[1])} · mín. {f(history.min)} · máx.{' '}
+          {f(history.max)} {unit}
         </span>
       </div>
     </div>

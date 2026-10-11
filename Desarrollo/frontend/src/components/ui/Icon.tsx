@@ -30,6 +30,7 @@ export type IconName =
   | 'camera'
   | 'calendar'
   | 'chevron-down'
+  | 'chevron-right'
   | 'map-pin'
   | 'rules'
   | 'users'
@@ -200,6 +201,7 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
+  'chevron-right': <path d="M9 18l6-6-6-6" />,
   'map-pin': (
     <>
       <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" />

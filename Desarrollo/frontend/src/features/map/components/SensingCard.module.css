@@ -1,4 +1,4 @@
-/* SensingCard — métricas del nodo testigo como filas desplegables */
+/* SensingCard — métricas del nodo testigo; cada fila abre su detalle en un modal */
 
 .metaItem {
   display: inline-flex;
@@ -50,10 +50,10 @@
   border-bottom-color: transparent;
 }
 
-/* Fila: nombre y estado · valor · barra de rango · chevrón */
+/* Fila: nombre y estado · valor · barra de rango */
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px minmax(120px, 1.1fr) 24px;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(120px, 1.1fr);
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -143,34 +143,13 @@
   background: var(--line2);
 }
 
-.chevron {
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  transition: transform 0.18s;
-}
-
-.itemOpen .chevron {
-  transform: rotate(180deg);
-}
-
-.detail {
-  padding: 4px 8px 16px;
-}
-
 @media (max-width: 560px) {
   .row {
-    grid-template-columns: minmax(0, 1fr) auto 24px;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px 12px;
   }
   .bar {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chevron {
-    transition: none;
   }
 }

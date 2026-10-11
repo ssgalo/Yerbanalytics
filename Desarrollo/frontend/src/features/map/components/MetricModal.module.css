@@ -1,0 +1,227 @@
+/* Modal centrado con el detalle de una métrica */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(21, 35, 27, 0.55);
+  animation: fadeIn 0.16s ease-out;
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  /* Tamaño fijo: no cambia al pasar de una métrica a otra, ni cuando alguna no tiene serie.
+     El alto es el que ocupa el contenido con el gráfico completo. */
+  width: min(760px, 100%);
+  height: min(498px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-overlay);
+  animation: popIn 0.18s ease-out;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 12px 24px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-18);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-12);
+  font-weight: 600;
+}
+
+.ok {
+  color: var(--ok-ink);
+}
+.warn {
+  color: var(--warn-ink);
+}
+.crit {
+  color: var(--crit-ink);
+}
+.off {
+  color: var(--off-ink);
+}
+
+.value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.number {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-weight: 650;
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.unit {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--card-2);
+}
+
+.iconBtn:focus-visible,
+.navBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Ocupa el alto sobrante; si la ventana es muy baja, sólo el cuerpo se desplaza */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 24px 20px;
+}
+
+.barEmpty {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line2);
+}
+
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line2);
+}
+
+.navBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Ancho fijo: el botón no cambia con el nombre de la métrica (si no entra, se recorta) */
+  width: 210px;
+  max-width: 48%;
+  padding: 6px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* "Siguiente" queda pegado a la derecha aunque no haya "Anterior" */
+.navNext {
+  margin-left: auto;
+}
+
+/* La flecha va fija contra el borde; el texto queda centrado en el botón */
+.navIcon {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  transform: translateY(-50%);
+}
+
+.navIconPrev {
+  left: 9px;
+}
+
+.navIconNext {
+  right: 9px;
+}
+
+.navBtn:hover:not(:disabled) {
+  background: var(--card-2);
+}
+
+.navBtn:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.navLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .modal {
+    animation: none;
+  }
+}

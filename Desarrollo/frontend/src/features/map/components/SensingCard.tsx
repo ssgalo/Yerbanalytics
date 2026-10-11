@@ -3,12 +3,13 @@
    que habla por todos sus sectores.
 
    Cada métrica es una fila: su valor contra las bandas de su rango.
-   Al abrirla, muestra su histórico debajo (de a una por vez). Van
+   Al abrirla, su histórico aparece en un modal centrado
+   (MetricModal), así la lista no se desplaza ni deja huecos. Van
    agrupadas aparte, sin título visible, las que definen el estado de
    los sectores y las informativas, cuyos rangos todavía no están
    validados (el grupo se nombra sólo para el lector de pantalla).
    ============================================================ */
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import type { Metric, Range, Status, Zona } from '@/types/domain';
 import { Card } from '@/components/ui/Card';
 import { Callout } from '@/components/ui/Callout';
@@ -17,7 +18,7 @@ import { RangeBar } from '@/components/ui/Medidas';
 import { StateGlyph } from '@/components/ui/StateGlyph';
 import { TONO, cx } from '@/components/ui/estado';
 import { fmtNum } from '@/components/ui/rango';
-import { MetricHistoryChart } from './MetricHistoryChart';
+import { MetricModal } from './MetricModal';
 import panel from './Panel.module.css';
 import styles from './SensingCard.module.css';
 
@@ -42,14 +43,26 @@ function statusText(m: Metric): string {
 
 export function SensingCard({ zona, wide, className }: SensingCardProps) {
   const { lectura, nodo } = zona;
-  /* Una métrica abierta por vez; el rango del histórico se conserva al cambiar de métrica. */
+  /* Una métrica abierta por vez en el modal; el rango del histórico se conserva al
+     cambiar de métrica. */
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [range, setRange] = useState<Range>('7d');
 
   const groups = [
-    { title: 'Definen el estado de los sectores', metrics: lectura.metrics.filter((m) => m.spec.afectaEstado) },
-    { title: 'Informativas, con rango provisional', metrics: lectura.metrics.filter((m) => !m.spec.afectaEstado) },
+    {
+      title: 'Definen el estado de los sectores',
+      metrics: lectura.metrics.filter((m) => m.spec.afectaEstado),
+    },
+    {
+      title: 'Informativas, con rango provisional',
+      metrics: lectura.metrics.filter((m) => !m.spec.afectaEstado),
+    },
   ].filter((g) => g.metrics.length > 0);
+
+  /* El modal recorre las métricas en el mismo orden en que se ven en la lista */
+  const ordered = groups.flatMap((g) => g.metrics);
+  const openIndex = ordered.findIndex((m) => m.key === openKey);
+  const openMetric = openIndex >= 0 ? ordered[openIndex] : null;
 
   return (
     <Card className={cx(panel.panel, className)}>
@@ -78,7 +91,8 @@ export function SensingCard({ zona, wide, className }: SensingCardProps) {
       {lectura.stale && (
         <div className={styles.stale}>
           <Callout tone="warn" icon="clock">
-            Sin reporte reciente del nodo testigo: los valores son los últimos conocidos, no los vigentes.
+            Sin reporte reciente del nodo testigo: los valores son los últimos conocidos, no los
+            vigentes.
           </Callout>
         </div>
       )}
@@ -91,44 +105,47 @@ export function SensingCard({ zona, wide, className }: SensingCardProps) {
                 <MetricRow
                   key={m.key}
                   metric={m}
-                  zona={zona}
-                  open={openKey === m.key}
-                  onToggle={() => setOpenKey((k) => (k === m.key ? null : m.key))}
-                  range={range}
-                  onRangeChange={setRange}
+                  selected={openKey === m.key}
+                  onOpen={() => setOpenKey(m.key)}
                 />
               ))}
             </ul>
           </section>
         ))}
       </div>
+
+      {openMetric && (
+        <MetricModal
+          zona={zona}
+          metric={openMetric}
+          status={statusOf(openMetric)}
+          statusText={statusText(openMetric)}
+          prev={ordered[openIndex - 1] ?? null}
+          next={ordered[openIndex + 1] ?? null}
+          onNavigate={setOpenKey}
+          range={range}
+          onRangeChange={setRange}
+          onClose={() => setOpenKey(null)}
+        />
+      )}
     </Card>
   );
 }
 
 interface MetricRowProps {
   metric: Metric;
-  zona: Zona;
-  open: boolean;
-  onToggle: () => void;
-  range: Range;
-  onRangeChange: (r: Range) => void;
+  /** La métrica que se está mostrando en el modal. */
+  selected: boolean;
+  onOpen: () => void;
 }
 
-function MetricRow({ metric: m, zona, open, onToggle, range, onRangeChange }: MetricRowProps) {
-  const panelId = useId();
+function MetricRow({ metric: m, selected, onOpen }: MetricRowProps) {
   const status = statusOf(m);
   const tone = TONO[status];
 
   return (
-    <li className={cx(styles.item, open && styles.itemOpen)}>
-      <button
-        type="button"
-        className={styles.row}
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={onToggle}
-      >
+    <li className={cx(styles.item, selected && styles.itemOpen)}>
+      <button type="button" className={styles.row} aria-haspopup="dialog" onClick={onOpen}>
         <span className={styles.name}>
           <span className={styles.label}>{m.label}</span>
           <span className={cx(styles.status, styles[tone])}>
@@ -149,19 +166,13 @@ function MetricRow({ metric: m, zona, open, onToggle, range, onRangeChange }: Me
         </span>
 
         <span className={styles.bar}>
-          {m.raw == null ? <span className={styles.barEmpty} /> : <RangeBar value={m.raw} spec={m.spec} />}
-        </span>
-
-        <span className={styles.chevron} aria-hidden="true">
-          <Icon name="chevron-down" size={18} />
+          {m.raw == null ? (
+            <span className={styles.barEmpty} />
+          ) : (
+            <RangeBar value={m.raw} spec={m.spec} />
+          )}
         </span>
       </button>
-
-      {open && (
-        <div id={panelId} className={styles.detail}>
-          <MetricHistoryChart zona={zona} metric={m} range={range} onRangeChange={onRangeChange} />
-        </div>
-      )}
     </li>
   );
 }
