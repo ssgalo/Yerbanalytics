@@ -10,7 +10,7 @@
   display: block;
   height: 100%;
 }
-/* La trama es la forma: observación rayada, sin señal en líneas finas. */
+/* La trama es la forma: observación rayada, sin señal hueco (como el aro de su glifo). */
 .compbar .ok {
   background: var(--ok);
 }
@@ -20,8 +20,11 @@
 .compbar .crit {
   background: var(--crit);
 }
+/* Radio propio: el contorno no queda cortado por el redondeo de la barra */
 .compbar .off {
-  background: repeating-linear-gradient(90deg, var(--off) 0 1.5px, var(--off-soft) 1.5px 5px);
+  background: var(--off-soft);
+  box-shadow: inset 0 0 0 1.5px var(--off);
+  border-radius: 4px;
 }
 
 /* ── valor contra su rango: bandas crítico / observación / ideal ── */

@@ -387,6 +387,9 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 - **Cambios grandes pasan por OpenSpec** antes de codear.
 - **Archivos `.env`** no se versionan; usar `env.example` como plantilla.
 - **Idioma**: español (Rioplatense) en docs y comentarios.
+- **El código va en inglés** (identificadores, nombres de archivos, componentes, funciones, tipos y
+  clases nuevos); todo lo demás —comentarios, docs, textos de la interfaz, commits— en español. El
+  código existente en español se migra cuando se reescribe, no en cambios aparte.
 
 ---
 

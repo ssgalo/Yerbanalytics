@@ -1,0 +1,6 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: ybFade 0.4s both;
+}
