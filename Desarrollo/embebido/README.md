@@ -1,23 +1,27 @@
 # Yerbanalytics — Firmware ESP32
 
-Firmware de los nodos del vivero. **Tres firmwares independientes** —uno por
-tipo de nodo— con arquitectura **FreeRTOS** (tareas y colas). Cada uno
-compila solo lo que su rol necesita. El código común (red, contrato, tipos, drivers)
-se comparte entre firmwares sin duplicarse.
+Firmware de los nodos del vivero para **ESP32-S3 DevKitC-1 N16R8**. Hay **tres firmwares
+independientes** (uno por tipo de nodo), con arquitectura **FreeRTOS** (tareas y colas). Cada uno
+compila solo lo que su rol necesita. El código común (red, contrato, tipos y drivers) se comparte
+entre los tres sin duplicarse.
+
+> **Estado.** Los tres firmwares **compilan** sin advertencias propias (`arduino-cli`, core
+> `esp32:esp32` 3.3.10). **Todavía no se probaron en la placa**. Con PlatformIO no se compiló:
+> ver §2.
 
 ---
 
 ## 1. Los tres firmwares
 
-| Firmware (`env` PlatformIO) | Sketch                              | Qué hace                                | Uso                                  |
-| --------------------------- | ----------------------------------- | --------------------------------------- | ------------------------------------ |
-| `nodo_sensor`               | `nodo_sensor/nodo_sensor.ino`       | Solo sensado + telemetría               | Nodo testigo por macro-zona (campo)  |
-| `nodo_actuador`             | `nodo_actuador/nodo_actuador.ino`   | Solo escucha comandos y acciona (+ ACK) | Nodo de actuación por sector (campo) |
-| `nodo_combinado`            | `nodo_combinado/nodo_combinado.ino` | Sensado **+** actuación en un ESP32     | **Prototipo**                        |
+| Firmware (`env` PlatformIO) | Sketch                              | Qué hace                                                 | Uso                                  |
+| --------------------------- | ----------------------------------- | -------------------------------------------------------- | ------------------------------------ |
+| `nodo_sensor`               | `nodo_sensor/nodo_sensor.ino`       | Solo sensado + telemetría                                | Nodo testigo por macro-zona (campo)  |
+| `nodo_actuador`             | `nodo_actuador/nodo_actuador.ino`   | Solo comandos (riego, insumo, mediasombra, riel) + ack   | Nodo de actuación (campo)            |
+| `nodo_combinado`            | `nodo_combinado/nodo_combinado.ino` | Sensado **+** actuación en un ESP32                      | **Prototipo**                        |
 
-Cada sketch tiene su propio `setup()` y su propia `task_red` a medida: el nodo
-sensor no compila el subsistema de actuación ni su callback de comandos; el nodo
-actuador no compila el subsistema de sensado ni el buffer offline.
+Cada sketch tiene su propio `setup()` y su propia `task_red` a medida: el nodo sensor no compila
+el subsistema de actuación ni su callback de comandos, y el nodo actuador no compila el subsistema
+de sensado ni el buffer offline.
 
 ### Qué compila cada uno
 
@@ -27,201 +31,290 @@ actuador no compila el subsistema de sensado ni el buffer offline.
 | `nodo_actuador`  |    ✅    |     —      |      ✅      |
 | `nodo_combinado` |    ✅    |     ✅     |      ✅      |
 
-El reparto lo hace `build_src_filter` en `platformio.ini`; no hay que tocar nada
-para que cada entorno tome solo sus carpetas.
+El reparto lo hace `build_src_filter` en `platformio.ini`; no hay que tocar nada para que cada
+entorno tome solo sus carpetas.
+
+### Tareas FreeRTOS
+
+| Tarea        | Prioridad | Qué hace                                                                                 |
+| ------------ | :-------: | ---------------------------------------------------------------------------------------- |
+| `actuacion`  | 4         | Recibe comandos, deduplica y despacha. Riego y mediasombra no bloquean: los atiende cada 50 ms |
+| `sensado`    | 3         | Lee una vez al arrancar y después solo ante un `LEER_AHORA` (el backend lo publica cada X s; sin timer propio) y arma la telemetría |
+| `red`        | 2         | WiFi/MQTT: publica telemetría, acks y eventos del riel, y drena el buffer offline         |
+| `riel`       | 1         | Mueve el carro de la cámara. Genera los pasos con espera activa: va última y las demás la interrumpen. Fija al núcleo 1 |
+
+El callback MQTT **solo encola o avisa**: nunca acciona, lee ni publica (PubSubClient reusa su buffer al
+publicar y corrompería el mensaje que está leyendo).
+
+### Comando de zona `LEER_AHORA`
+
+`nodo_combinado` y `nodo_sensor` (los que sensan) se suscriben, a QoS 1, a
+`nursery/zone/{NODO_ZONA_ID}/command` (`contratoTopicComandoZona`). Con
+`{"commandId":"<id>","accion":"LEER_AHORA","parametros":{}}` el callback sólo le avisa a `task_sensado`
+(`task_sensado::pedirLecturaAhora()`, una notificación de FreeRTOS): la tarea corta su espera, lee y
+entrega el paquete por la cola de siempre, y `task_red` lo publica con `publicarTelemetria` en el topic
+de telemetría de la zona. Sin `commandId` en la respuesta y **sin ACK**; una acción desconocida o un JSON
+ilegible se ignoran con una línea de log.
+
+- **Sensing is backend-driven (pure pull).** The node reads once at boot, then blocks in
+  `ulTaskNotifyTake(pdTRUE, portMAX_DELAY)` until a `LEER_AHORA` arrives. The backend publishes it to
+  every zone each X seconds (`sensingPullIntervalSeconds`, 10-3600, default 60). `SENSOR_POLLING_INTERVAL_MS`
+  no longer exists. Back-to-back requests merge into a single read.
+- **Sin dedup por `commandId`**: `dedup_comandos` vive en `actuacion/`, que `nodo_sensor` no compila, y
+  una reentrega del broker sólo cuesta una telemetría de más.
+- **Sin red**, la lectura a pedido sigue el camino de cualquier otra: va al buffer offline con su
+  timestamp. Es una lectura real, así que no se pierde; el backend ya habrá dado la secuencia por
+  vencida por timeout, y el motor la procesa como una lectura atrasada más.
+- `MAX_SUSCRIPCIONES` (`net_mqtt.cpp`) es 4: el combinado usa las 4 (2 sectores, riel y zona).
 
 ---
 
-## 2. Procedimiento por tipo de nodo (PlatformIO)
+## 2. Compilar y flashear
 
-Paso previo común (una sola vez): copiar la plantilla de configuración y completar
-credenciales, broker, identidad (zona/sector) y pines.
+Paso previo común (una sola vez): copiar la plantilla de configuración y completar credenciales,
+broker e identidad (zona y sectores). Los pines ya vienen con el cableado del prototipo (§4).
 
 ```bash
 cd Desarrollo/embebido
 cp comun/config.example.h comun/config.h
-# editar comun/config.h → WiFi, MQTT_HOST, NODO_ZONA_ID, NODO_SECTOR_ID, pines...
+# editar comun/config.h → WIFI_*, MQTT_HOST, NODO_ZONA_ID, NODO_SECTOR_1_ID / NODO_SECTOR_2_ID
 ```
 
-Luego, según el nodo que quieras flashear, elegí **un** entorno:
+### PlatformIO (vía recomendada)
 
-**Nodo del prototipo (sensado + actuación):**
-
-```bash
-pio run -e nodo_combinado -t upload
-pio device monitor          # logs a 115200 baud
-```
-
-**Nodo testigo (solo sensado):**
+`platformio.ini` usa la plataforma **pioarduino** (core Arduino-ESP32 3.x). La `espressif32`
+oficial de PlatformIO quedó en el core 2.x, que no tiene `ledcAttach` y no compila este firmware.
+**Esta configuración no se probó** (PlatformIO no estaba instalado cuando se escribió): si falla, la
+alternativa verificada es `arduino-cli` (abajo).
 
 ```bash
-pio run -e nodo_sensor -t upload
-```
-
-**Nodo de actuación (solo actuadores):**
-
-```bash
-pio run -e nodo_actuador -t upload
+pio run -e nodo_combinado -t upload   # prototipo
+pio device monitor                    # logs a 115200 baud
+pio run -e nodo_sensor -t upload      # testigo
+pio run -e nodo_actuador -t upload    # actuación
 ```
 
 > Cada `env` compila un solo sketch; nunca hay dos `setup()`/`loop()` en una build.
 > `pio run` (sin `-e`) compila los tres, útil para verificar que todos cierran.
 
-### Arduino IDE
+`-DARDUINO_USB_CDC_ON_BOOT=1` manda el `Serial` al puerto **USB** nativo de la placa. Si conectás
+el puerto **COM/UART**, cambialo a `0` o el monitor no muestra nada.
 
-Cada firmware es su propia carpeta-sketch. Para compilar uno, abrí su `.ino`
-(p.ej. `nodo_combinado/nodo_combinado.ino`) y asegurate de que el IDE encuentre
-los `.h/.cpp` de `comun/` + las carpetas que ese nodo usa (§1). La vía soportada
-y recomendada es **PlatformIO**, que arma el include path automáticamente.
+### arduino-cli / Arduino IDE
+
+Arduino exige que todos los fuentes estén en la carpeta del sketch, así que hay que armar una copia
+plana: el `.ino` del nodo + los `.h/.cpp` de `comun/` y de las carpetas que usa (§1) + `config.h`.
+Así se verificaron los tres firmwares:
+
+```bash
+FQBN="esp32:esp32:esp32s3:PSRAM=opi,FlashSize=16M,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB"
+mkdir -p /tmp/nodo_combinado
+cp nodo_combinado/nodo_combinado.ino comun/*.h comun/*.cpp sensado/* actuacion/* /tmp/nodo_combinado/
+cp comun/config.h /tmp/nodo_combinado/ && rm /tmp/nodo_combinado/config.example.h
+arduino-cli compile --fqbn "$FQBN" /tmp/nodo_combinado
+arduino-cli upload -p <puerto> --fqbn "$FQBN" /tmp/nodo_combinado
+```
+
+En el Arduino IDE: placa **ESP32S3 Dev Module**, Flash Size **16MB**, PSRAM **OPI PSRAM**,
+USB CDC On Boot según el puerto (ver arriba).
 
 ---
 
 ## 3. Configuración (`comun/config.h`)
 
-Un único archivo, compartido por los tres firmwares (copia de `config.example.h`,
-**no versionada**): credenciales WiFi, broker MQTT, **identidad** (`NODO_ZONA_ID`,
-`NODO_SECTOR_ID`), pines, `SENSOR_POLLING_INTERVAL_MS`, límites de seguridad,
-calibraciones y flags. El tipo de nodo **no** se elige acá (se elige compilando el
-sketch); cada nodo usa solo la porción que le aplica.
+Un único archivo, compartido por los tres firmwares: es una copia de `config.example.h` y **no se
+versiona**. Tiene las credenciales WiFi, el broker MQTT, la **identidad** (`NODO_ZONA_ID`,
+`NODO_SECTOR_1_ID`, `NODO_SECTOR_2_ID`), los pines, los intervalos, los límites de seguridad, las
+calibraciones y los flags. El tipo de nodo **no** se elige acá: se elige compilando el sketch, y
+cada nodo usa solo la porción que le aplica.
 
-Flags clave:
+### Dos sectores en un nodo
 
-- **`TELEMETRIA_NIVEL_SECTOR`**: `0` → publica en `.../zone/{zona}/telemetry`
-  (testigo, backend actual); `1` → `.../zone/{zona}/sector/{sector}/telemetry`
-  (nodo combinado). Solo afecta a los nodos que sensan.
-- **`ENVIAR_METRICAS_EXTENDIDAS`**: `0` → solo las 5 métricas base (100% compatible
-  con el backend actual). `1` → agrega pH/N/P/K/etc. **Requiere cambio backend** (ver §7).
-- **`CAUDALIMETRO_INSTALADO`**: `0` (de fábrica, el prototipo no tiene caudalímetro) →
-  la válvula no verifica flujo; `1` → si no hay pulsos en `TIMEOUT_CAUDAL_MS` cierra y
-  reporta `falla_hidraulica`. Con el flag en `1` y sin caudalímetro, todo riego falla a los 10 s.
+El prototipo maneja **dos sectores de una macro-zona** desde un solo ESP32. El nodo se suscribe al
+tópico de comando de cada sector y publica cada ack en el tópico del sector del comando:
 
-Límite de la válvula: **`LIMITE_VALVULA_SEG_MAX` = 1200 s**, igual al máximo del contrato
-(`CONTRATO_VALVULA_DURACION_MAX_SEG` en `comun/contrato.h`; espejo en `ContratoNodo.java` y
-en `simulador/server/contract.ts`). El backend calcula la duración de cada riego (volumen ÷
-caudal) y nunca pide más de 1200 s; el límite local sigue siendo la última barrera. Si tu
-`config.h` local es anterior y dice 120, **el firmware no compila** (`static_assert` en
-`actuacion/act_valvula.cpp`): copiá el valor nuevo y el flag de `config.example.h`.
+| Sector | Id (config.h)       | Válvula               |
+| ------ | ------------------- | --------------------- |
+| 1      | `NODO_SECTOR_1_ID`  | `PIN_RELE_VALVULA_S1` |
+| 2      | `NODO_SECTOR_2_ID`  | `PIN_RELE_VALVULA_S2` |
+
+La bomba de riego, la bomba de insumo, la mediasombra y el riel son **compartidos**.
+
+### Flags y ajustes clave
+
+| Constante | Qué hace |
+|---|---|
+| `TELEMETRIA_NIVEL_SECTOR` | `0` (de fábrica) → `nursery/zone/{zona}/telemetry`, que es lo que escucha el backend. `1` → tópico del sector 1, que el backend **no** escucha |
+| `ENVIAR_METRICAS_EXTENDIDAS` | `1` (de fábrica) → agrega `tempSuelo`, `phSuelo`, `n`, `p`, `k`, `salinidad` y `tds`. El backend ignora las claves que no modela |
+| `BATERIA_INSTALADA` | `0` (prototipo) → no se mide ni se publica `battery`, y el backend no actualiza ese dato |
+| `RELE_ACTIVO_EN_LOW` | `1` para módulos de relés con optoacoplador (cierran con el IN en LOW) |
+| `FINES_CARRERA_NC` | `1` para microswitches NC (cableados con C y NC). Vale para los 4 finales |
+| `INSUMO_SEG_POR_DEFECTO` | Cuánto bombea el insumo cuando el backend manda `pump ON` sin parámetros (es lo que manda hoy) |
+| `MEDIASOMBRA_UMBRAL_APERTURA_PCT` | `targetPct` (% de apertura) desde el que se enrolla |
+| `LIMITE_VALVULA_SEG_MAX` | 1200 s, igual al máximo del contrato (`CONTRATO_VALVULA_DURACION_MAX_SEG`). Si es menor, no compila (`static_assert` en `actuacion/act_riego.cpp`) |
+| `RIEL_POSICION_SECTOR_1/2`, `RIEL_DIR_HACIA_HOME` | Calibración del riel en pasos y sentido del motor |
+| `TANQUE_*_DIST_LLENO_CM` / `_VACIO_CM` | Calibración de los HC-SR04 para pasar distancia a % de nivel |
+
+Si tu `config.h` es anterior al ESP32-S3, no compila (faltan pines y constantes nuevas): volvé a
+copiar `config.example.h` y pasá tus credenciales.
 
 ---
 
-## 4. Wiring (pines por defecto)
+## 4. Cableado (ESP32-S3 DevKitC-1 N16R8)
 
-Cada nodo usa solo la parte que le corresponde: el `nodo_sensor` no cablea
-actuadores; el `nodo_actuador` no cablea sensores; el `nodo_combinado` usa todo.
+Fuente de verdad: `comun/config.example.h`. El sketch `prototipo_hardware/vivero_esp32_red` repite
+los mismos pines con los mismos nombres.
 
-| Función                   | Pin             | Nodo(s)             | Notas                                             |
-| ------------------------- | --------------- | ------------------- | ------------------------------------------------- |
-| Sensor de luz (LDR)       | GPIO39          | sensor, combinado   | ADC1. TODO: confirmar si es LDR (% luz) o UV real |
-| DHT11 (ambiente)          | GPIO18          | sensor, combinado   | humedad + temp aire                               |
-| Sonda suelo RS-485 RX/TX  | GPIO16 / GPIO17 | sensor, combinado   | UART2, Modbus RTU 4800 8N1                        |
-| Sonda suelo RS-485 DE/RE  | GPIO4           | sensor, combinado   | control de dirección                              |
-| Batería (ADC)             | GPIO34          | sensor, combinado   | divisor resistivo (calibrar)                      |
-| LED estado                | GPIO5           | todos               |                                                   |
-| Electroválvula (relé)     | GPIO25          | actuador, combinado | riego                                             |
-| Caudalímetro              | GPIO35          | actuador, combinado | feedback de flujo (pulsos)                        |
-| Bomba peristáltica        | GPIO26          | actuador, combinado | dosificación                                      |
-| Motor mediasombra A/B     | GPIO32 / GPIO33 | actuador, combinado | driver puente H                                   |
-| Fin de carrera            | GPIO27          | actuador, combinado |                                                   |
-| Sensor de corriente motor | GPIO36          | actuador, combinado | ADC, detección de atasco                          |
+| Componente | Señal | GPIO | Nodo(s) | Notas |
+|---|---|---|---|---|
+| LDR (luz) | AO | 1 | sensor, combinado | ADC1. Módulo a **3,3 V**; DO no se conecta |
+| HC-SR04 ×2 | TRIG (compartido) | 4 | sensor, combinado | |
+| | ECHO tanque de agua / de insumo | 5 / 6 | sensor, combinado | ⚠️ divisor 1k/2k (el ECHO sale a 5 V) |
+| Sonda de suelo RS-485 | TX / RX | 17 / 18 | sensor, combinado | UART1, Modbus RTU 4800 8N1 |
+| | DE+RE | 8 | sensor, combinado | ⚠️ si el MAX485 va a 5 V, el RO necesita divisor |
+| DHT11 | data | 9 | sensor, combinado | |
+| Relés (activos en LOW) | IN1 bomba riego / IN2 bomba insumo | 10 / 11 | actuador, combinado | Cargas en los contactos NO, fuente aparte |
+| | IN3 válvula sector 1 / IN4 válvula sector 2 | 12 / 13 | actuador, combinado | Diodo en antiparalelo en cada electroválvula |
+| Riel (DRV8825) | STEP / DIR / SLEEP | 14 / 15 / 16 | actuador, combinado | RESET del módulo fijo a 3V3 del ESP32 |
+| | final de carrera home / opuesto | 21 / 47 | actuador, combinado | NC, `INPUT_PULLUP` |
+| Mediasombra (L298N canal A) | IN1 / IN2 / ENA (PWM) | 39 / 40 / 41 | actuador, combinado | |
+| | final enrollada / desenrollada | 42 / 2 | actuador, combinado | NC, `INPUT_PULLUP` |
+| LED de estado | RGB de la placa | `RGB_BUILTIN` | todos | En la revisión v1.1 de la placa está en el 38 y no prende |
+| *Libre* | | 7 | | ADC1. Reservado para la batería (`PIN_BATERIA`) |
+
+**No usar:** 0, 3, 45, 46 (strapping) · 19, 20 (USB nativo) · 26–32 (flash) · 33–37 (PSRAM
+octal) · 43, 44 (consola) · 38 y 48 (LED RGB). Con WiFi encendido, solo el ADC1 (GPIO 1–10) lee
+valores analógicos.
 
 ---
 
 ## 5. Librerías
 
-`knolleary/PubSubClient` · `bblanchon/ArduinoJson` · `adafruit/DHT sensor library`
-(+ `Adafruit Unified Sensor`). Declaradas en `platformio.ini` (`lib_deps`).
+`knolleary/PubSubClient` · `bblanchon/ArduinoJson` (7.x) · `adafruit/DHT sensor library`
+(+ `Adafruit Unified Sensor`). Están declaradas en `platformio.ini` (`lib_deps`).
 
 ---
 
-## 6. Contrato MQTT (fuente única de verdad)
+## 6. Contrato MQTT
 
-Alineado con `openspec/changes/add-rules-engine`. **Este firmware ya lo respeta**; cuando
-se implemente el `ActionExecutor` y el publisher de comandos en el backend, deben usar
-exactamente este contrato.
+Fuente de verdad: `comun/contrato.h`. Los espejos del backend son `ContratoNodo.java` y
+`ContratoRiel.java`; el del simulador es `simulador/server/contract.ts`.
 
 ### Tópicos
 
-| Canal                  | Topic                                           | Publica | Suscribe | QoS | Nodo(s)                                 |
-| ---------------------- | ----------------------------------------------- | ------- | -------- | --- | --------------------------------------- |
-| Telemetría (combinado) | `nursery/zone/{zona}/sector/{sector}/telemetry` | ESP32   | Backend  | 1   | combinado (`TELEMETRIA_NIVEL_SECTOR=1`) |
-| Telemetría (testigo)   | `nursery/zone/{zona}/telemetry`                 | ESP32   | Backend  | 1   | sensor / combinado (`=0`)               |
-| Comando                | `nursery/zone/{zona}/sector/{sector}/command`   | Backend | ESP32    | 2   | actuador, combinado                     |
-| Ack                    | `nursery/zone/{zona}/sector/{sector}/ack`       | ESP32   | Backend  | 1   | actuador, combinado                     |
+| Canal | Topic | Publica | Suscribe | QoS |
+|---|---|---|---|---|
+| Telemetría | `nursery/zone/{zona}/telemetry` | ESP32 | Backend | 1 |
+| Comando (×2 sectores) | `nursery/zone/{zona}/sector/{sector}/command` | Backend | ESP32 | 1 |
+| Ack (×2 sectores) | `nursery/zone/{zona}/sector/{sector}/ack` | ESP32 | Backend (`AckActuadorReceiver`) | 1 |
+| Comando del riel | `nursery/rail/command` | Backend | ESP32 | 1 |
+| Evento del riel | `nursery/rail/event` | ESP32 | Backend | 0 (PubSubClient) |
 
-### Payload de telemetría (uplink)
+### Payload de telemetría
 
 ```json
 {
   "mac": "A4:CF:12:9A:00:01",
-  "battery": 85,
   "signal": -63,
   "timestamp": 1782414800,
   "metrics": {
-    "humSus": 52.4,
-    "humAmb": 72.1,
-    "temp": 23.5,
-    "ce": 1.2,
-    "uv": 40.0,
-    "tempSuelo": 22.8,
-    "phSuelo": 6.4,
-    "n": 12,
-    "p": 8,
-    "k": 30,
-    "salinidad": 120,
-    "tds": 210
+    "humSus": 52.4, "humAmb": 72.1, "temp": 23.5, "ce": 1200, "uv": 40.0,
+    "tempSuelo": 22.8, "phSuelo": 6.4, "n": 12, "p": 8, "k": 30, "salinidad": 120, "tds": 210,
+    "nivelAgua": 75.0, "nivelInsumo": 40.0
   }
 }
 ```
 
-Las claves extendidas (`tempSuelo`…`tds`) solo aparecen si `ENVIAR_METRICAS_EXTENDIDAS=1`.
+- `battery` solo aparece con `BATERIA_INSTALADA 1`.
+- Las métricas extendidas (`tempSuelo` … `tds`) solo aparecen con `ENVIAR_METRICAS_EXTENDIDAS 1`.
+- `nivelAgua` y `nivelInsumo` (en %) aparecen siempre que el HC-SR04 responde. **El backend todavía
+  no las modela**: las ignora.
+- Una métrica cuyo sensor falló no se envía.
 
-### Payload de comando (downlink)
+### Comandos (lo que manda el backend hoy)
+
+| Comando | Qué hace el nodo |
+|---|---|
+| `{"actuador":"valve","accion":"ON","parametros":{"durationSec":600}}` | **Riega el sector** del tópico: abre su válvula y, a los `RIEGO_VALVULA_ANTES_DE_BOMBA_MS`, prende la bomba de riego. Al terminar apaga la bomba y después cierra la válvula |
+| `{"actuador":"valve","accion":"OFF"}` | Corta el riego del sector |
+| `{"actuador":"pump","accion":"ON","parametros":{}}` | **Aplica insumo al sector**: abre su válvula y prende la bomba de insumo durante `INSUMO_SEG_POR_DEFECTO`. Con `"ml"` usa `BOMBA_INSUMO_MS_POR_ML`; con `"durationSec"`, esa duración |
+| `{"actuador":"pump","accion":"OFF"}` | Corta el insumo del sector |
+| `{"actuador":"shade","accion":"SET","parametros":{"targetPct":40}}` | `targetPct` es el % de **apertura**: desde `MEDIASOMBRA_UMBRAL_APERTURA_PCT` (50) enrolla, por debajo desenrolla. Hay una sola mediasombra: manda el último comando |
+
+- Todos llevan `commandId`.
+- `accion` no distingue mayúsculas y acepta también los nombres históricos (`open`, `inject`,
+  `close`, `move`).
+- Riego e insumo de los dos sectores pueden correr a la vez. Las bombas prenden mientras algún
+  sector las necesite, y nunca con su válvula cerrada.
+- Un `ON` para algo que ya está en curso lo **reemplaza**: el comando viejo termina con ack
+  `ERROR` y `reemplazado`.
+
+### Ack
 
 ```json
-{ "commandId": "abc-123", "actuador": "valve", "accion": "open", "parametros": { "durationSec": 30 } }
-{ "commandId": "abc-124", "actuador": "pump",  "accion": "inject", "parametros": { "ml": 12 } }
-{ "commandId": "abc-125", "actuador": "shade", "accion": "move",  "parametros": { "targetPct": 40 } }
+{ "commandId": "abc-123", "status": "SUCCESS", "detalle": { "tipo": "ok", "durationSec": 600 } }
+{ "commandId": "abc-124", "status": "SUCCESS", "detalle": { "tipo": "sin_cambio", "targetPct": 100 } }
+{ "commandId": "abc-125", "status": "ERROR",   "detalle": { "tipo": "falla_mecanica" } }
 ```
 
-`commandId` es opcional (deduplicación defensiva en el nodo). La idempotencia principal la
-garantiza el backend (in-flight lock + `ACTION_COOLDOWN_MINUTES`).
+El ack sale **cuando termina** la acción, no cuando llega el comando. Los valores de `tipo` son:
 
-### Payload de ack (uplink)
+| Tipo | Cuándo sale |
+|---|---|
+| `ok` | La acción terminó bien |
+| `limite_excedido` | Terminó, pero se recortó al límite local |
+| `sin_cambio` | La mediasombra ya estaba en esa posición |
+| `reemplazado` | Llegó otro comando para lo mismo antes de terminar |
+| `cancelado` | Llegó un `OFF` |
+| `falla_mecanica` | La mediasombra no llegó al final de carrera a tiempo |
+| `comando_invalido`, `accion_invalida`, `duracion_invalida`, `parametros_invalidos` | El comando no se pudo ejecutar |
 
-```json
-{ "commandId": "abc-123", "status": "SUCCESS", "detalle": { "durationSec": 30 } }
-{ "commandId": "abc-123", "status": "ERROR",   "detalle": { "tipo": "falla_hidraulica" } }
-```
+Un `commandId` repetido no se vuelve a ejecutar:
+- si sigue en curso, se ignora;
+- si ya terminó, se reenvía su ack.
 
-El backend usa `status`: `SUCCESS` libera el lock e inicia el cooldown; `ERROR` libera el
-lock y habilita reintento.
+> **Qué hace el backend con el ack** (`SeguimientoComandosService`): un `SUCCESS` cierra el seguimiento;
+> un `ERROR` que es una falla deja una alerta en el historial (`falla_mecanica` es crítica; `reemplazado`
+> y `cancelado` no son fallas); y si no llega ningún ack en `durationSec` + 90 s, alerta
+> `ActuadorSinRespuesta`. No cambia ninguna decisión del motor.
 
-### ⚠️ Limitación de QoS conocida
+### Riel
 
-`PubSubClient` no soporta QoS 2 (ni QoS 1 en `publish`). El canal de comando **debería** ser
-QoS 2 (evita doble dosis/riego). Mitigación actual: deduplicación por `commandId` en el nodo
+Contrato completo en la sección "Riel" de `comun/contrato.h` y en
+`openspec/changes/add-pasada-riel/design.md` §1.
 
-- in-flight lock del backend. Para QoS 2 real, migrar a un cliente async (`async-mqtt-client`
-  o `esp-mqtt`). Documentado como mejora futura.
+- **Comandos:** `IR_A` con `posicion` 1 o 2, y `HOME`.
+- **Eventos:** `ACEPTADO`, después `LLEGO` o `ERROR`. Los errores llevan un `codigo`:
+  `COMANDO_INVALIDO`, `HOME_NO_ENCONTRADO`, `FIN_DE_CARRERA` o `REEMPLAZADO`.
+- **Al arrancar** hace homing.
+- **Comportamiento:** el mismo que `prototipo_hardware/vivero_esp32_red`, ya probado con el riel
+  real:
+  - el último comando gana;
+  - el mismo `commandId` se ignora o se republica su evento;
+  - un evento que no se pudo publicar se reintenta al reconectar.
+
+### QoS
+
+PubSubClient no se suscribe con QoS 2 (devuelve `false`) y no publica con QoS 1. Por eso los
+comandos se suscriben con QoS 1 (que es lo que publica el backend), y la doble ejecución la evitan
+el dedup por `commandId` y el lock del backend. Para tener QoS 2 real habría que migrar a un cliente
+async (`esp-mqtt`).
 
 ---
 
-## 7. Cambios backend acoplados (pendientes, fuera del embebido)
+## 7. Cambios pendientes en el backend (fuera del embebido)
 
-Para poder recibir el **payload extendido** (`ENVIAR_METRICAS_EXTENDIDAS=1`) sin romper
-la ingesta actual, el backend debe (una de dos):
-
-1. Anotar `MqttTelemetryPayload`/`MetricsPayload` con `@JsonIgnoreProperties(ignoreUnknown = true)`, o
-2. Extender el record con las métricas nuevas (recomendado: habilita persistir/mostrar pH, N, P, K)
-   y propagarlas a DB y frontend.
-
-Además, para el **nodo combinado** (telemetría sector-level) el `MqttTelemetryReceiver`
-—hoy suscrito a `nursery/zone/+/telemetry` (nivel zona)— debe extenderse a sector-level.
-Y falta implementar el **publisher de comandos** + evaluación de **ack** (previsto en
-`add-rules-engine`, tareas 1.3 y 6.5).
-
-Mientras esos cambios no estén, desplegar con `ENVIAR_METRICAS_EXTENDIDAS=0` y
-`TELEMETRIA_NIVEL_SECTOR=0`: el nodo es indistinguible del simulador actual.
+- **Niveles de tanque:** modelar `nivelAgua` y `nivelInsumo` en `MetricsPayload` para persistirlos y
+  mostrarlos (hoy se ignoran).
+- **Mediasombra de dos estados (decidido el 10/10/2026):** la mediasombra **nunca** tiene un % de
+  apertura: siempre se abre (enrolla) o se cierra (desenrolla) del todo. El backend todavía piensa en
+  porcentajes: `ShadingRule` calcula una apertura a partir del plan de rustificación y del UV, la manda
+  como `targetPct` y la web la muestra como %. Hay que pasarlo a dos estados en la regla, en el plan
+  de rustificación, en el comando (p. ej. `shade SET {"estado":"abierta"|"cerrada"}`, con su espejo en
+  `contrato.h`) y en la web. Mientras tanto lo resuelve el umbral del firmware
+  (`MEDIASOMBRA_UMBRAL_APERTURA_PCT`, 50 %).
+- **Insumo:** el backend manda `pump ON` sin dosis. Si se quiere dosificar, mandar `ml` o
+  `durationSec`.
 
 ---
 
@@ -229,26 +322,49 @@ Mientras esos cambios no estén, desplegar con `ENVIAR_METRICAS_EXTENDIDAS=0` y
 
 ```
 embebido/
-  platformio.ini            tres envs (uno por firmware); reparte carpetas con build_src_filter
-  comun/                    compartido por los 3: config, contrato, tipos, red (wifi/mqtt), reloj, util_json
-  sensado/                  drivers (luz/dht/suelo), buffer_offline, task_sensado   (sensor + combinado)
-  actuacion/                drivers (valvula/bomba/mediasombra), dedup, task_actuacion (actuador + combinado)
-  nodo_sensor/    nodo_sensor.ino      setup() red + sensado
-  nodo_actuador/  nodo_actuador.ino    setup() red + actuación
-  nodo_combinado/ nodo_combinado.ino   setup() red + sensado + actuación (prototipo)
-  prototipo_hardware/       sketches de Arduino IDE del hardware real; `vivero_esp32_red` mueve el riel por MQTT (`nursery/rail/*`, sección "Riel" de `comun/contrato.h`). Ver su README
+  platformio.ini        tres envs (uno por firmware) para ESP32-S3 N16R8; reparte carpetas con build_src_filter
+  comun/                compartido por los 3: config, contrato, tipos, red (wifi/mqtt), reloj, util_json
+  sensado/              luz (LDR), ambiente (DHT11), suelo (RS-485), tanques (2x HC-SR04),
+                        buffer_offline, task_sensado                              (sensor + combinado)
+  actuacion/            act_riego (relés: 2 válvulas + 2 bombas), act_mediasombra (L298N, 2 estados),
+                        act_riel (NEMA 17 + DRV8825), dedup_comandos, task_actuacion (actuador + combinado)
+  nodo_sensor/          setup() red + sensado
+  nodo_actuador/        setup() red + actuación + riel
+  nodo_combinado/       setup() red + sensado + actuación + riel (prototipo)
+  prototipo_hardware/   sketches de Arduino IDE del hardware real, para pruebas por monitor serie.
+                        vivero_esp32_red: riel por MQTT + riego por relés (ver su README)
 ```
 
 ---
 
-## 9. Validación sin hardware
+## 9. Validación sin backend
 
-El nodo publica al mismo broker/topic que el `MqttTelemetrySimulator` del backend, así que
-se puede validar la ingesta **antes** de tener el hardware. Para comandos, publicar
-manualmente:
+Con el broker levantado (`docker compose up -d mosquitto` en la raíz del repo):
 
 ```bash
-mosquitto_pub -h <broker> -t 'nursery/zone/MZ-1/sector/MZ-1-001/command' \
-  -m '{"commandId":"t1","actuador":"valve","accion":"open","parametros":{"durationSec":10}}'
-mosquitto_sub -h <broker> -t 'nursery/zone/MZ-1/sector/MZ-1-001/ack'
+# Ver todo lo que publica el nodo
+docker compose exec mosquitto mosquitto_sub -t 'nursery/#' -v
+
+# Regar el sector 1 durante 10 s
+docker compose exec mosquitto mosquitto_pub -q 1 -t 'nursery/zone/MZ-1/sector/MZ-1-001/command' \
+  -m '{"commandId":"t1","actuador":"valve","accion":"ON","parametros":{"durationSec":10}}'
+
+# Insumo al sector 2 (duración por defecto)
+docker compose exec mosquitto mosquitto_pub -q 1 -t 'nursery/zone/MZ-1/sector/MZ-1-002/command' \
+  -m '{"commandId":"t2","actuador":"pump","accion":"ON","parametros":{}}'
+
+# Mediasombra: 100 % de apertura → enrollar
+docker compose exec mosquitto mosquitto_pub -q 1 -t 'nursery/zone/MZ-1/sector/MZ-1-001/command' \
+  -m '{"commandId":"t3","actuador":"shade","accion":"SET","parametros":{"targetPct":100}}'
+
+# Riel a la posición 1
+docker compose exec mosquitto mosquitto_pub -q 1 -t nursery/rail/command \
+  -m '{"commandId":"t4","actuador":"rail","accion":"IR_A","parametros":{"posicion":1}}'
+
+# Lectura inmediata (nodo_combinado / nodo_sensor): una telemetría nueva en nursery/zone/MZ-1/telemetry
+# al toque, sin ack. Una acción desconocida solo deja una línea de log en el monitor serie.
+docker compose exec mosquitto mosquitto_pub -q 1 -t 'nursery/zone/MZ-1/command' \
+  -m '{"commandId":"t5","accion":"LEER_AHORA","parametros":{}}'
 ```
+
+Usá un `commandId` nuevo para cada prueba nueva: los repetidos no se vuelven a ejecutar.

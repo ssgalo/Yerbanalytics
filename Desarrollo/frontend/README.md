@@ -162,7 +162,7 @@ src/
 │   ├── http/              HttpRepository, HttpSeguridadRepository y apiFetch (cookie + 401/403)
 │   ├── selectors.ts       derivaciones puras (detalle de sector)
 │   └── index.ts           getRepository() — factory por entorno
-├── hooks/         AuthContext (useAuth), useInactividad, NurseryContext (provider + useNurseryData), PageMeta, DemoExpoContext, usePasada, useSectorDetail
+├── hooks/         AuthContext (useAuth), useInactividad, NurseryContext (provider + useNurseryData), PageMeta, DemoExpoContext, usePasada, useSecuencia, useSectorDetail
 ├── components/
 │   ├── ui/        átomos: Card, Badge, StatusDot, ProgressBar, Sparkline, Icon
 │   └── layout/    AppLayout, Sidebar, Topbar, UserMenu, AlertsDropdown, VigilanteInactividad
@@ -173,7 +173,7 @@ src/
 │   ├── diagnostics/    Diagnósticos de IA
 │   ├── auth/           Login, cambio de contraseña y guardas de ruta
 │   ├── usuarios/       Usuarios, roles y permisos, auditoría y política de sesión
-│   ├── demo-expo/      Demo Expo: pasada del riel en vivo (pestaña oculta; se enciende en Configuración → "Mostrar Demo Expo")
+│   ├── demo-expo/      Demo Expo: pasada del riel y secuencias de riego, mediasombra y lectura en vivo (pestaña oculta; se enciende en Configuración → "Mostrar Demo Expo")
 │   └── placeholder/    Módulos no incluidos en la demo
 ├── router.tsx     rutas (react-router)
 ├── App.tsx        AuthProvider + RouterProvider (el vivero se monta dentro del shell, con sesión)

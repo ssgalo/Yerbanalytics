@@ -1,8 +1,8 @@
 // ============================================================================
 //  Yerbanalytics - Firmware ESP32 - NODO SENSOR
 // ----------------------------------------------------------------------------
-//  Nodo testigo (por macro-zona): SOLO sensa y publica telemetría. No escucha
-//  comandos ni acciona nada. Firmware independiente y optimizado para el rol:
+//  Nodo testigo (por macro-zona): SOLO sensa y publica telemetría. No acciona nada; lo
+//  único que escucha es el comando de zona LEER_AHORA (nursery/zone/{zona}/command). Firmware independiente y optimizado para el rol:
 //  no compila ni el subsistema de actuación ni su callback de comandos.
 //
 //  Tareas FreeRTOS:
@@ -31,6 +31,33 @@
 static SistemaColas sys;
 
 static char topicTelemetria[96];
+static char topicComandoZona[96];
+
+// ----------------------------------------------------------------------------
+//  Callback MQTT: sólo atiende LEER_AHORA y sólo avisa a task_sensado (no lee ni publica acá).
+//  Sin ack: la respuesta es la telemetría de siempre. Un nodo que no puede leer calla.
+// ----------------------------------------------------------------------------
+static void onMensajeMqtt(char *topic, byte *payload, unsigned int length)
+{
+  if (strcmp(topic, topicComandoZona) != 0)
+  {
+    return;
+  }
+  char commandId[40];
+  switch (util_json::parsearComandoZona((const char *)payload, length, commandId, sizeof(commandId)))
+  {
+  case util_json::ResultadoComandoZona::LEER_AHORA:
+    Serial.printf("[main] LEER_AHORA (commandId '%s'): lectura inmediata\n", commandId);
+    task_sensado::pedirLecturaAhora();
+    break;
+  case util_json::ResultadoComandoZona::ACCION_DESCONOCIDA:
+    Serial.printf("[main] Comando de zona ignorado (commandId '%s'): acción desconocida\n", commandId);
+    break;
+  default:
+    Serial.println("[main] Comando de zona ignorado: JSON inválido");
+    break;
+  }
+}
 
 // ----------------------------------------------------------------------------
 //  Publicación de telemetría
@@ -113,17 +140,21 @@ void setup()
 
   // Topic de telemetría (según config: zona o sector).
   contratoTopicTelemetria(topicTelemetria, sizeof(topicTelemetria));
+  contratoTopicComandoZona(topicComandoZona, sizeof(topicComandoZona));
 
   // Recursos FreeRTOS (este nodo solo produce telemetría).
   sys.telemetria = xQueueCreate(10, sizeof(PaqueteTelemetria));
   sys.comandos = nullptr;
   sys.ack = nullptr;
+  sys.comandoRiel = nullptr;
+  sys.eventoRiel = nullptr;
 
-  // Infraestructura común. Sin suscripciones: callback nulo (nunca se invoca).
+  // Infraestructura común + única suscripción: el comando de zona (LEER_AHORA).
   net_wifi::iniciar();
-  net_mqtt::iniciar(nullptr);
+  net_mqtt::iniciar(onMensajeMqtt);
   reloj::iniciar();
   buffer_offline::iniciar();
+  net_mqtt::suscribir(topicComandoZona, QOS_COMANDO_ZONA);
 
   // Drivers y tarea de sensado.
   task_sensado::iniciarDrivers();

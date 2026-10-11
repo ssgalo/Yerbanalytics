@@ -116,7 +116,6 @@ export function App() {
       {status && (
         <AutoEmission
           active={status.emission.active}
-          intervalMs={status.emission.intervalMs}
           onChange={(active) =>
             setStatus((prev) =>
               prev ? { ...prev, emission: { ...prev.emission, active } } : prev,

@@ -62,7 +62,6 @@ export const config = {
   backendPassword: str('BACKEND_CLAVE', ''),
   mqttUrl: str('MQTT_URL', 'mqtt://localhost:1883'),
   mqttClientId: str('MQTT_CLIENT_ID', 'yerbanalytics-simulator'),
-  autoEmissionIntervalMs: int('AUTO_EMISSION_INTERVAL_MS', 10_000),
   /** Serve the `dist/` build instead of mounting Vite in middleware mode. */
   production: process.argv.includes('--prod'),
   /** Simulator state file. */

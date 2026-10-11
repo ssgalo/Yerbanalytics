@@ -107,6 +107,10 @@ public final class MapaPermisos {
 
         permiso(r, get, "/api/pasadas/**", Permiso.PASADAS_VER);
         permiso(r, post, "/api/pasadas/**", Permiso.PASADAS_OPERAR);
+        // Secuencias de Demo Expo: misma pantalla que la pasada y nunca corren a la vez que ella.
+        permiso(r, get, "/api/secuencias/**", Permiso.PASADAS_VER);
+        permiso(r, post, "/api/secuencias", Permiso.PASADAS_OPERAR);
+        permiso(r, post, "/api/secuencias/**", Permiso.PASADAS_OPERAR);
 
         // Seguridad
         permiso(r, null, "/api/usuarios/**", Permiso.USUARIOS_GESTIONAR);

@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.engine;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.mqtt.MqttCommandGateway;
+import com.yerbanalytics.backend.service.SeguimientoComandosService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,9 @@ import java.util.UUID;
  * </pre>
  * en el tópico {@code nursery/zone/{zonaId}/sector/{sectorId}/command}.
  *
+ * <p>Cada comando publicado queda en {@link SeguimientoComandosService}, que espera el ack del nodo
+ * y alerta si informa una falla o no contesta a tiempo.
+ *
  * <p>No traga la falla: devuelve un {@link Resultado} y quien llama decide. El despacho de riego
  * no registra el riego (y deja la solicitud en cola) si no se publicó; la bomba y la mediasombra
  * mantienen su comportamiento de siempre (loguear y seguir).
@@ -36,10 +40,13 @@ public class ComandoActuadorPublisher {
 
     private final MqttCommandGateway gateway;
     private final ObjectMapper objectMapper;
+    private final SeguimientoComandosService seguimiento;
 
-    public ComandoActuadorPublisher(MqttCommandGateway gateway, ObjectMapper objectMapper) {
+    public ComandoActuadorPublisher(MqttCommandGateway gateway, ObjectMapper objectMapper,
+                                    SeguimientoComandosService seguimiento) {
         this.gateway = gateway;
         this.objectMapper = objectMapper;
+        this.seguimiento = seguimiento;
     }
 
     /**
@@ -67,6 +74,7 @@ public class ComandoActuadorPublisher {
             String json = objectMapper.writeValueAsString(payload);
             gateway.send(topic, json);
             log.info("Sector {}: comando MQTT publicado → topic={} payload={}", sectorId, topic, json);
+            seguimiento.registrarEnvio(commandId, zonaId, sectorId, actuador, parametros);
             return new Resultado(true, commandId, null);
         } catch (JsonProcessingException e) {
             log.error("Sector {}: error serializando comando MQTT — {}", sectorId, e.getMessage());

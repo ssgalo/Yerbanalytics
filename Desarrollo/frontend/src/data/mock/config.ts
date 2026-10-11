@@ -14,6 +14,11 @@ const DEFAULT_RUSTIFICACION = [
   { orden: 4, diaDesde: 22, diaHasta: 30, aperturaPct: 100 },
 ];
 
+/** Same default as the backend. */
+const DEFAULT_SENSING_PULL_SECONDS = 60;
+/** Static value the real backend would report for the default interval (mock stands in for it). */
+const DEFAULT_STALE_THRESHOLD_SECONDS = 180;
+
 /** Construye la configuración de fábrica (también usada por "restablecer"). */
 export function buildConfig(): Configuracion {
   return {
@@ -37,6 +42,8 @@ export function buildConfig(): Configuracion {
       seguimientoDeltaMin: 5,
       intervaloSensadoMinutos: 240,
       intervaloEvaluacionMinutos: 5,
+      sensingPullIntervalSeconds: DEFAULT_SENSING_PULL_SECONDS,
+      effectiveStaleThresholdSeconds: DEFAULT_STALE_THRESHOLD_SECONDS,
       updatedBy: 'Mock System',
       updatedTs: null,
     },

@@ -10,6 +10,7 @@ import type { DataRepository } from '@/data/repository';
 import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
+import { SecuenciaRechazadaError } from '@/data/secuenciaError';
 import type {
   ActionRecord,
   CambioParametro,
@@ -23,7 +24,10 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  ParametrosSecuencia,
   Pasada,
+  Secuencia,
+  TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
 } from '@/types/domain';
@@ -85,6 +89,7 @@ export class HttpRepository implements DataRepository {
     if (data.operativa) {
       data.operativa.intervaloSensadoMinutos = data.operativa.intervaloSensadoMinutos ?? 240;
       data.operativa.intervaloEvaluacionMinutos = data.operativa.intervaloEvaluacionMinutos ?? 5;
+      data.operativa.sensingPullIntervalSeconds = data.operativa.sensingPullIntervalSeconds ?? 60;
     }
     return data;
   }
@@ -263,6 +268,42 @@ export class HttpRepository implements DataRepository {
 
   async cancelarPasada(): Promise<Pasada> {
     return this.postPasada(`${this.baseUrl}/pasadas/actual/cancelar`, 'cancelar');
+  }
+
+  /** POST de las secuencias: 400 y 409 traen { error } y son rechazos esperables, no una falla. */
+  private async postSecuencia(url: string, accion: string, body?: unknown): Promise<Secuencia> {
+    const init: RequestInit = { method: 'POST' };
+    if (body !== undefined) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    const res = await fetch(url, init);
+    if (res.status === 400 || res.status === 409) {
+      const cuerpo = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new SecuenciaRechazadaError(cuerpo?.error ?? `No se pudo ${accion} la secuencia.`);
+    }
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al ${accion} la secuencia`);
+    }
+    return (await res.json()) as Secuencia;
+  }
+
+  async iniciarSecuencia(tipo: TipoSecuencia, parametros: ParametrosSecuencia = {}): Promise<Secuencia> {
+    return this.postSecuencia(`${this.baseUrl}/secuencias`, 'iniciar', { tipo, parametros });
+  }
+
+  async getSecuenciaActual(): Promise<Secuencia | null> {
+    const res = await fetch(`${this.baseUrl}/secuencias/actual?t=${Date.now()}`);
+    // 204: todavía no hubo ninguna secuencia desde el arranque del backend.
+    if (res.status === 204) return null;
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener la secuencia`);
+    }
+    return (await res.json()) as Secuencia;
+  }
+
+  async cancelarSecuencia(): Promise<Secuencia> {
+    return this.postSecuencia(`${this.baseUrl}/secuencias/actual/cancelar`, 'cancelar');
   }
 
   async getDemoExpo(): Promise<boolean> {

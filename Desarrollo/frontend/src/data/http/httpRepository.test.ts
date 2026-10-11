@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpRepository } from './httpRepository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { buildConfig } from '@/data/mock/config';
 import type { DiagnosisCard, NurseryData } from '@/types/domain';
 
 /**
@@ -199,5 +200,50 @@ describe('HttpRepository · motor de reglas', () => {
   it('getTrazaEvaluacion falla en 404 (sector inexistente)', async () => {
     stubFetch({ status: 404, sinJson: true });
     await expect(new HttpRepository(BASE).getTrazaEvaluacion('NOPE')).rejects.toThrow(/404/);
+  });
+});
+
+describe('HttpRepository · configuration sensing fields', () => {
+  const BASE = 'http://localhost:8000/api';
+  afterEach(() => vi.unstubAllGlobals());
+
+  const serverConfig = (operativa: Record<string, unknown>) => ({ umbrales: [], rustificacion: [], operativa });
+
+  it('getConfig maps the pull interval and the effective stale threshold', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () =>
+          serverConfig({ sensingPullIntervalSeconds: 30, effectiveStaleThresholdSeconds: 90 }),
+      })),
+    );
+    const cfg = await new HttpRepository(BASE).getConfig();
+    expect(cfg.operativa.sensingPullIntervalSeconds).toBe(30);
+    expect(cfg.operativa.effectiveStaleThresholdSeconds).toBe(90);
+  });
+
+  it('getConfig falls back to 60 when the interval is null', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => serverConfig({ sensingPullIntervalSeconds: null }) })),
+    );
+    const cfg = await new HttpRepository(BASE).getConfig();
+    expect(cfg.operativa.sensingPullIntervalSeconds).toBe(60);
+  });
+
+  it('saveConfig sends the interval in the PUT body', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => serverConfig({ sensingPullIntervalSeconds: 30, effectiveStaleThresholdSeconds: 90 }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const cfg = buildConfig();
+    cfg.operativa.sensingPullIntervalSeconds = 30;
+    await new HttpRepository(BASE).saveConfig(cfg);
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string).operativa.sensingPullIntervalSeconds).toBe(30);
   });
 });

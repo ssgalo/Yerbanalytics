@@ -99,6 +99,67 @@ public class MqttConfig {
     }
 
     // -------------------------------------------------------------------------
+    // Inbound de los acks: resultado de cada comando de riego, insumo o mediasombra
+    // (nursery/zone/{zona}/sector/{sector}/ack)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Adaptador propio, como el del riel: el camino de la telemetría queda idéntico. Su clientId
+     * lleva sufijo {@code -ack} para no colisionar sesiones en el broker.
+     */
+    @Bean(name = "mqttAckChannel")
+    public MessageChannel mqttAckChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MqttPahoMessageDrivenChannelAdapter ackInboundAdapter(MqttPahoClientFactory factory) {
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                new MqttPahoMessageDrivenChannelAdapter(clientId + "-ack", factory, ContratoNodo.TOPIC_ACK_SUSCRIPCION);
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        adapter.setOutputChannel(mqttAckChannel());
+        return adapter;
+    }
+
+    @Bean
+    public IntegrationFlow mqttAckFlow() {
+        return IntegrationFlow.from(mqttAckChannel())
+                .handle("ackActuadorReceiver", "processMessage")
+                .get();
+    }
+
+    /**
+     * Segunda suscripción al <strong>mismo</strong> tópico de telemetría que la ingesta, con su propio
+     * cliente ({@code -lectura}): así la telemetría que alimenta al motor queda byte a byte igual y la
+     * secuencia de lectura se entera de la respuesta sin acoplarse a {@code NurseryService}. Costo: el
+     * broker entrega cada lectura dos veces al backend.
+     */
+    @Bean(name = "mqttLecturaChannel")
+    public MessageChannel mqttLecturaChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MqttPahoMessageDrivenChannelAdapter lecturaInboundAdapter(MqttPahoClientFactory factory) {
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                new MqttPahoMessageDrivenChannelAdapter(clientId + "-lectura", factory, telemetryTopic);
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        adapter.setOutputChannel(mqttLecturaChannel());
+        return adapter;
+    }
+
+    @Bean
+    public IntegrationFlow mqttLecturaFlow() {
+        return IntegrationFlow.from(mqttLecturaChannel())
+                .handle("lecturaZonaReceiver", "processMessage")
+                .get();
+    }
+
+    // -------------------------------------------------------------------------
     // Outbound: publicación de comandos hacia los nodos actuadores (Downlink)
     // -------------------------------------------------------------------------
 

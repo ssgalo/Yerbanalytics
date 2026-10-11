@@ -32,7 +32,7 @@ export type BackendAccess =
 export interface SimulatorStatus {
   backend: { url: string; up: boolean; access: BackendAccess; user: string | null };
   broker: { url: string; connected: boolean };
-  emission: { active: boolean; intervalMs: number };
+  emission: { active: boolean };
 }
 
 /** A reading to publish. Metrics are in UI units; the server converts `ce`. */

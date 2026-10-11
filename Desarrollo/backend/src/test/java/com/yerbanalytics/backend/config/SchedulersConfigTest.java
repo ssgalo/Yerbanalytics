@@ -67,6 +67,16 @@ class SchedulersConfigTest {
     }
 
     @Test
+    void elTickDeLaSecuenciaPideSuPropioCarril() throws NoSuchMethodException {
+        Scheduled anotacion = com.yerbanalytics.backend.service.SecuenciaService.class.getMethod("tick")
+                .getAnnotation(Scheduled.class);
+
+        assertNotNull(anotacion, "tick debe seguir siendo una tarea programada");
+        assertEquals("secuenciaScheduler", anotacion.scheduler(),
+                "el cierre de la válvula no puede esperar detrás del barrido del motor ni de la captura");
+    }
+
+    @Test
     void elTickDeLaPasadaPideSuPropioCarril() throws NoSuchMethodException {
         Scheduled anotacion = com.yerbanalytics.backend.service.PasadaRielService.class.getMethod("tick")
                 .getAnnotation(Scheduled.class);
@@ -75,5 +85,35 @@ class SchedulersConfigTest {
         assertEquals("pasadaScheduler", anotacion.scheduler(),
                 "el tick de la pasada no puede esperar detrás del barrido del motor ni de la captura");
         assertNotSame(taskScheduler, config.pasadaScheduler());
+    }
+
+    @Test
+    void laSecuenciaTieneSuPropioCarril() {
+        assertNotSame(taskScheduler, config.secuenciaScheduler(),
+                "el tick de las secuencias no puede esperar detrás del barrido del motor");
+        assertNotSame(config.pasadaScheduler(), config.secuenciaScheduler());
+    }
+
+    @Autowired
+    @org.springframework.beans.factory.annotation.Qualifier("sensingScheduler")
+    private TaskScheduler sensingScheduler;
+
+    @Test
+    void sensingPullHasItsOwnLaneAndTheEngineKeepsTheDefaultOne() {
+        assertNotNull(sensingScheduler, "the sensing lane must resolve by name");
+        assertNotSame(taskScheduler, sensingScheduler,
+                "NurseryWatchdog runs on the default taskScheduler: the pull must not share its thread");
+        assertNotSame(config.capturaScheduler(), sensingScheduler);
+        assertNotSame(config.despachoScheduler(), sensingScheduler);
+        assertNotSame(config.secuenciaScheduler(), sensingScheduler);
+        assertNotSame(config.pasadaScheduler(), sensingScheduler);
+    }
+
+    @Test
+    void nurseryWatchdogStaysOnTheDefaultScheduler() {
+        // It is a SchedulingConfigurer without a custom registrar scheduler, so it lands on `taskScheduler`.
+        assertEquals(true, org.springframework.scheduling.annotation.SchedulingConfigurer.class
+                .isAssignableFrom(com.yerbanalytics.backend.service.NurseryWatchdog.class));
+        assertNotSame(taskScheduler, sensingScheduler);
     }
 }

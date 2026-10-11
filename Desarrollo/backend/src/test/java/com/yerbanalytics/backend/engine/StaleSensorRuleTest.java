@@ -7,6 +7,7 @@ import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
 import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -212,5 +213,29 @@ class StaleSensorRuleTest {
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
         assertThat(acciones.get(0).detalle()).isNull();
+    }
+
+    // --- Backend-driven sensing: the rule sees the EFFECTIVE threshold max(floor, 3 x pull interval) ---
+
+    private List<RuleAction> evaluarConUmbralEfectivo(RuleContext ctx, int pullSeconds) {
+        double efectivo = SensingCadence.staleThresholdSeconds(90, pullSeconds);
+        return rule.evaluate(ctx, ev(rule, Map.of(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA,
+                String.valueOf((long) efectivo))));
+    }
+
+    @Test
+    @DisplayName("125 s old reading is not stale at the default 60 s pull interval (effective threshold 180 s)")
+    void reading125sOld_isNotStaleAtDefaultPull() {
+        assertThat(evaluarConUmbralEfectivo(conLecturaHace(125.0), 60)).extracting(RuleAction::type)
+                .containsExactly(ActionType.NOOP_INFO);
+    }
+
+    @Test
+    @DisplayName("200 s old reading is stale at X=60 and no longer stale once X is raised to 120")
+    void reading200sOld_staleAt60ButNotAt120() {
+        assertThat(evaluarConUmbralEfectivo(conLecturaHace(200.0), 60)).extracting(RuleAction::type)
+                .containsExactly(ActionType.ABORT_RIEGO);
+        assertThat(evaluarConUmbralEfectivo(conLecturaHace(200.0), 120)).extracting(RuleAction::type)
+                .containsExactly(ActionType.NOOP_INFO);
     }
 }

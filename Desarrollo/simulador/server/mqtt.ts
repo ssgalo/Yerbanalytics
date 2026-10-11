@@ -7,16 +7,34 @@
 
    Downlink: the simulator subscribes to the command wildcard topic so that orders sent by the
    backend rules engine are visible in the console. This validates the full cyber-physical loop
-   (measure → detect → decide → command) without needing physical hardware.
+   (measure → detect → decide → command) without needing physical hardware. For the macro-zones
+   it simulates (the ones with a simulated sensor) it also answers each command with the ack the
+   firmware would send when the action ends; commands for other zones belong to a real node and
+   are only logged.
 
    Error messages reaching the UI are in Spanish; console output is internal, so it is not.
    ============================================================ */
 import mqtt, { type MqttClient } from 'mqtt';
 import { config } from './config.ts';
-import { telemetryTopic, valveDurationWarning, type TelemetryPayload } from './contract.ts';
+import {
+  ackTopic,
+  isReadNow,
+  parseCommandTopic,
+  parseZoneCommandTopic,
+  simulatedAck,
+  telemetryTopic,
+  valveDurationWarning,
+  type ActuatorCommand,
+  type TelemetryPayload,
+} from './contract.ts';
+import { answerReadNow } from './emission.ts';
+import { listSensors } from './store.ts';
 
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
 const COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/sector/+/command';
+
+/** Wildcard topic for zone-level commands (LEER_AHORA). Mirrors contrato.h :: contratoTopicComandoZona. */
+const ZONE_COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/command';
 
 /** How long to wait for a publish acknowledgement before giving up. */
 const PUBLISH_TIMEOUT_MS = 5000;
@@ -58,6 +76,15 @@ export function connect(): void {
     lastError = null;
     console.log(`[simulator] connected to broker ${config.mqttUrl}`);
 
+    // Zone-level commands: the backend's periodic LEER_AHORA pull.
+    client!.subscribe(ZONE_COMMAND_TOPIC_WILDCARD, { qos: 1 }, (err) => {
+      if (err) {
+        console.error(`[simulator] failed to subscribe to zone commands: ${err.message}`);
+      } else {
+        console.log(`[simulator] subscribed to zone command wildcard: ${ZONE_COMMAND_TOPIC_WILDCARD}`);
+      }
+    });
+
     // Subscribe to all sector command topics to validate the downlink from the rules engine.
     client!.subscribe(COMMAND_TOPIC_WILDCARD, { qos: 1 }, (err) => {
       if (err) {
@@ -68,16 +95,15 @@ export function connect(): void {
     });
   });
 
-  // Log incoming commands from the backend rules engine.
-  // In production this role is played by the ESP32 nodo_actuador firmware.
+  // Log incoming commands from the backend rules engine, and ack the ones for simulated zones.
+  // In production this role is played by the ESP32 nodo_actuador / nodo_combinado firmware.
   client.on('message', (topic, message) => {
+    if (parseZoneCommandTopic(topic)) {
+      handleZoneCommand(topic, message);
+      return;
+    }
     try {
-      const payload = JSON.parse(message.toString()) as {
-        commandId?: string;
-        actuador?: string;
-        accion?: string;
-        parametros?: Record<string, unknown>;
-      };
+      const payload = JSON.parse(message.toString()) as ActuatorCommand;
       const params = payload.parametros
         ? ' params=' + JSON.stringify(payload.parametros)
         : '';
@@ -90,6 +116,7 @@ export function connect(): void {
       );
       const warning = valveDurationWarning(payload);
       if (warning) console.warn(`[simulator] WARNING ${warning}`);
+      scheduleAck(topic, payload);
     } catch {
       console.log(`[simulator] ← COMMAND topic=${topic} (unparseable payload)`);
     }
@@ -106,6 +133,47 @@ export function connect(): void {
         ' Retrying in the background; publishing is unavailable meanwhile.',
     );
   });
+}
+
+/** Routes a zone-level command: a LEER_AHORA is answered by the emission; anything else is ignored. */
+function handleZoneCommand(topic: string, message: Buffer): void {
+  const target = parseZoneCommandTopic(topic);
+  if (!target) return;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(message.toString());
+  } catch {
+    console.warn(`[simulator] ← ZONE COMMAND topic=${topic} (unparseable payload, ignored)`);
+    return;
+  }
+  if (!isReadNow(payload)) {
+    console.warn(`[simulator] ← ZONE COMMAND topic=${topic} (unknown accion, ignored)`);
+    return;
+  }
+  console.log(`[simulator] ← LEER_AHORA zone=${target.zonaId}`);
+  void answerReadNow(target.zonaId);
+}
+
+/**
+ * Publishes, after the time the action would take, the ack the firmware would send. Only for
+ * macro-zones with a simulated sensor: a command for another zone is a real node's to answer.
+ */
+function scheduleAck(topic: string, command: ActuatorCommand): void {
+  const target = parseCommandTopic(topic);
+  if (!target || !listSensors().some((s) => s.zonaId === target.zonaId)) return;
+
+  const { delayMs, ack } = simulatedAck(command);
+  const ackOn = ackTopic(target.zonaId, target.sectorId);
+  setTimeout(() => {
+    if (!client || !client.connected) {
+      console.warn(`[simulator] no broker connection: ack for ${ack.commandId ?? '?'} not sent`);
+      return;
+    }
+    client.publish(ackOn, JSON.stringify(ack), { qos: 1 }, (error) => {
+      if (error) console.error(`[simulator] failed to publish ack on ${ackOn}: ${error.message}`);
+      else console.log(`[simulator] → ACK topic=${ackOn} status=${ack.status} tipo=${ack.detalle.tipo}`);
+    });
+  }, delayMs);
 }
 
 /** `true` when the broker connection is alive. The UI uses it to warn before trying. */

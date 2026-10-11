@@ -23,6 +23,8 @@ export {
   SIN_PERMISO_ACCION,
 } from './seguridadErrores';
 export { escucharSesion, type OyenteSesion } from './sesionEventos';
+
+export { SecuenciaRechazadaError } from './secuenciaError';
 export { selectSectorDetail, selectSensadoTiles, selectSerieMetrica } from './selectors';
 
 let instancia: DataRepository | null = null;

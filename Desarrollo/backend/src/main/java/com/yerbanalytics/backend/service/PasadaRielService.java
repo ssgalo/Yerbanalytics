@@ -50,7 +50,7 @@ import java.util.regex.Pattern;
  * se reintenta. Ver {@code openspec/changes/add-pasada-riel/design.md} §2.2.
  */
 @Service
-public class PasadaRielService {
+public class PasadaRielService implements UsoDelHardware {
 
     private static final Logger log = LoggerFactory.getLogger(PasadaRielService.class);
 
@@ -80,6 +80,7 @@ public class PasadaRielService {
     private final DiagnosticoRepository diagnosticoRepo;
     private final PasadaProperties props;
     private final Clock reloj;
+    private final GuardiaHardware guardia;
 
     /** Eventos del riel pendientes de procesar. Sin lock a propósito: ver nota de hilos. */
     private final Queue<EventoRiel> eventos = new ConcurrentLinkedQueue<>();
@@ -95,13 +96,15 @@ public class PasadaRielService {
                              ZonaRepository zonaRepo,
                              DiagnosticoRepository diagnosticoRepo,
                              PasadaProperties props,
-                             Clock relojVivero) {
+                             Clock relojVivero,
+                             GuardiaHardware guardia) {
         this.capturaService = capturaService;
         this.rielPublisher = rielPublisher;
         this.zonaRepo = zonaRepo;
         this.diagnosticoRepo = diagnosticoRepo;
         this.props = props;
         this.reloj = relojVivero;
+        this.guardia = guardia;
     }
 
     // ==================================================================
@@ -110,9 +113,23 @@ public class PasadaRielService {
 
     /**
      * Arma y arranca una pasada. Las precondiciones se evalúan en este orden y la primera que
-     * falle rechaza sin publicar nada: pasada en curso, topología, dispositivo de captura.
+     * falle rechaza sin publicar nada: secuencia de actuadores en curso (el único ESP32 no admite
+     * las dos a la vez, ver {@link GuardiaHardware}), pasada en curso, topología, dispositivo de captura.
      */
-    public synchronized Pasada iniciar() {
+    public Pasada iniciar() {
+        return guardia.conHardwareLibre(this, PasadaRechazadaException::new, this::iniciarPasada);
+    }
+
+    /** El hardware está ocupado sólo mientras la pasada está {@code EN_CURSO}; lee la foto, sin lock. */
+    @Override
+    public Optional<String> ocupadoPor() {
+        Pasada f = foto;
+        return f != null && EN_CURSO.equals(f.estado())
+                ? Optional.of("Hay una pasada del riel en curso.")
+                : Optional.empty();
+    }
+
+    private synchronized Pasada iniciarPasada() {
         if (actual != null && EN_CURSO.equals(actual.estado)) {
             throw new PasadaRechazadaException("Ya hay una pasada en curso.");
         }

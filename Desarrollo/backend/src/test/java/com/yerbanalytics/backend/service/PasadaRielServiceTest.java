@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,6 +46,9 @@ class PasadaRielServiceTest {
     private final DiagnosticoRepository diagRepo = mock(DiagnosticoRepository.class);
     private final RelojDePrueba reloj = new RelojDePrueba(Instant.parse("2025-10-03T12:00:00Z"));
     private final AtomicInteger seq = new AtomicInteger();
+    /** Lo que dice la otra parte del guardia (las secuencias): vacío = libre. */
+    private final AtomicReference<Optional<String>> secuenciaOcupada = new AtomicReference<>(Optional.empty());
+    private final GuardiaHardware guardia = GuardiaHardwareTest.guardiaCon(() -> secuenciaOcupada.get());
     private PasadaRielService service;
 
     @BeforeEach
@@ -59,7 +63,7 @@ class PasadaRielServiceTest {
         when(riel.home()).thenAnswer(i -> new Resultado(true, "cmd-" + seq.incrementAndGet(), null));
         when(riel.irA(anyInt(), anyString())).thenAnswer(i -> new Resultado(true, i.getArgument(1), null));
         when(riel.home(anyString())).thenAnswer(i -> new Resultado(true, i.getArgument(0), null));
-        service = new PasadaRielService(capturas, riel, zonaRepo, diagRepo, new PasadaProperties(), reloj);
+        service = new PasadaRielService(capturas, riel, zonaRepo, diagRepo, new PasadaProperties(), reloj, guardia);
     }
 
     // ---------------------------------------------------------------- helpers
@@ -157,6 +161,33 @@ class PasadaRielServiceTest {
                 .isInstanceOf(PasadaRechazadaException.class)
                 .hasMessage("Ya hay una pasada en curso.");
         verify(riel, times(1)).irA(anyInt());
+    }
+
+    @Test
+    @DisplayName("409 con el motivo del guardia si hay una secuencia en curso, y no publica nada")
+    void rechazaConUnaSecuenciaEnCurso() {
+        secuenciaOcupada.set(Optional.of("Hay una secuencia de riego en curso."));
+
+        assertThatThrownBy(() -> service.iniciar())
+                .isInstanceOf(PasadaRechazadaException.class)
+                .hasMessage("Hay una secuencia de riego en curso.");
+        verifyNoInteractions(riel);
+        assertThat(service.estado()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("ocupadoPor() sólo informa ocupado con la pasada EN_CURSO")
+    void ocupadoPorSoloConLaPasadaEnCurso() {
+        assertThat(service.ocupadoPor()).as("nunca hubo una pasada").isEmpty();
+
+        service.iniciar();
+        assertThat(service.ocupadoPor()).contains("Hay una pasada del riel en curso.");
+
+        // Terminada (cancelada y con el HOME resuelto), vuelve a quedar libre.
+        service.cancelar();
+        llego(5);
+        assertThat(pasada().estado()).isEqualTo("CANCELADA");
+        assertThat(service.ocupadoPor()).isEmpty();
     }
 
     @Test
@@ -376,7 +407,7 @@ class PasadaRielServiceTest {
         evento(paso(1).commandId(), "ERROR", "COMANDO_INVALIDO", "posicion fuera de rango");
         assertThat(paso(1).detalle()).isEqualTo("El ESP32 rechazó el comando: posicion fuera de rango");
 
-        PasadaRielService otro = new PasadaRielService(capturas, riel, zonaRepo, diagRepo, new PasadaProperties(), reloj);
+        PasadaRielService otro = new PasadaRielService(capturas, riel, zonaRepo, diagRepo, new PasadaProperties(), reloj, guardia);
         otro.iniciar();
         String c = otro.estado().orElseThrow().pasos().get(0).commandId();
         otro.registrarEvento(new EventoRiel(c, "ERROR", null, 0L, "REEMPLAZADO", null));
@@ -384,7 +415,7 @@ class PasadaRielServiceTest {
         assertThat(otro.estado().orElseThrow().pasos().get(0).detalle())
                 .isEqualTo("El movimiento fue interrumpido por otro comando.");
 
-        PasadaRielService raro = new PasadaRielService(capturas, riel, zonaRepo, diagRepo, new PasadaProperties(), reloj);
+        PasadaRielService raro = new PasadaRielService(capturas, riel, zonaRepo, diagRepo, new PasadaProperties(), reloj, guardia);
         raro.iniciar();
         String c2 = raro.estado().orElseThrow().pasos().get(0).commandId();
         raro.registrarEvento(new EventoRiel(c2, "ERROR", null, 0L, "RARO", "algo"));

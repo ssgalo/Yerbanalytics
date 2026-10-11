@@ -10,6 +10,9 @@ import com.yerbanalytics.backend.model.ZonaEntity;
  * <p>La humedad de sustrato se mide aparte de la lectura: si la sonda falla, el nodo sigue publicando el
  * resto, la zona figura fresca y el backend conserva la humedad vieja. Regar con ese valor congelado sería
  * regar a ciegas.
+ *
+ * <p>Note: the threshold read from the catalog snapshot is the EFFECTIVE one, {@code max(floor, 3 x pull interval)},
+ * resolved by {@code SensingCadence} and overlaid in {@code CatalogoParametrosService.vigentes()}.
  */
 public final class FrescuraLectura {
 

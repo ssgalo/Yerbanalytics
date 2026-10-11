@@ -5,16 +5,8 @@ import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
 import type { EstadoPaso, PasoPasada } from '@/types/domain';
 import { duracionPasoSeg, textoPaso, tituloPaso } from '../pasadaPresentacion';
+import { COLOR } from './colorPaso';
 import styles from './PasoItem.module.css';
-
-/** Color de cada estado, con los tokens del sistema. */
-const COLOR: Record<EstadoPaso, { fg: string; bg: string }> = {
-  PENDIENTE: { fg: 'var(--faint)', bg: 'var(--off-soft)' },
-  EN_CURSO: { fg: 'var(--info)', bg: 'var(--info-soft)' },
-  OK: { fg: 'var(--ok)', bg: 'var(--ok-soft)' },
-  ERROR: { fg: 'var(--crit)', bg: 'var(--crit-soft)' },
-  OMITIDO: { fg: 'var(--off)', bg: 'var(--off-soft)' },
-};
 
 const SEVERIDAD: Record<string, { soft: string; ink: string }> = {
   Alta: { soft: 'var(--crit-soft)', ink: 'var(--crit-ink)' },
@@ -23,15 +15,16 @@ const SEVERIDAD: Record<string, { soft: string; ink: string }> = {
 };
 const SEVERIDAD_NEUTRA = { soft: 'var(--off-soft)', ink: 'var(--muted)' };
 
-function IconoEstado({ paso }: { paso: PasoPasada }) {
-  const { fg, bg } = COLOR[paso.estado];
+/** Ícono redondo del estado de un paso; lo comparten la pasada y las secuencias. */
+export function IconoEstado({ estado, n }: { estado: EstadoPaso; n: number }) {
+  const { fg, bg } = COLOR[estado];
   return (
     <span className={styles.icono} style={{ background: bg, color: fg }} aria-hidden="true">
-      {paso.estado === 'EN_CURSO' && <span className={styles.spinner} style={{ borderTopColor: fg }} />}
-      {paso.estado === 'OK' && <Icon name="check" size={22} strokeWidth={2.4} />}
-      {paso.estado === 'ERROR' && <Icon name="alert" size={22} strokeWidth={2.2} />}
-      {paso.estado === 'OMITIDO' && <Icon name="close" size={20} strokeWidth={2.2} />}
-      {paso.estado === 'PENDIENTE' && <span className={styles.numero}>{paso.n}</span>}
+      {estado === 'EN_CURSO' && <span className={styles.spinner} style={{ borderTopColor: fg }} />}
+      {estado === 'OK' && <Icon name="check" size={22} strokeWidth={2.4} />}
+      {estado === 'ERROR' && <Icon name="alert" size={22} strokeWidth={2.2} />}
+      {estado === 'OMITIDO' && <Icon name="close" size={20} strokeWidth={2.2} />}
+      {estado === 'PENDIENTE' && <span className={styles.numero}>{n}</span>}
     </span>
   );
 }
@@ -94,7 +87,7 @@ export function PasoItem({ paso, ahoraMs }: { paso: PasoPasada; ahoraMs: number 
 
   return (
     <li className={styles.item} style={paso.estado === 'EN_CURSO' ? { borderColor: 'var(--info)' } : undefined}>
-      <IconoEstado paso={paso} />
+      <IconoEstado estado={paso.estado} n={paso.n} />
       <div className={styles.cuerpo}>
         <div className={styles.cabecera}>
           <span className={styles.titulo} style={{ opacity: paso.estado === 'PENDIENTE' ? 0.55 : 1 }}>

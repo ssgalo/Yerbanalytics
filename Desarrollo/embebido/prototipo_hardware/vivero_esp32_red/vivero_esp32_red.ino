@@ -3,21 +3,23 @@
 //  Componentes:
 //    - NEMA 17 + DRV8825 (riel cámara)
 //    - JGA25-370 + L298N canal A (mediasombra)
-//    - Bomba DC + L298N canal B (riego)
-//    - 2x Endstop (mediasombra)
-//    - 2x Endstop (riel NEMA 17: home y fin de carrera)
+//    - Módulo de 4 relés: 2 minibombas (riego e insumo) y
+//      2 electroválvulas (aspersor del sector 1 y del sector 2)
+//    - 2x Endstop NC (mediasombra)
+//    - 2x Endstop NC (riel NEMA 17: home y fin de carrera)
 //
 //  Es una copia de vivero_esp32.ino (que no se toca) con red:
 //    - Todos los comandos por monitor serie de siempre, más "red".
 //    - Por MQTT SOLO maneja el riel: se suscribe a nursery/rail/command
-//      y publica en nursery/rail/event. Bomba y mediasombra, sólo por serie.
+//      y publica en nursery/rail/event. Riego y mediasombra, sólo por serie.
 //    - Contrato: openspec/changes/add-pasada-riel/design.md §1 y
 //      Desarrollo/embebido/comun/contrato.h (sección "Riel").
 //
 //  Librerías (Library Manager de Arduino IDE):
 //    - PubSubClient (Nick O'Leary) 2.8.x
 //    - ArduinoJson  (Benoit Blanchon) 7.x
-//  Placa: "esp32 by Espressif Systems" 3.x → ESP32 Dev Module.
+//  Placa: "esp32 by Espressif Systems" 3.x → ESP32S3 Dev Module
+//  (ESP32-S3 DevKitC-1 N16R8). Pines en config.h.
 // ============================================================
 
 #include <WiFi.h>
@@ -50,30 +52,35 @@
   #error "Hace falta ArduinoJson 7.x (Library Manager: ArduinoJson de Benoit Blanchon)"
 #endif
 
-// ── NEMA 17 / DRV8825 ────────────────────────────────────────
-#define STEP_PIN     19
-#define DIR_PIN      21
-#define SLEEP_PIN  15
-// Nivel de DIR_PIN que mueve el carro hacia HOME. Depende de cómo estén
-// cableadas las bobinas al driver: si el motor va al revés, cambiar LOW↔HIGH.
-#define DIR_HACIA_HOME HIGH
-#define DIR_HACIA_FIN  (!DIR_HACIA_HOME)
-// GPIO34 y GPIO35 son "solo entrada": no tienen pull-up/pull-down interno.
-// Hace falta una resistencia pull-up externa (~10k a 3.3V) en cada pin,
-// con el final de carrera entre el pin y GND.
-#define ENDSTOP_RIEL_HOME 34   // final de carrera extremo home (retroceso)
-#define ENDSTOP_RIEL_FIN  35   // final de carrera extremo opuesto (avance máximo)
-
-// Tipo de contacto de los finales de carrera del riel:
-// false = NO (normalmente abierto) → activado = LOW
-// true  = NC (normalmente cerrado) → activado = HIGH
-#define ENDSTOP_RIEL_NC true
-
-#if ENDSTOP_RIEL_NC
-  #define RIEL_ACTIVADO(pin) (digitalRead(pin) == HIGH)
-#else
-  #define RIEL_ACTIVADO(pin) (digitalRead(pin) == LOW)
+#if !defined(CONFIG_IDF_TARGET_ESP32S3)
+  #error "Este sketch es para ESP32-S3: elegí la placa 'ESP32S3 Dev Module' (Herramientas → Placa)"
 #endif
+
+// Los pines viven en config.h desde el paso al ESP32-S3. Un config.h anterior no los tiene.
+#if !defined(PIN_RIEL_STEP) || !defined(PIN_MEDIASOMBRA_IN1) || !defined(PIN_RELE_BOMBA_RIEGO) || !defined(RELE_ACTIVO_EN_LOW) || !defined(FINES_CARRERA_NC)
+  #error "config.h sin pines (es anterior al ESP32-S3): copiá el bloque PINES de config.example.h a tu config.h"
+#endif
+
+// ── NEMA 17 / DRV8825 ────────────────────────────────────────
+// Pines en config.h. Todos los finales de carrera usan INPUT_PULLUP
+// (en el S3 todos los GPIO tienen pull-up interno).
+#define STEP_PIN          PIN_RIEL_STEP
+#define DIR_PIN           PIN_RIEL_DIR
+#define SLEEP_PIN         PIN_RIEL_SLEEP
+#define DIR_HACIA_HOME    RIEL_DIR_HACIA_HOME
+#define DIR_HACIA_FIN     (!DIR_HACIA_HOME)
+#define ENDSTOP_RIEL_HOME PIN_RIEL_FIN_HOME      // final de carrera extremo home (retroceso)
+#define ENDSTOP_RIEL_FIN  PIN_RIEL_FIN_OPUESTO   // final de carrera extremo opuesto (avance máximo)
+
+// Tipo de contacto (FINES_CARRERA_NC en config.h):
+// NC (normalmente cerrado) → activado = HIGH · NO (normalmente abierto) → activado = LOW
+#if FINES_CARRERA_NC
+  #define FIN_ACTIVADO(pin) (digitalRead(pin) == HIGH)
+#else
+  #define FIN_ACTIVADO(pin) (digitalRead(pin) == LOW)
+#endif
+#define RIEL_ACTIVADO(pin)        FIN_ACTIVADO(pin)
+#define MEDIASOMBRA_ACTIVADO(pin) FIN_ACTIVADO(pin)
 
 #define POSICION_SECTOR_1 21000
 #define POSICION_SECTOR_2 42000
@@ -82,30 +89,22 @@
 #define MAX_PASOS_HOMING 80000
 
 // ── L298N Canal A — Motor DC mediasombra ─────────────────────
-#define MOTOR_IN1    22
-#define MOTOR_IN2    23
-#define MOTOR_ENA    25  // PWM velocidad
-
-// ── L298N Canal B — Bomba ────────────────────────────────────
-#define BOMBA_IN3    26
-#define BOMBA_IN4    27
-#define BOMBA_ENB    14  // PWM caudal
+#define MOTOR_IN1    PIN_MEDIASOMBRA_IN1
+#define MOTOR_IN2    PIN_MEDIASOMBRA_IN2
+#define MOTOR_ENA    PIN_MEDIASOMBRA_ENA  // PWM velocidad
 
 // ── Endstops mediasombra ─────────────────────────────────────
-#define ENDSTOP_ENROLLADA    32
-#define ENDSTOP_DESENROLLADA 33
+#define ENDSTOP_ENROLLADA    PIN_MEDIASOMBRA_FIN_ENROLLADA
+#define ENDSTOP_DESENROLLADA PIN_MEDIASOMBRA_FIN_DESENROLLADA
 
-// Tipo de contacto de los finales de carrera de la mediasombra (con INPUT_PULLUP,
-// contacto entre el pin y GND):
-// false = NO (normalmente abierto) → activado = LOW
-// true  = NC (normalmente cerrado) → activado = HIGH
-#define ENDSTOP_MEDIASOMBRA_NC true
-
-#if ENDSTOP_MEDIASOMBRA_NC
-  #define MEDIASOMBRA_ACTIVADO(pin) (digitalRead(pin) == HIGH)
-#else
-  #define MEDIASOMBRA_ACTIVADO(pin) (digitalRead(pin) == LOW)
-#endif
+// ── Riego: módulo de 4 relés ─────────────────────────────────
+// Regar el sector N = abrir la válvula N y prender una bomba (agua o insumo).
+// Interbloqueo: una bomba sólo prende con alguna válvula abierta, y al cerrar
+// la última válvula se apagan las bombas antes (nunca bombea contra cerrado).
+#define VALVULA_ANTES_DE_BOMBA_MS 300    // la válvula abre antes de que arranque la bomba
+#define RIEGO_SEG_MAX             1200   // = CONTRATO_VALVULA_DURACION_MAX_SEG (contrato.h)
+#define BOMBA_RIEGO   1
+#define BOMBA_INSUMO  2
 
 // ── Configuración LEDC (PWM en ESP32) ────────────────────────
 // Compatible con ESP32 Arduino 3.x (nueva API)
@@ -119,9 +118,15 @@ long pasos_actuales = 0;  // posición actual en pasos desde home
 // Más alto = más lento y más torque
 #define VELOCIDAD_NEMA 500
 
-// ── LED de estado de la red (GPIO 2, el LED azul de la placa) ─
+// ── LED de estado de la red (el LED RGB de la placa) ─────────
 // Parpadeo rápido: sin WiFi · lento: WiFi sin broker · fijo: conectado al broker
-#define LED_ESTADO 2
+// RGB_BUILTIN lo define el core para "ESP32S3 Dev Module" (GPIO 48); digitalWrite
+// lo prende en blanco. En la revisión v1.1 de la placa el LED está en el 38 y no prende.
+#ifdef RGB_BUILTIN
+  #define LED_ESTADO RGB_BUILTIN
+#else
+  #define LED_ESTADO 48
+#endif
 
 // =============================================================
 //  CONTRATO MQTT DEL RIEL
@@ -196,8 +201,19 @@ void motorDC_adelante(int velocidad);
 void motorDC_atras(int velocidad);
 void mediasombra_enrollar();
 void mediasombra_desenrollar();
-void bomba_encender(int caudal);
-void bomba_apagar();
+void rele_escribir(int pin, bool cerrado);
+int  pin_valvula(int sector);
+int  pin_bomba(int bomba);
+const char* nombre_bomba(int bomba);
+void valvula_abrir(int sector);
+void valvula_cerrar(int sector);
+bool bomba_prender(int bomba);
+void bomba_apagar(int bomba);
+void riego_iniciar(int sector, int bomba, long segundos);
+void riego_detener();
+void riego_atender();
+void riego_imprimir_estado();
+void atender_fondo();
 void serial_atender();
 void red_iniciar();
 void red_mantener();
@@ -259,6 +275,18 @@ unsigned long led_ultimo = 0;
 bool led_encendido = false;
 
 // =============================================================
+//  ESTADO DEL RIEGO (índice 1 y 2; el 0 no se usa)
+// =============================================================
+bool valvula_abierta[3] = {false, false, false};
+bool bomba_prendida[3]  = {false, false, false};
+
+// Riego temporizado en curso (regar / insumo): lo corta riego_atender()
+bool riego_temporizado = false;
+int  riego_sector = 0;
+unsigned long riego_inicio_ms = 0;
+unsigned long riego_duracion_ms = 0;
+
+// =============================================================
 //  SETUP
 // =============================================================
 void setup() {
@@ -266,20 +294,26 @@ void setup() {
   // NEMA 17
   pinMode(STEP_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
-  pinMode(ENDSTOP_RIEL_HOME, INPUT);
-  pinMode(ENDSTOP_RIEL_FIN,  INPUT);
+  pinMode(ENDSTOP_RIEL_HOME, INPUT_PULLUP);
+  pinMode(ENDSTOP_RIEL_FIN,  INPUT_PULLUP);
   pinMode(SLEEP_PIN, OUTPUT);
-  digitalWrite(SLEEP_PIN, LOW);
+  digitalWrite(SLEEP_PIN, LOW);   // driver dormido hasta el primer movimiento
 
   // Motor DC mediasombra
   pinMode(MOTOR_IN1, OUTPUT);
   pinMode(MOTOR_IN2, OUTPUT);
 
-  // Bomba
-  pinMode(BOMBA_IN3, OUTPUT);
-  pinMode(BOMBA_IN4, OUTPUT);
+  // Relés de riego: salida y abiertos (bombas apagadas, válvulas cerradas)
+  for (int s = 1; s <= 2; s++) {
+    pinMode(pin_valvula(s), OUTPUT);
+    rele_escribir(pin_valvula(s), false);
+  }
+  for (int b = BOMBA_RIEGO; b <= BOMBA_INSUMO; b++) {
+    pinMode(pin_bomba(b), OUTPUT);
+    rele_escribir(pin_bomba(b), false);
+  }
 
-  // Endstops mediasombra (INPUT_PULLUP; lógica según ENDSTOP_MEDIASOMBRA_NC)
+  // Endstops mediasombra (INPUT_PULLUP; lógica según FINES_CARRERA_NC)
   pinMode(ENDSTOP_ENROLLADA,    INPUT_PULLUP);
   pinMode(ENDSTOP_DESENROLLADA, INPUT_PULLUP);
 
@@ -290,11 +324,9 @@ void setup() {
   // PWM con LEDC del ESP32 — API nueva (Arduino 3.x)
   // ledcAttach(pin, frecuencia, bits_resolución)
   ledcAttach(MOTOR_ENA, PWM_FREQ, PWM_BITS);
-  ledcAttach(BOMBA_ENB, PWM_FREQ, PWM_BITS);
 
   // Asegurarse de que todo empieza apagado
   motorDC_parar();
-  bomba_apagar();
 
   Serial.begin(115200);
   Serial.println("Iniciando sistema vivero (con red)...");
@@ -313,7 +345,7 @@ void setup() {
 // =============================================================
 void loop() {
   red_mantener();       // reconexión WiFi/MQTT (sólo acá, nunca a mitad de un movimiento)
-  red_atender();        // mqtt.loop() + LED
+  atender_fondo();      // mqtt.loop() + LED + fin del riego temporizado
   procesar_entrante();  // comando del riel recibido por MQTT, si hay
   serial_atender();     // comandos por monitor serie de siempre
 }
@@ -349,12 +381,37 @@ void serial_atender() {
     } else if (cmd == "parar motor") {
       motorDC_parar();
 
-    // ── Bomba ─────────────────────────────────────────────────
-    } else if (cmd == "bomba on") {
-      bomba_encender(200); // 200/255 = ~78% caudal
+    // ── Riego (relés) ─────────────────────────────────────────
+    } else if (cmd == "valvula 1 abrir" || cmd == "valvula 2 abrir") {
+      valvula_abrir(cmd.charAt(8) - '0');
 
-    } else if (cmd == "bomba off") {
-      bomba_apagar();
+    } else if (cmd == "valvula 1 cerrar" || cmd == "valvula 2 cerrar") {
+      valvula_cerrar(cmd.charAt(8) - '0');
+
+    } else if (cmd == "bomba riego on") {
+      bomba_prender(BOMBA_RIEGO);
+
+    } else if (cmd == "bomba riego off") {
+      bomba_apagar(BOMBA_RIEGO);
+
+    } else if (cmd == "bomba insumo on") {
+      bomba_prender(BOMBA_INSUMO);
+
+    } else if (cmd == "bomba insumo off") {
+      bomba_apagar(BOMBA_INSUMO);
+
+    } else if (cmd.startsWith("regar ") || cmd.startsWith("insumo ")) {
+      // "regar N S" / "insumo N S": sector N durante S segundos
+      bool es_insumo = cmd.startsWith("insumo ");
+      String args = cmd.substring(es_insumo ? 7 : 6);
+      args.trim();
+      int espacio = args.indexOf(' ');
+      int sector = (espacio > 0) ? args.substring(0, espacio).toInt() : 0;
+      long segundos = (espacio > 0) ? args.substring(espacio + 1).toInt() : 0;
+      riego_iniciar(sector, es_insumo ? BOMBA_INSUMO : BOMBA_RIEGO, segundos);
+
+    } else if (cmd == "parar riego") {
+      riego_detener();
 
     // ── Estado sensores ───────────────────────────────────────
     } else if (cmd == "estado") {
@@ -368,6 +425,7 @@ void serial_atender() {
       Serial.println(RIEL_ACTIVADO(ENDSTOP_RIEL_FIN) ? "ACTIVADO" : "libre");
       Serial.print("Pasos actuales:       ");
       Serial.println(pasos_actuales);
+      riego_imprimir_estado();
 
     // ── Red ───────────────────────────────────────────────────
     } else if (cmd == "red") {
@@ -381,9 +439,13 @@ void serial_atender() {
       Serial.println("  enrollar      → enrolla mediasombra");
       Serial.println("  desenrollar   → desenrolla mediasombra");
       Serial.println("  parar motor   → para motor DC");
-      Serial.println("  bomba on      → enciende bomba");
-      Serial.println("  bomba off     → apaga bomba");
-      Serial.println("  estado        → lee todos los sensores");
+      Serial.println("  valvula N abrir|cerrar   → electroválvula del sector N (1 o 2)");
+      Serial.println("  bomba riego on|off       → minibomba de agua (necesita una válvula abierta)");
+      Serial.println("  bomba insumo on|off      → minibomba de insumo (necesita una válvula abierta)");
+      Serial.println("  regar N S     → riega el sector N durante S segundos");
+      Serial.println("  insumo N S    → aplica insumo al sector N durante S segundos");
+      Serial.println("  parar riego   → apaga las bombas y cierra las válvulas");
+      Serial.println("  estado        → lee todos los sensores y el estado del riego");
       Serial.println("  red           → estado de WiFi, MQTT y último comando del riel");
     }
   }
@@ -436,7 +498,7 @@ int nema_mover(long pasos) {
     // Cada PASOS_ENTRE_RED pasos atiende MQTT (sin reconectar) y se fija
     // si llegó otro comando del riel: el último gana.
     if (i > 0 && (i % PASOS_ENTRE_RED) == 0) {
-      red_atender();
+      atender_fondo();
       if (red_hay_reemplazo()) {
         pasos_actuales += direccion ? i : -i;  // solo los pasos que llegó a dar
         Serial.print("[riel] Movimiento interrumpido por otro comando. Posición: ");
@@ -493,7 +555,7 @@ int nema_homing() {
     }
     // Cada PASOS_ENTRE_RED pasos atiende MQTT (sin reconectar)
     if (i > 0 && (i % PASOS_ENTRE_RED) == 0) {
-      red_atender();
+      atender_fondo();
       if (red_hay_reemplazo()) {
         Serial.println("[riel] Homing interrumpido por otro comando.");
         nema_dormir();
@@ -598,7 +660,7 @@ void mediasombra_enrollar() {
       motorDC_parar();
       return;
     }
-    red_atender();  // mantiene viva la conexión MQTT (30 s > keepalive)
+    atender_fondo();  // mantiene viva la conexión MQTT (30 s > keepalive) y corta el riego a tiempo
     delay(10);
   }
   motorDC_parar();
@@ -620,7 +682,7 @@ void mediasombra_desenrollar() {
       motorDC_parar();
       return;
     }
-    red_atender();  // mantiene viva la conexión MQTT (30 s > keepalive)
+    atender_fondo();  // mantiene viva la conexión MQTT (30 s > keepalive) y corta el riego a tiempo
     delay(10);
   }
   motorDC_parar();
@@ -628,24 +690,159 @@ void mediasombra_desenrollar() {
 }
 
 // =============================================================
-//  FUNCIONES BOMBA
+//  FUNCIONES RIEGO (módulo de 4 relés)
 // =============================================================
 
-void bomba_encender(int caudal) {
-  // caudal: 0-255
-  digitalWrite(BOMBA_IN3, HIGH);
-  digitalWrite(BOMBA_IN4, LOW);
-  ledcWrite(BOMBA_ENB, caudal);
-  Serial.print("Bomba encendida al ");
-  Serial.print(map(caudal, 0, 255, 0, 100));
-  Serial.println("%");
+// cerrado = true → el relé cierra su contacto NO (la carga recibe tensión).
+void rele_escribir(int pin, bool cerrado) {
+  digitalWrite(pin, (cerrado != (bool) RELE_ACTIVO_EN_LOW) ? HIGH : LOW);
 }
 
-void bomba_apagar() {
-  digitalWrite(BOMBA_IN3, LOW);
-  digitalWrite(BOMBA_IN4, LOW);
-  ledcWrite(BOMBA_ENB, 0);
-  Serial.println("Bomba apagada.");
+int pin_valvula(int sector) {
+  return (sector == 1) ? PIN_RELE_VALVULA_S1 : PIN_RELE_VALVULA_S2;
+}
+
+int pin_bomba(int bomba) {
+  return (bomba == BOMBA_RIEGO) ? PIN_RELE_BOMBA_RIEGO : PIN_RELE_BOMBA_INSUMO;
+}
+
+const char* nombre_bomba(int bomba) {
+  return (bomba == BOMBA_RIEGO) ? "riego" : "insumo";
+}
+
+void valvula_abrir(int sector) {
+  if (sector != 1 && sector != 2) return;
+  rele_escribir(pin_valvula(sector), true);
+  valvula_abierta[sector] = true;
+  Serial.print("Válvula sector ");
+  Serial.print(sector);
+  Serial.println(" abierta.");
+}
+
+// Si es la última válvula abierta, apaga antes las bombas.
+void valvula_cerrar(int sector) {
+  if (sector != 1 && sector != 2) return;
+  int otro = (sector == 1) ? 2 : 1;
+  if (!valvula_abierta[otro]) {
+    bomba_apagar(BOMBA_RIEGO);
+    bomba_apagar(BOMBA_INSUMO);
+  }
+  rele_escribir(pin_valvula(sector), false);
+  valvula_abierta[sector] = false;
+  if (riego_temporizado && riego_sector == sector) {
+    riego_temporizado = false;
+  }
+  Serial.print("Válvula sector ");
+  Serial.print(sector);
+  Serial.println(" cerrada.");
+}
+
+// Interbloqueo: sin ninguna válvula abierta la bomba no prende.
+bool bomba_prender(int bomba) {
+  if (!valvula_abierta[1] && !valvula_abierta[2]) {
+    Serial.print("No prendo la bomba de ");
+    Serial.print(nombre_bomba(bomba));
+    Serial.println(": no hay ninguna válvula abierta.");
+    return false;
+  }
+  rele_escribir(pin_bomba(bomba), true);
+  bomba_prendida[bomba] = true;
+  Serial.print("Bomba de ");
+  Serial.print(nombre_bomba(bomba));
+  Serial.println(" prendida.");
+  return true;
+}
+
+void bomba_apagar(int bomba) {
+  rele_escribir(pin_bomba(bomba), false);
+  if (bomba_prendida[bomba]) {
+    Serial.print("Bomba de ");
+    Serial.print(nombre_bomba(bomba));
+    Serial.println(" apagada.");
+  }
+  bomba_prendida[bomba] = false;
+}
+
+// Riego temporizado de un sector: válvula → espera → bomba. Lo corta riego_atender().
+void riego_iniciar(int sector, int bomba, long segundos) {
+  if (sector != 1 && sector != 2) {
+    Serial.println("Sector inválido: tiene que ser 1 o 2.");
+    return;
+  }
+  if (segundos < 1 || segundos > RIEGO_SEG_MAX) {
+    Serial.print("Duración inválida: entre 1 y ");
+    Serial.print(RIEGO_SEG_MAX);
+    Serial.println(" segundos.");
+    return;
+  }
+  riego_detener();   // de a un sector por vez: corta lo que hubiera
+
+  Serial.print("Riego sector ");
+  Serial.print(sector);
+  Serial.print(" con la bomba de ");
+  Serial.print(nombre_bomba(bomba));
+  Serial.print(" durante ");
+  Serial.print(segundos);
+  Serial.println(" s.");
+
+  valvula_abrir(sector);
+  delay(VALVULA_ANTES_DE_BOMBA_MS);
+  bomba_prender(bomba);
+
+  riego_temporizado = true;
+  riego_sector = sector;
+  riego_inicio_ms = millis();
+  riego_duracion_ms = (unsigned long) segundos * 1000UL;
+}
+
+// Bombas primero, válvulas después.
+void riego_detener() {
+  bool habia_algo = riego_temporizado || bomba_prendida[BOMBA_RIEGO] || bomba_prendida[BOMBA_INSUMO]
+                    || valvula_abierta[1] || valvula_abierta[2];
+  riego_temporizado = false;
+  bomba_apagar(BOMBA_RIEGO);
+  bomba_apagar(BOMBA_INSUMO);
+  for (int s = 1; s <= 2; s++) {
+    if (valvula_abierta[s]) valvula_cerrar(s);
+  }
+  if (habia_algo) Serial.println("Riego detenido.");
+}
+
+// Corta el riego temporizado al cumplirse la duración. Se llama desde
+// atender_fondo(), también durante los movimientos bloqueantes del riel.
+void riego_atender() {
+  if (!riego_temporizado) return;
+  if (millis() - riego_inicio_ms >= riego_duracion_ms) {
+    Serial.print("Riego sector ");
+    Serial.print(riego_sector);
+    Serial.println(": tiempo cumplido.");
+    riego_detener();
+  }
+}
+
+void riego_imprimir_estado() {
+  Serial.print("Válvula sector 1:     ");
+  Serial.println(valvula_abierta[1] ? "ABIERTA" : "cerrada");
+  Serial.print("Válvula sector 2:     ");
+  Serial.println(valvula_abierta[2] ? "ABIERTA" : "cerrada");
+  Serial.print("Bomba riego:          ");
+  Serial.println(bomba_prendida[BOMBA_RIEGO] ? "PRENDIDA" : "apagada");
+  Serial.print("Bomba insumo:         ");
+  Serial.println(bomba_prendida[BOMBA_INSUMO] ? "PRENDIDA" : "apagada");
+  if (riego_temporizado) {
+    Serial.print("Riego temporizado:    sector ");
+    Serial.print(riego_sector);
+    Serial.print(", quedan ");
+    Serial.print((riego_duracion_ms - (millis() - riego_inicio_ms)) / 1000UL);
+    Serial.println(" s");
+  }
+}
+
+// Todo lo que tiene que seguir corriendo aunque el riel o la mediasombra
+// estén en un movimiento bloqueante.
+void atender_fondo() {
+  red_atender();
+  riego_atender();
 }
 
 // =============================================================

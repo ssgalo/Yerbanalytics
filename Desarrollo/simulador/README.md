@@ -49,8 +49,11 @@ simulador (punto ámbar, con el motivo).
 - **Envío de lecturas** — cada métrica por separado, con su propia fecha/hora opcional, o las
   diez juntas con batería y señal. Fecha vacía = ahora. Las métricas que no mandás conservan
   su último valor en el vivero.
-- **Emisión automática** — ruido periódico a todas las macro-zonas, para darle actividad de
+- **Emisión automática** — lecturas al azar para todas las macro-zonas, para darle actividad de
   fondo al vivero. Arranca siempre apagada, porque encendida pisa lo que cargaste a mano.
+  Sensing is backend-driven: there is no interval. On activation it sends one boot round, then
+  answers each `LEER_AHORA` the backend publishes on `nursery/zone/{id}/command` with one reading
+  for that zone (only simulated macro-zones, only while on).
 - **Topología** — regenera la grilla (N macro-zonas × M sectores) para que coincida con el
   hardware a simular.
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a
@@ -75,6 +78,16 @@ y dos tablas que no servían a ningún caso de uso del vivero.
 
 Como el navegador no habla MQTT sobre TCP, el simulador necesita su propio proceso. De ahí que
 sea una app Node y no una SPA suelta.
+
+### Comandos y acks
+
+El simulador también escucha los comandos del backend (`nursery/zone/+/sector/+/command`) y los
+muestra en la consola. Para las macro-zonas que simula (las que tienen un sensor simulado) además
+**responde el ack** en `nursery/zone/{zona}/sector/{sector}/ack`, como el firmware: el riego al
+cumplir `durationSec`, el insumo a los 10 s (o según `ml`/`durationSec`) y la mediasombra a los 3 s.
+Sin esto, el backend registraría una alerta `ActuadorSinRespuesta` por cada comando de la demo. Los
+comandos de otras zonas son de un nodo real y sólo se loguean. Las reglas están en
+`server/contract.ts` (`simulatedAck`).
 
 ---
 

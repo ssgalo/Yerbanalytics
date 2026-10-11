@@ -4,6 +4,9 @@ import com.yerbanalytics.backend.dto.CatalogoReglasDto;
 import com.yerbanalytics.backend.dto.ParametroDto;
 import com.yerbanalytics.backend.dto.ReglaCatalogoDto;
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
+import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
+import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +47,17 @@ public class CatalogoParametrosService {
     private record OverridePersistido(String valor, String updatedBy, Long updatedTs) {}
 
     /** Lo que se cachea: valores resueltos más la auditoría de los overrides. */
-    private record Estado(ParametrosVigentes vigentes, Map<String, OverridePersistido> overrides,
-                          Set<String> corruptas) {}
+    private record Estado(ParametrosVigentes vigentes, ParametrosVigentes efectivos,
+                          Map<String, OverridePersistido> overrides, Set<String> corruptas) {}
+
+    /** Operating-config row that holds the sensing pull interval. */
+    private static final int OPERATIVA_ID = 1;
 
     private final CatalogoParametros catalogo;
     private final ParametroReglaRepository repository;
     private final HistorialService historialService;
     private final TransactionTemplate transaccion;
+    private final ConfiguracionOperativaRepository operativaRepository;
 
     /** Serializa los guardados: cada uno valida contra la base, así que no pueden solaparse. */
     private final Object escritura = new Object();
@@ -68,22 +75,27 @@ public class CatalogoParametrosService {
     public CatalogoParametrosService(CatalogoParametros catalogo,
                                      ParametroReglaRepository repository,
                                      HistorialService historialService,
-                                     PlatformTransactionManager transactionManager) {
+                                     PlatformTransactionManager transactionManager,
+                                     ConfiguracionOperativaRepository operativaRepository) {
         this.transaccion = new TransactionTemplate(transactionManager);
         // Transacción propia: el lock de guardar tiene que soltarse DESPUÉS del commit.
         this.transaccion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.catalogo = catalogo;
         this.repository = repository;
         this.historialService = historialService;
+        this.operativaRepository = operativaRepository;
     }
 
     // ------------------------------------------------------------------
     // Lectura
     // ------------------------------------------------------------------
 
-    /** Valores vigentes; el mismo objeto hasta que alguien guarde. */
+    /**
+     * Valores vigentes; el mismo objeto hasta que alguien guarde. This is the EFFECTIVE snapshot the
+     * engine consumes: {@code seguridad.antiguedad-max-lectura} is {@code max(floor, 3 x pull interval)}.
+     */
     public ParametrosVigentes vigentes() {
-        return estado().vigentes();
+        return estado().efectivos();
     }
 
     /** Catálogo normalizado para la API: reglas por prioridad y cada parámetro una sola vez. */
@@ -152,7 +164,22 @@ public class CatalogoParametrosService {
                         fila.getClave(), fila.getValor(), ex.getMessage());
             }
         }
-        return new Estado(ParametrosVigentes.de(valores), Map.copyOf(overrides), Set.copyOf(corruptas));
+        ParametrosVigentes crudos = ParametrosVigentes.de(valores);
+        return new Estado(crudos, conUmbralEfectivo(crudos), Map.copyOf(overrides), Set.copyOf(corruptas));
+    }
+
+    /**
+     * Overlays the effective stale threshold on the raw values: the stored value is only the floor,
+     * the real threshold also depends on the pull interval (see {@link SensingCadence}).
+     */
+    private ParametrosVigentes conUmbralEfectivo(ParametrosVigentes crudos) {
+        Integer raw = operativaRepository.findById(OPERATIVA_ID)
+                .map(ConfiguracionOperativaEntity::getSensingPullIntervalSeconds).orElse(null);
+        double piso = crudos.numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
+        Map<String, ValorParametro> efectivos = new HashMap<>(crudos.valores());
+        efectivos.put(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(),
+                new ValorParametro.Numero(SensingCadence.staleThresholdSeconds(piso, SensingCadence.pullSeconds(raw))));
+        return ParametrosVigentes.de(efectivos);
     }
 
     /** Descarta el cache: la próxima lectura vuelve a la base. */
@@ -280,7 +307,7 @@ public class CatalogoParametrosService {
      * repoblara el cache entre medio, leería la base sin el commit y quedaría con valores viejos
      * hasta el próximo guardado.
      */
-    private void invalidarAlTerminar() {
+    public void invalidarAlTerminar() {
         invalidar();
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
