@@ -60,6 +60,17 @@
   --info-ink: #1f4f86;
   --info-line: #c4d7ef;
 
+  /* clases de diagnóstico de IA: tonos terrosos y apagados, sólo para mostrar cómo se reparten
+     los diagnósticos (barra y muestras de la vista Diagnósticos). No son estados de salud, así
+     que nunca tiñen texto ni compiten con --ok/--warn/--crit. "No concluyente" es una trama. */
+  --dx-sano: #57965f;
+  --dx-clorosis: #c2b14e;
+  --dx-estres: #c4843e;
+  --dx-plaga: #4f8f86;
+  --dx-fungico: #7a5a40;
+  --dx-nc: #9ba39e;
+  --dx-nc-2: #c9cec9;
+
   /* texto sobre un fondo de marca / acción primaria */
   --on-brand: #ffffff;
 

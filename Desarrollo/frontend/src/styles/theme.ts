@@ -40,6 +40,14 @@ export const theme = {
   trayLine: '#39433D',
   onTray: '#FFFFFF',
   onTrayMuted: '#A9B5AE',
+  /* clases de diagnóstico (sólo composición) */
+  dxSano: '#57965F',
+  dxClorosis: '#C2B14E',
+  dxEstres: '#C4843E',
+  dxPlaga: '#4F8F86',
+  dxFungico: '#7A5A40',
+  dxNc: '#9BA39E',
+  dxNc2: '#C9CEC9',
 } as const;
 
 export type Theme = typeof theme;

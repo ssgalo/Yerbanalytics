@@ -1,0 +1,146 @@
+/* DiagnosisKpis — composición por clase, con el lenguaje del resumen del Panel general */
+
+.summary {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Medidas idénticas a las del resumen del Panel general (NurserySummary) */
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-15);
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.meta {
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 34px;
+}
+
+/* Cada cifra es un filtro, pero se ve igual que una cifra del Panel general: sin relleno ni borde */
+.figure {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.figure:hover .figureLabel,
+.figure[aria-pressed='true'] .figureLabel {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.figure[aria-pressed='true'] .figureLabel {
+  font-weight: 600;
+  text-decoration-thickness: 2px;
+}
+
+.figure:focus-visible {
+  outline: none;
+  border-radius: var(--r-s);
+  box-shadow: var(--focus-ring);
+}
+
+.number {
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-32);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.zero {
+  color: var(--muted);
+}
+
+.figureLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* Mismo tamaño que el glifo de estado que acompaña a las cifras del Panel general */
+.swatch {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 3px;
+}
+
+/* Barra de composición: mismas medidas que la del Panel general */
+.bar {
+  display: flex;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+}
+
+.bar > i {
+  display: block;
+  height: 100%;
+}
+
+.sano {
+  background: var(--dx-sano);
+}
+.clorosis {
+  background: var(--dx-clorosis);
+}
+.estres {
+  background: var(--dx-estres);
+}
+.plaga {
+  background: var(--dx-plaga);
+}
+.fungico {
+  background: var(--dx-fungico);
+}
+/* "No concluyente" es una trama, no un color más: no es una clase del vivero sino la falta de una */
+.nc {
+  background: repeating-linear-gradient(135deg, var(--dx-nc) 0 4px, var(--dx-nc-2) 4px 7px);
+}
+
+@media (max-width: 600px) {
+  .summary {
+    padding: 14px 16px;
+  }
+  .figures {
+    gap: 8px 22px;
+  }
+  .number {
+    font-size: 1.625rem;
+  }
+}
