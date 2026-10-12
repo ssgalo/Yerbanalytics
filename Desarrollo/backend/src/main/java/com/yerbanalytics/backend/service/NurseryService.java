@@ -122,6 +122,7 @@ public class NurseryService {
         // Antigüedad de la lectura por zona: los diagnósticos la usan como sello temporal,
         // y ya no vive en el sector.
         Map<String, String> agoPorZona = new HashMap<>();
+        Map<String, Long> lecturaPorZona = new HashMap<>();
 
         for (ZonaEntity ze : zonesDb) {
             List<Sector> zoneSectors = new ArrayList<>();
@@ -136,6 +137,7 @@ public class NurseryService {
             List<Metric> zoneMetrics = isStale ? buildOfflineMetricsList() : buildMetricsList(ze);
             String zoneAgo = ze.getLastReadingTime() == null ? "hace —" : formatAgo(ze.getLastReadingTime());
             agoPorZona.put(ze.getId(), zoneAgo);
+            lecturaPorZona.put(ze.getId(), ze.getLastReadingTime());
 
             for (SectorEntity se : ze.getSectors()) {
                 String finalStatus;
@@ -262,7 +264,8 @@ public class NurseryService {
                     TINTS.getOrDefault(d.estado(), TINTS.get("Sin diagnóstico")),
                     agoPorZona.getOrDefault(s.zona(), "hace —"),
                     d.conf() != null && d.conf() >= 85,
-                    null // derivada del sector: no tiene captura asociada
+                    null, // derivada del sector: no tiene captura asociada
+                    lecturaPorZona.get(s.zona())
             ));
         }
 
@@ -285,11 +288,14 @@ public class NurseryService {
                     TINTS.get("No concluyente"),
                     agoPorZona.getOrDefault(s.zona(), "hace —"),
                     false,
-                    null // derivada del sector: no tiene captura asociada
+                    null, // derivada del sector: no tiene captura asociada
+                    lecturaPorZona.get(s.zona())
             ));
         }
 
-        diagnoses.sort(Comparator.comparing(DiagnosisCard::time));
+        // Más recientes primero; sin fecha (zona que nunca reportó), al final
+        diagnoses.sort(Comparator.comparing(DiagnosisCard::creadoEn,
+                Comparator.nullsLast(Comparator.reverseOrder())));
 
         // Diagnósticos persistidos (los que nacieron de una captura real) al frente de la
         // lista: son los más recientes y los únicos con fotografía. La vista no los distingue
@@ -775,7 +781,8 @@ public class NurseryService {
                     TINTS.getOrDefault(e.getEstado(), TINTS.get("Sin diagnóstico")),
                     formatAgo(e.getCreadoEn()),
                     diagnosticoService.esConcluyente(e.getConf()),
-                    CapturaService.imagenUrl(e.getCapturaId())
+                    CapturaService.imagenUrl(e.getCapturaId()),
+                    e.getCreadoEn()
             ));
         }
         return out;

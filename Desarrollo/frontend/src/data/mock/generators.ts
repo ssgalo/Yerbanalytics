@@ -326,6 +326,7 @@ export function buildNursery(
   const byId: Record<string, Sector> = {};
   /** Antigüedad de la lectura por zona: los diagnósticos la usan como sello temporal. */
   const agoPorZona: Record<string, string> = {};
+  const lecturaPorZona: Record<string, number | null> = {};
 
   const zonas: Zona[] = zonaList.map((z, zonaIdx) => {
     // Lectura del nodo testigo: una por macro-zona, compartida por sus 100 sectores.
@@ -341,11 +342,15 @@ export function buildNursery(
     const metrics = offlineOnly ? offlineMetrics() : conHumedadDemo(z.id, makeLectura(r, sesgo));
     const piso: Status = offlineOnly ? 'offline' : pisoDeZona(metrics);
 
-    const ago = offlineOnly ? 'hace —' : 'hace ' + Math.round(rr(r, 4, 28)) + ' min';
+    // El texto y la marca de tiempo salen de la misma antigüedad, como en el backend
+    const minutos = Math.round(rr(r, 4, 28));
+    const ago = offlineOnly ? 'hace —' : 'hace ' + minutos + ' min';
+    const ts = offlineOnly ? null : Date.now() - minutos * 60_000;
     agoPorZona[z.id] = ago;
+    lecturaPorZona[z.id] = ts;
     const lectura = {
       metrics,
-      ts: offlineOnly ? null : Date.now() - Math.round(rr(r, 4, 28)) * 60_000,
+      ts,
       ago,
       stale: offlineOnly,
     };
@@ -430,6 +435,7 @@ export function buildNursery(
         thumb: tints[d.estado] || tints['Sin diagnóstico'],
         imagenUrl: capturaDemo(d.estado, dn),
         time: agoPorZona[s.zona] ?? 'hace —',
+        creadoEn: lecturaPorZona[s.zona] ?? null,
         concluyente: (d.conf as number) >= 85,
       };
     });
@@ -449,10 +455,12 @@ export function buildNursery(
       thumb: tints['No concluyente'],
       imagenUrl: capturaDemo('No concluyente', dn),
       time: agoPorZona[s.zona] ?? 'hace —',
+      creadoEn: lecturaPorZona[s.zona] ?? null,
       concluyente: false,
     });
   });
-  diagnoses.sort((a, b) => a.time.localeCompare(b.time));
+  // Más recientes primero; sin fecha, al final (igual que el backend)
+  diagnoses.sort((a, b) => (b.creadoEn ?? -Infinity) - (a.creadoEn ?? -Infinity));
   stats.diagCount = diagnoses.length;
   const diagById: Record<string, DiagnosisCard> = {};
   diagnoses.forEach((d) => (diagById[d.id] = d));

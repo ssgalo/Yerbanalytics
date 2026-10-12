@@ -209,6 +209,7 @@ class DiagnosticoControllerTest {
         String creado = alta(Map.of("capturaId", capturaId,
                 "estado", "Clorosis", "conf", 95.0, "sev", "Alta"));
         String id = json.readTree(creado).get("id").asText();
+        long creadoEn = json.readTree(creado).get("creadoEn").asLong();
 
         // Aparece como una tarjeta más, con su imagen real, indistinguible de una que emitiría
         // el modelo. El dashboard no sabe de dónde salió.
@@ -217,6 +218,8 @@ class DiagnosticoControllerTest {
                 .andExpect(jsonPath("$.diagnoses[?(@.id=='" + id + "')]").exists())
                 .andExpect(jsonPath("$.diagnoses[?(@.id=='" + id + "')].imagenUrl")
                         .value("/api/capturas/" + capturaId + "/imagen"))
+                // Con la fecha real del alta, no sólo el "hace N min" ya redactado
+                .andExpect(jsonPath("$.diagnoses[?(@.id=='" + id + "')].creadoEn").value(creadoEn))
                 .andExpect(jsonPath("$.diagById['" + id + "']").exists());
     }
 
