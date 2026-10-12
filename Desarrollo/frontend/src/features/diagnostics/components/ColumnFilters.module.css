@@ -1,0 +1,93 @@
+/* Cuerpo de los filtros del menú de columna */
+
+.body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.caption {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.hint {
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* Casillas */
+.list {
+  display: grid;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-s);
+  padding: 4px 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  font-size: var(--t-13);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--card-2);
+}
+
+.option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+.all {
+  font-weight: 600;
+  border-bottom: 1px solid var(--line2);
+  margin-bottom: 2px;
+  padding-bottom: 8px;
+}
+
+.count {
+  margin-left: auto;
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+}
+
+.none {
+  padding: 6px 10px;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* Rango: dos campos lado a lado; las fechas, una debajo de la otra */
+.range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stacked {
+  grid-template-columns: 1fr;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line2);
+}
+
+.push {
+  margin-left: auto;
+}

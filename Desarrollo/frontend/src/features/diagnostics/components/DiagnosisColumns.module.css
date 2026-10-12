@@ -1,0 +1,66 @@
+/* Barra de columnas: el encabezado de tabla de la grilla de tarjetas */
+
+.bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  flex: 1;
+  min-width: 0;
+}
+
+/* Separadores de celda, como en una planilla */
+.columns > * + * {
+  border-left: 1px solid var(--line);
+}
+
+.columns > :first-child button:first-child {
+  border-radius: var(--r-l) 0 0 var(--r-l);
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-left: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.count {
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+.count b {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+}
+
+@media (max-width: 900px) {
+  .bar {
+    flex-direction: column;
+  }
+  .columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .columns > :nth-child(3n + 1) {
+    border-left: 0;
+  }
+  .columns > :nth-child(n + 4) {
+    border-top: 1px solid var(--line);
+  }
+  .result {
+    justify-content: flex-end;
+    padding: 8px 14px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}

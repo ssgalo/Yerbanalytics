@@ -24,6 +24,7 @@ describe('HttpRepository · resolución de imágenes', () => {
     sevInk: '#000',
     thumb: 'linear-gradient(#000,#fff)',
     time: 'recién',
+    creadoEn: 0,
     concluyente: true,
     imagenUrl,
   });

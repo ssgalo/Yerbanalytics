@@ -169,6 +169,12 @@ export interface DiagnosisCard {
    * diagnósticos que se derivan del estado del sector, y entonces la vista usa `thumb`.
    */
   imagenUrl?: string | null;
+  /**
+   * Momento del diagnóstico (ms epoch): el alta, si nació de una captura; la última lectura de la
+   * zona, si se deriva del sector. `null` si la zona nunca reportó. `time` es el mismo dato ya
+   * redactado ("hace 12 min").
+   */
+  creadoEn: number | null;
 }
 
 /** Evento del feed de actividad del sistema. */

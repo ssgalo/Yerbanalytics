@@ -37,6 +37,15 @@ const ESTADOS: [string, string, string][] = [
   ['--info', '#2D6FB5', 'El sistema actuó: riego, acciones, traza'],
 ];
 
+const CLASES_DIAGNOSTICO: [string, string, string][] = [
+  ['--dx-sano', '#57965F', 'Sano'],
+  ['--dx-clorosis', '#C2B14E', 'Clorosis'],
+  ['--dx-estres', '#C4843E', 'Estrés solar'],
+  ['--dx-plaga', '#4F8F86', 'Plaga foliar'],
+  ['--dx-fungico', '#7A5A40', 'Daño fúngico'],
+  ['--dx-nc', '#9BA39E', 'No concluyente · rayado con --dx-nc-2'],
+];
+
 const TODOS: Status[] = ['ok', 'warning', 'critical', 'offline'];
 
 const HUMEDAD: Pick<MetricSpec, 'label' | 'unit' | 'dec' | 'ideal' | 'warn' | 'crit'> = {
@@ -86,6 +95,8 @@ export function SistemaDisenoPage() {
           <Swatches items={BASE} />
           <h3 className={styles.h3}>Estados (los únicos colores saturados)</h3>
           <Swatches items={ESTADOS} />
+          <h3 className={styles.h3}>Clases de diagnóstico (sólo composición, nunca texto)</h3>
+          <Swatches items={CLASES_DIAGNOSTICO} />
         </section>
 
         <section className={styles.sec}>

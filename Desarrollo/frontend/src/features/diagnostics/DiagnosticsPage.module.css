@@ -1,8 +1,15 @@
 /* Layout de la página de Diagnósticos de IA */
 
-/* Grid de 4 columnas para las cards */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: ybFade 0.4s both;
+}
+
+/* Grilla de tarjetas: tantas columnas como entren, nunca más angostas que 220px */
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
 }

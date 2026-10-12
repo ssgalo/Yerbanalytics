@@ -30,6 +30,10 @@ export type IconName =
   | 'camera'
   | 'calendar'
   | 'chevron-down'
+  | 'sort'
+  | 'sort-asc'
+  | 'sort-desc'
+  | 'filter'
   | 'chevron-right'
   | 'map-pin'
   | 'rules'
@@ -201,6 +205,10 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
+  sort: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />,
+  'sort-asc': <path d="M7 20V4M3 8l4-4 4 4M14 6h7M14 12h5M14 18h3" />,
+  'sort-desc': <path d="M7 4v16M3 16l4 4 4-4M14 6h3M14 12h5M14 18h7" />,
+  filter: <path d="M3 5h18l-7 8.5V19l-4 2v-7.5Z" />,
   'chevron-right': <path d="M9 18l6-6-6-6" />,
   'map-pin': (
     <>
