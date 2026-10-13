@@ -7,10 +7,12 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -53,6 +55,14 @@ import java.util.regex.Pattern;
  * sigue teniendo todas las reglas. El barrido tampoco repite lo que ya registró la telemetría. Es estado en memoria:
  * tras un reinicio se registra una vez más y {@link #reiniciarEstado()} lo limpia al regenerar la topología.
  *
+ * <p><b>Y a lo sumo una vez cada {@code yerbanalytics.historial.inaccion-intervalo-min} por sector.</b> "Sólo ante un
+ * cambio" no alcanza con lecturas ruidosas: la lectura es de la macro-zona, así que si oscila alrededor de un umbral
+ * (la humedad cruzando el de riego, el estado de la zona alternando entre ok y warning) cambia la decisión de los 100
+ * sectores en cada mensaje, y con el sondeo cada 60 s eran ~7.800 filas por minuto (cientos de miles por hora). Un
+ * cambio dentro del intervalo no se escribe ni se marca: se compara siempre contra lo último ESCRITO, así que si al
+ * vencer el intervalo la decisión sigue distinta se registra la vigente, y si volvió a la registrada no se escribe
+ * nada. La traza del Inspector sigue mostrando cada evaluación; esto sólo acota lo que queda en el historial.
+ *
  * <p><b>Ese estado se marca recién tras el commit.</b> {@code updateTelemetry} y el barrido evalúan dentro de una
  * transacción: si se marcara "inacción registrada" o "alerta del ciclo enviada" antes y la transacción revirtiera, la
  * memoria diría "registrado" para filas que no existen y no se volverían a escribir. Con una transacción activa las
@@ -90,13 +100,22 @@ public class ActionExecutor {
      * Una por origen: la telemetría y el barrido evalúan con datos distintos (el barrido, sin métricas) y no
      * deben pisarse el estado entre sí.
      */
-    private final Map<String, Map<String, String>> inaccionTelemetria = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, String>> inaccionBarrido = new ConcurrentHashMap<>();
+    private final Map<String, InaccionRegistrada> inaccionTelemetria = new ConcurrentHashMap<>();
+    private final Map<String, InaccionRegistrada> inaccionBarrido = new ConcurrentHashMap<>();
 
-    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola) {
+    /** Lo último que se escribió de un sector: la firma de cada regla y cuándo (instante de la evaluación). */
+    private record InaccionRegistrada(Map<String, String> firmas, Instant ts) {
+    }
+
+    /** Tiempo mínimo entre dos registros de inacción de un mismo sector (y origen). */
+    private final Duration intervaloInaccion;
+
+    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola,
+                          @Value("${yerbanalytics.historial.inaccion-intervalo-min:30}") long intervaloInaccionMin) {
         this.historialService = historialService;
         this.publisher = publisher;
         this.cola = cola;
+        this.intervaloInaccion = Duration.ofMinutes(Math.max(0, intervaloInaccionMin));
     }
 
     /**
@@ -180,9 +199,9 @@ public class ActionExecutor {
     }
 
     /**
-     * Escribe las filas "Info" del sector sólo si su decisión cambió (cualquier regla): en ese caso, el conjunto
-     * completo de la evaluación. Si la escritura falla se propaga y NO se da por registrada: la próxima evaluación
-     * lo reintenta.
+     * Escribe las filas "Info" del sector sólo si su decisión cambió (cualquier regla) y pasó el intervalo mínimo
+     * desde el último registro: en ese caso, el conjunto completo de la evaluación. Si la escritura falla se propaga
+     * y NO se da por registrada: la próxima evaluación lo reintenta.
      */
     private void registrarInacciones(List<RuleAction> actions, RuleContext ctx, OrigenEvaluacion origen) {
         List<RuleAction> inacciones = actions.stream().filter(ActionExecutor::esInaccion).toList();
@@ -200,26 +219,32 @@ public class ActionExecutor {
         }
         String sectorId = ctx.sector().getId();
         boolean telemetria = origen == OrigenEvaluacion.TELEMETRIA;
-        Map<String, Map<String, String>> propio = telemetria ? inaccionTelemetria : inaccionBarrido;
         Pendiente pendiente = pendiente();
-        Map<String, String> previa = ultimaInaccion(telemetria, sectorId, pendiente);
-        if (actual.equals(previa)) {
+        InaccionRegistrada previa = ultimaInaccion(telemetria, sectorId, pendiente);
+        if (previa != null && actual.equals(previa.firmas())) {
             return;
         }
         // El barrido no repite lo que la telemetría ya dejó asentado.
-        if (!telemetria && actual.equals(ultimaInaccion(true, sectorId, pendiente))) {
-            marcarInaccion(false, sectorId, actual, pendiente);
+        if (!telemetria) {
+            InaccionRegistrada deTelemetria = ultimaInaccion(true, sectorId, pendiente);
+            if (deTelemetria != null && actual.equals(deTelemetria.firmas())) {
+                marcarInaccion(false, sectorId, new InaccionRegistrada(actual, ctx.now()), pendiente);
+                return;
+            }
+        }
+        // Cambió, pero el sector se registró hace poco: se espera, sin marcar nada, a que venza el intervalo.
+        if (previa != null && ctx.now().isBefore(previa.ts().plus(intervaloInaccion))) {
             return;
         }
         for (RuleAction a : inacciones) {
             historialService.registrarInaccion(ctx.sector(), a.type(), a.ruleName(), a.motivo());
         }
-        marcarInaccion(telemetria, sectorId, actual, pendiente);
+        marcarInaccion(telemetria, sectorId, new InaccionRegistrada(actual, ctx.now()), pendiente);
     }
 
-    private Map<String, String> ultimaInaccion(boolean telemetria, String sectorId, Pendiente pendiente) {
+    private InaccionRegistrada ultimaInaccion(boolean telemetria, String sectorId, Pendiente pendiente) {
         if (pendiente != null) {
-            Map<String, String> enVuelo = (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).get(sectorId);
+            InaccionRegistrada enVuelo = (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).get(sectorId);
             if (enVuelo != null) {
                 return enVuelo;
             }
@@ -228,11 +253,11 @@ public class ActionExecutor {
     }
 
     /** Marca la decisión como registrada: ya, o recién tras el commit si hay una transacción en curso. */
-    private void marcarInaccion(boolean telemetria, String sectorId, Map<String, String> actual, Pendiente pendiente) {
+    private void marcarInaccion(boolean telemetria, String sectorId, InaccionRegistrada registrada, Pendiente pendiente) {
         if (pendiente != null) {
-            (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).put(sectorId, actual);
+            (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).put(sectorId, registrada);
         } else {
-            (telemetria ? inaccionTelemetria : inaccionBarrido).put(sectorId, actual);
+            (telemetria ? inaccionTelemetria : inaccionBarrido).put(sectorId, registrada);
         }
     }
 
@@ -246,8 +271,8 @@ public class ActionExecutor {
      */
     private final class Pendiente implements TransactionSynchronization {
         final Map<String, Instant> alertas = new HashMap<>();
-        final Map<String, Map<String, String>> inaccionTelemetria = new HashMap<>();
-        final Map<String, Map<String, String>> inaccionBarrido = new HashMap<>();
+        final Map<String, InaccionRegistrada> inaccionTelemetria = new HashMap<>();
+        final Map<String, InaccionRegistrada> inaccionBarrido = new HashMap<>();
 
         @Override
         public void afterCommit() {

@@ -46,7 +46,7 @@ class ActionExecutorTransaccionTest {
         ComandoActuadorPublisher publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego());
+        executor = new ActionExecutor(historial, publisher, new ColaRiego(), 0);
     }
 
     @AfterEach

@@ -41,7 +41,7 @@ class ActionExecutorPublicacionTest {
         publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c-1", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego());
+        executor = new ActionExecutor(historial, publisher, new ColaRiego(), 0);
         ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-1");
         sector = RuleContextTestFactory.sectorBasico("MZ-1-001");
         sector.setZona(zona);

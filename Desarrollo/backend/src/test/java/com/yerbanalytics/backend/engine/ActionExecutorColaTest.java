@@ -45,7 +45,7 @@ class ActionExecutorColaTest {
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
         cola = new ColaRiego();
-        executor = new ActionExecutor(historial, publisher, cola);
+        executor = new ActionExecutor(historial, publisher, cola, 0);
     }
 
     private static RuleContext ctx(String zonaId, int n, String inicioCiclo) {

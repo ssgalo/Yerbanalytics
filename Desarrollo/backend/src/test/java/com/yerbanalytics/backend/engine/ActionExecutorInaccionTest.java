@@ -43,15 +43,19 @@ class ActionExecutorInaccionTest {
         ComandoActuadorPublisher publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego());
+        executor = new ActionExecutor(historial, publisher, new ColaRiego(), 0);
     }
 
     private static RuleContext ctx(String sectorId) {
+        return ctx(sectorId, AHORA);
+    }
+
+    private static RuleContext ctx(String sectorId, Instant ahora) {
         ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-2");
         SectorEntity sector = RuleContextTestFactory.sectorBasico(sectorId);
         sector.setZona(zona);
         return new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
-                "ok", AHORA, null, false);
+                "ok", ahora, null, false);
     }
 
     /** Lo que emiten tres reglas con la humedad dada: dos "no aplica / sin déficit" y una que bloquea. */
@@ -191,6 +195,66 @@ class ActionExecutorInaccionTest {
         evaluar("MZ-2-001", decision(40.0), OrigenEvaluacion.TELEMETRIA);
 
         verify(historial, never()).registrarInaccion(any(), any(), any(), any());
+    }
+
+    // ------------------------------------------------------------------ intervalo mínimo entre registros
+
+    /** Con la lectura de la zona oscilando alrededor de un umbral, la decisión cambia en cada mensaje. */
+    private static List<RuleAction> oscilante(int mensaje) {
+        return List.of(RuleAction.noopInfo("SupplyRule",
+                "Sector en estado '" + (mensaje % 2 == 0 ? "ok" : "warning") + "' — dosificación solo en crítico."));
+    }
+
+    private ActionExecutor conIntervalo(long minutos) {
+        ComandoActuadorPublisher publisher = mock(ComandoActuadorPublisher.class);
+        return new ActionExecutor(historial, publisher, new ColaRiego(), minutos);
+    }
+
+    @Test
+    @DisplayName("una decisión que oscila en cada mensaje (cada 60 s) se registra a lo sumo una vez por intervalo")
+    void decisionOscilante_unaVezPorIntervalo() {
+        ActionExecutor ex = conIntervalo(30);
+        for (int minuto = 0; minuto < 120; minuto++) {
+            ex.execute(oscilante(minuto), ctx("MZ-2-001", AHORA.plusSeconds(60L * minuto)), OrigenEvaluacion.TELEMETRIA);
+        }
+
+        filas(4);   // minutos 0, 31, 62 y 93: el primer cambio tras vencer cada intervalo
+    }
+
+    @Test
+    @DisplayName("el primer registro de un sector es inmediato; un cambio dentro del intervalo espera a que venza")
+    void cambioDentroDelIntervalo_esperaYRegistraElVigente() {
+        ActionExecutor ex = conIntervalo(30);
+        ex.execute(List.of(RuleAction.noopInfo("R", "a")), ctx("MZ-2-001", AHORA), OrigenEvaluacion.TELEMETRIA);
+        filas(1);
+
+        ex.execute(List.of(RuleAction.noopInfo("R", "b")), ctx("MZ-2-001", AHORA.plusSeconds(600)), OrigenEvaluacion.TELEMETRIA);
+        filas(1);
+
+        ex.execute(List.of(RuleAction.noopInfo("R", "b")), ctx("MZ-2-001", AHORA.plusSeconds(1800)), OrigenEvaluacion.TELEMETRIA);
+        verify(historial).registrarInaccion(any(), eq(ActionType.NOOP_INFO), eq("R"), eq("b"));
+        filas(2);
+    }
+
+    @Test
+    @DisplayName("si dentro del intervalo vuelve a la decisión registrada, no se escribe nada")
+    void vuelveALaRegistradaDentroDelIntervalo_noEscribe() {
+        ActionExecutor ex = conIntervalo(30);
+        ex.execute(List.of(RuleAction.noopInfo("R", "a")), ctx("MZ-2-001", AHORA), OrigenEvaluacion.TELEMETRIA);
+        ex.execute(List.of(RuleAction.noopInfo("R", "b")), ctx("MZ-2-001", AHORA.plusSeconds(60)), OrigenEvaluacion.TELEMETRIA);
+        ex.execute(List.of(RuleAction.noopInfo("R", "a")), ctx("MZ-2-001", AHORA.plusSeconds(3600)), OrigenEvaluacion.TELEMETRIA);
+
+        filas(1);
+    }
+
+    @Test
+    @DisplayName("el intervalo es por sector: registrar uno no demora a otro")
+    void intervaloPorSector() {
+        ActionExecutor ex = conIntervalo(30);
+        ex.execute(decision(40.0), ctx("MZ-2-001", AHORA), OrigenEvaluacion.TELEMETRIA);
+        ex.execute(decision(40.0), ctx("MZ-2-002", AHORA.plusSeconds(60)), OrigenEvaluacion.TELEMETRIA);
+
+        filas(6);
     }
 
     // ------------------------------------------------------------------ reinicio y fallos
