@@ -1,7 +1,6 @@
 /* Marco de las pantallas sin shell (login, cambio de contraseña): marca a la izquierda, tarjeta a la derecha. */
 import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/Card';
-import { Icon } from '@/components/ui/Icon';
 import styles from './Auth.module.css';
 
 export function PantallaAuth({ children }: { children: ReactNode }) {
@@ -9,13 +8,8 @@ export function PantallaAuth({ children }: { children: ReactNode }) {
     <div className={styles.pantalla}>
       <aside className={styles.marca}>
         <div className={styles.marcaLogo}>
-          <div className={styles.logo}>
-            <Icon name="leaf" size={23} stroke="var(--on-brand)" strokeWidth={1.9} />
-          </div>
-          <div>
-            <div className={styles.marcaNombre}>Yerbanalytics</div>
-            <div className={styles.marcaSub}>Monitoreo IA</div>
-          </div>
+          <img className={styles.logo} src="/yerbanalytics_simbolo.svg" alt="" />
+          <img className={styles.marcaNombre} src="/yerbanalytics_texto.svg" alt="Yerbanalytics" />
         </div>
         <div className={styles.marcaLema}>Cada plantín, mirado de cerca.</div>
         <p className={styles.marcaTexto}>

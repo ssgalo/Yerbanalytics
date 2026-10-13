@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
 import { useDemoExpo } from '@/hooks/DemoExpoContext';
 import { useAuth } from '@/hooks/AuthContext';
@@ -64,15 +64,10 @@ export function Sidebar() {
 
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.brand}>
-        <div className={styles.logo}>
-          <Icon name="leaf" size={22} stroke="var(--on-brand)" strokeWidth={1.9} />
-        </div>
-        <div style={{ lineHeight: 1.05 }}>
-          <div className={styles.brandName}>Yerbanalytics</div>
-          <div className={styles.brandSub}>Monitoreo IA</div>
-        </div>
-      </div>
+      <Link to="/" className={styles.brand} aria-label="Ir al panel general">
+        <img className={styles.logo} src="/yerbanalytics_simbolo.svg" alt="" />
+        <img className={styles.brandName} src="/yerbanalytics_texto.svg" alt="Yerbanalytics" />
+      </Link>
 
       {principal.length > 0 && (
         <>
