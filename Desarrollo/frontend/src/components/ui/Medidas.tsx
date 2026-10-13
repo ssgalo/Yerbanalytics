@@ -21,7 +21,8 @@ export function CompositionBar({ counts }: { counts: Partial<Record<Status, numb
 }
 
 interface RangeBarProps {
-  value: number;
+  /** Sin valor, la barra muestra sólo las bandas (p. ej. al editarlas). */
+  value?: number;
   spec: Pick<MetricSpec, 'label' | 'unit' | 'dec' | 'ideal' | 'warn' | 'crit'>;
   /** Muestra debajo los extremos de la banda crítica. */
   scale?: boolean;
@@ -37,11 +38,11 @@ export function RangeBar({ value, spec, scale = false }: RangeBarProps) {
       <div
         className={styles.rangebar}
         role="img"
-        aria-label={`${spec.label}: ${f(value)} ${spec.unit}; ideal entre ${f(spec.ideal[0])} y ${f(spec.ideal[1])}`}
+        aria-label={`${spec.label}: ${value !== undefined ? `${f(value)} ${spec.unit}; ` : ''}ideal entre ${f(spec.ideal[0])} y ${f(spec.ideal[1])}`}
       >
         <span className={styles.bandWarn} style={tramo(spec.warn[0], spec.warn[1])} />
         <span className={styles.bandIdeal} style={tramo(spec.ideal[0], spec.ideal[1])} />
-        <span className={styles.mark} style={{ left: `${pos(value)}%` }} />
+        {value !== undefined && <span className={styles.mark} style={{ left: `${pos(value)}%` }} />}
       </div>
       {scale && (
         <div className={styles.scale} aria-hidden="true">

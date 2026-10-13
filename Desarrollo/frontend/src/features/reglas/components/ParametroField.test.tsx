@@ -59,7 +59,7 @@ describe('ParametroField', () => {
 
   it('invalid marca el campo', () => {
     render(<ParametroField parametro={base} valor="99" invalid onChange={() => undefined} />);
-    expect(screen.getByLabelText(base.etiqueta).className).toMatch(/inputError/);
+    expect(screen.getByLabelText(base.etiqueta).getAttribute('aria-invalid')).toBe('true');
   });
 
   it('HORA usa un input de hora', () => {

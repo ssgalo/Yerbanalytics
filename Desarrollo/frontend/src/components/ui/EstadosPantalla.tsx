@@ -12,10 +12,20 @@ interface SaveBarProps {
   /** Texto del botón de guardar: se recomienda que lleve a una confirmación con motivo. */
   saveLabel?: string;
   saving?: boolean;
+  /** Hay cambios pero no se pueden guardar todavía (p. ej. un valor inválido): se puede descartar. */
+  saveDisabled?: boolean;
 }
 
 /** Barra de guardado común: la misma en toda vista que edita. */
-export function SaveBar({ count, detalle, onDiscard, onSave, saveLabel = 'Revisar y guardar', saving }: SaveBarProps) {
+export function SaveBar({
+  count,
+  detalle,
+  onDiscard,
+  onSave,
+  saveLabel = 'Revisar y guardar',
+  saving,
+  saveDisabled,
+}: SaveBarProps) {
   if (count <= 0) return null;
   return (
     <div className={styles.savebar} role="region" aria-label="Cambios sin guardar">
@@ -30,7 +40,7 @@ export function SaveBar({ count, detalle, onDiscard, onSave, saveLabel = 'Revisa
       <button type="button" className={styles.saveGhost} onClick={onDiscard} disabled={saving}>
         Descartar
       </button>
-      <button type="button" className={styles.saveLight} onClick={onSave} disabled={saving}>
+      <button type="button" className={styles.saveLight} onClick={onSave} disabled={saving || saveDisabled}>
         {saving ? 'Guardando…' : saveLabel}
       </button>
     </div>

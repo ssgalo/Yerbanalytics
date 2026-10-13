@@ -1,0 +1,231 @@
+/* Editor de umbrales: una barra por métrica con sus zonas y manijas, y los valores debajo */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 4px;
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 18px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px 28px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line2);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+@media (max-width: 960px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.metricName {
+  font-size: var(--t-15);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.metricUnit {
+  font-size: var(--t-13);
+  font-weight: 400;
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.editor {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* --- Barra --- */
+
+/* Margen lateral para que una manija en el extremo no quede cortada. */
+.bar {
+  position: relative;
+  height: 28px;
+  margin: 0 6px;
+  touch-action: none;
+}
+
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--crit-line);
+}
+
+.track span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.zoneCrit {
+  background: var(--crit-line);
+}
+
+.zoneWarn {
+  background: var(--warn-line);
+}
+
+/* Franja amarilla donde ya se emite alerta: la misma tinta, rayada. */
+.zoneAlert {
+  background: repeating-linear-gradient(135deg, var(--warn-line) 0 5px, var(--warn) 5px 7px);
+}
+
+.zoneIdeal {
+  background: var(--ok-line);
+}
+
+.swIdeal {
+  background: var(--ok-line);
+}
+
+.swWarn {
+  background: var(--warn-line);
+}
+
+.swAlert {
+  background: repeating-linear-gradient(135deg, var(--warn-line) 0 3px, var(--warn) 3px 5px);
+}
+
+.swCrit {
+  background: var(--crit-line);
+}
+
+/* Manija de un borde de banda: una pastilla blanca con borde. */
+.knob,
+.knobAlert {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.knob {
+  width: 12px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1.5px solid var(--ink-2);
+  box-shadow: 0 1px 2px rgba(21, 35, 27, 0.18);
+  z-index: 2;
+}
+
+/* Manija de un punto de alerta: un rombo ámbar, más chico, para no confundirla con un borde. */
+.knobAlert {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--warn);
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 1px var(--warn-ink);
+  transform: translate(-50%, -50%) rotate(45deg);
+  z-index: 3;
+}
+
+.knob:active,
+.knobAlert:active {
+  cursor: grabbing;
+}
+
+.knob:focus-visible,
+.knobAlert:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.knob[aria-disabled='true'],
+.knobAlert[aria-disabled='true'] {
+  cursor: default;
+}
+
+/* --- Valores --- */
+.fields {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fieldAlert .fieldLabel {
+  color: var(--warn-ink);
+}
+
+.input {
+  height: 36px;
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--crit-ink);
+}

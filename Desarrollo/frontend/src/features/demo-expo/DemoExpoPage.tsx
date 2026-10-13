@@ -21,7 +21,7 @@ function Desactivada() {
     <Card className={styles.aviso}>
       <p className={styles.avisoTitulo}>La sección Demo Expo está desactivada.</p>
       <p className={styles.avisoTexto}>
-        Activala en <Link to="/configuracion">Configuración</Link>.
+        Activala en <Link to="/preferencias">Preferencias</Link>.
       </p>
     </Card>
   );

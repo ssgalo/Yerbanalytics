@@ -10,6 +10,8 @@ import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
+import { PlanRustificacionError } from '@/data/planRustificacionError';
+import { HORARIO_MEDIASOMBRA_DEFAULT } from '@/lib/planRustificacion';
 import { SecuenciaRechazadaError } from '@/data/secuenciaError';
 import type {
   ActionRecord,
@@ -30,6 +32,8 @@ import type {
   TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
+  NuevoPlanRustificacion,
+  PlanRustificacion,
 } from '@/types/domain';
 
 export class HttpRepository implements DataRepository {
@@ -87,14 +91,7 @@ export class HttpRepository implements DataRepository {
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener la configuración desde ${this.baseUrl}`);
     }
-    const data = (await res.json()) as Configuracion;
-    // Normalizar campos nuevos que pueden venir null si la fila existía antes de la migración
-    if (data.operativa) {
-      data.operativa.intervaloSensadoMinutos = data.operativa.intervaloSensadoMinutos ?? 240;
-      data.operativa.intervaloEvaluacionMinutos = data.operativa.intervaloEvaluacionMinutos ?? 5;
-      data.operativa.sensingPullIntervalSeconds = data.operativa.sensingPullIntervalSeconds ?? 60;
-    }
-    return data;
+    return normalizeConfig((await res.json()) as Configuracion);
   }
 
   async saveConfig(config: Configuracion): Promise<Configuracion> {
@@ -108,7 +105,41 @@ export class HttpRepository implements DataRepository {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? `Error ${res.status} al guardar la configuración`);
     }
-    return (await res.json()) as Configuracion;
+    return normalizeConfig((await res.json()) as Configuracion);
+  }
+
+  async getPlanRustificacion(zonaId: string): Promise<PlanRustificacion | null> {
+    const res = await apiFetch(`${this.baseUrl}/zonas/${encodeURIComponent(zonaId)}/rustificacion?t=${Date.now()}`);
+    // 204: la macro-zona no tiene un plan vigente.
+    if (res.status === 204) return null;
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener el plan de rustificación de ${zonaId}`);
+    }
+    return (await res.json()) as PlanRustificacion;
+  }
+
+  async iniciarPlanRustificacion(zonaId: string, plan: NuevoPlanRustificacion): Promise<PlanRustificacion> {
+    return this.postPlan(`${this.baseUrl}/zonas/${encodeURIComponent(zonaId)}/rustificacion`, 'iniciar', plan);
+  }
+
+  async cancelarPlanRustificacion(zonaId: string): Promise<PlanRustificacion> {
+    return this.postPlan(`${this.baseUrl}/zonas/${encodeURIComponent(zonaId)}/rustificacion/cancelar`, 'cancelar');
+  }
+
+  /** POST de los planes: 400 y 409 traen { error } y son rechazos esperables, no una falla. */
+  private async postPlan(url: string, accion: string, body?: unknown): Promise<PlanRustificacion> {
+    const res = await apiFetch(url, {
+      method: 'POST',
+      ...(body !== undefined && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    });
+    if (res.status === 400 || res.status === 409) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new PlanRustificacionError(err?.error ?? `No se pudo ${accion} el plan de rustificación.`);
+    }
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al ${accion} el plan de rustificación`);
+    }
+    return (await res.json()) as PlanRustificacion;
   }
 
   async getHardware(): Promise<HardwareData> {
@@ -329,4 +360,20 @@ export class HttpRepository implements DataRepository {
     }
     return ((await res.json()) as { visible: boolean }).visible === true;
   }
+}
+
+/**
+ * Completa los campos que el backend todavía no manda (filas previas a una migración, o campos
+ * que aún no implementa, como el horario por defecto de la mediasombra).
+ */
+function normalizeConfig(data: Configuracion): Configuracion {
+  if (data.operativa) {
+    const op = data.operativa;
+    op.intervaloSensadoMinutos = op.intervaloSensadoMinutos ?? 240;
+    op.intervaloEvaluacionMinutos = op.intervaloEvaluacionMinutos ?? 5;
+    op.sensingPullIntervalSeconds = op.sensingPullIntervalSeconds ?? 60;
+    op.mediasombraAbiertaDesde = op.mediasombraAbiertaDesde ?? HORARIO_MEDIASOMBRA_DEFAULT.desde;
+    op.mediasombraAbiertaHasta = op.mediasombraAbiertaHasta ?? HORARIO_MEDIASOMBRA_DEFAULT.hasta;
+  }
+  return data;
 }

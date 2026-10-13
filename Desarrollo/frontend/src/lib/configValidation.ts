@@ -6,12 +6,8 @@
    las specs base.
    ============================================================ */
 import { specs } from '@/data/mock/specs';
-import type {
-  Configuracion,
-  ConfigOperativa,
-  MetricThreshold,
-  RustificacionEtapa,
-} from '@/types/domain';
+import type { Configuracion, ConfigOperativa, MetricThreshold } from '@/types/domain';
+import { horarioError } from './horario';
 
 /** Mirrors the backend range for sensingPullIntervalSeconds. */
 export const SENSING_PULL_MIN_SECONDS = 10;
@@ -20,6 +16,12 @@ export const SENSING_PULL_MAX_SECONDS = 3600;
 const factoryByKey = new Map(specs.map((s) => [s.key, s]));
 
 const fmt = (v: number) => String(v);
+
+/** Medio de una franja redondeado a `dec` decimales: el punto de alerta de fábrica (igual que el backend). */
+export function bandMidpoint(from: number, to: number, dec: number): number {
+  const scale = 10 ** dec;
+  return Math.round(((from + to) / 2) * scale) / scale;
+}
 
 /** Error de coherencia/envelope de una banda de métrica, o null si es válida. */
 export function umbralError(u: MetricThreshold): string | null {
@@ -30,7 +32,10 @@ export function umbralError(u: MetricThreshold): string | null {
     u.idealMax <= u.warnMax &&
     u.warnMax <= u.critMax;
   if (!coherente) {
-    return `Bandas incoherentes en «${u.label}»: crit mín ≤ warn mín ≤ ideal mín < ideal máx ≤ warn máx ≤ crit máx.`;
+    return `Bandas incoherentes en «${u.label}»: el ideal debe quedar dentro del crítico y el crítico dentro del rango fisiológico.`;
+  }
+  if (u.alertMin < u.warnMin || u.alertMin > u.idealMin || u.alertMax < u.idealMax || u.alertMax > u.warnMax) {
+    return `Bandas incoherentes en «${u.label}»: cada punto de alerta debe quedar entre el crítico y el ideal de su lado.`;
   }
   const f = factoryByKey.get(u.key);
   if (f) {
@@ -59,36 +64,13 @@ export function operativaErrors(op: ConfigOperativa): string[] {
       `La frecuencia de pedido de lectura debe ser un entero entre ${SENSING_PULL_MIN_SECONDS} y ${SENSING_PULL_MAX_SECONDS} segundos.`,
     );
   }
+  const horario = horarioError(op.mediasombraAbiertaDesde, op.mediasombraAbiertaHasta);
+  if (horario) out.push(`Horario de la mediasombra: ${horario}`);
   return out;
 }
 
-/** Error del plan de rustificación (días invertidos, solapamiento, % fuera de rango). */
-export function etapasError(etapas: RustificacionEtapa[], aperturaMax: number): string | null {
-  if (!etapas || etapas.length === 0) return null;
-  const ordenadas = [...etapas].sort((a, b) => a.diaDesde - b.diaDesde);
-  let prevHasta = 0;
-  for (const et of ordenadas) {
-    if (et.diaDesde < 1 || et.diaDesde > et.diaHasta) {
-      return 'Etapa de rustificación inválida: «día desde» debe ser ≥ 1 y ≤ «día hasta».';
-    }
-    if (et.diaDesde <= prevHasta) {
-      return 'Las etapas de rustificación no pueden solaparse en el cronograma.';
-    }
-    if (et.aperturaPct < 0 || et.aperturaPct > aperturaMax) {
-      return `La apertura de cada etapa debe estar entre 0 % y la apertura máxima (${fmt(aperturaMax)} %).`;
-    }
-    prevHasta = et.diaHasta;
-  }
-  return null;
-}
-
-/**
- * Lista de mensajes de error de toda la configuración. Vacía = válida.
- *
- * `aperturaMax` es el valor vigente de `mediasombra.apertura-maxima` del catálogo del motor de
- * reglas: el tope del plan de rustificación ya no vive en la configuración operativa.
- */
-export function validateConfig(cfg: Configuracion, aperturaMax: number): string[] {
+/** Lista de mensajes de error de toda la configuración. Vacía = válida. */
+export function validateConfig(cfg: Configuracion): string[] {
   const out: string[] = [];
   if (!cfg.umbrales || cfg.umbrales.length !== specs.length) {
     out.push(`Se esperan los umbrales de las ${specs.length} métricas.`);
@@ -99,7 +81,5 @@ export function validateConfig(cfg: Configuracion, aperturaMax: number): string[
     }
   }
   out.push(...operativaErrors(cfg.operativa));
-  const eEtapas = etapasError(cfg.rustificacion, aperturaMax);
-  if (eEtapas) out.push(eEtapas);
   return out;
 }

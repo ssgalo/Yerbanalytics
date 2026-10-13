@@ -28,6 +28,8 @@ export const VISTAS = {
   demoExpo: { ruta: '/demo-expo', permisos: ['pasadas.ver', 'vivero.ver'] },
   historial: { ruta: '/historial', permisos: ['historial.ver'] },
   configuracion: { ruta: '/configuracion', permisos: ['configuracion.ver'] },
+  // Preferencias es parte de la misma configuración agronómica: mismo permiso.
+  preferencias: { ruta: '/preferencias', permisos: ['configuracion.ver'] },
   reglas: { ruta: '/reglas', permisos: ['reglas.ver', 'vivero.ver'] },
   hardware: { ruta: '/hardware', permisos: ['hardware.ver'] },
   topologia: { ruta: '/topologia', permisos: ['topologia.ver'] },
@@ -46,6 +48,7 @@ const ORDEN: readonly ClaveVista[] = [
   'hardware',
   'topologia',
   'usuarios',
+  'preferencias',
 ];
 
 type Puede = (permiso: Permiso) => boolean;

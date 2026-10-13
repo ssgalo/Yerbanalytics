@@ -1,203 +1,97 @@
-/* Vista principal: Configuración agronómica (HU-15) */
-import { useEffect, useMemo, useState } from 'react';
-import { Card } from '@/components/ui/Card';
+/* Vista Umbrales (Configuración agronómica, HU-15): bandas de las métricas, límites de insumos,
+   seguimiento post-acción y horario por defecto de la mediasombra. En el menú vive dentro del grupo Configuración. */
+import { useMemo } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useAuth } from '@/hooks/AuthContext';
-import { useConfig } from '@/hooks/useConfig';
-import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
-import { validateConfig } from '@/lib/configValidation';
+import { operativaErrors, umbralError } from '@/lib/configValidation';
 import { buildConfig } from '@/data/mock/config';
-import type { ConfigOperativa, Configuracion, MetricThreshold, RustificacionEtapa } from '@/types/domain';
+import type { ConfigOperativa, MetricThreshold } from '@/types/domain';
 import { UmbralesForm } from './components/UmbralesForm';
 import { LimitesActuadoresForm } from './components/LimitesActuadoresForm';
-import { RustificacionPlanForm } from './components/RustificacionPlanForm';
 import { SeguimientoForm } from './components/SeguimientoForm';
-import { IntervalosForm } from './components/IntervalosForm';
-import { DemoExpoSwitch } from './components/DemoExpoSwitch';
-import styles from './ConfiguracionPage.module.css';
-
-type Feedback = { kind: 'ok' | 'err'; msg: string } | null;
-
-function formatTs(ts: number | null): string {
-  if (!ts) return '';
-  const d = new Date(ts);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
+import { ShadeScheduleForm } from './components/ShadeScheduleForm';
+import { ConfigFieldset, ConfigLayout, ConfigRow, ConfigSection } from './components/ConfigLayout';
+import { pendingFixes, useConfigDraft } from './useConfigDraft';
 
 export function ConfiguracionPage() {
-  const { config, loading, error, saving, save } = useConfig();
-  const { puede } = useAuth();
-  // Sin `configuracion.editar` la página es de sólo lectura: los campos quedan deshabilitados
-  // y no hay botones de guardar. El interruptor de Demo Expo depende de otro permiso.
-  const editable = puede('configuracion.editar');
-  // El tope del plan de rustificación es un parámetro del motor de reglas, no de esta página.
-  const { catalogo, loading: catalogoCargando, error: catalogoError, reload: recargarCatalogo } = useCatalogoReglas();
-  // Sin el catálogo no hay tope: no se supone ninguno (100 % daría por válido un plan que el
-  // motor rechazaría) y el plan no se guarda hasta conocerlo.
-  const valorApertura = catalogo?.parametros.find((p) => p.clave === 'mediasombra.apertura-maxima')?.valor;
-  const aperturaMax = valorApertura !== undefined && Number.isFinite(Number(valorApertura)) ? Number(valorApertura) : null;
-  const [draft, setDraft] = useState<Configuracion | null>(null);
-  const [feedback, setFeedback] = useState<Feedback>(null);
+  const state = useConfigDraft();
+  const { draft, config, update } = state;
+  // Sin `configuracion.editar` la vista es de sólo lectura: campos deshabilitados, sin guardar.
+  const editable = useAuth().puede('configuracion.editar');
 
-  // El borrador se reinicia con la config cargada o recién guardada.
-  useEffect(() => {
-    if (config) setDraft(structuredClone(config));
-  }, [config]);
+  usePageTitle('Umbrales', 'Bandas de las métricas, insumos, seguimiento y horario de la mediasombra');
 
-  const errors = useMemo(() => (draft ? validateConfig(draft, aperturaMax ?? 100) : []), [draft, aperturaMax]);
-  const dirty = useMemo(
-    () => (draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false),
-    [draft, config],
+  const errors = useMemo(
+    () =>
+      draft
+        ? [...draft.umbrales.map(umbralError).filter((e): e is string => e !== null), ...operativaErrors(draft.operativa)]
+        : [],
+    [draft],
   );
 
-  usePageTitle('Configuración agronómica', 'Umbrales, límites operativos y plan de rustificación');
-
-  if (error) {
-    return (
-      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
-        No se pudo cargar la configuración: {error.message}
-      </div>
-    );
-  }
-
-  if (loading || !draft) {
-    return <div className={styles.state}>Cargando configuración…</div>;
-  }
-
   const patchUmbral = (index: number, patch: Partial<MetricThreshold>) =>
-    setDraft((d) =>
-      d ? { ...d, umbrales: d.umbrales.map((u, i) => (i === index ? { ...u, ...patch } : u)) } : d,
-    );
+    update((d) => ({ ...d, umbrales: d.umbrales.map((u, i) => (i === index ? { ...u, ...patch } : u)) }));
 
   const patchOperativa = (patch: Partial<ConfigOperativa>) =>
-    setDraft((d) => (d ? { ...d, operativa: { ...d.operativa, ...patch } } : d));
+    update((d) => ({ ...d, operativa: { ...d.operativa, ...patch } }));
 
-  const setEtapas = (rustificacion: RustificacionEtapa[]) =>
-    setDraft((d) => (d ? { ...d, rustificacion } : d));
-
-  const onSave = async () => {
-    setFeedback(null);
-    try {
-      await save(draft);
-      setFeedback({ kind: 'ok', msg: 'Configuración guardada correctamente.' });
-    } catch (e) {
-      setFeedback({ kind: 'err', msg: e instanceof Error ? e.message : String(e) });
-    }
-  };
-
+  // De fábrica, sólo lo de esta vista: bandas, dosis de insumo, seguimiento y horario de la mediasombra.
   const onReset = () => {
-    setDraft(buildConfig());
-    setFeedback(null);
+    const f = buildConfig();
+    update((d) => ({
+      ...d,
+      umbrales: f.umbrales,
+      operativa: {
+        ...d.operativa,
+        insumoDosisMax24hMl: f.operativa.insumoDosisMax24hMl,
+        seguimientoLatenciaMin: f.operativa.seguimientoLatenciaMin,
+        seguimientoDeltaMin: f.operativa.seguimientoDeltaMin,
+        mediasombraAbiertaDesde: f.operativa.mediasombraAbiertaDesde,
+        mediasombraAbiertaHasta: f.operativa.mediasombraAbiertaHasta,
+      },
+    }));
   };
-
-  const canSave = dirty && errors.length === 0 && !saving && aperturaMax !== null;
 
   return (
-    <div>
-      <p className={styles.intro}>
-        Calibrá las decisiones automáticas del sistema a la realidad del vivero. El sistema arranca con
-        valores de fábrica seguros para la yerba mate; los cambios se validan contra el rango fisiológico
-        antes de aplicarse.
-      </p>
+    <ConfigLayout
+      state={state}
+      editable={editable}
+      onReset={onReset}
+      blockedReason={pendingFixes(errors)}
+      intro="Calibrá las decisiones automáticas del sistema a la realidad del vivero. Arranca con valores de fábrica seguros para la yerba mate, y cada cambio se valida contra el rango fisiológico antes de aplicarse."
+    >
+      {draft && (
+        <>
+          <ConfigSection
+            title="Umbrales de métricas"
+            hint="Arrastrá las manijas o escribí los valores. Más allá de cada punto de alerta, la campana avisa; el estado no cambia."
+          >
+            <ConfigFieldset disabled={!editable}>
+              <UmbralesForm value={draft.umbrales} saved={config?.umbrales} disabled={!editable} onChange={patchUmbral} />
+            </ConfigFieldset>
+          </ConfigSection>
 
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Umbrales de métricas</span>
-          <span className={styles.sectionHint}>Bandas ideal · advertencia · crítico por variable</span>
-        </div>
-        <fieldset className={styles.fieldset} disabled={!editable}>
-          <UmbralesForm value={draft.umbrales} onChange={patchUmbral} />
-        </fieldset>
-      </Card>
+          <ConfigRow>
+            <ConfigSection title="Límites de insumos" hint="Topes informativos de dosis">
+              <ConfigFieldset disabled={!editable}>
+                <LimitesActuadoresForm value={draft.operativa} saved={config?.operativa} onChange={patchOperativa} />
+              </ConfigFieldset>
+            </ConfigSection>
 
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Límites de riego e insumos</span>
-          <span className={styles.sectionHint}>Topes informativos de volumen y dosis</span>
-        </div>
-        <fieldset className={styles.fieldset} disabled={!editable}>
-          <LimitesActuadoresForm value={draft.operativa} onChange={patchOperativa} />
-        </fieldset>
-      </Card>
+            <ConfigSection title="Seguimiento post-acción" hint="Cuándo y cuánto debe mejorar una métrica después de actuar">
+              <ConfigFieldset disabled={!editable}>
+                <SeguimientoForm value={draft.operativa} saved={config?.operativa} onChange={patchOperativa} />
+              </ConfigFieldset>
+            </ConfigSection>
 
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Plan de rustificación</span>
-          <span className={styles.sectionHint}>Cronograma de exposición gradual de la mediasombra</span>
-        </div>
-        {aperturaMax !== null ? (
-          <fieldset className={styles.fieldset} disabled={!editable}>
-            <RustificacionPlanForm value={draft.rustificacion} aperturaMax={aperturaMax} onChange={setEtapas} />
-          </fieldset>
-        ) : catalogoCargando && !catalogoError ? (
-          <div className={styles.state}>Cargando la apertura máxima del motor…</div>
-        ) : (
-          <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
-            No se pudo obtener la apertura máxima de la mediasombra
-            {catalogoError ? ` (${catalogoError.message})` : ''}. Sin ese tope no se puede validar el plan de
-            rustificación ni guardar la configuración.{' '}
-            <button type="button" className={styles.btnSecondary} onClick={recargarCatalogo}>
-              Reintentar
-            </button>
-          </div>
-        )}
-      </Card>
-
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Seguimiento post-acción</span>
-          <span className={styles.sectionHint}>Latencia y mejora mínima para evaluar efectividad</span>
-        </div>
-        <fieldset className={styles.fieldset} disabled={!editable}>
-          <SeguimientoForm value={draft.operativa} onChange={patchOperativa} />
-        </fieldset>
-      </Card>
-
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Frecuencia Operativa</span>
-          <span className={styles.sectionHint}>Intervalos de sensado (IoT) y ejecución de inferencia (IA)</span>
-        </div>
-        <fieldset className={styles.fieldset} disabled={!editable}>
-          <IntervalosForm value={draft.operativa} onChange={patchOperativa} />
-        </fieldset>
-      </Card>
-
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Demo Expo</span>
-          <span className={styles.sectionHint}>Preferencia de visualización · se guarda al instante</span>
-        </div>
-        <DemoExpoSwitch editable={puede('demo-expo.configurar')} />
-      </Card>
-
-      <div className={styles.actions}>
-        {draft.operativa.updatedBy && (
-          <span className={styles.audit}>
-            Última edición: {draft.operativa.updatedBy}
-            {draft.operativa.updatedTs ? ` · ${formatTs(draft.operativa.updatedTs)}` : ''}
-          </span>
-        )}
-        {feedback && (
-          <span className={feedback.kind === 'ok' ? styles.feedbackOk : styles.feedbackErr}>
-            {feedback.msg}
-          </span>
-        )}
-        <span className={styles.spacer} />
-        {editable ? (
-          <>
-            <button type="button" className={styles.btnSecondary} onClick={onReset}>
-              Restablecer valores de fábrica
-            </button>
-            <button type="button" className={styles.btnPrimary} disabled={!canSave} onClick={onSave}>
-              {saving ? 'Guardando…' : 'Guardar cambios'}
-            </button>
-          </>
-        ) : (
-          <span className={styles.soloLectura}>Sólo lectura: tu rol puede ver la configuración pero no modificarla.</span>
-        )}
-      </div>
-    </div>
+            <ConfigSection title="Mediasombra" hint="Horario de apertura por defecto, sin plan de rustificación">
+              <ConfigFieldset disabled={!editable}>
+                <ShadeScheduleForm value={draft.operativa} saved={config?.operativa} onChange={patchOperativa} />
+              </ConfigFieldset>
+            </ConfigSection>
+          </ConfigRow>
+        </>
+      )}
+    </ConfigLayout>
   );
 }

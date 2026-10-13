@@ -156,3 +156,49 @@
   margin-top: 6px;
   line-height: 1.45;
 }
+
+/* ── Grupo desplegable (Configuración) ── */
+.groupHead {
+  color: var(--ink-2);
+}
+
+/* Colapsado con una de sus vistas abierta: el encabezado dice dónde estás. */
+.groupHeadActive {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.groupHeadActive svg {
+  color: var(--brand);
+}
+
+.chevron {
+  display: grid;
+  margin-left: auto;
+  transition: transform 0.15s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Las vistas del grupo cuelgan de una guía vertical alineada con el ícono del encabezado. */
+.subNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 3px 0 2px 20px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+
+.subItem {
+  padding: 8px 10px;
+  font-size: var(--t-13);
+  gap: 9px;
+}
+
+/* La barra de acento del ítem activo sigue pegada al borde del sidebar, no a la guía. */
+.subItem.itemActive::before {
+  left: -47px;
+}

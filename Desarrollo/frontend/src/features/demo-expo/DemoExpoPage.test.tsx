@@ -100,14 +100,14 @@ const montar = (rol: Rol = 'PRODUCTOR_VIVERISTA') =>
 const btn = (nombre: RegExp) => screen.queryByRole('button', { name: nombre }) as HTMLButtonElement | null;
 
 describe('DemoExpoPage · interruptor apagado', () => {
-  it('avisa que está desactivada y enlaza a Configuración', () => {
+  it('avisa que está desactivada y enlaza a Preferencias', () => {
     estado.visible = false;
     hook(null);
 
     montar();
 
     expect(screen.getByText(/La sección Demo Expo está desactivada/)).toBeTruthy();
-    expect(screen.getByRole('link', { name: /Configuración/ }).getAttribute('href')).toBe('/configuracion');
+    expect(screen.getByRole('link', { name: /Preferencias/ }).getAttribute('href')).toBe('/preferencias');
     expect(btn(/Iniciar pasada/)).toBeNull();
   });
 });
