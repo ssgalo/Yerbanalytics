@@ -20,11 +20,15 @@ import { SectorHistory } from './components/SectorHistory';
 
 import styles from './SectorPage.module.css';
 
+/** Acciones del sector que muestra la tarjeta de historial. */
+const HISTORIAL_SECTOR = 5;
+
 export function SectorPage() {
   /* ── Hooks — todos antes de cualquier return temprano ── */
   const { id } = useParams();
   const { sector, zona, detail } = useSectorDetail(id);
-  const { records } = useHistory();
+  // Sólo las últimas del sector, recortadas en el origen: nunca el historial entero.
+  const { records } = useHistory({ sector: id, limit: HISTORIAL_SECTOR });
   const navigate = useNavigate();
   usePageTitle(
     sector ? `Sector ${sector.id}` : 'Sector',
@@ -36,7 +40,7 @@ export function SectorPage() {
     return records
       .filter((r) => r.sectorId === sector.id)
       .sort((a, b) => b.ts - a.ts)
-      .slice(0, 5)
+      .slice(0, HISTORIAL_SECTOR)
       .map((r) => ({
         tipo: r.tipo,
         t: r.time,

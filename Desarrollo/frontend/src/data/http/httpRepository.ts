@@ -78,7 +78,10 @@ export class HttpRepository implements DataRepository {
   async getHistory(filtro: FiltroHistorial = {}): Promise<ActionRecord[]> {
     const params = new URLSearchParams({ t: String(Date.now()) });
     if (filtro.tipo) params.set('tipo', filtro.tipo);
+    if (filtro.sector) params.set('sector', filtro.sector);
     if (filtro.desde != null) params.set('desde', String(filtro.desde));
+    if (filtro.hasta != null) params.set('hasta', String(filtro.hasta));
+    if (filtro.limit != null) params.set('limit', String(filtro.limit));
     const res = await apiFetch(`${this.baseUrl}/historial?${params}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el historial desde ${this.baseUrl}`);

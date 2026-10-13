@@ -32,8 +32,17 @@ import type {
 /** Filtros del historial que resuelve el origen de datos (los mismos que `GET /api/historial`). */
 export interface FiltroHistorial {
   tipo?: string;
+  /** Id exacto del sector (p. ej. `MZ-2-014`). */
+  sector?: string;
   /** Epoch ms, inclusive. */
   desde?: number;
+  /** Epoch ms, inclusive. */
+  hasta?: number;
+  /**
+   * Tope de eventos (los más recientes). El backend lo acota a su máximo y, si no se pide, aplica el suyo
+   * por defecto: nunca devuelve el historial entero.
+   */
+  limit?: number;
 }
 
 export interface DataRepository {

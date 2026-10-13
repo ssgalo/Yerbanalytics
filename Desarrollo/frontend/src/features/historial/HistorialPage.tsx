@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useHistory } from '@/hooks/useHistory';
 import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
+import { Callout } from '@/components/ui/Callout';
 import { HistorialFilters, type HistorialFilterState } from './components/HistorialFilters';
 import { HistorialTimeline } from './components/HistorialTimeline';
 import styles from './HistorialPage.module.css';
@@ -16,11 +17,25 @@ const INITIAL: HistorialFilterState = {
   hasta: '',
 };
 
+/**
+ * Eventos que se piden por consulta (los más recientes). El historial real acumula cientos de miles de
+ * eventos `Info`: bajarlo entero colgaba la pestaña y el backend.
+ */
+export const LIMITE_HISTORIAL = 1000;
+
 export function HistorialPage() {
-  const { records, loading, error } = useHistory();
-  const { schema, loading: schemaLoading } = useRuleEngineSchema();
   const [filters, setFilters] = useState<HistorialFilterState>(INITIAL);
 
+  // Tipo y fechas se resuelven en el backend; macro-zona, sector y resultado, sobre lo recibido.
+  const desdeMs = filters.desde ? new Date(`${filters.desde}T00:00:00`).getTime() : undefined;
+  const hastaMs = filters.hasta ? new Date(`${filters.hasta}T23:59:59.999`).getTime() : undefined;
+  const { records, loading, error } = useHistory({
+    tipo: filters.tipo === 'Todas' ? undefined : filters.tipo,
+    desde: desdeMs,
+    hasta: hastaMs,
+    limit: LIMITE_HISTORIAL,
+  });
+  const { schema, loading: schemaLoading } = useRuleEngineSchema();
 
   const patch = (p: Partial<HistorialFilterState>) => setFilters((f) => ({ ...f, ...p }));
 
@@ -30,24 +45,24 @@ export function HistorialPage() {
     [records],
   );
 
-  /** Filtrado en memoria, replicando el patrón de Diagnósticos. */
+  /** Filtrado en memoria de lo que el backend no recorta. */
   const filtered = useMemo(() => {
-    const desdeMs = filters.desde ? new Date(`${filters.desde}T00:00:00`).getTime() : null;
-    const hastaMs = filters.hasta ? new Date(`${filters.hasta}T23:59:59.999`).getTime() : null;
     const sectorQ = filters.sector.trim().toLowerCase();
 
     return records.filter(
       (r) =>
-        (filters.tipo === 'Todas' || r.tipo === filters.tipo) &&
         (filters.zona === 'Todas' || r.zonaName === filters.zona) &&
         (filters.resultado === 'Todas' || r.res === filters.resultado) &&
-        (sectorQ === '' || r.sectorId.toLowerCase().includes(sectorQ)) &&
-        (desdeMs === null || r.ts >= desdeMs) &&
-        (hastaMs === null || r.ts <= hastaMs),
+        (sectorQ === '' || r.sectorId.toLowerCase().includes(sectorQ)),
     );
-  }, [records, filters]);
+  }, [records, filters.zona, filters.resultado, filters.sector]);
 
-  usePageTitle('Historial y trazabilidad', `${records.length} acciones registradas`);
+  const truncado = records.length >= LIMITE_HISTORIAL;
+
+  usePageTitle(
+    'Historial y trazabilidad',
+    truncado ? `Últimas ${records.length} acciones registradas` : `${records.length} acciones registradas`,
+  );
 
   if (error) {
     return (
@@ -57,13 +72,24 @@ export function HistorialPage() {
     );
   }
 
-  if (loading) {
+  // Sólo la primera carga reemplaza la vista: al cambiar un filtro se conserva lo anterior hasta que llega lo nuevo.
+  if (loading && records.length === 0) {
     return <div className={styles.state}>Cargando historial…</div>;
   }
 
   return (
     <div className={styles.root}>
       <HistorialFilters value={filters} zonaOpts={zonaOpts} count={filtered.length} onChange={patch} />
+
+      {truncado && (
+        <div className={styles.aviso}>
+          <Callout>
+            Se muestran los {LIMITE_HISTORIAL} eventos más recientes
+            {filters.tipo !== 'Todas' || filters.desde || filters.hasta ? ' que cumplen el tipo y las fechas elegidos' : ''}.
+            Para ver más atrás, acotá por tipo de acción o por rango de fechas.
+          </Callout>
+        </div>
+      )}
 
       <div className={styles.singleColumn}>
         <HistorialTimeline

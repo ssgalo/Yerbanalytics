@@ -107,11 +107,18 @@ export class MockRepository implements DataRepository {
     if (!this.historyCache) {
       this.historyCache = buildHistory(this.seed);
     }
-    const { tipo, desde } = filtro;
-    if (tipo == null && desde == null) return this.historyCache;
-    return this.historyCache.filter(
-      (h) => (tipo == null || h.tipo === tipo) && (desde == null || h.ts >= desde),
-    );
+    const { tipo, sector, desde, hasta, limit } = filtro;
+    const filtrado =
+      tipo == null && sector == null && desde == null && hasta == null
+        ? this.historyCache
+        : this.historyCache.filter(
+            (h) =>
+              (tipo == null || h.tipo === tipo) &&
+              (sector == null || h.sectorId === sector) &&
+              (desde == null || h.ts >= desde) &&
+              (hasta == null || h.ts <= hasta),
+          );
+    return limit == null ? filtrado : filtrado.slice(0, limit);
   }
 
   async getConfig(): Promise<Configuracion> {

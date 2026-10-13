@@ -12,6 +12,11 @@
   gap: 0;
 }
 
+/* Aviso de historial recortado: mismo aire que deja la barra de filtros */
+.aviso {
+  margin-bottom: 18px;
+}
+
 /* Layout split: timeline | inspector */
 .split {
   display: grid;
