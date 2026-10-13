@@ -59,7 +59,7 @@ export function MapPage() {
           onSectorClick={(id) => navigate('/sector/' + id)}
         />
         <SensingCard className={styles.sensing} zona={zona} wide={wide} />
-        <HardeningCard className={styles.hardening} />
+        <HardeningCard className={styles.hardening} zona={zona} />
       </div>
     </div>
   );

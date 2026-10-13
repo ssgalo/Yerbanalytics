@@ -1,0 +1,257 @@
+/* Rustificación de la macro-zona: formulario del plan y plan vigente */
+
+/* --- Formulario --- */
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.formHead {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.dateInput {
+  width: 180px;
+}
+
+.summary {
+  margin: 0 0 9px;
+  font-size: var(--t-13);
+  color: var(--ink-2);
+}
+
+.summary b {
+  font-weight: 650;
+}
+
+.stages {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stages th {
+  text-align: left;
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 10px 6px 0;
+  white-space: nowrap;
+}
+
+.stages td {
+  padding: 5px 10px 5px 0;
+  vertical-align: middle;
+}
+
+.stageNum {
+  width: 44px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.daysInput {
+  width: 116px;
+  height: 34px;
+}
+
+.timeInput {
+  width: 116px;
+  height: 34px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stripCol {
+  width: 100%;
+  min-width: 160px;
+}
+
+td.stripCol {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 10px;
+}
+
+.stripNote {
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.iconBtn {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.addBtn {
+  justify-self: start;
+}
+
+.errors {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--crit-ink);
+}
+
+.errors li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* --- Plan vigente --- */
+.view {
+  display: grid;
+  gap: 14px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: var(--t-15);
+  color: var(--ink-2);
+}
+
+.status b {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.statusDates {
+  margin-left: auto;
+  font-size: var(--t-13);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line2);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  background: var(--info);
+}
+
+.today {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-m);
+  background: var(--card-2);
+  border: 1px solid var(--line2);
+}
+
+.todayLabel {
+  font-size: var(--t-13);
+  color: var(--ink-2);
+}
+
+.stageList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stageItem {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 190px) 100px minmax(120px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--r-s);
+  font-size: var(--t-13);
+}
+
+@media (max-width: 720px) {
+  .stageItem {
+    grid-template-columns: 70px minmax(0, 1fr) 90px;
+  }
+  .stageItem > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.stageCurrent {
+  background: var(--brand-soft);
+}
+
+.stagePast {
+  opacity: 0.6;
+}
+
+.stageTitle {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.stageMeta {
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.stageWindow {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.meta {
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.confirmText {
+  margin: 0 0 10px;
+}
+
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

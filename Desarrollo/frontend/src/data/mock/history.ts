@@ -87,8 +87,8 @@ const SCENARIOS: Scenario[] = [
   {
     tipo: 'Mediasombra',
     lectura: 'Plan de rustificación día 12.',
-    decision: 'Avance del cronograma: apertura gradual programada.',
-    accion: 'Cobertura ajustada de 35% a 45% por plan de rustificación.',
+    decision: 'Ventana de la etapa 2 del plan: abierta de 09:00 a 15:00.',
+    accion: 'Mediasombra abierta a las 09:00 por plan de rustificación.',
     res: 'Efectiva',
     sev: '—',
     evo: null,
@@ -198,8 +198,8 @@ const SCENARIOS: Scenario[] = [
   {
     tipo: 'Mediasombra',
     lectura: 'Plan de rustificación día 11.',
-    decision: 'Avance del cronograma: apertura gradual programada.',
-    accion: 'Cobertura ajustada de 25% a 35% por plan de rustificación.',
+    decision: 'Fin de la ventana de la etapa 2 del plan (09:00 a 15:00).',
+    accion: 'Mediasombra cerrada a las 15:00 por plan de rustificación.',
     res: 'Efectiva',
     sev: '—',
     evo: null,

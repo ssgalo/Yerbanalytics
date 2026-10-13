@@ -81,8 +81,10 @@ hardware real.
 - **Dispositivo de captura**: el equipo que toma las fotos (hoy un iPhone con la PWA de
   `Desarrollo/camara/`). Distinto del **hardware** del vivero (nodos y actuadores), que se
   registra aparte.
-- **Rustificación**: endurecimiento progresivo del plantín antes del trasplante
-  (plan por días, regula mediasombra).
+- **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
+  macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
+  está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
+  El backend todavía no lo implementa (ver `openspec/changes/add-rustificacion-por-macrozona/`).
 - **Roles** (fijos): Administrador, Ingeniero Agrónomo, Productor Viverista, Operario y
   **Servicio** (cuentas de integraciones: simulador, servicio de inferencia; no para personas).
 - **Permiso**: código del catálogo fijo en `seguridad/Permiso.java` (`reglas.ver`,
@@ -144,12 +146,16 @@ npm run dev          # http://localhost:5173
   OfflineBanner, CompositionBar, RangeBar, ConfidenceBar, SectorCell, ScrollArea (grilla desplazable
   sin barra, con fade y flechas en los bordes); y los previos Card, Badge,
   StatusDot, ProgressBar, Sparkline, Icon.
-- **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown.
+- **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown. En el Sidebar,
+  **Configuración** es un grupo desplegable (Umbrales —la vista `/configuracion`—, Rustificación,
+  Motor de reglas, Hardware, Topología, Usuarios, Preferencias); se abre solo al entrar a una de sus
+  vistas. Umbrales, Rustificación y Preferencias editan partes de la misma configuración agronómica
+  (`useConfigDraft`): cada una guarda el recurso entero.
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
   diagnostics, reglas, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
   *Parámetros* (edita el catálogo de umbrales) e *Inspector* (el grafo de reglas con la última
   evaluación de un sector). **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
-  se ve u oculta con un interruptor en Configuración.
+  se ve u oculta con un interruptor en Configuración → Preferencias.
 - **Routing**: react-router (`src/router.tsx`).
 
 ### Convenciones de estilo (sistema de diseño)
