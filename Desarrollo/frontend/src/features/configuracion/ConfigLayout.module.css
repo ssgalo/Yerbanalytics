@@ -1,0 +1,92 @@
+/* Vista Umbrales (Configuración agronómica, HU-15) */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: ybFade 0.4s both;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+
+.intro {
+  margin: 0;
+  max-width: 720px;
+  font-size: var(--t-15);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.headSide {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.audit {
+  font-size: var(--t-13);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.audit b {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.section {
+  min-width: 0;
+  padding: 18px 22px 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+}
+
+.sectionHead {
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-15);
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.sectionHint {
+  margin: 2px 0 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* Las secciones chicas van lado a lado mientras entren. */
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.state {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* Envuelve cada formulario: `disabled` deshabilita todos sus campos en sólo lectura. */
+.fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}

@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useEffect, useId, useState } from 'react';
+import { Link, NavLink, matchPath, useLocation } from 'react-router-dom';
 import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
 import { useDemoExpo } from '@/hooks/DemoExpoContext';
 import { useAuth } from '@/hooks/AuthContext';
@@ -29,26 +30,76 @@ const PRINCIPAL: NavItem[] = [
 /* Sólo se agrega si el interruptor de Configuración la enciende; va pegada a Diagnósticos de IA. */
 const DEMO_EXPO: NavItem = { to: '/demo-expo', vista: VISTAS.demoExpo, icon: 'camera', label: 'Demo Expo' };
 
-const GESTION: NavItem[] = [
-  { to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' },
-  { to: '/configuracion', vista: VISTAS.configuracion, icon: 'config', label: 'Configuración' },
+const GESTION: NavItem[] = [{ to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' }];
+
+/* Grupo desplegable "Configuración": todo lo que ajusta cómo opera el sistema. Umbrales y
+   Preferencias editan partes de la misma configuración agronómica (Umbrales sigue en
+   /configuracion). Los planes de rustificación no están acá: son de cada macro-zona. */
+const CONFIGURACION: NavItem[] = [
+  { to: '/configuracion', vista: VISTAS.configuracion, icon: 'gauge', label: 'Umbrales' },
   { to: '/reglas', vista: VISTAS.reglas, icon: 'rules', label: 'Motor de reglas' },
   { to: '/hardware', vista: VISTAS.hardware, icon: 'hardware', label: 'Hardware' },
   { to: '/topologia', vista: VISTAS.topologia, icon: 'cube', label: 'Topología' },
   { to: '/usuarios', vista: VISTAS.usuarios, icon: 'users', label: 'Usuarios' },
+  { to: '/preferencias', vista: VISTAS.preferencias, icon: 'toggle', label: 'Preferencias' },
 ];
 
-function NavItemLink({ item, count }: { item: NavItem; count: number }) {
+function NavItemLink({ item, count, sub }: { item: NavItem; count: number; sub?: boolean }) {
+  const base = sub ? `${styles.item} ${styles.subItem}` : styles.item;
   return (
     <NavLink
       to={item.to}
       end={item.end}
-      className={({ isActive }) => (isActive ? `${styles.item} ${styles.itemActive}` : styles.item)}
+      className={({ isActive }) => (isActive ? `${base} ${styles.itemActive}` : base)}
     >
-      <Icon name={item.icon} size={18} />
+      <Icon name={item.icon} size={sub ? 16 : 18} />
       <span>{item.label}</span>
       {item.showCount && <span className={styles.count}>{count}</span>}
     </NavLink>
+  );
+}
+
+/**
+ * Grupo que se despliega y colapsa con un clic en su encabezado (no navega). Se abre solo al
+ * entrar a una de sus vistas, para que el ítem activo quede siempre a la vista.
+ */
+function NavGroup({ icon, label, items, count }: { icon: IconName; label: string; items: NavItem[]; count: number }) {
+  const { pathname } = useLocation();
+  const contieneActiva = items.some((i) => matchPath({ path: i.to, end: false }, pathname));
+  const [abierto, setAbierto] = useState(contieneActiva);
+  const idLista = useId();
+
+  useEffect(() => {
+    if (contieneActiva) setAbierto(true);
+  }, [contieneActiva, pathname]);
+
+  const clase = [styles.item, styles.groupHead, !abierto && contieneActiva && styles.groupHeadActive]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div>
+      <button
+        type="button"
+        className={clase}
+        aria-expanded={abierto}
+        aria-controls={idLista}
+        onClick={() => setAbierto((a) => !a)}
+      >
+        <Icon name={icon} size={18} />
+        <span>{label}</span>
+        <span className={abierto ? `${styles.chevron} ${styles.chevronOpen}` : styles.chevron}>
+          <Icon name="chevron-down" size={16} />
+        </span>
+      </button>
+      {abierto && (
+        <div id={idLista} className={styles.subNav} role="group" aria-label={label}>
+          {items.map((item) => (
+            <NavItemLink key={item.to} item={item} count={count} sub />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -61,18 +112,15 @@ export function Sidebar() {
   const habilitados = (items: NavItem[]) => items.filter((i) => puedeVer(i.vista, puede));
   const principal = habilitados(demoExpoVisible ? [...PRINCIPAL, DEMO_EXPO] : PRINCIPAL);
   const gestion = habilitados(GESTION);
+  const configuracion = habilitados(CONFIGURACION);
+  const hayGestion = gestion.length > 0 || configuracion.length > 0;
 
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.brand}>
-        <div className={styles.logo}>
-          <Icon name="leaf" size={22} stroke="var(--on-brand)" strokeWidth={1.9} />
-        </div>
-        <div style={{ lineHeight: 1.05 }}>
-          <div className={styles.brandName}>Yerbanalytics</div>
-          <div className={styles.brandSub}>Monitoreo IA</div>
-        </div>
-      </div>
+      <Link to="/" className={styles.brand} aria-label="Ir al panel general">
+        <img className={styles.logo} src="/yerbanalytics_simbolo.svg" alt="" />
+        <img className={styles.brandName} src="/yerbanalytics_texto.svg" alt="Yerbanalytics" />
+      </Link>
 
       {principal.length > 0 && (
         <>
@@ -85,7 +133,7 @@ export function Sidebar() {
         </>
       )}
 
-      {gestion.length > 0 && (
+      {hayGestion && (
         <>
           <div className={principal.length > 0 ? `${styles.section} ${styles.sectionTop}` : styles.section}>
             Gestión
@@ -94,6 +142,9 @@ export function Sidebar() {
             {gestion.map((item) => (
               <NavItemLink key={item.to} item={item} count={diagCount} />
             ))}
+            {configuracion.length > 0 && (
+              <NavGroup icon="config" label="Configuración" items={configuracion} count={diagCount} />
+            )}
           </nav>
         </>
       )}

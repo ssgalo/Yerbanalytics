@@ -1,197 +1,170 @@
-/* Estilos compartidos por los formularios de configuración */
+/* Estilos compartidos por los formularios de Umbrales (configuración agronómica) */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px 24px;
+  align-items: start;
+}
+
+.stack {
+  display: grid;
   gap: 16px;
 }
 
-.field {
+.formError {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 6px;
-}
-
-.label {
-  font-size: 11px;
-  color: var(--muted);
+  margin: 10px 0 0;
+  font-size: var(--t-13);
   font-weight: 600;
+  color: var(--crit-ink);
 }
 
-.inputWrap {
+/* --- Intervalos --- */
+.intervalRow {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.input {
-  width: 100%;
-  border: 1px solid var(--line-field);
-  background-color: var(--card);
-  border-radius: 10px;
-  padding: 9px 13px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  color: var(--ink);
-  outline: none;
+.intervalInput {
+  width: 96px;
+  font-variant-numeric: tabular-nums;
 }
 
-.input:focus {
-  border-color: var(--muted);
-}
-
-.inputError {
-  border-color: var(--crit);
-  background-color: #fff8f6;
-}
-
-.hint {
-  font-size: 11px;
-  color: var(--muted);
-  line-height: 1.35;
-}
-
-.unit {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
+.pullInput {
+  max-width: 140px;
 }
 
 /* --- Tabla de umbrales --- */
+.tableWrap {
+  overflow-x: auto;
+  margin: 0 -22px;
+  padding: 0 22px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--t-13);
 }
 
 .table th {
   text-align: left;
-  font-size: 11px;
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
   color: var(--muted);
   font-weight: 600;
-  padding: 0 8px 8px;
+  padding: 0 6px 6px;
+  white-space: nowrap;
+}
+
+.thMetric {
+  vertical-align: bottom;
+  padding-left: 0 !important;
+}
+
+.thBand {
+  border-bottom: 1px solid var(--line2);
+}
+
+.bandHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+}
+
+.table .thSub {
+  padding-top: 6px;
+  font-weight: 500;
+}
+
+.thPreview {
+  vertical-align: bottom;
+  min-width: 170px;
+}
+
+.table tbody tr + tr td {
+  border-top: 1px solid var(--line2);
+}
+
+/* La fila del error se lee pegada a su métrica: sin separador entre ambas. */
+.table tbody tr.rowWithError + tr td {
+  border-top: 0;
 }
 
 .table td {
-  padding: 6px 8px;
+  padding: 10px 6px;
   vertical-align: middle;
+}
+
+.tdMetric {
+  padding-left: 0 !important;
+  white-space: nowrap;
 }
 
 .metricName {
   font-weight: 600;
   color: var(--ink);
-  font-family: var(--font-body);
-  white-space: nowrap;
 }
 
 .metricUnit {
-  font-size: 11px;
+  margin-left: 5px;
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
   color: var(--muted);
-  margin-left: 4px;
+}
+
+.metricChip {
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.tdInput {
+  width: 1%;
 }
 
 .cellInput {
   width: 74px;
-  border: 1px solid var(--line-field);
-  background-color: var(--card);
-  border-radius: 8px;
-  padding: 7px 9px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  color: var(--ink);
-  outline: none;
+  height: 34px;
+  padding: 0 8px;
+  text-align: right;
+  font-size: var(--t-13);
+  font-variant-numeric: tabular-nums;
 }
 
-.cellInput:focus {
-  border-color: var(--muted);
+.tdPreview {
+  padding-left: 16px !important;
+  min-width: 170px;
 }
 
 .rowError {
+  padding: 0 0 10px !important;
   color: var(--crit-ink);
-  font-size: 11px;
-  padding: 0 8px 8px;
+  font-size: var(--t-12);
+  font-weight: 600;
 }
 
-/* --- Plan de rustificación --- */
-.etapas {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.rowError svg {
+  vertical-align: -2px;
+  margin-right: 6px;
 }
 
-.etapaRow {
-  display: flex;
-  align-items: flex-end;
+/* --- Horario de la mediasombra --- */
+.timePair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  flex-wrap: wrap;
 }
 
-.etapaOrden {
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
-  font-weight: 600;
+.note {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.45;
   color: var(--muted);
-  min-width: 70px;
-  padding-bottom: 9px;
-}
-
-.btnGhost {
-  border: 1px solid var(--line);
-  background-color: var(--card);
-  border-radius: 10px;
-  padding: 8px 13px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.btnGhost:hover {
-  border-color: var(--muted);
-}
-
-.btnRemove {
-  border: 1px solid var(--line);
-  background-color: var(--card);
-  border-radius: 8px;
-  width: 34px;
-  height: 34px;
-  font-size: 16px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.btnRemove:hover {
-  border-color: var(--crit);
-  color: var(--crit-ink);
-}
-
-/* Aviso de que otros umbrales se editan en la sección Motor de reglas */
-.aviso {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  font-size: 12.5px;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.aviso a {
-  color: var(--brand);
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.aviso a:hover {
-  text-decoration: underline;
 }

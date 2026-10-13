@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildConfig } from './config';
 import { specs } from './specs';
 import {
-  etapasError,
+  bandMidpoint,
   operativaErrors,
   umbralError,
   validateConfig,
@@ -25,7 +25,7 @@ describe('buildConfig (configuración de fábrica)', () => {
   });
 
   it('la configuración de fábrica es válida', () => {
-    expect(validateConfig(buildConfig(), 100)).toEqual([]);
+    expect(validateConfig(buildConfig())).toEqual([]);
   });
 
   it('ya no trae los dos límites que se mudaron al catálogo del motor', () => {
@@ -40,7 +40,20 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
     const cfg = buildConfig();
     cfg.umbrales[0] = { ...cfg.umbrales[0], idealMin: 90, idealMax: 10 };
     expect(umbralError(cfg.umbrales[0])).not.toBeNull();
-    expect(validateConfig(cfg, 100).length).toBeGreaterThan(0);
+    expect(validateConfig(cfg).length).toBeGreaterThan(0);
+  });
+
+  it('el punto de alerta de fábrica es el medio de cada franja amarilla', () => {
+    const hum = buildConfig().umbrales.find((u) => u.key === 'humAmb')!;
+    expect(hum.alertMin).toBe(bandMidpoint(hum.warnMin, hum.idealMin, hum.dec));
+    expect(hum.alertMax).toBe(bandMidpoint(hum.idealMax, hum.warnMax, hum.dec));
+    expect(umbralError(hum)).toBeNull();
+  });
+
+  it('detecta un punto de alerta fuera de su franja', () => {
+    const u = buildConfig().umbrales[0];
+    expect(umbralError({ ...u, alertMin: u.warnMin - 1 })).toMatch(/punto de alerta/);
+    expect(umbralError({ ...u, alertMax: u.idealMax - 1 })).toMatch(/punto de alerta/);
   });
 
   it('detecta valores fuera del rango fisiológico de fábrica', () => {
@@ -57,34 +70,24 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
     expect(operativaErrors(cfg.operativa).length).toBeGreaterThan(0);
   });
 
-  it('el plan de rustificación se valida contra la apertura máxima que le pasan (la del catálogo)', () => {
+  it('el horario por defecto de la mediasombra es válido y exige cierre posterior a la apertura', () => {
     const cfg = buildConfig();
-    expect(validateConfig(cfg, 100)).toEqual([]);
-    // El plan de fábrica llega a 100 %: con un tope de 50 % del catálogo deja de ser válido.
-    expect(validateConfig(cfg, 50).length).toBeGreaterThan(0);
+    expect(cfg.operativa.mediasombraAbiertaDesde).toBe('08:00');
+    expect(cfg.operativa.mediasombraAbiertaHasta).toBe('18:00');
+    cfg.operativa = { ...cfg.operativa, mediasombraAbiertaDesde: '18:00', mediasombraAbiertaHasta: '08:00' };
+    expect(operativaErrors(cfg.operativa)).toEqual([
+      'Horario de la mediasombra: la hora de cierre debe ser posterior a la de apertura.',
+    ]);
   });
 
-  it('detecta etapas de rustificación solapadas', () => {
-    const cfg = buildConfig();
-    const err = etapasError(
-      [
-        { orden: 1, diaDesde: 1, diaHasta: 10, aperturaPct: 20 },
-        { orden: 2, diaDesde: 5, diaHasta: 15, aperturaPct: 40 },
-      ],
-      100,
-    );
-    expect(err).not.toBeNull();
-    expect(cfg.rustificacion.length).toBeGreaterThan(0);
-  });
-
-  it('acepta un plan de rustificación bien formado', () => {
-    expect(etapasError(buildConfig().rustificacion, 100)).toBeNull();
+  it('la configuración ya no trae el plan de rustificación (es por macro-zona)', () => {
+    expect(buildConfig()).not.toHaveProperty('rustificacion');
   });
 
   it('exige las 5 métricas: una config incompleta es inválida', () => {
     const cfg: Configuracion = buildConfig();
     cfg.umbrales = cfg.umbrales.slice(0, 3);
-    expect(validateConfig(cfg, 100).length).toBeGreaterThan(0);
+    expect(validateConfig(cfg).length).toBeGreaterThan(0);
   });
 });
 
@@ -92,7 +95,7 @@ describe('node read request frequency (sensingPullIntervalSeconds)', () => {
   const withInterval = (v: number) => {
     const cfg = buildConfig();
     cfg.operativa = { ...cfg.operativa, sensingPullIntervalSeconds: v };
-    return validateConfig(cfg, 100);
+    return validateConfig(cfg);
   };
 
   it('factory config defaults to 60 seconds and is valid', () => {

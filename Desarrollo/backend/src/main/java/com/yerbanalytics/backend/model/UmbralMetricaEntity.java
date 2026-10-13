@@ -44,4 +44,16 @@ public class UmbralMetricaEntity {
 
     @Column(name = "crit_max", nullable = false)
     private double critMax;
+
+    /**
+     * Punto de alerta dentro de la franja amarilla baja ({@code warnMin ≤ alertMin ≤ idealMin}).
+     * Nulable: las filas anteriores a la columna (y las que nunca lo definieron) usan el medio
+     * de la franja. No cambia el estado; sólo decide si se emite una alerta.
+     */
+    @Column(name = "alert_min")
+    private Double alertMin;
+
+    /** Punto de alerta dentro de la franja amarilla alta ({@code idealMax ≤ alertMax ≤ warnMax}). */
+    @Column(name = "alert_max")
+    private Double alertMax;
 }

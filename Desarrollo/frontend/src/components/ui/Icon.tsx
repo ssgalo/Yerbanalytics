@@ -41,7 +41,9 @@ export type IconName =
   | 'lock'
   | 'key'
   | 'logout'
-  | 'info';
+  | 'info'
+  | 'gauge'
+  | 'toggle';
 
 const PATHS: Record<IconName, JSX.Element> = {
   // Seguridad: personas, candado, llave y salida.
@@ -125,6 +127,20 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="16" cy="6" r="2" />
       <circle cx="8" cy="12" r="2" />
       <circle cx="13" cy="18" r="2" />
+    </>
+  ),
+  // Umbrales: un indicador con su aguja.
+  gauge: (
+    <>
+      <path d="m12 14 4-4" />
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+    </>
+  ),
+  // Preferencias: un interruptor.
+  toggle: (
+    <>
+      <rect x="2" y="6" width="20" height="12" rx="6" />
+      <circle cx="16" cy="12" r="2.5" />
     </>
   ),
   hardware: (

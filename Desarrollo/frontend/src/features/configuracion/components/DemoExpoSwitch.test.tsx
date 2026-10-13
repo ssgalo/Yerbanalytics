@@ -18,13 +18,13 @@ function montar(repo: Partial<DataRepository>) {
       <DemoExpoSwitch />
     </DemoExpoProvider>,
   );
-  return screen.getByRole('switch', { name: /Mostrar Demo Expo/ }) as HTMLInputElement;
+  return screen.getByRole('switch', { name: /Mostrar Demo Expo/ }) as HTMLButtonElement;
 }
 
 describe('DemoExpoSwitch', () => {
   it('refleja el valor guardado', async () => {
     const sw = montar({ getDemoExpo: vi.fn().mockResolvedValue(true) });
-    await waitFor(() => expect(sw.checked).toBe(true));
+    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'));
   });
 
   it('guarda al instante, sin botón Guardar', async () => {
@@ -35,7 +35,7 @@ describe('DemoExpoSwitch', () => {
     fireEvent.click(sw);
 
     expect(set).toHaveBeenCalledWith(true);
-    await waitFor(() => expect(sw.checked).toBe(true));
+    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'));
     expect(screen.queryByRole('button', { name: /Guardar/ })).toBeNull();
   });
 
@@ -62,6 +62,6 @@ describe('DemoExpoSwitch', () => {
     fireEvent.click(sw);
 
     expect((await screen.findByRole('alert')).textContent).toContain('El backend no responde');
-    expect(sw.checked).toBe(false);
+    expect(sw.getAttribute('aria-checked')).toBe('false');
   });
 });

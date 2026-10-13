@@ -23,9 +23,10 @@ afterEach(() => {
 const montarEn = (ruta: string) => montarApp(ruta);
 
 describe('Ruta /reglas (7.1)', () => {
-  it('el Sidebar enlaza a "Motor de reglas"', async () => {
+  it('el Sidebar enlaza a "Motor de reglas" dentro del grupo Configuración', async () => {
     montarEn('/');
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }));
     const enlace = await screen.findByRole('link', { name: 'Motor de reglas' });
     expect(enlace.getAttribute('href')).toBe('/reglas');
   });

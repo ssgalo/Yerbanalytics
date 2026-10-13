@@ -257,7 +257,7 @@ export const actTpl = [
   {
     tipo: 'Mediasombra',
     title: 'Apertura de mediasombra',
-    d: 'Plan de rustificación día 12 · apertura gradual 35% → 45%.',
+    d: 'Plan de rustificación día 12 · abierta de 09:00 a 15:00.',
     res: 'Efectiva',
     t: 'hace 1 h',
   },

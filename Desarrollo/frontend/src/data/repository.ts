@@ -25,6 +25,8 @@ import type {
   TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
+  NuevoPlanRustificacion,
+  PlanRustificacion,
 } from '@/types/domain';
 
 /** Filtros del historial que resuelve el origen de datos (los mismos que `GET /api/historial`). */
@@ -58,6 +60,15 @@ export interface DataRepository {
   generarTopologia(input: NuevaTopologia): Promise<TopologiaVivero>;
   /** Actualiza la disposición visual por fila sin regenerar la grilla (HU-18 CA-01). */
   guardarDisposicion(input: DisposicionTopologia): Promise<TopologiaVivero>;
+  /**
+   * Plan de rustificación vigente (programado o en curso) de una macro-zona; `null` si no tiene
+   * (204). Sin plan, la mediasombra sigue el horario por defecto de la configuración.
+   */
+  getPlanRustificacion(zonaId: string): Promise<PlanRustificacion | null>;
+  /** Inicia un plan. Rechaza con `PlanRustificacionError` si es inválido o la zona ya tiene uno. */
+  iniciarPlanRustificacion(zonaId: string, plan: NuevoPlanRustificacion): Promise<PlanRustificacion>;
+  /** Cancela el plan vigente. Rechaza con `PlanRustificacionError` si no hay ninguno. */
+  cancelarPlanRustificacion(zonaId: string): Promise<PlanRustificacion>;
   /** Catálogo de umbrales del motor de reglas, agrupado por regla (cada parámetro una vez). */
   getCatalogoReglas(): Promise<CatalogoReglas>;
   /**

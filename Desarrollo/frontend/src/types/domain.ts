@@ -334,6 +334,12 @@ export interface MetricThreshold {
   warnMax: number;
   critMin: number;
   critMax: number;
+  /**
+   * Puntos de alerta dentro de cada franja amarilla (`warnMin ≤ alertMin ≤ idealMin`,
+   * `idealMax ≤ alertMax ≤ warnMax`). No cambian el estado: más allá de ellos, la campana avisa.
+   */
+  alertMin: number;
+  alertMax: number;
   /** Bandas todavía sin validar con el vivero (métricas de la sonda de suelo). */
   provisional: boolean;
 }
@@ -353,23 +359,62 @@ export interface ConfigOperativa {
   sensingPullIntervalSeconds: number;
   /** Read-only, computed by the backend from the pull interval; the browser never derives it. */
   effectiveStaleThresholdSeconds?: number;
+  /**
+   * Horario en que la mediasombra está abierta por defecto ("HH:MM", hora local del vivero), en
+   * toda macro-zona sin un plan de rustificación en curso. Fuera de él, cerrada. Dentro, otras
+   * reglas (p. ej. protección por radiación) pueden cerrarla igual.
+   */
+  mediasombraAbiertaDesde: string;
+  mediasombraAbiertaHasta: string;
   updatedBy: string | null;
   updatedTs: number | null;
 }
 
-/** Etapa del plan de rustificación (HU-15 CA-06). */
-export interface RustificacionEtapa {
-  orden: number;
-  diaDesde: number;
-  diaHasta: number;
-  aperturaPct: number;
-}
-
-/** Configuración agronómica completa (HU-15). Espejo del DTO `Configuracion`. */
+/**
+ * Configuración agronómica completa (HU-15). Espejo del DTO `Configuracion`. El plan de
+ * rustificación ya no vive acá: es por macro-zona (`PlanRustificacion`).
+ */
 export interface Configuracion {
   umbrales: MetricThreshold[];
   operativa: ConfigOperativa;
-  rustificacion: RustificacionEtapa[];
+}
+
+/**
+ * Etapa de un plan de rustificación. La mediasombra sólo abre o cierra del todo, así que la etapa
+ * no fija un porcentaje sino una ventana diaria: abierta de `abiertaDesde` a `abiertaHasta`
+ * ("HH:MM"), cerrada el resto del día, durante `dias` días seguidos.
+ */
+export interface EtapaRustificacion {
+  orden: number;
+  dias: number;
+  abiertaDesde: string;
+  abiertaHasta: string;
+}
+
+/** Estado de un plan: los dos primeros son vigentes; cancelado/finalizado ya no rigen. */
+export type EstadoPlanRustificacion = 'programado' | 'en_curso' | 'finalizado' | 'cancelado';
+
+/**
+ * Plan de rustificación de una macro-zona: expone a los plantines al sol cada vez más tiempo antes
+ * del trasplante. Mientras rige, reemplaza el horario por defecto de la mediasombra en esa zona.
+ */
+export interface PlanRustificacion {
+  id: string;
+  zonaId: string;
+  /** Primer día del plan ("YYYY-MM-DD", fecha local del vivero). */
+  fechaInicio: string;
+  etapas: EtapaRustificacion[];
+  estado: EstadoPlanRustificacion;
+  creadoPor: string | null;
+  /** epoch ms */
+  creadoEn: number;
+  canceladoEn: number | null;
+}
+
+/** Lo que manda el dashboard al iniciar un plan. */
+export interface NuevoPlanRustificacion {
+  fechaInicio: string;
+  etapas: Omit<EtapaRustificacion, 'orden'>[];
 }
 
 /** Estado operativo derivado de un dispositivo (HU-21). */

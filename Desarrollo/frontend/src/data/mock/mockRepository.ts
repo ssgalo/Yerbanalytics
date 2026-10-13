@@ -6,6 +6,7 @@ import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { SecuenciaRechazadaError } from '@/data/secuenciaError';
+import { PlanRustificacionError } from '@/data/planRustificacionError';
 import type {
   ActionRecord,
   CambioParametro,
@@ -24,8 +25,12 @@ import type {
   TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
+  NuevoPlanRustificacion,
+  PlanRustificacion,
 } from '@/types/domain';
 import { validateConfig } from '@/lib/configValidation';
+import { addDays, todayIso } from '@/lib/horario';
+import { ETAPAS_SUGERIDAS, planErrors, planVigente, progreso } from '@/lib/planRustificacion';
 import { buildConfig } from './config';
 import { buildNursery, type TopologiaGrid } from './generators';
 import { buildHistory } from './history';
@@ -66,6 +71,8 @@ export class MockRepository implements DataRepository {
   private topologiaOverride: TopologiaGrid | null = null;
   /** Disposición visual elegida por el Administrador; null = defaults (HU-18 CA-01). */
   private disposicionOverride: DisposicionTopologia | null = null;
+  /** Planes de rustificación por macro-zona (el último de cada una); null = sin sembrar todavía. */
+  private planes: Map<string, PlanRustificacion> | null = null;
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
 
@@ -116,13 +123,7 @@ export class MockRepository implements DataRepository {
 
   async saveConfig(config: Configuracion): Promise<Configuracion> {
     // Mismo comportamiento que el backend: rechaza configuraciones inválidas (HU-15 CA-03).
-    // El tope de apertura del plan de rustificación es un parámetro del catálogo del motor.
-    const aperturaMax = Number(
-      catalogoVigente(this.parametrosEditados).parametros.find(
-        (p) => p.clave === 'mediasombra.apertura-maxima',
-      )?.valor ?? 100,
-    );
-    const errors = validateConfig(config, aperturaMax);
+    const errors = validateConfig(config);
     if (errors.length > 0) {
       throw new Error(errors[0]);
     }
@@ -139,6 +140,73 @@ export class MockRepository implements DataRepository {
     };
     this.configCache = saved;
     return structuredClone(saved);
+  }
+
+  /**
+   * La demo arranca con un plan en curso en MZ-3 (empezó hace 9 días: etapa 2) para que se vea la
+   * tarjeta con progreso; el resto de las zonas, sin plan.
+   */
+  private planesDemo(): Map<string, PlanRustificacion> {
+    if (!this.planes) {
+      const fechaInicio = addDays(todayIso(), -9);
+      this.planes = new Map([
+        [
+          'MZ-3',
+          {
+            id: 'PR-1',
+            zonaId: 'MZ-3',
+            fechaInicio,
+            etapas: ETAPAS_SUGERIDAS.map((e, i) => ({ ...e, orden: i + 1 })),
+            estado: 'en_curso',
+            creadoPor: 'Ana Benítez',
+            creadoEn: Date.parse(`${fechaInicio}T09:00:00`),
+            canceladoEn: null,
+          },
+        ],
+      ]);
+    }
+    return this.planes;
+  }
+
+  /** El estado según las fechas, como lo recalcula el backend. */
+  private conEstado(p: PlanRustificacion): PlanRustificacion {
+    if (p.estado === 'cancelado') return p;
+    const pr = progreso(p);
+    return { ...p, estado: pr.terminado ? 'finalizado' : pr.dia === 0 ? 'programado' : 'en_curso' };
+  }
+
+  async getPlanRustificacion(zonaId: string): Promise<PlanRustificacion | null> {
+    const p = this.planesDemo().get(zonaId);
+    const actual = p ? this.conEstado(p) : null;
+    return planVigente(actual) ? structuredClone(actual) : null;
+  }
+
+  async iniciarPlanRustificacion(zonaId: string, plan: NuevoPlanRustificacion): Promise<PlanRustificacion> {
+    if (await this.getPlanRustificacion(zonaId)) {
+      throw new PlanRustificacionError('La macro-zona ya tiene un plan de rustificación vigente.');
+    }
+    const errores = planErrors(plan);
+    if (errores.length > 0) throw new PlanRustificacionError(errores[0]);
+    const nuevo = this.conEstado({
+      id: `PR-${Date.now()}`,
+      zonaId,
+      fechaInicio: plan.fechaInicio,
+      etapas: plan.etapas.map((e, i) => ({ ...e, orden: i + 1 })),
+      estado: 'programado',
+      creadoPor: 'Ingeniero Agrónomo',
+      creadoEn: Date.now(),
+      canceladoEn: null,
+    });
+    this.planesDemo().set(zonaId, nuevo);
+    return structuredClone(nuevo);
+  }
+
+  async cancelarPlanRustificacion(zonaId: string): Promise<PlanRustificacion> {
+    const actual = await this.getPlanRustificacion(zonaId);
+    if (!actual) throw new PlanRustificacionError('La macro-zona no tiene un plan de rustificación vigente.');
+    const cancelado: PlanRustificacion = { ...actual, estado: 'cancelado', canceladoEn: Date.now() };
+    this.planesDemo().set(zonaId, cancelado);
+    return structuredClone(cancelado);
   }
 
   private fleet(): RawDispositivo[] {

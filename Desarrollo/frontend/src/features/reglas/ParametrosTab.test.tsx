@@ -170,7 +170,7 @@ describe('ParametrosTab · edición validada (7.4)', () => {
     const campo = screen.getByLabelText(/Umbral de riego/) as HTMLInputElement;
     fireEvent.change(campo, { target: { value: '99' } });
 
-    expect(campo.className).toMatch(/inputError/);
+    expect(campo.getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('Debe estar entre 35 y 60 %.')).toBeTruthy();
     expect(guardar().disabled).toBe(true);
   });
@@ -358,7 +358,7 @@ describe('ParametrosTab · errores ocultos por los filtros (#5)', () => {
 
     expect((screen.getByPlaceholderText(/Buscar/) as HTMLInputElement).value).toBe('');
     const campo = screen.getByLabelText(/Saturación que bloquea/) as HTMLInputElement;
-    expect(campo.className).toMatch(/inputError/);
+    expect(campo.getAttribute('aria-invalid')).toBe('true');
     expect(screen.queryByText(/oculto/)).toBeNull();
   });
 

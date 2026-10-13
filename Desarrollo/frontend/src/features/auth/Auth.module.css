@@ -26,30 +26,18 @@
 }
 
 .logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--brand);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .marcaNombre {
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
-  font-weight: 700;
-  font-size: 19px;
-  letter-spacing: -0.02em;
-}
-
-.marcaSub {
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--on-tray-muted);
-  font-weight: 600;
-  margin-top: 2px;
+  display: block;
+  min-width: 0;
+  width: 220px;
+  max-width: 100%;
+  height: auto;
 }
 
 .marcaLema {

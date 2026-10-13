@@ -4,15 +4,9 @@
    backend (data.sql). El contrato (Configuracion) es idéntico al DTO.
    ============================================================ */
 import type { Configuracion } from '@/types/domain';
+import { bandMidpoint } from '@/lib/configValidation';
+import { HORARIO_MEDIASOMBRA_DEFAULT } from '@/lib/planRustificacion';
 import { specs } from './specs';
-
-/** Plan de rustificación por defecto (idéntico al seed del backend). */
-const DEFAULT_RUSTIFICACION = [
-  { orden: 1, diaDesde: 1, diaHasta: 7, aperturaPct: 20 },
-  { orden: 2, diaDesde: 8, diaHasta: 14, aperturaPct: 40 },
-  { orden: 3, diaDesde: 15, diaHasta: 21, aperturaPct: 70 },
-  { orden: 4, diaDesde: 22, diaHasta: 30, aperturaPct: 100 },
-];
 
 /** Same default as the backend. */
 const DEFAULT_SENSING_PULL_SECONDS = 60;
@@ -33,6 +27,8 @@ export function buildConfig(): Configuracion {
       warnMax: s.warn[1],
       critMin: s.crit[0],
       critMax: s.crit[1],
+      alertMin: bandMidpoint(s.warn[0], s.ideal[0], s.dec),
+      alertMax: bandMidpoint(s.ideal[1], s.warn[1], s.dec),
       // Las métricas informativas (sonda de suelo) tienen rangos aún sin validar.
       provisional: !s.afectaEstado,
     })),
@@ -44,9 +40,10 @@ export function buildConfig(): Configuracion {
       intervaloEvaluacionMinutos: 5,
       sensingPullIntervalSeconds: DEFAULT_SENSING_PULL_SECONDS,
       effectiveStaleThresholdSeconds: DEFAULT_STALE_THRESHOLD_SECONDS,
+      mediasombraAbiertaDesde: HORARIO_MEDIASOMBRA_DEFAULT.desde,
+      mediasombraAbiertaHasta: HORARIO_MEDIASOMBRA_DEFAULT.hasta,
       updatedBy: 'Mock System',
       updatedTs: null,
     },
-    rustificacion: DEFAULT_RUSTIFICACION.map((e) => ({ ...e })),
   };
 }
