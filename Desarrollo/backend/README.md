@@ -387,6 +387,26 @@ Otros límites conocidos: R-06 depende de los eventos "Insumo" y la bomba conser
 no cada regla frente a la spec está en
 [`diferencias-motor-reglas-vs-reglas-v2.md`](../../docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md).
 
+### Historial: volumen del Registro de Inacción y tope de la consulta
+
+Cuando el motor decide no actuar, `ActionExecutor` deja filas `Info` en `historial_evento`: una por
+regla, para todo el sector. Un sector tiene unas 13 reglas y hay 600 sectores, así que **cada
+registro completo del vivero son ~7.800 filas**. Hay dos frenos, en este orden:
+
+1. **Sólo cuando cambia la decisión** del sector, sin contar los números del motivo.
+2. **Y como mucho una vez cada `yerbanalytics.historial.inaccion-intervalo-min`** (30 min) por
+   sector. La lectura es de la macro-zona: si oscila alrededor de un umbral (la humedad cruzando el
+   de riego, la zona alternando entre `ok` y `warning`), la decisión de sus 100 sectores cambia en cada
+   sondeo. Con el simulador (lecturas al azar) y el sondeo cada 60 s se llegó a ~130.000 filas por
+   hora. Si un cambio cae dentro del intervalo, se registra al vencer, siempre que siga vigente.
+   El Inspector (`/api/rules/evaluaciones`) muestra igual cada evaluación. Con `0` se escribe cada
+   cambio.
+
+`GET /api/historial` **nunca devuelve la tabla entera**. Devuelve los eventos más recientes que
+cumplen los filtros (`sector`, `zona`, `tipo`, `desde`, `hasta`) hasta `limit`: 1000 si no se indica,
+5000 como máximo. Una consulta sin tope llegó a cargar cientos de miles de filas en memoria y colgaba
+el backend y la pestaña.
+
 ## Captura de imágenes cenitales (HU-04 CA-01)
 
 La API se divide en **dos superficies que conviene no confundir**.
