@@ -51,6 +51,8 @@ public class ConfiguracionService {
 
     /** Cache de las specs efectivas (10 filas, camino caliente de telemetría). */
     private volatile List<MetricSpec> effectiveSpecsCache;
+    /** Cache de los puntos de alerta por métrica. */
+    private volatile Map<String, double[]> alertPointsCache;
     /** Cache de la configuración operativa. */
     private volatile ConfiguracionOperativaEntity operativaCache;
 
@@ -95,9 +97,10 @@ public class ConfiguracionService {
             double warnMax = e != null ? e.getWarnMax() : sp.warn()[1];
             double critMin = e != null ? e.getCritMin() : sp.crit()[0];
             double critMax = e != null ? e.getCritMax() : sp.crit()[1];
+            double[] alerta = puntosDeAlerta(e, sp);
             out.add(new UmbralMetrica(sp.key(), sp.label(), sp.unit(), sp.dec(),
                     idealMin, idealMax, warnMin, warnMax, critMin, critMax,
-                    !Boolean.TRUE.equals(sp.afectaEstado())));
+                    !Boolean.TRUE.equals(sp.afectaEstado()), alerta[0], alerta[1]));
         }
         return out;
     }
@@ -137,6 +140,9 @@ public class ConfiguracionService {
             e.setWarnMax(u.warnMax());
             e.setCritMin(u.critMin());
             e.setCritMax(u.critMax());
+            // Sin punto en el payload queda nulo: vale el medio de la franja vigente.
+            e.setAlertMin(u.alertMin());
+            e.setAlertMax(u.alertMax());
             umbralRepository.save(e);
         }
 
@@ -208,6 +214,15 @@ public class ConfiguracionService {
                 throw new InvalidConfigurationException(
                         "Bandas incoherentes para «" + f.label() + "»: debe cumplirse "
                                 + "crit mín ≤ warn mín ≤ ideal mín < ideal máx ≤ warn máx ≤ crit máx.");
+            }
+            boolean alertaCoherente = (u.alertMin() == null
+                    || (u.warnMin() <= u.alertMin() && u.alertMin() <= u.idealMin()))
+                    && (u.alertMax() == null
+                    || (u.idealMax() <= u.alertMax() && u.alertMax() <= u.warnMax()));
+            if (!alertaCoherente) {
+                throw new InvalidConfigurationException(
+                        "Bandas incoherentes para «" + f.label() + "»: cada punto de alerta debe "
+                                + "quedar entre el crítico y el ideal de su lado.");
             }
             // Envelope fisiológico de fábrica (HU-15 CA-03).
             double envMin = f.crit()[0];
@@ -362,7 +377,47 @@ public class ConfiguracionService {
 
     private synchronized void invalidateCache() {
         effectiveSpecsCache = null;
+        alertPointsCache = null;
         operativaCache = null;
+    }
+
+    /** Puntos de alerta {bajo, alto} de una fila, o los de fábrica si no hay fila; nulos = medio de la franja. */
+    private static double[] puntosDeAlerta(UmbralMetricaEntity e, MetricSpec sp) {
+        double idealMin = e != null ? e.getIdealMin() : sp.ideal()[0];
+        double idealMax = e != null ? e.getIdealMax() : sp.ideal()[1];
+        double warnMin = e != null ? e.getWarnMin() : sp.warn()[0];
+        double warnMax = e != null ? e.getWarnMax() : sp.warn()[1];
+        Double bajo = e != null ? e.getAlertMin() : null;
+        Double alto = e != null ? e.getAlertMax() : null;
+        return new double[]{
+                bajo != null ? bajo : UmbralMetrica.puntoMedio(warnMin, idealMin, sp.dec()),
+                alto != null ? alto : UmbralMetrica.puntoMedio(idealMax, warnMax, sp.dec()),
+        };
+    }
+
+    /**
+     * Puntos de alerta vigentes por clave de métrica ({bajo, alto}). Sólo deciden si se emite una
+     * alerta; el estado lo siguen fijando las bandas de {@link #getEffectiveSpecs()}.
+     */
+    public Map<String, double[]> getAlertPoints() {
+        Map<String, double[]> cached = alertPointsCache;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (alertPointsCache == null) {
+                Map<String, UmbralMetricaEntity> persisted = new LinkedHashMap<>();
+                for (UmbralMetricaEntity e : umbralRepository.findAll()) {
+                    persisted.put(e.getMetricKey(), e);
+                }
+                Map<String, double[]> out = new LinkedHashMap<>();
+                for (MetricSpec sp : SPECS) {
+                    out.put(sp.key(), puntosDeAlerta(persisted.get(sp.key()), sp));
+                }
+                alertPointsCache = out;
+            }
+            return alertPointsCache;
+        }
     }
 
     private static String fmt(double v) {

@@ -352,9 +352,12 @@ public class NurseryService {
         // "Sin actividad registrada" en ese caso.
         List<ActionEvent> actions = historialService.getRecentActions(8);
 
-        // Alertas: sectores críticos/warning más recientes del historial real.
-        // Se toma del historial reciente y se limita a 5 para la campana de la topbar.
-        List<Alert> alerts = buildAlertsFromHistorial(priority);
+        // Alertas de la campana: las de cada métrica de zona que pasó su punto de alerta (o está en
+        // crítico) y las de los sectores críticos/warning. Crítico primero; hasta 8.
+        List<Alert> alerts = new ArrayList<>(buildMetricAlerts(zonas, configuracionService.getAlertPoints()));
+        alerts.addAll(buildAlertsFromHistorial(priority));
+        alerts.sort(Comparator.comparingInt(a -> "CRITICAL".equals(a.level()) ? 0 : 1));
+        alerts = alerts.stream().limit(MAX_ALERTAS).toList();
 
         // Clima: datos reales de Open-Meteo. En modo degradado (API caída) se
         // usa fallback con —, nunca valores hardcodeados.
@@ -442,6 +445,57 @@ public class NurseryService {
                 rainText,
                 slots
         );
+    }
+
+    /** Tope de alertas de la campana. */
+    private static final int MAX_ALERTAS = 8;
+
+    /**
+     * Alertas por métrica de cada macro-zona (sólo las que afectan el estado y con lectura vigente):
+     * {@code CRITICAL} en la franja roja; {@code WARNING} en la amarilla, pero sólo más allá de su punto
+     * de alerta. Entre el punto y el ideal la zona sigue "En observación" sin avisar.
+     */
+    static List<Alert> buildMetricAlerts(List<Zona> zonas, Map<String, double[]> alertPoints) {
+        List<Alert> out = new ArrayList<>();
+        for (Zona z : zonas) {
+            LecturaZona lectura = z.lectura();
+            if (lectura == null || lectura.stale()) {
+                continue;
+            }
+            for (Metric m : lectura.metrics()) {
+                if (m.raw() == null || m.spec() == null || !Boolean.TRUE.equals(m.spec().afectaEstado())) {
+                    continue;
+                }
+                double v = m.raw();
+                String valor = m.value() + " " + m.unit();
+                if ("critical".equals(m.status())) {
+                    boolean bajo = v < m.spec().warn()[0];
+                    double limite = bajo ? m.spec().warn()[0] : m.spec().warn()[1];
+                    out.add(new Alert("CRITICAL", C.get("critical"), lectura.ago(), z.id(),
+                            z.name() + " · " + m.label() + " " + valor + ": "
+                                    + (bajo ? "debajo" : "arriba") + " del crítico (" + fmtLimite(limite) + " " + m.unit() + ")",
+                            false));
+                } else if ("warning".equals(m.status())) {
+                    double[] punto = alertPoints.get(m.key());
+                    if (punto == null) {
+                        continue;
+                    }
+                    boolean bajo = v < punto[0];
+                    if (bajo || v > punto[1]) {
+                        double limite = bajo ? punto[0] : punto[1];
+                        out.add(new Alert("WARNING", C.get("warning"), lectura.ago(), z.id(),
+                                z.name() + " · " + m.label() + " " + valor + ": "
+                                        + (bajo ? "debajo" : "arriba") + " del punto de alerta (" + fmtLimite(limite) + " " + m.unit() + ")",
+                                false));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static String fmtLimite(double v) {
+        return v == Math.rint(v) ? String.valueOf((long) v) : String.valueOf(v);
     }
 
     /**
