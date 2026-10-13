@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.repository;
 
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,7 +12,11 @@ import java.util.List;
 @Repository
 public interface HistorialRepository extends JpaRepository<HistorialEventoEntity, String> {
 
-    /** Eventos que cumplen los filtros opcionales (null = sin filtrar), más recientes primero. */
+    /**
+     * Eventos que cumplen los filtros opcionales (null = sin filtrar), más recientes primero. Siempre paginado:
+     * el historial acumula cientos de miles de filas "Info" y traerlo entero agota la memoria del backend y del
+     * navegador.
+     */
     @Query("""
             SELECT h FROM HistorialEventoEntity h
             WHERE (:sector IS NULL OR h.sectorId = :sector)
@@ -26,7 +31,8 @@ public interface HistorialRepository extends JpaRepository<HistorialEventoEntity
             @Param("zona") String zona,
             @Param("tipo") String tipo,
             @Param("desde") Long desde,
-            @Param("hasta") Long hasta);
+            @Param("hasta") Long hasta,
+            Pageable pageable);
 
     /** Eventos con seguimiento pendiente de evaluar (latencia aún no resuelta). */
     List<HistorialEventoEntity> findByEvoShowTrueAndEvoEvaluadoTsIsNull();

@@ -13,6 +13,9 @@ import java.util.List;
 /**
  * Consulta del historial de acciones (HU-11). Solo lectura: no expone verbos de
  * escritura, garantizando la inalterabilidad del registro.
+ *
+ * <p>Devuelve los eventos más recientes hasta {@code limit} (por defecto
+ * {@link HistorialService#LIMITE_DEFAULT}, nunca más de {@link HistorialService#LIMITE_MAXIMO}).
  */
 @RestController
 @RequestMapping("/api/historial")
@@ -30,7 +33,8 @@ public class HistorialController {
             @RequestParam(required = false) String zona,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) Long desde,
-            @RequestParam(required = false) Long hasta) {
-        return ResponseEntity.ok(historialService.getHistorial(sector, zona, tipo, desde, hasta));
+            @RequestParam(required = false) Long hasta,
+            @RequestParam(required = false) Integer limit) {
+        return ResponseEntity.ok(historialService.getHistorial(sector, zona, tipo, desde, hasta, limit));
     }
 }
