@@ -35,18 +35,19 @@ La configuración principal se encuentra en `src/main/resources/application.prop
 El esquema lo genera Hibernate (`ddl-auto=update`) y se siembra con
 `src/main/resources/data.sql` (600 sectores, 6 macro-zonas, umbrales de fábrica).
 
-### Sensado por pull del backend · columna nueva (sin migración)
+### Migración manual pendiente · pulso de sensado y pasada diaria
 
-**No hace falta correr nada.** `ddl-auto=update` agrega `configuracion_operativa.sensing_pull_interval_seconds`
-como columna **nullable**; las filas existentes quedan en `NULL` y el backend las lee como **60 s**.
+El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso
+de sensado** (ver "Pulso de sensado" más abajo). `ddl-auto=update` agrega solo las columnas nuevas
+(`configuracion_operativa.pasada_diaria_activa` y `pasada_diaria_hora`, `sector.diagnosis_ts` y
+`diagnosis_usado_ts`, `zona.pulsos_sin_respuesta`), todas nullable: los nulos se leen como valores de
+fábrica (pasada desactivada a las 11:00) o 0. Lo que no hace es borrar las dos columnas que quedaron sin
+uso, `sensing_pull_interval_seconds` e `intervalo_evaluacion_minutos`.
 
-| Dato | Valor |
-|---|---|
-| Columna | `configuracion_operativa.sensing_pull_interval_seconds` (nullable) |
-| `NULL` | se lee como 60 s |
-| Rango válido | 10-3600 s (el `PUT /api/configuracion` rechaza fuera de rango con 400; `null` conserva el valor guardado) |
-| Efecto | el backend pide `LEER_AHORA` a cada zona cada X s; el umbral de lectura vieja pasa a `max(piso, 3 × X)` |
-| Rollback | revertir el código; la columna sobrante se ignora |
+Corré `src/main/resources/migracion-pulso-sensado.sql` (detener la app, ejecutar, volver a arrancar).
+Se pierden dos valores de configuración que ya nadie lee; ningún dato del vivero. Backend y dashboard
+se despliegan juntos: los campos retirados y los nuevos viajan en `GET/PUT /api/configuracion` (un `PUT`
+que todavía mande los viejos los ignora).
 
 ### Migración manual pendiente · sensado por macro-zona
 
@@ -326,7 +327,7 @@ una constante en la regla.
 
 Fuera del catálogo quedan, a propósito, la fecha de siembra (`yerbanalytics.nursery.sowing-date-iso`),
 el intervalo de despacho de riego, los parámetros del cliente de pronóstico (`yerbanalytics.weather.*`)
-y los intervalos de sensado y evaluación (configuración operativa).
+y el intervalo del pulso de sensado y evaluación (configuración operativa).
 
 - `GET /api/rules/parametros`: catálogo normalizado (`reglas` y `parametros`, cada parámetro una
   vez con su `usadoPor`).
@@ -335,13 +336,55 @@ y los intervalos de sensado y evaluación (configuración operativa).
   de riego < humedad objetivo; bloqueo ≤ alerta de saturación; el volumen máximo debe caber en los
   1200 s de la válvula); si algo falla responde `400 {"errores":[{"clave","mensaje"}]}` y no persiste
   nada. El historial lo firma el usuario de la sesión.
-- `GET /api/rules/evaluaciones/{sectorId}?origen=TELEMETRIA|BARRIDO`: última traza de evaluación
+- `GET /api/rules/evaluaciones/{sectorId}?origen=TELEMETRIA`: última traza de evaluación
   del sector (qué recibió cada regla contra qué umbral). Vive en memoria: `204` si todavía no se
-  evaluó desde el arranque, `404` si el sector no existe.
+  evaluó desde el arranque, `404` si el sector no existe. Una regla de diagnóstico sin diagnóstico
+  nuevo figura `OMITIDA_SIN_DIAGNOSTICO_NUEVO`.
 - `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros`.
 
 El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Parámetros* (edición
 del catálogo) e *Inspector* (el grafo coloreado con la última evaluación de un sector).
+
+### Pulso de sensado: el único momento en que decide el motor
+
+Cada `intervaloSensadoMinutos` (60-360 min, 240 por defecto), en franjas ancladas a las 02:00 (con 240:
+02, 06, 10, 14, 18 y 22 h), `SensingScheduler` emite un **pulso**: `PulsoSensadoService` publica
+`LEER_AHORA` a todas las macro-zonas y espera la **primera telemetría de cada una recibida desde el
+pedido** (la telemetría no trae `commandId`: la correlación es por ventana, como la secuencia
+`LECTURA`). Esa primera respuesta persiste la lectura y evalúa el motor para los 100 sectores de la
+zona. El intervalo se relee en cada tick, así que un cambio rige sin reiniciar; un pulso perdido con el
+backend caído no se recupera.
+
+- **No hay barrido.** `NurseryWatchdog` y `intervaloEvaluacionMinutos` se eliminaron. Toda otra
+  telemetría (arranque del nodo, secuencia `LECTURA`, segunda respuesta, pulso sin motor) sólo actualiza
+  la lectura y el estado de los sectores. La mediasombra la mueven las reglas en el pulso; el plan de
+  rustificación por horario queda fuera del motor (`add-rustificacion-por-macrozona`).
+- **Pulso manual**: `POST /api/pulsos {"ejecutarMotor": bool}` (`true` si se omite) → `202
+  {id, origen, ejecutaMotor, pedidoEn}` · `409 {"error"}` si hay uno en curso. Permiso `pasadas.operar`.
+  Pide a todas las zonas y sólo se usa por API: Demo Expo usa la secuencia `LECTURA` con `ejecutarMotor`,
+  que emite un pulso con motor sólo de su zona (ver "Secuencias"). No corre las franjas. Un programado
+  que encuentra uno en curso se omite (queda en el log).
+- **Reintentos** (`yerbanalytics.pulso.*`): a una zona pendiente se le reenvía el pedido cada
+  `reintento-seg` (60) hasta `intentos` (3); vencido el último plazo queda sin respuesta en ese pulso y
+  no se evalúa. El pulso no toma `GuardiaHardware`: si el ESP32 está moviendo el riel, lo cubren los
+  reintentos.
+- **Escalamiento** (`EscalamientoNodoService`): cada pulso sin respuesta suma uno a
+  `zona.pulsos_sin_respuesta` y deja una alerta de la zona (regla `PulsoSensado`): `WARNING`, `WARNING`
+  y, al tercero, `CRITICAL`, que pone la zona y sus sectores **fuera de servicio** (en el panel y en
+  Hardware: 0 operativo, 1-2 señal intermitente, ≥ 3 fuera de servicio). Desde el cuarto, sin alertas.
+  Cualquier telemetría vuelve la cuenta a 0 (alerta `INFO` si estaba fuera de servicio). La cuenta está
+  en la base: sobrevive a un reinicio.
+- **Umbral de lectura vieja**: `max(piso, intervalo × 60 + reintento-seg × intentos)` (14 580 s con los
+  valores de fábrica). Sólo protege al riego (`StaleSensorRule`, revalidación del despacho); ya no decide
+  si un nodo está fuera de servicio.
+- **Diagnóstico nuevo.** Una regla que declara `usaDiagnostico()` (hoy `SupplyRule`) sólo corre si el
+  sector tiene un diagnóstico que no usó: `sector.diagnosis_ts` (lo escribe el alta con el `creadoEn`)
+  posterior a `diagnosis_usado_ts`. Al evaluarse, `NurseryService` copia uno en otro en la misma
+  transacción: un rollback, un bloqueo manual o una rama cortada lo dejan nuevo para el pulso siguiente.
+  La ingesta **no toca más el diagnóstico** del sector (antes lo inventaba a partir del estado).
+- **Riesgo aceptado**: el riego reacciona como mucho una vez por pulso (hasta 4 h para el déficit
+  crítico, como plantea `reglas_v2` §1.2). Para decidir en el momento, un pulso por API o, en Demo Expo, "Leer
+  sensores y ejecutar motor ahora".
 
 ### Riego: reglas R-01…R-06 y despacho por tandas
 
@@ -391,16 +434,12 @@ no cada regla frente a la spec está en
 
 Cuando el motor decide no actuar, `ActionExecutor` deja filas `Info` en `historial_evento`: una por
 regla, para todo el sector. Un sector tiene unas 13 reglas y hay 600 sectores, así que **cada
-registro completo del vivero son ~7.800 filas**. Hay dos frenos, en este orden:
-
-1. **Sólo cuando cambia la decisión** del sector, sin contar los números del motivo.
-2. **Y como mucho una vez cada `yerbanalytics.historial.inaccion-intervalo-min`** (30 min) por
-   sector. La lectura es de la macro-zona: si oscila alrededor de un umbral (la humedad cruzando el
-   de riego, la zona alternando entre `ok` y `warning`), la decisión de sus 100 sectores cambia en cada
-   sondeo. Con el simulador (lecturas al azar) y el sondeo cada 60 s se llegó a ~130.000 filas por
-   hora. Si un cambio cae dentro del intervalo, se registra al vencer, siempre que siga vigente.
-   El Inspector (`/api/rules/evaluaciones`) muestra igual cada evaluación. Con `0` se escribe cada
-   cambio.
+pulso con motor deja ~7.800 filas** (~47.000 por día con 6 pulsos). Se escribe el **conjunto completo
+en cada pulso**, haya cambiado o no la decisión: cada pulso queda como un ciclo completo en la vista y
+el DAG de cada sector tiene siempre todas sus reglas. No hay deduplicación ni tope temporal (se retiró
+`yerbanalytics.historial.inaccion-intervalo-min`): lo que acota el volumen es la cadencia del pulso.
+Antes el motor corría con cada lectura (una por minuto) y se llegó a ~130.000 filas por hora; si el
+volumen molesta, volver a "sólo ante un cambio" es local al `ActionExecutor`.
 
 `GET /api/historial` **nunca devuelve la tabla entera**. Devuelve los eventos más recientes que
 cumplen los filtros (`sector`, `zona`, `tipo`, `desde`, `hasta`) hasta `limit`: 1000 si no se indica,
@@ -581,6 +620,17 @@ La forma de `Pasada` y sus pasos está en `openspec/changes/add-pasada-riel/desi
 - **Diagnóstico.** `GET /api/pasadas/actual` lo completa por captura aunque la pasada ya haya
   terminado: llega ~1 min después de la última foto, cuando el servicio de inferencia barre.
 
+### Pasada diaria
+
+Si `pasadaDiariaActiva` (configuración operativa, `PUT /api/configuracion`; desactivada de fábrica para
+que en desarrollo el riel no se mueva sin que nadie lo pida), `PasadaProgramadaService` inicia **la misma
+pasada** que `POST /api/pasadas` en el minuto de `pasadaDiariaHora` (`HH:mm`, hora del vivero). Revisa
+cada `yerbanalytics.pasada.programada-tick-ms` (20 s) en el carril `pasadaScheduler` y dispara a lo sumo
+una vez por minuto. No guarda "ya corrió hoy": un cambio de hora rige desde el minuto siguiente, y un
+reinicio posterior a la hora no la recupera. Si se rechaza (pasada o secuencia en curso, sin topología,
+sin cámara conectada) deja una alerta `WARNING` de la macro-zona del recorrido (regla
+`PasadaProgramada`) con el motivo, y no se reintenta. La pasada manual no cambia.
+
 ### Interruptor "Demo Expo"
 
 `GET`/`PUT /api/configuracion/demo-expo` (`{"visible": true|false}`; `400` si falta `visible`) decide si
@@ -592,7 +642,10 @@ Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de 
 Una **secuencia** es un guion corto contra el actuador de un sector, con cada paso visible: **riego**
 (abre la válvula, espera el ACK del final del riego, cierra), **mediasombra** (despliega, espera, enrolla) y **lectura** (pide una
 lectura al nodo testigo y la muestra). No pasan por el motor de reglas: son una prueba directa del
-hardware. Una sola a la vez, y ninguna mientras corre una pasada del riel (ni al revés).
+hardware. La excepción es la lectura con `"parametros":{"ejecutarMotor":true}` ("Leer sensores y ejecutar
+motor ahora"): su pedido sale como un pulso de sensado con motor sólo de su zona, así que la telemetría que
+la responde evalúa las reglas de esos sectores en la ingesta, como cualquier pulso (`409` si ya hay un pulso
+en curso). Una sola a la vez, y ninguna mientras corre una pasada del riel (ni al revés).
 
 | Método y ruta | Respuesta |
 |---|---|
