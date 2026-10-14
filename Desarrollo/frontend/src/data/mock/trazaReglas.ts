@@ -49,6 +49,11 @@ export interface EntradaMotor {
   /** Estado de salud del sector (`ok`, `warning`, `critical`, `offline`). */
   estadoSector: string;
   confianza: number | null;
+  /**
+   * ¿El sector tiene un diagnóstico de IA que todavía no se usó? Sin él, las reglas que usan el
+   * diagnóstico se omiten. Si no se informa, sí.
+   */
+  diagnosticoNuevo?: boolean;
   /** Epoch ms del último riego despachado al sector; null/ausente = nunca. */
   ultimoRiegoMs?: number | null;
   /** Epoch ms del último riego ordenado por R-02 (déficit crítico). */
@@ -441,7 +446,10 @@ function huella(catalogo: CatalogoReglas): string {
   return h.toString(16).padStart(8, '0');
 }
 
-const omitida = (r: CatalogoReglas['reglas'][number], estado: EstadoReglaTraza, por: string): TrazaRegla => ({
+/** Reglas que usan el diagnóstico de IA (`Rule.usaDiagnostico()` en el backend). */
+const USAN_DIAGNOSTICO = new Set(['SupplyRule']);
+
+const omitida = (r: CatalogoReglas['reglas'][number], estado: EstadoReglaTraza, por: string | null): TrazaRegla => ({
   ruleId: r.id,
   rama: r.rama,
   prioridad: r.prioridad,
@@ -469,6 +477,10 @@ export function evaluarMotor(catalogo: CatalogoReglas, entrada: EntradaMotor): T
     }
     if (regla.rama === 'INSUMO' && abortInsumo) {
       reglas.push(omitida(regla, 'OMITIDA_RAMA_BLOQUEADA', abortInsumo));
+      continue;
+    }
+    if (USAN_DIAGNOSTICO.has(regla.id) && entrada.diagnosticoNuevo === false) {
+      reglas.push(omitida(regla, 'OMITIDA_SIN_DIAGNOSTICO_NUEVO', null));
       continue;
     }
 

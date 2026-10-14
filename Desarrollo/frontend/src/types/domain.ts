@@ -353,12 +353,17 @@ export interface ConfigOperativa {
   insumoDosisMax24hMl: number;
   seguimientoLatenciaMin: number;
   seguimientoDeltaMin: number;
+  /**
+   * Intervalo del pulso de sensado y evaluación (60–360 min). En cada franja, anclada a las 02:00,
+   * el backend lee los sensores de todas las macro-zonas y evalúa el motor.
+   */
   intervaloSensadoMinutos: number;
-  intervaloEvaluacionMinutos: number;
-  /** How often the backend asks each node to read (seconds, 10..3600). Null from the server = stored default. */
-  sensingPullIntervalSeconds: number;
-  /** Read-only, computed by the backend from the pull interval; the browser never derives it. */
+  /** Sólo lectura: lo calcula el backend sobre el pulso; el navegador nunca deriva la fórmula. */
   effectiveStaleThresholdSeconds?: number;
+  /** ¿Corre la pasada diaria del riel? */
+  pasadaDiariaActiva: boolean;
+  /** Hora local de la pasada diaria ("HH:mm"); se guarda aunque la pasada esté desactivada. */
+  pasadaDiariaHora: string;
   /**
    * Horario en que la mediasombra está abierta por defecto ("HH:MM", hora local del vivero), en
    * toda macro-zona sin un plan de rustificación en curso. Fuera de él, cerrada. Dentro, otras
@@ -622,9 +627,19 @@ export interface ErrorParametro {
   mensaje: string;
 }
 
-export type OrigenEvaluacion = 'TELEMETRIA' | 'BARRIDO';
+/** Sin barrido periódico: el motor sólo se evalúa con la lectura de un pulso. */
+export type OrigenEvaluacion = 'TELEMETRIA';
 
-export type EstadoReglaTraza = 'EVALUADA' | 'OMITIDA_RAMA_BLOQUEADA' | 'NO_ALCANZADA' | 'ERROR';
+/**
+ * `OMITIDA_SIN_DIAGNOSTICO_NUEVO`: la regla usa el diagnóstico de IA y el sector no tiene uno nuevo
+ * (todavía sin usar), así que no se evaluó.
+ */
+export type EstadoReglaTraza =
+  | 'EVALUADA'
+  | 'OMITIDA_RAMA_BLOQUEADA'
+  | 'OMITIDA_SIN_DIAGNOSTICO_NUEVO'
+  | 'NO_ALCANZADA'
+  | 'ERROR';
 
 /** `EN` es pertenencia ("∈"): la hora local dentro de una ventana horaria. */
 export type OperadorComparacion = 'LT' | 'LE' | 'GT' | 'GE' | 'EQ' | 'EN';
@@ -739,6 +754,8 @@ export type TipoPasoSecuencia =
 export interface ParametrosSecuencia {
   duracionSeg?: number | null;
   esperaSeg?: number | null;
+  /** Sólo LECTURA: además de mostrar la lectura, la zona la responde como un pulso con motor. */
+  ejecutarMotor?: boolean | null;
 }
 
 export interface PasoSecuencia {

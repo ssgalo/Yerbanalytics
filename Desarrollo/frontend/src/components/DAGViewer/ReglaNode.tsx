@@ -32,6 +32,7 @@ const TEXTO_ESTADO: Partial<Record<EstadoNodo, string>> = {
   pospuso: 'Pospuso',
   accion: 'Accionó',
   omitida: 'Omitida',
+  sinDiagnostico: 'Sin diagnóstico nuevo',
   noAlcanzada: 'No alcanzada',
   error: 'Error',
   sinTraza: 'Sin evaluar',
@@ -103,6 +104,9 @@ export function ReglaNodeView({ data }: { data: ReglaNodeData }) {
         <div className={styles.nota}>
           Omitida: la cortó {data.bloqueadaPorLabel ?? traza?.bloqueadaPor ?? 'una regla anterior'}
         </div>
+      )}
+      {estado === 'sinDiagnostico' && (
+        <div className={styles.nota}>Omitida: sin diagnóstico nuevo</div>
       )}
       {estado === 'noAlcanzada' && (
         <div className={styles.nota}>

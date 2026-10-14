@@ -34,6 +34,7 @@
 
 /* Lo que no corrió se apaga y va con borde punteado */
 .nodo[data-estado='omitida'],
+.nodo[data-estado='sinDiagnostico'],
 .nodo[data-estado='noAlcanzada'],
 .nodo[data-estado='sinTraza'] {
   border-style: dashed;

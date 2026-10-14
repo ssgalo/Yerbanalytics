@@ -111,7 +111,7 @@ describe('evaluarMotor · R-01 riego por déficit', () => {
     expect(tipos(r)).toEqual(['NOOP_INFO']);
   });
 
-  it('sin dato de humedad (barrido sin métricas): SIN_DATO con recibido null y no riega', () => {
+  it('sin dato de humedad (la lectura no la trajo): SIN_DATO con recibido null y no riega', () => {
     const r = regla(evaluarMotor(catalogo, { ...base, humSus: null }), 'RiegoPorDeficitRule');
 
     expect(r.comparaciones[0]).toMatchObject({ recibido: null, resultado: 'SIN_DATO' });
@@ -348,8 +348,8 @@ describe('evaluarMotor · un riego por ciclo de lectura', () => {
 });
 
 describe('evaluarMotor · bloqueos por rama', () => {
-  it('la lectura vieja (barrido) bloquea sólo la rama de riego', () => {
-    const t = evaluarMotor(catalogo, { ...base, origen: 'BARRIDO', antiguedadSeg: 300, humSus: null });
+  it('la lectura vieja bloquea sólo la rama de riego', () => {
+    const t = evaluarMotor(catalogo, { ...base, antiguedadSeg: 300, humSus: null });
 
     expect(regla(t, 'StaleSensorRule').comparaciones[0]).toMatchObject({
       recibido: 300,
@@ -442,5 +442,27 @@ describe('evaluarMotor · insumo y mediasombra', () => {
 
   it('el seguimiento no tiene comparaciones', () => {
     expect(regla(evaluarMotor(catalogo, base), 'FollowUpRule').comparaciones).toEqual([]);
+  });
+});
+
+describe('evaluarMotor · diagnóstico nuevo', () => {
+  const critico = { ...base, estadoSector: 'critical', confianza: 92 };
+
+  it('sin diagnóstico nuevo la dosificación figura omitida, sin acciones ni culpable', () => {
+    const t = evaluarMotor(catalogo, { ...critico, diagnosticoNuevo: false });
+
+    expect(regla(t, 'SupplyRule')).toMatchObject({
+      estado: 'OMITIDA_SIN_DIAGNOSTICO_NUEVO',
+      comparaciones: [],
+      acciones: [],
+      bloqueadaPor: null,
+    });
+    // Las reglas que no usan el diagnóstico corren igual.
+    expect(regla(t, 'RiegoPorDeficitRule').estado).toBe('EVALUADA');
+  });
+
+  it('con un diagnóstico nuevo la dosificación se evalúa', () => {
+    expect(regla(evaluarMotor(catalogo, { ...critico, diagnosticoNuevo: true }), 'SupplyRule').estado).toBe('EVALUADA');
+    expect(regla(evaluarMotor(catalogo, critico), 'SupplyRule').estado).toBe('EVALUADA');
   });
 });

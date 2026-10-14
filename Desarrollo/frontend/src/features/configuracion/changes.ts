@@ -18,8 +18,8 @@ const OPERATIVA: (keyof ConfigOperativa)[] = [
   'seguimientoLatenciaMin',
   'seguimientoDeltaMin',
   'intervaloSensadoMinutos',
-  'intervaloEvaluacionMinutos',
-  'sensingPullIntervalSeconds',
+  'pasadaDiariaActiva',
+  'pasadaDiariaHora',
   'mediasombraAbiertaDesde',
   'mediasombraAbiertaHasta',
 ];

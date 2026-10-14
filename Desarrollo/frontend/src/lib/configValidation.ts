@@ -7,11 +7,18 @@
    ============================================================ */
 import { specs } from '@/data/mock/specs';
 import type { Configuracion, ConfigOperativa, MetricThreshold } from '@/types/domain';
-import { horarioError } from './horario';
+import { horarioError, minutesOf } from './horario';
 
-/** Mirrors the backend range for sensingPullIntervalSeconds. */
-export const SENSING_PULL_MIN_SECONDS = 10;
-export const SENSING_PULL_MAX_SECONDS = 3600;
+/** Rango del intervalo del pulso de sensado y evaluación (espeja al backend). */
+export const PULSE_MIN_MINUTES = 60;
+export const PULSE_MAX_MINUTES = 360;
+
+/** ¿El intervalo del pulso es un entero de minutos dentro del rango? */
+export const pulseIntervalValid = (min: number | null | undefined): boolean =>
+  Number.isInteger(min) && (min as number) >= PULSE_MIN_MINUTES && (min as number) <= PULSE_MAX_MINUTES;
+
+/** ¿La hora de la pasada diaria es "HH:mm" entre 00:00 y 23:59? Vacía no vale. */
+export const dailyPassTimeValid = (hhmm: string | null | undefined): boolean => minutesOf(hhmm) !== null;
 
 const factoryByKey = new Map(specs.map((s) => [s.key, s]));
 
@@ -56,13 +63,13 @@ export function operativaErrors(op: ConfigOperativa): string[] {
   positive(op.insumoDosisMax24hMl, 'la dosis máxima de insumo por 24 h');
   positive(op.seguimientoLatenciaMin, 'la latencia de seguimiento');
   positive(op.seguimientoDeltaMin, 'el delta mínimo de recuperación');
-  positive(op.intervaloSensadoMinutos ?? 0, 'el intervalo de sensado');
-  positive(op.intervaloEvaluacionMinutos ?? 0, 'el intervalo de evaluación');
-  const pull = op.sensingPullIntervalSeconds;
-  if (pull != null && !(Number.isInteger(pull) && pull >= SENSING_PULL_MIN_SECONDS && pull <= SENSING_PULL_MAX_SECONDS)) {
+  if (!pulseIntervalValid(op.intervaloSensadoMinutos)) {
     out.push(
-      `La frecuencia de pedido de lectura debe ser un entero entre ${SENSING_PULL_MIN_SECONDS} y ${SENSING_PULL_MAX_SECONDS} segundos.`,
+      `El intervalo de sensado y evaluación debe ser un entero entre ${PULSE_MIN_MINUTES} y ${PULSE_MAX_MINUTES} minutos.`,
     );
+  }
+  if (!dailyPassTimeValid(op.pasadaDiariaHora)) {
+    out.push('La hora de la pasada diaria debe tener el formato HH:MM (00:00 a 23:59).');
   }
   const horario = horarioError(op.mediasombraAbiertaDesde, op.mediasombraAbiertaHasta);
   if (horario) out.push(`Horario de la mediasombra: ${horario}`);

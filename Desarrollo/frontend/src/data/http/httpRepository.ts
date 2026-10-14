@@ -373,8 +373,8 @@ function normalizeConfig(data: Configuracion): Configuracion {
   if (data.operativa) {
     const op = data.operativa;
     op.intervaloSensadoMinutos = op.intervaloSensadoMinutos ?? 240;
-    op.intervaloEvaluacionMinutos = op.intervaloEvaluacionMinutos ?? 5;
-    op.sensingPullIntervalSeconds = op.sensingPullIntervalSeconds ?? 60;
+    op.pasadaDiariaActiva = op.pasadaDiariaActiva ?? false;
+    op.pasadaDiariaHora = op.pasadaDiariaHora ?? '11:00';
     op.mediasombraAbiertaDesde = op.mediasombraAbiertaDesde ?? HORARIO_MEDIASOMBRA_DEFAULT.desde;
     op.mediasombraAbiertaHasta = op.mediasombraAbiertaHasta ?? HORARIO_MEDIASOMBRA_DEFAULT.hasta;
   }

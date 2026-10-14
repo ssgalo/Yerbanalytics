@@ -28,14 +28,14 @@ function repoCon(get: ReturnType<typeof vi.fn>) {
 }
 
 describe('useTrazaEvaluacion', () => {
-  it('pide la traza del sector y origen elegidos', async () => {
+  it('pide la traza del sector elegido', async () => {
     const get = repoCon(vi.fn().mockResolvedValue(traza('MZ-1-001')));
 
-    const { result } = renderHook(() => useTrazaEvaluacion('MZ-1-001', 'BARRIDO', false));
+    const { result } = renderHook(() => useTrazaEvaluacion('MZ-1-001', 'TELEMETRIA', false));
 
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(get).toHaveBeenCalledWith('MZ-1-001', 'BARRIDO');
+    expect(get).toHaveBeenCalledWith('MZ-1-001', 'TELEMETRIA');
     expect(result.current.traza?.sectorId).toBe('MZ-1-001');
     expect(result.current.error).toBeNull();
   });
@@ -88,20 +88,6 @@ describe('useTrazaEvaluacion', () => {
 
     expect(result.current.traza).toBeNull();
     expect(result.current.loading).toBe(true);
-  });
-
-  it('al cambiar de origen limpia la traza del origen anterior', async () => {
-    const pendiente = new Promise<TrazaEvaluacion>(() => undefined);
-    repoCon(vi.fn().mockImplementation((_id: string, o: string) => (o === 'TELEMETRIA' ? Promise.resolve(traza('MZ-1-001')) : pendiente)));
-    const { result, rerender } = renderHook(
-      ({ o }: { o: 'TELEMETRIA' | 'BARRIDO' }) => useTrazaEvaluacion('MZ-1-001', o, false),
-      { initialProps: { o: 'TELEMETRIA' } },
-    );
-    await waitFor(() => expect(result.current.traza).not.toBeNull());
-
-    rerender({ o: 'BARRIDO' });
-
-    expect(result.current.traza).toBeNull();
   });
 
   it('al cambiar de sector limpia el error anterior: no queda pegado al sector nuevo', async () => {

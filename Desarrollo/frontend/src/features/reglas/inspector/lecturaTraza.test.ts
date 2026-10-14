@@ -107,12 +107,18 @@ describe('formatoComparacion · ventana horaria (operador EN)', () => {
 describe('etiquetaOrigen', () => {
   it('traduce el origen', () => {
     expect(etiquetaOrigen('TELEMETRIA')).toBe('Telemetría');
-    expect(etiquetaOrigen('BARRIDO')).toBe('Barrido');
   });
 });
 
 describe('resumenTraza', () => {
   const resumen = (e: Partial<EntradaMotor>) => resumenTraza(schema, evaluarMotor(catalogo, { ...base, ...e }));
+
+  it('dice qué reglas se omitieron por no tener un diagnóstico nuevo', () => {
+    const r = resumen({ diagnosticoNuevo: false });
+    expect(r).toContainEqual(
+      expect.objectContaining({ tipo: 'omitida', texto: expect.stringMatching(/quedó omitida: el sector no tiene un diagnóstico nuevo/) }),
+    );
+  });
 
   it('sin acciones lo dice', () => {
     const r = resumen({});

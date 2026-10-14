@@ -16,7 +16,10 @@ const SIMBOLOS: Record<OperadorComparacion, string> = { LT: '<', LE: '≤', GT: 
 
 export const simboloOperador = (op: OperadorComparacion): string => SIMBOLOS[op];
 
-export const etiquetaOrigen = (o: OrigenEvaluacion): string => (o === 'TELEMETRIA' ? 'Telemetría' : 'Barrido');
+/** Hoy el único origen es la lectura de un pulso (sin barrido periódico). */
+const ETIQUETA_ORIGEN: Record<OrigenEvaluacion, string> = { TELEMETRIA: 'Telemetría' };
+
+export const etiquetaOrigen = (o: OrigenEvaluacion): string => ETIQUETA_ORIGEN[o] ?? o;
 
 /** Un valor de la traza como texto: números redondeados, booleanos en español, texto tal cual. */
 function valorTexto(v: Comparacion['recibido'], unidad: string): string {
@@ -100,6 +103,15 @@ export function resumenTraza(schema: DagSchema, traza: TrazaEvaluacion): LineaRe
       tipo: 'omitida',
       ruleId: culpable,
       texto: `${omitidas.join(', ')} ${omitidas.length === 1 ? 'quedó omitida' : 'quedaron omitidas'} por ${nombre(culpable)}.`,
+    });
+  }
+
+  // Las que usan el diagnóstico de IA no corren si el sector no tiene uno nuevo.
+  const sinDiagnostico = traza.reglas.filter((r) => r.estado === 'OMITIDA_SIN_DIAGNOSTICO_NUEVO').map((r) => nombre(r.ruleId));
+  if (sinDiagnostico.length > 0) {
+    lineas.push({
+      tipo: 'omitida',
+      texto: `${sinDiagnostico.join(', ')} ${sinDiagnostico.length === 1 ? 'quedó omitida' : 'quedaron omitidas'}: el sector no tiene un diagnóstico nuevo.`,
     });
   }
 

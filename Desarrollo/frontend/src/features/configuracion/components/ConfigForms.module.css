@@ -35,8 +35,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-.pullInput {
+/* --- Pasada diaria --- */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.switchTexts {
+  display: grid;
+  gap: 2px;
+}
+
+.switchLabel {
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.timeInput {
   max-width: 140px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Tabla de umbrales --- */

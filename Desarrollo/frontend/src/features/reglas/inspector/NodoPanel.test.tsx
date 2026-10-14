@@ -161,6 +161,14 @@ describe('NodoPanel', () => {
     expect(screen.queryAllByTestId('fila-comparacion')).toHaveLength(0);
   });
 
+  it('una omitida sin diagnóstico nuevo lo explica', () => {
+    montar(regla({ ruleId: 'SupplyRule', estado: 'OMITIDA_SIN_DIAGNOSTICO_NUEVO', comparaciones: [], acciones: [], bloqueadaPor: null }));
+
+    expect(screen.getByText('Sin diagnóstico nuevo')).toBeTruthy();
+    expect(screen.getByText(/Omitida: sin diagnóstico nuevo/)).toBeTruthy();
+    expect(screen.queryAllByTestId('fila-comparacion')).toHaveLength(0);
+  });
+
   it('una con error muestra el mensaje', () => {
     montar(regla({ estado: 'ERROR', comparaciones: [], acciones: [], error: 'IllegalStateException: boom' }));
     expect(screen.getByText(/IllegalStateException: boom/)).toBeTruthy();

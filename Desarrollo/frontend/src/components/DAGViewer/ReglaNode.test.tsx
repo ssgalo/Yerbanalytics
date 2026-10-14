@@ -153,6 +153,19 @@ describe('ReglaNodeView', () => {
     expect(screen.queryByTestId('comparacion-0')).toBeNull();
   });
 
+  it('una regla sin diagnóstico nuevo lo dice con su propia etiqueta', () => {
+    const { container } = montar({
+      estado: 'sinDiagnostico',
+      traza: traza({ estado: 'OMITIDA_SIN_DIAGNOSTICO_NUEVO', comparaciones: [], acciones: [], bloqueadaPor: null }),
+      bloqueadaPorLabel: null,
+    });
+
+    expect(screen.getByText('Sin diagnóstico nuevo')).toBeTruthy();
+    expect(screen.getByText('Omitida: sin diagnóstico nuevo')).toBeTruthy();
+    expect(container.querySelector('[data-estado="sinDiagnostico"]')).toBeTruthy();
+    expect(screen.queryByTestId('comparacion-0')).toBeNull();
+  });
+
   it('una regla no alcanzada dice dónde se detuvo el motor', () => {
     montar({
       estado: 'noAlcanzada',

@@ -1,6 +1,7 @@
 /* ============================================================
    Sección "Secuencias" de Demo Expo: tres tarjetas (riego, mediasombra, lectura de sensores)
-   que comandan el actuador directo, y el avance de la última. Los botones se deshabilitan si
+   que comandan el actuador directo, y el avance de la última. La lectura puede además ejecutar el
+   motor de reglas de la zona: el backend la pide como un pulso de sensado con motor de esa zona. Los botones se deshabilitan si
    hay una secuencia o una pasada en curso; es una ayuda visual: el que decide es el 409 del
    backend (un solo ESP32 para las dos cosas).
    ============================================================ */
@@ -118,7 +119,7 @@ export function SecuenciasPanel({
 
           <Tarjeta
             titulo="Lectura"
-            descripcion="Le pide una lectura ahora al nodo testigo de la zona."
+            descripcion="Le pide una lectura ahora al nodo testigo de la zona. Con motor, además evalúa las reglas de sus sectores y las decisiones quedan en el historial."
           >
             <button
               type="button"
@@ -127,6 +128,14 @@ export function SecuenciasPanel({
               onClick={() => void iniciar('LECTURA')}
             >
               Leer sensores ahora
+            </button>
+            <button
+              type="button"
+              className={styles.btn}
+              disabled={ocupado}
+              onClick={() => void iniciar('LECTURA', { ejecutarMotor: true })}
+            >
+              Leer sensores y ejecutar motor ahora
             </button>
           </Tarjeta>
         </div>

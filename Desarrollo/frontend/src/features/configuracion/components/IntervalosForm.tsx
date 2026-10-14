@@ -1,8 +1,9 @@
-/* Parámetros de frecuencia operativa — Intervalo de sensado e inferencia */
-import { useId, useState } from 'react';
+/* Intervalo del pulso de sensado y evaluación: el único que marca cuándo se lee y cuándo decide el motor. */
+import { useId, useState, type ReactNode } from 'react';
 import type { ConfigOperativa } from '@/types/domain';
-import { SENSING_PULL_MAX_SECONDS, SENSING_PULL_MIN_SECONDS } from '@/lib/configValidation';
-import { Field, Input, InputUnit } from '@/components/ui/Field';
+import { PULSE_MAX_MINUTES, PULSE_MIN_MINUTES, pulseIntervalValid } from '@/lib/configValidation';
+import { formatDuration } from '@/lib/horario';
+import { Field, Input } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Seleccion';
 import { ayudaDe } from '@/components/ui/clases';
 import styles from './ConfigForms.module.css';
@@ -30,7 +31,7 @@ function IntervalField({
   onChangeMinutes,
 }: {
   label: string;
-  hint: string;
+  hint: ReactNode;
   valueMinutes: number;
   invalid?: boolean;
   modified?: boolean;
@@ -71,81 +72,25 @@ function IntervalField({
   );
 }
 
-/** Seconds field: how often the backend asks each node for a reading. */
-function PullIntervalField({
-  seconds,
-  staleThresholdSeconds,
-  modified,
-  onChangeSeconds,
-}: {
-  seconds: number;
-  staleThresholdSeconds?: number;
-  modified?: boolean;
-  onChangeSeconds: (seconds: number) => void;
-}) {
-  const id = 'sensing-pull-seconds';
-  const invalid = !(
-    Number.isInteger(seconds) &&
-    seconds >= SENSING_PULL_MIN_SECONDS &&
-    seconds <= SENSING_PULL_MAX_SECONDS
-  );
-  return (
-    <Field
-      label="Frecuencia de pedido de lectura a los nodos (segundos)"
-      htmlFor={id}
-      hint={
-        <>
-          Cada cuánto el backend le pide una lectura a cada nodo; no es el intervalo de sensado de riego.
-          Rango {SENSING_PULL_MIN_SECONDS} a {SENSING_PULL_MAX_SECONDS} s.
-          {staleThresholdSeconds != null &&
-            ` Umbral de lectura vieja (calculado por el backend): ${staleThresholdSeconds} s.`}
-        </>
-      }
-    >
-      <InputUnit
-        id={id}
-        unit="s"
-        className={styles.pullInput}
-        type="number"
-        inputMode="numeric"
-        min={SENSING_PULL_MIN_SECONDS}
-        max={SENSING_PULL_MAX_SECONDS}
-        step={1}
-        value={Number.isNaN(seconds) ? '' : seconds}
-        invalid={invalid}
-        modified={modified}
-        aria-describedby={ayudaDe(id)}
-        onChange={(e) => onChangeSeconds(e.target.valueAsNumber)}
-      />
-    </Field>
-  );
-}
-
 export function IntervalosForm({ value, saved, onChange }: IntervalosFormProps) {
-  const cambio = (k: keyof ConfigOperativa) => saved !== undefined && saved[k] !== value[k];
+  const stale = value.effectiveStaleThresholdSeconds;
   return (
     <div className={styles.grid}>
       <IntervalField
-        label="Intervalo de Evaluación (IA/Watchdog)"
-        hint="Cada cuánto el backend analiza todos los sectores y procesa las fotos."
-        valueMinutes={value.intervaloEvaluacionMinutos}
-        invalid={value.intervaloEvaluacionMinutos <= 0}
-        modified={cambio('intervaloEvaluacionMinutos')}
-        onChangeMinutes={(m) => onChange({ intervaloEvaluacionMinutos: m })}
-      />
-      <IntervalField
-        label="Intervalo de Sensado (IoT)"
-        hint="Cada cuánto los nodos reportan sus lecturas."
+        label="Intervalo de sensado y evaluación"
+        hint={
+          <>
+            En cada franja, anclada a las 02:00, se leen los sensores de todas las macro-zonas y se evalúa
+            el motor de reglas. Rango {PULSE_MIN_MINUTES} a {PULSE_MAX_MINUTES} min.
+            {/* El umbral lo calcula el backend al guardar; el navegador no repite la fórmula. */}
+            {stale != null &&
+              ` Umbral de lectura vieja (calculado por el backend): ${stale} s (${formatDuration(Math.round(stale / 60))}).`}
+          </>
+        }
         valueMinutes={value.intervaloSensadoMinutos}
-        invalid={value.intervaloSensadoMinutos <= 0}
-        modified={cambio('intervaloSensadoMinutos')}
+        invalid={!pulseIntervalValid(value.intervaloSensadoMinutos)}
+        modified={saved !== undefined && saved.intervaloSensadoMinutos !== value.intervaloSensadoMinutos}
         onChangeMinutes={(m) => onChange({ intervaloSensadoMinutos: m })}
-      />
-      <PullIntervalField
-        seconds={value.sensingPullIntervalSeconds}
-        staleThresholdSeconds={value.effectiveStaleThresholdSeconds}
-        modified={cambio('sensingPullIntervalSeconds')}
-        onChangeSeconds={(n) => onChange({ sensingPullIntervalSeconds: n })}
       />
     </div>
   );

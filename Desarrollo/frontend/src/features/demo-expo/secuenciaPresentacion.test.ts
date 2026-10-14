@@ -57,6 +57,9 @@ describe('tituloPasoSecuencia', () => {
     expect(tituloPasoSecuencia(paso('ENROLLAR', 'OK'), sombra)).toBe('Enrollarla');
     const lectura = secuencia('LECTURA');
     expect(tituloPasoSecuencia(paso('PEDIR', 'OK'), lectura)).toBe('Pedir lectura a MZ-1');
+    expect(tituloPasoSecuencia(paso('PEDIR', 'OK'), { ...lectura, parametros: { ejecutarMotor: true } })).toBe(
+      'Pedir lectura a MZ-1 y ejecutar el motor',
+    );
     expect(tituloPasoSecuencia(paso('ESPERAR_TELEMETRIA', 'OK'), lectura)).toBe(
       'Esperando la telemetría…',
     );

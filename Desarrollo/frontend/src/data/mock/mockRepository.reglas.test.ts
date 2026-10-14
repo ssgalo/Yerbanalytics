@@ -135,14 +135,22 @@ describe('MockRepository · traza de evaluación', () => {
     expect(verificadas).toBeGreaterThan(0);
   });
 
-  it('el barrido no tiene lectura de métricas: la humedad queda SIN_DATO', async () => {
-    const traza = await nuevo().getTrazaEvaluacion('MZ-1-001', 'BARRIDO');
+  it('la traza es la del pulso: origen telemetría, sin barrido', async () => {
+    const traza = await nuevo().getTrazaEvaluacion('MZ-1-001');
+    expect(traza!.origen).toBe('TELEMETRIA');
+  });
 
-    expect(traza!.origen).toBe('BARRIDO');
-    const riego = traza!.reglas.find((r) => r.ruleId === 'RiegoPorDeficitRule')!;
-    // Con la lectura de 5 min de antigüedad el barrido corta riego antes de llegar a evaluarla.
-    expect(riego.estado).toBe('OMITIDA_RAMA_BLOQUEADA');
-    expect(traza!.reglas.find((r) => r.ruleId === 'StaleSensorRule')!.acciones[0].tipo).toBe('ABORT_RIEGO');
+  it('un sector sano ya usó su diagnóstico: la dosificación queda omitida; uno con patología lo tiene nuevo', async () => {
+    const repo = nuevo();
+    const { zonas } = await repo.getNursery();
+    const sectores = zonas.flatMap((z) => z.sectors);
+    const sano = sectores.find((s) => s.diagnosis.estado === 'Sano')!;
+    const enfermo = sectores.find((s) => !['Sano', 'Sin diagnóstico'].includes(s.diagnosis.estado))!;
+
+    const supply = async (id: string) =>
+      (await repo.getTrazaEvaluacion(id))!.reglas.find((r) => r.ruleId === 'SupplyRule')!;
+    expect((await supply(sano.id)).estado).toBe('OMITIDA_SIN_DIAGNOSTICO_NUEVO');
+    expect((await supply(enfermo.id)).estado).not.toBe('OMITIDA_SIN_DIAGNOSTICO_NUEVO');
   });
 
   it('refleja un umbral editado', async () => {

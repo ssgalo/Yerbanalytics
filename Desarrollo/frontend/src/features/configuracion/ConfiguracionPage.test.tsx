@@ -137,15 +137,26 @@ describe('Umbrales (ConfiguracionPage)', () => {
 });
 
 describe('Preferencias (PreferencesPage)', () => {
-  const pullField = async () =>
-    (await screen.findByLabelText(/frecuencia de pedido de lectura/i)) as HTMLInputElement;
+  // El intervalo de fábrica (240 min) se muestra en horas.
+  const pulseField = async () =>
+    (await screen.findByLabelText('Intervalo de sensado y evaluación')) as HTMLInputElement;
+  const hourField = async () => (await screen.findByLabelText('Hora de la pasada')) as HTMLInputElement;
 
-  it('trae la frecuencia operativa y el interruptor de Demo Expo', async () => {
+  it('trae la frecuencia operativa, la pasada diaria y el interruptor de Demo Expo', async () => {
     montar(PreferencesPage);
 
     expect(await screen.findByText('Frecuencia operativa')).toBeTruthy();
+    expect(screen.getByText('Pasada diaria del riel')).toBeTruthy();
     expect(screen.getByRole('switch', { name: /Mostrar Demo Expo/ })).toBeTruthy();
     expect(screen.queryByText('Umbrales de métricas')).toBeNull();
+  });
+
+  it('no hay intervalo de evaluación aparte ni pedido de lectura en segundos', async () => {
+    montar(PreferencesPage);
+    await pulseField();
+
+    expect(screen.queryByLabelText(/Intervalo de Evaluación/i)).toBeNull();
+    expect(screen.queryByLabelText(/frecuencia de pedido de lectura/i)).toBeNull();
   });
 
   it('usar el interruptor de Demo Expo no ensucia el borrador', async () => {
@@ -167,32 +178,74 @@ describe('Preferencias (PreferencesPage)', () => {
     expect(sw.disabled).toBe(true);
   });
 
-  it('disables Save when the node read request frequency is out of range', async () => {
+  it.each([
+    ['0.5', '30 min'],
+    ['7', '420 min'],
+  ])('con %s h (%s) el intervalo queda inválido y Guardar se deshabilita', async (horas) => {
     montar(PreferencesPage);
+    const campo = await pulseField();
 
-    fireEvent.change(await pullField(), { target: { value: '5' } });
+    fireEvent.change(campo, { target: { value: horas } });
 
+    expect(campo.getAttribute('aria-invalid')).toBe('true');
     expect(guardar().disabled).toBe(true);
   });
 
-  it('factory reset brings the read request frequency back to 60', async () => {
+  it('restablecer vuelve el intervalo a 4 h y apaga la pasada diaria', async () => {
     montar(PreferencesPage);
-    const field = await pullField();
-    fireEvent.change(field, { target: { value: '30' } });
-    expect(field.value).toBe('30');
+    const campo = await pulseField();
+    fireEvent.change(campo, { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('switch', { name: 'Pasada diaria activa' }));
+    expect(campo.value).toBe('2');
 
     fireEvent.click(screen.getByRole('button', { name: /Restablecer/ }));
 
-    await waitFor(() => expect(field.value).toBe('60'));
+    await waitFor(() => expect(campo.value).toBe('4'));
+    expect(screen.getByRole('switch', { name: 'Pasada diaria activa' }).getAttribute('aria-checked')).toBe('false');
   });
 
-  it('refreshes the backend-computed threshold hint after saving', async () => {
+  it('la hora vacía queda inválida y Guardar se deshabilita', async () => {
     montar(PreferencesPage);
-    expect(await screen.findByText(/lectura vieja.*180 s/)).toBeTruthy();
+    const hora = await hourField();
 
-    fireEvent.change(await pullField(), { target: { value: '120' } });
+    fireEvent.change(hora, { target: { value: '' } });
+
+    expect(hora.getAttribute('aria-invalid')).toBe('true');
+    expect(guardar().disabled).toBe(true);
+  });
+
+  it('la hora se edita aunque la pasada esté desactivada', async () => {
+    montar(PreferencesPage);
+    const hora = await hourField();
+    expect(screen.getByRole('switch', { name: 'Pasada diaria activa' }).getAttribute('aria-checked')).toBe('false');
+
+    expect(hora.disabled).toBe(false);
+    fireEvent.change(hora, { target: { value: '09:15' } });
+    expect(hora.value).toBe('09:15');
+  });
+
+  // Los dos que guardan van al final: el repositorio mock es único y conserva lo guardado.
+  it('muestra el umbral de lectura vieja del backend y lo refresca al guardar', async () => {
+    montar(PreferencesPage);
+    expect(await screen.findByText(/lectura vieja.*14580 s/)).toBeTruthy();
+
+    fireEvent.change(await pulseField(), { target: { value: '2' } });
     fireEvent.click(guardar());
 
-    expect(await screen.findByText(/lectura vieja.*360 s/)).toBeTruthy();
+    expect(await screen.findByText(/lectura vieja.*7380 s/)).toBeTruthy();
+  });
+
+  it('activar la pasada a las 10:30 y guardar se lo manda a saveConfig', async () => {
+    const save = vi.spyOn(getRepository(), 'saveConfig');
+    montar(PreferencesPage);
+    const hora = await hourField();
+    expect(hora.value).toBe('11:00');
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Pasada diaria activa' }));
+    fireEvent.change(hora, { target: { value: '10:30' } });
+    fireEvent.click(guardar());
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].operativa).toMatchObject({ pasadaDiariaActiva: true, pasadaDiariaHora: '10:30' });
   });
 });

@@ -8,10 +8,13 @@ import { bandMidpoint } from '@/lib/configValidation';
 import { HORARIO_MEDIASOMBRA_DEFAULT } from '@/lib/planRustificacion';
 import { specs } from './specs';
 
-/** Same default as the backend. */
-const DEFAULT_SENSING_PULL_SECONDS = 60;
-/** Static value the real backend would report for the default interval (mock stands in for it). */
-const DEFAULT_STALE_THRESHOLD_SECONDS = 180;
+/** Los mismos valores que siembra el backend: un pulso cada 4 h y la pasada diaria apagada a las 11:00. */
+const DEFAULT_PULSE_MINUTES = 240;
+/**
+ * Umbral de lectura vieja que informaría el backend: max(piso de 90 s, pulso + 180 s de reintentos).
+ * El mock hace de backend; la vista nunca lo calcula.
+ */
+export const mockStaleThresholdSeconds = (intervaloMin: number) => Math.max(90, intervaloMin * 60 + 180);
 
 /** Construye la configuración de fábrica (también usada por "restablecer"). */
 export function buildConfig(): Configuracion {
@@ -36,10 +39,10 @@ export function buildConfig(): Configuracion {
       insumoDosisMax24hMl: 15,
       seguimientoLatenciaMin: 2,
       seguimientoDeltaMin: 5,
-      intervaloSensadoMinutos: 240,
-      intervaloEvaluacionMinutos: 5,
-      sensingPullIntervalSeconds: DEFAULT_SENSING_PULL_SECONDS,
-      effectiveStaleThresholdSeconds: DEFAULT_STALE_THRESHOLD_SECONDS,
+      intervaloSensadoMinutos: DEFAULT_PULSE_MINUTES,
+      effectiveStaleThresholdSeconds: mockStaleThresholdSeconds(DEFAULT_PULSE_MINUTES),
+      pasadaDiariaActiva: false,
+      pasadaDiariaHora: '11:00',
       mediasombraAbiertaDesde: HORARIO_MEDIASOMBRA_DEFAULT.desde,
       mediasombraAbiertaHasta: HORARIO_MEDIASOMBRA_DEFAULT.hasta,
       updatedBy: 'Mock System',

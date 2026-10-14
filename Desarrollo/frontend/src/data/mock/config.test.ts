@@ -91,22 +91,43 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
   });
 });
 
-describe('node read request frequency (sensingPullIntervalSeconds)', () => {
-  const withInterval = (v: number) => {
+describe('pulso de sensado y pasada diaria', () => {
+  const con = (patch: Partial<Configuracion['operativa']>) => {
     const cfg = buildConfig();
-    cfg.operativa = { ...cfg.operativa, sensingPullIntervalSeconds: v };
+    cfg.operativa = { ...cfg.operativa, ...patch };
     return validateConfig(cfg);
   };
 
-  it('factory config defaults to 60 seconds and is valid', () => {
-    expect(buildConfig().operativa.sensingPullIntervalSeconds).toBe(60);
+  it('de fábrica: pulso de 240 min, pasada apagada a las 11:00 y umbral del backend', () => {
+    const op = buildConfig().operativa;
+    expect(op).toMatchObject({ intervaloSensadoMinutos: 240, pasadaDiariaActiva: false, pasadaDiariaHora: '11:00' });
+    expect(op.effectiveStaleThresholdSeconds).toBe(14580);
   });
 
-  it.each([5, 9, 4000, 3601, 10.5])('rejects %s seconds', (v) => {
-    expect(withInterval(v).length).toBeGreaterThan(0);
+  it('ya no trae el intervalo de evaluación ni el pedido de lectura en segundos', () => {
+    const op = buildConfig().operativa as unknown as Record<string, unknown>;
+    expect(op).not.toHaveProperty('intervaloEvaluacionMinutos');
+    expect(op).not.toHaveProperty('sensingPullIntervalSeconds');
   });
 
-  it.each([10, 60, 3600])('accepts %s seconds', (v) => {
-    expect(withInterval(v)).toEqual([]);
+  it.each([30, 59, 361, 400, 90.5])('rechaza un intervalo de %s min', (v) => {
+    expect(con({ intervaloSensadoMinutos: v })).toEqual([
+      'El intervalo de sensado y evaluación debe ser un entero entre 60 y 360 minutos.',
+    ]);
+  });
+
+  it.each([60, 240, 360])('acepta un intervalo de %s min', (v) => {
+    expect(con({ intervaloSensadoMinutos: v })).toEqual([]);
+  });
+
+  it.each(['', '24:00', '12:60', '9:30', 'mediodía'])('rechaza la hora «%s»', (v) => {
+    expect(con({ pasadaDiariaHora: v })).toEqual([
+      'La hora de la pasada diaria debe tener el formato HH:MM (00:00 a 23:59).',
+    ]);
+  });
+
+  it.each(['00:00', '10:30', '23:59'])('acepta la hora %s, con la pasada apagada o encendida', (v) => {
+    expect(con({ pasadaDiariaHora: v, pasadaDiariaActiva: false })).toEqual([]);
+    expect(con({ pasadaDiariaHora: v, pasadaDiariaActiva: true })).toEqual([]);
   });
 });

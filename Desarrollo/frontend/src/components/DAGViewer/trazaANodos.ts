@@ -8,7 +8,8 @@ import type { DagSchema, TrazaEvaluacion, TrazaRegla } from '@/types/domain';
 
 /**
  * Estado visual de un nodo:
- * - de regla: pasó, bloqueó, pospuso, accionó, omitida (rama cortada antes), no alcanzada
+ * - de regla: pasó, bloqueó, pospuso, accionó, omitida (rama cortada antes), sin diagnóstico
+ *   (usa el diagnóstico de IA y el sector no tiene uno nuevo), no alcanzada
  *   (cortó un ABORT_ALL), error (lanzó excepción);
  * - terminal de rama: accionó / no accionó;
  * - `inicio` para el nodo de entrada y `sinTraza` para el que la traza no menciona.
@@ -20,6 +21,7 @@ export type EstadoNodo =
   | 'pospuso'
   | 'accion'
   | 'omitida'
+  | 'sinDiagnostico'
   | 'noAlcanzada'
   | 'error'
   | 'noAccion'
@@ -31,6 +33,7 @@ const EJECUTORAS = new Set(['ACTIVAR_VALVULA', 'ACTIVAR_BOMBA', 'MOVER_MEDIASOMB
 /** Estado visual de una regla según su traza. Si emite varias acciones manda la más fuerte. */
 export function clasificarRegla(r: TrazaRegla): EstadoNodo {
   if (r.estado === 'OMITIDA_RAMA_BLOQUEADA') return 'omitida';
+  if (r.estado === 'OMITIDA_SIN_DIAGNOSTICO_NUEVO') return 'sinDiagnostico';
   if (r.estado === 'NO_ALCANZADA') return 'noAlcanzada';
   if (r.estado === 'ERROR') return 'error';
 
@@ -58,7 +61,7 @@ export function trazaANodos(schema: DagSchema, traza: TrazaEvaluacion): Record<s
       // no se alcanzó (cortó un ABORT_ALL antes) o se omitió (la bloqueó una regla global).
       if (actuo) estados[nodo.id] = 'accion';
       else if (deLaRama.length > 0 && deLaRama.every((e) => e === 'noAlcanzada')) estados[nodo.id] = 'noAlcanzada';
-      else if (deLaRama.length > 0 && deLaRama.every((e) => e === 'noAlcanzada' || e === 'omitida'))
+      else if (deLaRama.length > 0 && deLaRama.every((e) => e === 'noAlcanzada' || e === 'omitida' || e === 'sinDiagnostico'))
         estados[nodo.id] = 'omitida';
       else estados[nodo.id] = 'noAccion';
     } else {
@@ -68,7 +71,7 @@ export function trazaANodos(schema: DagSchema, traza: TrazaEvaluacion): Record<s
   return estados;
 }
 
-const SIN_EVALUAR = new Set<EstadoNodo>(['omitida', 'noAlcanzada', 'sinTraza']);
+const SIN_EVALUAR = new Set<EstadoNodo>(['omitida', 'sinDiagnostico', 'noAlcanzada', 'sinTraza']);
 
 /** Color de la arista: apagada si el origen o el destino no llegaron a evaluarse; si no, sigue al origen. */
 export function colorArista(origen: EstadoNodo, destino: EstadoNodo): { color: string; activa: boolean } {
