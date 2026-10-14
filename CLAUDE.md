@@ -81,6 +81,13 @@ hardware real.
 - **Dispositivo de captura**: el equipo que toma las fotos (hoy un iPhone con la PWA de
   `Desarrollo/camara/`). Distinto del **hardware** del vivero (nodos y actuadores), que se
   registra aparte.
+- **Pulso de sensado**: cada `intervaloSensadoMinutos` (240 por defecto, franjas desde las 02:00) el
+  backend pide lectura a todas las macro-zonas y el motor decide con la primera respuesta de cada una.
+  **Es el único momento en que decide el motor**: no hay barrido, y cualquier otra lectura sólo
+  actualiza valores. Tres pulsos seguidos sin respuesta ponen el nodo fuera de servicio
+  (`WARNING`, `WARNING`, `CRITICAL`). También se pide a mano (`POST /api/pulsos`, con o sin motor).
+- **Diagnóstico nuevo**: las reglas que usan el diagnóstico de IA (hoy la de insumo) actúan una vez
+  por diagnóstico; queda marcado como usado en el sector. La telemetría no toca el diagnóstico.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
@@ -211,7 +218,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay cuatro scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay cinco scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -219,6 +226,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   `riego_vol_max_diario_ml`.
 > - `resources/migracion-quitar-simulador.sql` — baja de `modo_operacion` y `sensor_simulado`,
 >   que eran estado de una herramienta de prueba dentro de la base de producción (ver §6.2).
+> - `resources/migracion-pulso-sensado.sql` — borra `sensing_pull_interval_seconds` e
+>   `intervalo_evaluacion_minutos`, que reemplazó el pulso de sensado.
 >
 > Detalle en el README del backend.
 
@@ -234,7 +243,11 @@ cd Desarrollo/backend
 - `GET/PUT /api/rules/parametros`, `GET /api/rules/evaluaciones/{sectorId}`, `GET /api/rules/schema`
   → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
 - `POST /api/pasadas`, `GET /api/pasadas/actual`, `POST /api/pasadas/actual/cancelar` → pasada del
-  riel; `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
+  riel (también diaria, a hora configurable: `pasadaDiariaActiva`/`pasadaDiariaHora` en la
+  configuración); `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
+- `POST /api/pulsos {ejecutarMotor}` → pulso de sensado manual de todas las zonas, sólo por API; `409` si hay
+  uno en curso. En Demo Expo, la lectura con motor es la secuencia `LECTURA` con `ejecutarMotor` (sólo la zona
+  de la secuencia). Ver "Pulso de sensado" en el README del backend.
 - `POST /api/auth/login`, `GET /api/auth/perfil`, `POST /api/auth/actividad|logout`,
   `PUT /api/auth/clave` → sesión. `/api/usuarios/**`, `/api/roles/**`, `/api/seguridad/politica`,
   `GET /api/auditoria` → gestión de seguridad (HU-01 / HU-20). Ver "Autenticación y permisos" en

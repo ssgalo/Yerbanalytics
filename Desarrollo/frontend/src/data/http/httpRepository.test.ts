@@ -181,9 +181,9 @@ describe('HttpRepository · motor de reglas', () => {
     const traza = { sectorId: 'MZ-1-001', reglas: [] };
     const llamadas = stubFetch({ status: 200, body: traza });
 
-    expect(await new HttpRepository(BASE).getTrazaEvaluacion('MZ-1-001', 'BARRIDO')).toEqual(traza);
+    expect(await new HttpRepository(BASE).getTrazaEvaluacion('MZ-1-001', 'TELEMETRIA')).toEqual(traza);
     expect(llamadas[0].url).toMatch(
-      /^http:\/\/localhost:8000\/api\/rules\/evaluaciones\/MZ-1-001\?origen=BARRIDO&t=\d+$/,
+      /^http:\/\/localhost:8000\/api\/rules\/evaluaciones\/MZ-1-001\?origen=TELEMETRIA&t=\d+$/,
     );
   });
 
@@ -204,47 +204,49 @@ describe('HttpRepository · motor de reglas', () => {
   });
 });
 
-describe('HttpRepository · configuration sensing fields', () => {
+describe('HttpRepository · campos del pulso y de la pasada diaria', () => {
   const BASE = 'http://localhost:8000/api';
   afterEach(() => vi.unstubAllGlobals());
 
   const serverConfig = (operativa: Record<string, unknown>) => ({ umbrales: [], rustificacion: [], operativa });
+  const stubConfig = (operativa: Record<string, unknown>) => {
+    const fn = vi.fn(async () => ({ ok: true, status: 200, json: async () => serverConfig(operativa) }));
+    vi.stubGlobal('fetch', fn);
+    return fn;
+  };
 
-  it('getConfig maps the pull interval and the effective stale threshold', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () =>
-          serverConfig({ sensingPullIntervalSeconds: 30, effectiveStaleThresholdSeconds: 90 }),
-      })),
-    );
-    const cfg = await new HttpRepository(BASE).getConfig();
-    expect(cfg.operativa.sensingPullIntervalSeconds).toBe(30);
-    expect(cfg.operativa.effectiveStaleThresholdSeconds).toBe(90);
+  it('getConfig lee el intervalo, el umbral del backend y la pasada diaria', async () => {
+    stubConfig({
+      intervaloSensadoMinutos: 180,
+      effectiveStaleThresholdSeconds: 10980,
+      pasadaDiariaActiva: true,
+      pasadaDiariaHora: '10:30',
+    });
+    const op = (await new HttpRepository(BASE).getConfig()).operativa;
+    expect(op).toMatchObject({
+      intervaloSensadoMinutos: 180,
+      effectiveStaleThresholdSeconds: 10980,
+      pasadaDiariaActiva: true,
+      pasadaDiariaHora: '10:30',
+    });
   });
 
-  it('getConfig falls back to 60 when the interval is null', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({ ok: true, status: 200, json: async () => serverConfig({ sensingPullIntervalSeconds: null }) })),
-    );
-    const cfg = await new HttpRepository(BASE).getConfig();
-    expect(cfg.operativa.sensingPullIntervalSeconds).toBe(60);
+  it('getConfig completa los valores de fábrica cuando el backend manda nulos', async () => {
+    stubConfig({ intervaloSensadoMinutos: null, pasadaDiariaActiva: null, pasadaDiariaHora: null });
+    const op = (await new HttpRepository(BASE).getConfig()).operativa;
+    expect(op).toMatchObject({ intervaloSensadoMinutos: 240, pasadaDiariaActiva: false, pasadaDiariaHora: '11:00' });
   });
 
-  it('saveConfig sends the interval in the PUT body', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => serverConfig({ sensingPullIntervalSeconds: 30, effectiveStaleThresholdSeconds: 90 }),
-    }));
-    vi.stubGlobal('fetch', fetchMock);
+  it('saveConfig manda la pasada diaria y ya no los campos retirados', async () => {
+    const fetchMock = stubConfig({ pasadaDiariaActiva: true, pasadaDiariaHora: '10:30' });
     const cfg = buildConfig();
-    cfg.operativa.sensingPullIntervalSeconds = 30;
+    cfg.operativa.pasadaDiariaActiva = true;
+    cfg.operativa.pasadaDiariaHora = '10:30';
     await new HttpRepository(BASE).saveConfig(cfg);
     const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
-    expect(JSON.parse(init.body as string).operativa.sensingPullIntervalSeconds).toBe(30);
+    const op = JSON.parse(init.body as string).operativa;
+    expect(op).toMatchObject({ pasadaDiariaActiva: true, pasadaDiariaHora: '10:30' });
+    expect(op).not.toHaveProperty('sensingPullIntervalSeconds');
+    expect(op).not.toHaveProperty('intervaloEvaluacionMinutos');
   });
 });

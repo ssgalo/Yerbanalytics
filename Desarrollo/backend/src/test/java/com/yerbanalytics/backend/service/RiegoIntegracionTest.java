@@ -83,7 +83,6 @@ class RiegoIntegracionTest {
     private final List<String> comandos = Collections.synchronizedList(new ArrayList<>());
     private final Map<String, Integer> duraciones = new HashMap<>();
     private ZonaEntity zona;
-    private NurseryWatchdog watchdog;
     private HistorialService historialService;
     private WeatherService clima;
     private ManualLockRepository bloqueosDelNodo;
@@ -174,9 +173,8 @@ class RiegoIntegracionTest {
         nursery = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository, historialService,
                 configuracion, mock(HardwareService.class), mock(TopologiaLayoutRepository.class), orquestador,
                 executor, clima, bloqueosDelNodo,
-                mock(DiagnosticoService.class), trazas, catalogo, historialRepository, despacho, reloj, 20);
-        watchdog = new NurseryWatchdog(zonaRepository, sectorRepository, orquestador, executor, configuracion,
-                mock(WeatherService.class), mock(ManualLockRepository.class), trazas, reloj);
+                mock(DiagnosticoService.class), trazas, historialRepository, despacho,
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), reloj, 20);
     }
 
     private static String id(int n) {
@@ -190,6 +188,13 @@ class RiegoIntegracionTest {
             @Override public String getRegla() { return e.getRegla(); }
             @Override public Long getTs() { return e.getTs(); }
         };
+    }
+
+    /** Lectura sin humedad de sustrato (la sonda calló): el resto refresca la zona, la humedad queda vieja. */
+    private void telemetriaSinHumedad() {
+        nursery.updateTelemetry("MZ-2", new MqttTelemetryPayload("aa:bb", 90, -60, reloj.instant().getEpochSecond(),
+                new MqttTelemetryPayload.MetricsPayload(null, 70.0, 22.0, 20.0, 40.0,
+                        null, null, null, null, null)));
     }
 
     private void telemetria(double humedadSustrato) {
@@ -332,38 +337,19 @@ class RiegoIntegracionTest {
     }
 
     @Test
-    @DisplayName("el barrido del watchdog no encola, no retira ni duplica riegos: la cola queda como estaba")
-    void elBarridoNoTocaLaCola() {
-        telemetria(40.0);
-        despacho.tick();
-        assertThat(cola.pendientes("MZ-2")).hasSize(90);
-
-        for (int pasada = 1; pasada <= 3; pasada++) {
-            reloj.avanzar(Duration.ofMinutes(5));         // cada pasada del watchdog, sin lectura fresca
-            watchdog.evaluarTodos();
-        }
-
-        // Evalúa sin métricas: ni R-01 ni R-02 pueden pedir riego, y el barrido no retira lo pendiente.
-        assertThat(cola.pendientes("MZ-2")).extracting(p -> p.sectorId()).containsExactlyElementsOf(rango(11, 100));
-        assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
-        assertThat(historia).hasSize(10);
-    }
-
-    @Test
-    @DisplayName("con la lectura vieja el barrido corta (StaleSensorRule) y el despacho NO abre nada más; la cola queda pausada")
-    void barridoConLecturaViejaNoRiega() {
+    @DisplayName("con la lectura vieja el despacho NO abre nada más; la cola queda pausada")
+    void lecturaViejaNoRiega() {
         telemetria(40.0);
         despacho.tick();                                   // abre 1-10; los 90 restantes esperan
         reloj.avanzar(Duration.ofSeconds(700));            // el nodo murió: la lectura es mucho más vieja que 90 s
 
-        watchdog.evaluarTodos();
         despacho.tick();                                   // cupo libre, pero con datos viejos no se abre ninguna
 
         assertThat(comandos).containsExactlyElementsOf(rango(1, 10));
         assertThat(cola.pendientes("MZ-2")).hasSize(90);
     }
 
-    // ------------------------------------------------------------------ el registro de inacción sólo cuando cambia
+    // ------------------------------------------------------------------ el registro de inacción completo en cada pulso
 
     private int filasDeInaccion() {
         return org.mockito.Mockito.mockingDetails(historialService).getInvocations().stream()
@@ -371,41 +357,17 @@ class RiegoIntegracionTest {
     }
 
     @Test
-    @DisplayName("60 mensajes idénticos del nodo (30 min) escriben una sola tanda de filas Info; al cambiar la decisión se registra otra")
-    void inaccionSoloCuandoCambia() {
+    @DisplayName("dos pulsos con la misma decisión escriben dos tandas completas de filas Info")
+    void inaccionCompletaEnCadaPulso() {
         telemetria(40.0);
         int primeraTanda = filasDeInaccion();
         assertThat(primeraTanda).as("la primera evaluación registra el conjunto de cada sector").isGreaterThan(SECTORES);
 
-        for (int mensaje = 0; mensaje < 59; mensaje++) {
-            reloj.avanzar(Duration.ofSeconds(30));
-            telemetria(40.0);
-        }
-        assertThat(filasDeInaccion()).as("en régimen estable: cero filas por mensaje").isEqualTo(primeraTanda);
-
-        telemetria(80.0);                                  // saturado: R-04 corta, otras reglas pasan a "no alcanzada"
-        assertThat(filasDeInaccion()).isGreaterThan(primeraTanda);
-    }
-
-    @Test
-    @DisplayName("el barrido del watchdog no escribe filas que la telemetría ya registró ni repite las suyas")
-    void barridoNoDuplicaFilas() {
+        reloj.avanzar(Duration.ofHours(4));
         telemetria(40.0);
-        reloj.avanzar(Duration.ofSeconds(30));
-        telemetria(40.0);
-        int base = filasDeInaccion();
 
-        for (int pasada = 0; pasada < 3; pasada++) {
-            watchdog.evaluarTodos();
-        }
-
-        // La primera pasada registra la decisión propia del barrido (otra: sin métricas), las demás nada.
-        int tras1 = filasDeInaccion();
-        reloj.avanzar(Duration.ofSeconds(30));
-        telemetria(40.0);
-        watchdog.evaluarTodos();
-        assertThat(filasDeInaccion()).isEqualTo(tras1);
-        assertThat(tras1).isGreaterThanOrEqualTo(base);
+        assertThat(filasDeInaccion()).as("el segundo pulso vuelve a escribir al menos una fila por sector")
+                .isGreaterThanOrEqualTo(primeraTanda + SECTORES);
     }
 
     // ------------------------------------------------------------------ la ronda se completa (cancelación explícita)
@@ -718,9 +680,8 @@ class RiegoIntegracionTest {
     void sensorSinDatosNoRetiraLaCola() {
         telemetria(40.0);
         zona.setHumSusTs(reloj.millis() - 300_000L);       // la sonda calló: la evaluación de la telemetría la ve vieja
-        // (el mensaje siguiente trae humSus y la refresca, así que se evalúa el barrido: no toca la cola)
         reloj.avanzar(Duration.ofMinutes(5));
-        watchdog.evaluarTodos();
+        telemetriaSinHumedad();                            // el resto de la lectura llega; la humedad sigue vieja
         despacho.tick();
 
         assertThat(cola.pendientes("MZ-2")).hasSize(SECTORES);

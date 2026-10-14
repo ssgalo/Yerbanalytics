@@ -11,13 +11,12 @@ import com.yerbanalytics.backend.engine.riego.CicloLectura;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
-import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
-import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -70,9 +69,10 @@ public class NurseryService {
     private final ManualLockRepository manualLockRepository;
     private final DiagnosticoService diagnosticoService;
     private final TrazaEvaluacionStore trazaStore;
-    private final CatalogoParametrosService parametros;
     private final HistorialRepository historialRepository;
     private final DespachoRiego despacho;
+    private final PulsoSensadoService pulsos;
+    private final EscalamientoNodoService escalamiento;
     private final Clock reloj;
     private final int bateriaMinPct;
 
@@ -89,9 +89,10 @@ public class NurseryService {
                           ManualLockRepository manualLockRepository,
                           DiagnosticoService diagnosticoService,
                           TrazaEvaluacionStore trazaStore,
-                          CatalogoParametrosService parametros,
                           HistorialRepository historialRepository,
                           DespachoRiego despacho,
+                          PulsoSensadoService pulsos,
+                          EscalamientoNodoService escalamiento,
                           Clock reloj,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -106,9 +107,10 @@ public class NurseryService {
         this.manualLockRepository = manualLockRepository;
         this.diagnosticoService = diagnosticoService;
         this.trazaStore = trazaStore;
-        this.parametros = parametros;
         this.historialRepository = historialRepository;
         this.despacho = despacho;
+        this.pulsos = pulsos;
+        this.escalamiento = escalamiento;
         this.reloj = reloj;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -131,9 +133,9 @@ public class NurseryService {
             int off = 0;
 
             // La lectura es de la zona: un solo nodo testigo la produce y sus 100 sectores
-            // la comparten. Si el nodo dejó de reportar, toda la zona queda fuera de servicio.
-            boolean isStale = ze.getLastReadingTime() == null
-                    || (reloj.millis() - ze.getLastReadingTime() > umbralAntiguedadMs());
+            // la comparten. Si el nodo no respondió a tres pulsos seguidos (o nunca leyó), toda la zona
+            // queda fuera de servicio. Entre pulsos el nodo no reporta: el tiempo sin lectura no lo decide.
+            boolean isStale = ze.getLastReadingTime() == null || EscalamientoNodoService.fueraDeServicio(ze);
             List<Metric> zoneMetrics = isStale ? buildOfflineMetricsList() : buildMetricsList(ze);
             String zoneAgo = ze.getLastReadingTime() == null ? "hace —" : formatAgo(ze.getLastReadingTime());
             agoPorZona.put(ze.getId(), zoneAgo);
@@ -535,13 +537,22 @@ public class NurseryService {
         } else {
             zonasConTimestampInvalido.remove(zoneId);
         }
+        // Cualquier telemetría prueba que el nodo responde: corta la racha de pulsos sin respuesta.
+        boolean rachaCortada = escalamiento.reiniciar(zona);
         // Lectura vieja (buffer offline del nodo, que conserva su hora original): no pisa una más
-        // nueva ni cuenta como "recién leída". Sólo se ignora con timestamp legítimo.
+        // nueva ni cuenta como "recién leída" (tampoco responde al pulso). Sólo se ignora con timestamp legítimo.
         if (zona.getLastReadingTime() != null && tsMs < zona.getLastReadingTime()) {
             log.debug("Zona {}: lectura de {} ignorada por ser anterior a la última guardada ({})",
                     zoneId, tsMs, zona.getLastReadingTime());
+            if (rachaCortada) {
+                zonaRepository.save(zona);
+            }
             return;
         }
+        // El motor decide sólo con la primera respuesta de la zona a un pulso con motor. Cualquier otra
+        // telemetría (pulso sin motor, segunda respuesta, arranque del nodo, secuencia LECTURA) sólo actualiza
+        // la lectura y el estado de los sectores.
+        boolean ejecutaMotor = pulsos.respondePulso(zoneId, recepcionMs);
         List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
 
         // La lectura se persiste UNA vez, en la zona. Sólo se actualizan las métricas
@@ -594,38 +605,23 @@ public class NurseryService {
         // Lo que las reglas de riego necesitan del pasado reciente, UNA consulta por zona (no una por sector y
         // por regla): último riego, último riego crítico y última aplicación de cada sector.
         Instant ahora = reloj.instant();
-        Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
-        Map<String, ContextoRiego> riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
-        // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker MQTT
-        // y sostiene a R-02. Sin pronóstico cacheado se evalúa sin él (la traza lo muestra como sin dato).
-        WeatherForecast forecast = weatherService.getForecastSinEspera();
+        Map<String, ContextoRiego> riegoPorSector = Map.of();
+        WeatherForecast forecast = null;
+        if (ejecutaMotor) {
+            Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
+            riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
+            // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker
+            // MQTT y sostiene a R-02. Sin pronóstico cacheado se evalúa sin él (la traza lo muestra como sin dato).
+            forecast = weatherService.getForecastSinEspera();
+        }
 
         for (SectorEntity s : sectors) {
-            String oldStatus = s.getStatus();
             s.setStatus(finalStatus);
             s.setColor(C.get(finalStatus));
             s.setStatusLabel(LAB.get(finalStatus));
             s.setTip(s.getId() + " · " + LAB.get(finalStatus));
 
-            // Diagnosis
-            if ("ok".equals(finalStatus)) {
-                s.setDiagnosisEstado("Sano");
-                s.setDiagnosisConf(98.0);
-                s.setDiagnosisSev(EMDASH);
-            } else {
-                // Keep original if it was already warning/critical and has a valid diagnosis
-                if (!"ok".equals(oldStatus) && !"offline".equals(oldStatus) && !"Sin diagnóstico".equals(s.getDiagnosisEstado())) {
-                    // keep existing diagnosis
-                } else {
-                    List<PathoEntry> pList = PATHOS.get(finalStatus);
-                    if (pList != null && !pList.isEmpty()) {
-                        PathoEntry p = pList.get(0); // Pick default first one
-                        s.setDiagnosisEstado(p.estado());
-                        s.setDiagnosisConf(92.0);
-                        s.setDiagnosisSev(p.sev());
-                    }
-                }
-            }
+            // El diagnóstico no se toca: sólo lo cambia el alta de diagnósticos (DiagnosticoService).
 
             // Reason: sólo sobre las métricas que efectivamente movieron el estado, para no
             // justificar un "warning" citando una métrica informativa que no lo causó.
@@ -642,6 +638,9 @@ public class NurseryService {
                 s.setReason(s.getDiagnosisEstado());
             }
 
+            if (!ejecutaMotor) {
+                continue;
+            }
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
             RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()));
@@ -649,6 +648,11 @@ public class NurseryService {
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
             actionExecutor.execute(resultado.acciones(), ctx, OrigenEvaluacion.TELEMETRIA);
+            // Una regla de diagnóstico se evaluó: el diagnóstico queda usado, en esta misma transacción (si revierte,
+            // sigue siendo nuevo para el pulso siguiente).
+            if (resultado.usoDiagnostico()) {
+                s.setDiagnosisUsadoTs(s.getDiagnosisTs());
+            }
         }
         sectorRepository.saveAll(sectors);
 
@@ -730,18 +734,6 @@ public class NurseryService {
 
     private static Long masReciente(Long a, Long b) {
         return a == null ? b : (b == null ? a : Long.valueOf(Math.max(a, b)));
-    }
-
-    /**
-     * Antigüedad máxima de la lectura de una zona, en ms, según el catálogo de parámetros
-     * ({@code seguridad.antiguedad-max-lectura}, en segundos): el mismo valor que usa
-     * {@code StaleSensorRule}, así la vista y el motor no pueden discrepar.
-     *
-     * <p>Note: the snapshot value is the effective threshold {@code max(floor, 3 x pull interval)}
-     * (see {@code SensingCadence}), not just the catalog floor.
-     */
-    private long umbralAntiguedadMs() {
-        return (long) (parametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA) * 1000);
     }
 
     /** Evalúa la lectura de la macro-zona contra los umbrales vigentes. */

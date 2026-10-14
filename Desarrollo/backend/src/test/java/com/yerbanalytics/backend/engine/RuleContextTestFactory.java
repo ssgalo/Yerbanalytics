@@ -52,8 +52,8 @@ public final class RuleContextTestFactory {
                 5,      // seguimientoLatenciaMin
                 5.0,    // seguimientoDeltaMin
                 240,    // intervaloSensadoMinutos
-                5,      // intervaloEvaluacionMinutos
-                null,   // sensingPullIntervalSeconds (null reads as 60)
+                null,   // pasadaDiariaActiva (null se lee como false)
+                null,   // pasadaDiariaHora (null se lee como "11:00")
                 "test",
                 System.currentTimeMillis()
         );

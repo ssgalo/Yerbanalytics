@@ -136,6 +136,13 @@ describe('SecuenciasPanel', () => {
     expect(h.iniciar).toHaveBeenCalledWith('LECTURA');
   });
 
+  it('lectura con motor: manda ejecutarMotor', () => {
+    const h = hook(null);
+    montar();
+    fireEvent.click(btn(/Leer sensores y ejecutar motor ahora/)!);
+    expect(h.iniciar).toHaveBeenCalledWith('LECTURA', { ejecutarMotor: true });
+  });
+
   it('un valor fuera de rango deshabilita el botón de esa tarjeta', () => {
     hook(null);
     montar();
@@ -175,6 +182,7 @@ describe('SecuenciasPanel', () => {
     expect(btn(/^Regar$/)!.disabled).toBe(true);
     expect(btn(/Desplegar y enrollar/)!.disabled).toBe(true);
     expect(btn(/Leer sensores ahora/)!.disabled).toBe(true);
+    expect(btn(/Leer sensores y ejecutar motor ahora/)!.disabled).toBe(true);
   });
 
   it('mientras inicia, los botones quedan deshabilitados', () => {

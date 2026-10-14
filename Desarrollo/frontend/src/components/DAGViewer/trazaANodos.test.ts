@@ -51,6 +51,7 @@ describe('clasificarRegla', () => {
 
   it('mapea los estados de la traza que no corrieron', () => {
     expect(clasificarRegla(regla([], 'OMITIDA_RAMA_BLOQUEADA'))).toBe('omitida');
+    expect(clasificarRegla(regla([], 'OMITIDA_SIN_DIAGNOSTICO_NUEVO'))).toBe('sinDiagnostico');
     expect(clasificarRegla(regla([], 'NO_ALCANZADA'))).toBe('noAlcanzada');
     expect(clasificarRegla(regla([], 'ERROR'))).toBe('error');
   });

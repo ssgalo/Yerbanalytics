@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine.parametros;
 
+import com.yerbanalytics.backend.config.PulsoProperties;
 import com.yerbanalytics.backend.dto.CatalogoReglasDto;
 import com.yerbanalytics.backend.dto.ParametroDto;
 import com.yerbanalytics.backend.dto.ReglaCatalogoDto;
@@ -50,7 +51,7 @@ public class CatalogoParametrosService {
     private record Estado(ParametrosVigentes vigentes, ParametrosVigentes efectivos,
                           Map<String, OverridePersistido> overrides, Set<String> corruptas) {}
 
-    /** Operating-config row that holds the sensing pull interval. */
+    /** Operating-config row that holds the sensing pulse interval. */
     private static final int OPERATIVA_ID = 1;
 
     private final CatalogoParametros catalogo;
@@ -58,6 +59,7 @@ public class CatalogoParametrosService {
     private final HistorialService historialService;
     private final TransactionTemplate transaccion;
     private final ConfiguracionOperativaRepository operativaRepository;
+    private final PulsoProperties pulso;
 
     /** Serializa los guardados: cada uno valida contra la base, así que no pueden solaparse. */
     private final Object escritura = new Object();
@@ -76,7 +78,8 @@ public class CatalogoParametrosService {
                                      ParametroReglaRepository repository,
                                      HistorialService historialService,
                                      PlatformTransactionManager transactionManager,
-                                     ConfiguracionOperativaRepository operativaRepository) {
+                                     ConfiguracionOperativaRepository operativaRepository,
+                                     PulsoProperties pulso) {
         this.transaccion = new TransactionTemplate(transactionManager);
         // Transacción propia: el lock de guardar tiene que soltarse DESPUÉS del commit.
         this.transaccion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -84,6 +87,7 @@ public class CatalogoParametrosService {
         this.repository = repository;
         this.historialService = historialService;
         this.operativaRepository = operativaRepository;
+        this.pulso = pulso;
     }
 
     // ------------------------------------------------------------------
@@ -92,7 +96,7 @@ public class CatalogoParametrosService {
 
     /**
      * Valores vigentes; el mismo objeto hasta que alguien guarde. This is the EFFECTIVE snapshot the
-     * engine consumes: {@code seguridad.antiguedad-max-lectura} is {@code max(floor, 3 x pull interval)}.
+     * engine consumes: {@code seguridad.antiguedad-max-lectura} is {@code max(floor, pulse interval + response window)}.
      */
     public ParametrosVigentes vigentes() {
         return estado().efectivos();
@@ -170,15 +174,16 @@ public class CatalogoParametrosService {
 
     /**
      * Overlays the effective stale threshold on the raw values: the stored value is only the floor,
-     * the real threshold also depends on the pull interval (see {@link SensingCadence}).
+     * the real threshold also depends on the pulse interval and its response window (see {@link SensingCadence}).
      */
     private ParametrosVigentes conUmbralEfectivo(ParametrosVigentes crudos) {
         Integer raw = operativaRepository.findById(OPERATIVA_ID)
-                .map(ConfiguracionOperativaEntity::getSensingPullIntervalSeconds).orElse(null);
+                .map(ConfiguracionOperativaEntity::getIntervaloSensadoMinutos).orElse(null);
         double piso = crudos.numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
         Map<String, ValorParametro> efectivos = new HashMap<>(crudos.valores());
         efectivos.put(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(),
-                new ValorParametro.Numero(SensingCadence.staleThresholdSeconds(piso, SensingCadence.pullSeconds(raw))));
+                new ValorParametro.Numero(SensingCadence.staleThresholdSeconds(
+                        piso, SensingCadence.intervalMinutes(raw), pulso.ventanaSeg())));
         return ParametrosVigentes.de(efectivos);
     }
 

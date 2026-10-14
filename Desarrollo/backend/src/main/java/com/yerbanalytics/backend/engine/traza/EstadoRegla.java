@@ -8,6 +8,8 @@ public enum EstadoRegla {
     OMITIDA_RAMA_BLOQUEADA,
     /** No se ejecutó porque una regla anterior emitió {@code ABORT_ALL}. */
     NO_ALCANZADA,
+    /** No se ejecutó porque usa el diagnóstico de IA y el sector no tiene uno nuevo (todavía no usado). */
+    OMITIDA_SIN_DIAGNOSTICO_NUEVO,
     /** Lanzó una excepción al evaluarse: {@code TrazaRegla.error} dice cuál. Las reglas que seguían quedan {@code NO_ALCANZADA}. */
     ERROR
 }

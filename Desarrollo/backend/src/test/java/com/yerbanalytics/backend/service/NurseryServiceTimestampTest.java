@@ -83,7 +83,8 @@ class NurseryServiceTimestampTest {
                 mock(HistorialService.class), mock(ConfiguracionService.class), hardwareService,
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor,
                 mock(WeatherService.class), mock(ManualLockRepository.class),
-                mock(DiagnosticoService.class), store, parametros, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
+                mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class),
                 java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
     }
 
@@ -153,7 +154,7 @@ class NurseryServiceTimestampTest {
 
         assertThat(zona.getLastReadingTime()).isEqualTo(reciente);
         assertThat(zona.getHumSusRaw()).isEqualTo(55.0);
-        verify(zonaRepository, never()).save(any());
+        // Se puede guardar la zona (la telemetría igual corta la racha de pulsos sin respuesta), pero sin pisar la lectura.
         verify(actionExecutor, never()).execute(any(), any(), any());
         verify(hardwareService, never()).actualizarHeartbeat(any(), any(), any(), any(), anyLong());
     }

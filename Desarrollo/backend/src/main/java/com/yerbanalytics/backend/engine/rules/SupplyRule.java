@@ -56,6 +56,12 @@ public class SupplyRule implements Rule {
         return RuleBranch.INSUMO;
     }
 
+    /** Decide con el diagnóstico de IA: actúa una vez por diagnóstico nuevo. */
+    @Override
+    public boolean usaDiagnostico() {
+        return true;
+    }
+
     @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA);

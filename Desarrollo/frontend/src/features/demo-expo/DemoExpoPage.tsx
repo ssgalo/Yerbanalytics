@@ -1,5 +1,6 @@
 /* ============================================================
-   Vista Demo Expo: la pasada del riel de punta a punta (dashboard → ESP32 → celular → IA).
+   Vista Demo Expo: la pasada del riel de punta a punta (dashboard → ESP32 → celular → IA) y las
+   secuencias de actuadores y de lectura (con o sin motor).
    Pensada para mostrarse en una expo: el titular dice a distancia qué está pasando y cada paso
    tiene su estado, su foto y su diagnóstico. Sólo consume `DataRepository` (vía `usePasada`).
    ============================================================ */

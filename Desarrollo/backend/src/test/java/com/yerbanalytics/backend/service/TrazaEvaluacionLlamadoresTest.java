@@ -98,7 +98,8 @@ class TrazaEvaluacionLlamadoresTest {
         NurseryService service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 historialService, configuracionService, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
-                manualLockRepository, mock(DiagnosticoService.class), store, parametros, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
+                manualLockRepository, mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class),
                 java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
 
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, System.currentTimeMillis(),
@@ -106,7 +107,6 @@ class TrazaEvaluacionLlamadoresTest {
 
         for (String sector : List.of("MZ-1-001", "MZ-1-002")) {
             assertThat(store.ultima(sector, OrigenEvaluacion.TELEMETRIA)).isPresent();
-            assertThat(store.ultima(sector, OrigenEvaluacion.BARRIDO)).isEmpty();
         }
         ArgumentCaptor<List<RuleAction>> acciones = ArgumentCaptor.forClass(List.class);
         verify(actionExecutor, times(2)).execute(acciones.capture(), any(RuleContext.class), eq(OrigenEvaluacion.TELEMETRIA));
@@ -133,22 +133,20 @@ class TrazaEvaluacionLlamadoresTest {
     }
 
     @Test
-    void evaluarTodos_guardaUnaTrazaBarridoPorSectorYNoPisaLaDeTelemetria() {
-        // Una traza de telemetría previa, que el barrido no debe tapar.
-        store.guardar(orchestrator.evaluate(
-                RuleContextTestFactory.basico(s1, zona), OrigenEvaluacion.TELEMETRIA).traza());
-        when(zonaRepository.findAllWithSectors()).thenReturn(List.of(zona));
-        NurseryWatchdog watchdog = new NurseryWatchdog(zonaRepository, sectorRepository, orchestrator,
-                actionExecutor, configuracionService, weatherService, manualLockRepository, store,
-                java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA));
+    void telemetriaFueraDeUnPulsoConMotor_noEvaluaNiGuardaTraza() {
+        when(zonaRepository.findById("MZ-1")).thenReturn(Optional.of(zona));
+        when(sectorRepository.findByZonaId("MZ-1")).thenReturn(List.of(s1, s2));
+        NurseryService service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
+                historialService, configuracionService, mock(HardwareService.class),
+                mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
+                manualLockRepository, mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
+                PulsosDePrueba.sinMotor(), mock(EscalamientoNodoService.class),
+                java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
 
-        watchdog.evaluarTodos();
+        service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, System.currentTimeMillis(),
+                new MqttTelemetryPayload.MetricsPayload(38.0, 70.0, 22.0, 20.0, 40.0, null, null, null, null, null)));
 
-        for (String sector : List.of("MZ-1-001", "MZ-1-002")) {
-            assertThat(store.ultima(sector, OrigenEvaluacion.BARRIDO)).isPresent();
-        }
-        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA)).isPresent();
-        assertThat(store.ultima("MZ-1-002", OrigenEvaluacion.TELEMETRIA)).isEmpty();
-        verify(actionExecutor, times(2)).execute(any(), any(RuleContext.class), eq(OrigenEvaluacion.BARRIDO));
+        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA)).isEmpty();
+        verify(actionExecutor, org.mockito.Mockito.never()).execute(any(), any(RuleContext.class), any());
     }
 }

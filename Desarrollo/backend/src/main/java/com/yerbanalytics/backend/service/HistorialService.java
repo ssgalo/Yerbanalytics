@@ -15,6 +15,7 @@ import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -360,9 +361,24 @@ public class HistorialService {
     // Consulta (endpoint)
     // ------------------------------------------------------------------
 
+    /** Eventos que devuelve la consulta si el cliente no pide un tope. */
+    public static final int LIMITE_DEFAULT = 1000;
+    /** Tope absoluto por consulta, pida lo que pida el cliente. */
+    public static final int LIMITE_MAXIMO = 5000;
+
+    /**
+     * Los {@code limite} eventos más recientes que cumplen los filtros. Nunca el historial entero: con el motor
+     * registrando inacciones de 600 sectores, una consulta sin tope llegó a cargar cientos de miles de filas en
+     * memoria (y a serializarlas en un JSON de cientos de MB) y dejó colgados al backend y al navegador.
+     *
+     * @param limite tope pedido; {@code null} = {@link #LIMITE_DEFAULT}, y nunca más que {@link #LIMITE_MAXIMO}
+     */
     @Transactional(readOnly = true)
-    public List<HistorialEvento> getHistorial(String sector, String zona, String tipo, Long desde, Long hasta) {
-        return historialRepository.findFiltered(blank(sector), blank(zona), blank(tipo), desde, hasta)
+    public List<HistorialEvento> getHistorial(String sector, String zona, String tipo, Long desde, Long hasta,
+                                              Integer limite) {
+        int tope = limite == null ? LIMITE_DEFAULT : Math.max(1, Math.min(LIMITE_MAXIMO, limite));
+        return historialRepository.findFiltered(blank(sector), blank(zona), blank(tipo), desde, hasta,
+                        PageRequest.of(0, tope))
                 .stream()
                 .map(this::toDto)
                 .toList();

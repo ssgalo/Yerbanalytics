@@ -44,7 +44,7 @@ public record RuleContext(
         /**
          * Pasado reciente del sector que necesitan las reglas de riego (último riego, última
          * aplicación de insumo, inicio del ciclo de lectura…). {@link ContextoRiego#vacio()} si
-         * el llamador no lo arma (el barrido, que no riega).
+         * el llamador no lo arma.
          */
         ContextoRiego riego
 
@@ -55,6 +55,16 @@ public record RuleContext(
                        WeatherForecast forecast, boolean bloqueoManualActivo) {
         this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo,
                 ContextoRiego.vacio());
+    }
+
+    /**
+     * {@code true} si el sector tiene un diagnóstico de IA que todavía no usó ninguna evaluación: llegó
+     * ({@code diagnosisTs}) después del último usado ({@code diagnosisUsadoTs}), o nunca se usó uno.
+     */
+    public boolean diagnosticoNuevo() {
+        Long llegada = sector.getDiagnosisTs();
+        Long usado = sector.getDiagnosisUsadoTs();
+        return llegada != null && (usado == null || llegada > usado);
     }
 
     /**

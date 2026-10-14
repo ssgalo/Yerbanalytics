@@ -53,6 +53,20 @@ public class SectorEntity {
     @Column(name = "diagnosis_sev", nullable = false)
     private String diagnosisSev;
 
+    /**
+     * Epoch ms de llegada del diagnóstico vigente ({@code creadoEn} del alta). Lo escribe sólo el alta de
+     * diagnósticos; {@code null} si el sector nunca recibió uno.
+     */
+    @Column(name = "diagnosis_ts")
+    private Long diagnosisTs;
+
+    /**
+     * {@link #diagnosisTs} del último diagnóstico que usó una regla del motor. Si es menor que
+     * {@code diagnosisTs} (o nulo), el diagnóstico vigente es nuevo.
+     */
+    @Column(name = "diagnosis_usado_ts")
+    private Long diagnosisUsadoTs;
+
     @Column(name = "actuador_valve", nullable = false)
     private String actuadorValve;
 

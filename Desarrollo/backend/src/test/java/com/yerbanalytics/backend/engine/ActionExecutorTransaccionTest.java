@@ -25,8 +25,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * El estado en memoria del executor ("inacción ya registrada", "alerta del ciclo ya enviada") se marca recién cuando la
- * transacción de la telemetría o del barrido CONFIRMA. Si se marcara antes y la transacción revirtiera, la memoria diría
+ * El estado en memoria del executor ("alerta del ciclo ya enviada") se marca recién cuando la transacción de la
+ * telemetría CONFIRMA. Si se marcara antes y la transacción revirtiera, la memoria diría
  * "registrado" para filas que no existen y no se volverían a escribir.
  *
  * <p>La transacción se simula con la sincronización de Spring: {@code initSynchronization} es lo que activa
@@ -106,7 +106,7 @@ class ActionExecutorTransaccionTest {
     }
 
     @Test
-    @DisplayName("la transacción confirma: recién ahí quedan marcadas y la siguiente evaluación idéntica no escribe")
+    @DisplayName("la transacción confirma: recién ahí queda marcada la alerta del ciclo; la inacción se escribe en cada evaluación")
     void commit_marca() {
         TransactionSynchronizationManager.initSynchronization();
         executor.execute(decision(), ctx("MZ-2-001"), OrigenEvaluacion.TELEMETRIA);
@@ -114,7 +114,7 @@ class ActionExecutorTransaccionTest {
 
         executor.execute(decision(), ctx("MZ-2-001"), OrigenEvaluacion.TELEMETRIA);
 
-        inaccionesEscritas(1);
+        inaccionesEscritas(2);
         alertasEscritas(1);
     }
 

@@ -11,7 +11,7 @@ import com.yerbanalytics.backend.model.ZonaEntity;
  * resto, la zona figura fresca y el backend conserva la humedad vieja. Regar con ese valor congelado sería
  * regar a ciegas.
  *
- * <p>Note: the threshold read from the catalog snapshot is the EFFECTIVE one, {@code max(floor, 3 x pull interval)},
+ * <p>Note: the threshold read from the catalog snapshot is the EFFECTIVE one, {@code max(floor, pulse interval + response window)},
  * resolved by {@code SensingCadence} and overlaid in {@code CatalogoParametrosService.vigentes()}.
  */
 public final class FrescuraLectura {

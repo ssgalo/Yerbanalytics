@@ -111,6 +111,8 @@ public final class MapaPermisos {
         permiso(r, get, "/api/secuencias/**", Permiso.PASADAS_VER);
         permiso(r, post, "/api/secuencias", Permiso.PASADAS_OPERAR);
         permiso(r, post, "/api/secuencias/**", Permiso.PASADAS_OPERAR);
+        // Pulso de sensado manual ("Leer ahora" / "Leer y ejecutar motor"): se opera desde Demo Expo.
+        permiso(r, post, "/api/pulsos", Permiso.PASADAS_OPERAR);
 
         // Seguridad
         permiso(r, null, "/api/usuarios/**", Permiso.USUARIOS_GESTIONAR);

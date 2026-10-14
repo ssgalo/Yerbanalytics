@@ -94,6 +94,7 @@ class NurseryServiceRiegoTest {
         RuleOrchestrator orchestrator = new RuleOrchestrator(List.of(regla), parametros, store);
 
         zona = RuleContextTestFactory.zonaBasica("MZ-1");
+        zona.setLastReadingTime(null);   // la fábrica la pone en la hora real: con el reloj fijo, la lectura sería "vieja"
         List<SectorEntity> sectores = new ArrayList<>();
         for (int n = 1; n <= 3; n++) {
             SectorEntity s = RuleContextTestFactory.sectorBasico(String.format("MZ-1-%03d", n));
@@ -112,8 +113,8 @@ class NurseryServiceRiegoTest {
         service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 mock(HistorialService.class), configuracion, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
-                mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, parametros,
-                historialRepository, despacho, RELOJ, 20);
+                mock(ManualLockRepository.class), mock(DiagnosticoService.class), store,
+                historialRepository, despacho, PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), RELOJ, 20);
     }
 
     private static HistorialRepository.UltimoEvento fila(String sector, String tipo, String regla, long ts) {

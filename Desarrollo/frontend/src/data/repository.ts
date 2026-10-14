@@ -32,8 +32,17 @@ import type {
 /** Filtros del historial que resuelve el origen de datos (los mismos que `GET /api/historial`). */
 export interface FiltroHistorial {
   tipo?: string;
+  /** Id exacto del sector (p. ej. `MZ-2-014`). */
+  sector?: string;
   /** Epoch ms, inclusive. */
   desde?: number;
+  /** Epoch ms, inclusive. */
+  hasta?: number;
+  /**
+   * Tope de eventos (los más recientes). El backend lo acota a su máximo y, si no se pide, aplica el suyo
+   * por defecto: nunca devuelve el historial entero.
+   */
+  limit?: number;
 }
 
 export interface DataRepository {
@@ -79,7 +88,7 @@ export interface DataRepository {
   /** Esquema base del DAG del motor (topología estática, con los parámetros de cada regla). */
   getRuleSchema(): Promise<DagSchema>;
   /**
-   * Última evaluación del motor para un sector. Sin `origen`, la más reciente de las dos.
+   * Última evaluación del motor para un sector (hoy hay un solo origen: la lectura de un pulso).
    * `null` si todavía no se evaluó desde el arranque.
    */
   getTrazaEvaluacion(sectorId: string, origen?: OrigenEvaluacion): Promise<TrazaEvaluacion | null>;

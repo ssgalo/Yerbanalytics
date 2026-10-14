@@ -20,7 +20,9 @@ export function tituloPasoSecuencia(s: PasoSecuencia, q: Secuencia): string {
         ? `Regar durante ${q.parametros.duracionSeg ?? '—'} s`
         : `Mantenerla desplegada ${q.parametros.esperaSeg ?? '—'} s`;
     case 'PEDIR':
-      return `Pedir lectura a ${q.zonaId}`;
+      return q.parametros.ejecutarMotor
+        ? `Pedir lectura a ${q.zonaId} y ejecutar el motor`
+        : `Pedir lectura a ${q.zonaId}`;
     case 'ESPERAR_TELEMETRIA':
       return 'Esperando la telemetría…';
     case 'MOSTRAR':

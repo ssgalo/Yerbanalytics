@@ -104,12 +104,14 @@ public class DiagnosticoService {
         e.setCreadoEn(System.currentTimeMillis());
         repo.save(e);
 
-        // Actualizar el estado del sector para reflejar este nuevo diagnóstico
+        // El diagnóstico del sector sólo lo cambia el alta (la ingesta de telemetría no lo toca). La hora de
+        // llegada es la que el motor compara con la del último usado para saber si es nuevo.
         SectorEntity sector = sectorRepo.findById(sectorFinal)
                 .orElseThrow(() -> new IllegalArgumentException("Sector no encontrado"));
         sector.setDiagnosisEstado(estado.trim());
         sector.setDiagnosisConf(conf);
         sector.setDiagnosisSev(sevFinal);
+        sector.setDiagnosisTs(e.getCreadoEn());
         sectorRepo.save(sector);
 
         return aDto(e);

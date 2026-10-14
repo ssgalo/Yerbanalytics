@@ -16,6 +16,8 @@ import com.yerbanalytics.backend.mqtt.AckActuador;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService.OrigenPulso;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,6 +40,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -56,6 +60,7 @@ class SecuenciaServiceTest {
     private final ComandoActuadorPublisher actuadores = mock(ComandoActuadorPublisher.class);
     private final ComandoZonaPublisher zonaPublisher = mock(ComandoZonaPublisher.class);
     private final ZonaRepository zonaRepo = mock(ZonaRepository.class);
+    private final PulsoSensadoService pulsos = mock(PulsoSensadoService.class);
     private final RelojDePrueba reloj = new RelojDePrueba(Instant.parse("2026-10-10T15:00:00Z"));
     private final AtomicInteger seq = new AtomicInteger();
     private final ObjectMapper json = new ObjectMapper();
@@ -73,7 +78,7 @@ class SecuenciaServiceTest {
                 .thenAnswer(i -> new Resultado(true, "cmd-" + seq.incrementAndGet(), null));
         when(zonaPublisher.leerAhora(anyString()))
                 .thenAnswer(i -> new ComandoZonaPublisher.Resultado(true, "lec-" + seq.incrementAndGet(), null));
-        service = new SecuenciaService(actuadores, zonaPublisher, zonaRepo,
+        service = new SecuenciaService(actuadores, zonaPublisher, pulsos, zonaRepo,
                 GuardiaHardwareTest.guardiaCon(() -> pasadaOcupada.get()),
                 new SecuenciaProperties(), reloj);
     }
@@ -241,7 +246,7 @@ class SecuenciaServiceTest {
         void margenConfigurable() {
             SecuenciaProperties props = new SecuenciaProperties();
             props.setMargenAckRiegoSeg(5);
-            service = new SecuenciaService(actuadores, zonaPublisher, zonaRepo,
+            service = new SecuenciaService(actuadores, zonaPublisher, pulsos, zonaRepo,
                     GuardiaHardwareTest.guardiaCon(() -> pasadaOcupada.get()), props, reloj);
             iniciar("RIEGO", 15, null);
 
@@ -628,12 +633,13 @@ class SecuenciaServiceTest {
 
             assertThat(s.zonaId()).isEqualTo(ZONA);
             assertThat(s.sectorId()).isNull();
-            assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(null, null));
+            assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(null, null, false));
             assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("PEDIR", "ESPERAR_TELEMETRIA", "MOSTRAR");
             assertThat(s.pasos()).extracting(PasoSecuencia::estado).containsExactly("OK", "EN_CURSO", "PENDIENTE");
             assertThat(s.pasos().get(0).commandId()).isEqualTo("lec-1");
             verify(zonaPublisher).leerAhora(ZONA);
             verifyNoInteractions(actuadores);
+            verifyNoInteractions(pulsos);
         }
 
         @Test
@@ -754,6 +760,80 @@ class SecuenciaServiceTest {
 
             assertThat(secuencia().estado()).isEqualTo("CANCELADA");
             assertThat(secuencia().lectura()).isNull();
+        }
+    }
+
+    // ================================================================ LECTURA con motor
+
+    @Nested
+    @DisplayName("lectura con motor")
+    class LecturaConMotor {
+
+        private Secuencia iniciarConMotor() {
+            return service.iniciar(new IniciarSecuencia("LECTURA", new ParametrosSecuencia(null, null, true)));
+        }
+
+        @Test
+        @DisplayName("el pedido sale como un pulso con motor sólo para la zona de la secuencia")
+        void pideUnPulsoDeLaZona() {
+            when(pulsos.iniciar(OrigenPulso.MANUAL, true, List.of(ZONA)))
+                    .thenReturn(new PulsoSensadoService.Pulso("pulso-1", OrigenPulso.MANUAL, true, reloj.millis()));
+
+            Secuencia s = iniciarConMotor();
+
+            assertThat(s.parametros().ejecutarMotor()).isTrue();
+            assertThat(s.pasos()).extracting(PasoSecuencia::estado).containsExactly("OK", "EN_CURSO", "PENDIENTE");
+            assertThat(s.pasos().get(0).commandId()).isEqualTo("pulso-1");
+            verify(pulsos).iniciar(OrigenPulso.MANUAL, true, List.of(ZONA));
+            verifyNoInteractions(zonaPublisher);
+        }
+
+        @Test
+        @DisplayName("la telemetría que responde al pulso se muestra como en la lectura simple")
+        void muestraLosValores() {
+            when(pulsos.iniciar(OrigenPulso.MANUAL, true, List.of(ZONA)))
+                    .thenReturn(new PulsoSensadoService.Pulso("pulso-1", OrigenPulso.MANUAL, true, reloj.millis()));
+            iniciarConMotor();
+
+            service.registrarTelemetria(ZONA, telemetria(1200.0), reloj.millis());
+            service.tick();
+
+            assertThat(secuencia().estado()).isEqualTo("COMPLETADA");
+            assertThat(secuencia().lectura().metricas().get("ce")).isEqualTo(1.2);
+        }
+
+        @Test
+        @DisplayName("con un pulso en curso se rechaza sin publicar nada")
+        void pulsoEnCurso() {
+            when(pulsos.enCurso()).thenReturn(true);
+
+            assertThatThrownBy(this::iniciarConMotor)
+                    .isInstanceOf(SecuenciaRechazadaException.class)
+                    .hasMessageContaining("lectura de sensores en curso");
+            verify(pulsos, never()).iniciar(any(), anyBoolean(), any());
+            verifyNoInteractions(zonaPublisher);
+        }
+
+        @Test
+        @DisplayName("si el pulso se rechaza al pedir, la secuencia termina FALLIDA con el motivo")
+        void pulsoRechazadoAlPedir() {
+            when(pulsos.iniciar(OrigenPulso.MANUAL, true, List.of(ZONA)))
+                    .thenThrow(new PulsoSensadoService.PulsoEnCursoException("Ya hay una lectura de sensores en curso."));
+
+            iniciarConMotor();
+
+            assertThat(secuencia().estado()).isEqualTo("FALLIDA");
+            assertThat(paso(1).codigoError()).isEqualTo("PULSO_EN_CURSO");
+            assertThat(secuencia().error()).isEqualTo("Ya hay una lectura de sensores en curso.");
+        }
+
+        @Test
+        @DisplayName("ejecutarMotor no aplica al riego")
+        void noAplicaAlRiego() {
+            Secuencia s = service.iniciar(new IniciarSecuencia("RIEGO", new ParametrosSecuencia(10, null, true)));
+
+            assertThat(s.parametros().ejecutarMotor()).isNull();
+            verifyNoInteractions(pulsos);
         }
     }
 }

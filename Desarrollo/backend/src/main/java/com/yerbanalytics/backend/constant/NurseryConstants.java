@@ -77,18 +77,6 @@ public final class NurseryConstants {
             new ZonaDef("MZ-6", "Macro-zona 6", "Sector sur")
     );
 
-    public static final Map<String, List<PathoEntry>> PATHOS = Map.of(
-            "warning", List.of(
-                    new PathoEntry("Clorosis", "Media"),
-                    new PathoEntry("Estr\u00e9s solar", "Media")
-            ),
-            "critical", List.of(
-                    new PathoEntry("Da\u00f1o f\u00fangico", "Alta"),
-                    new PathoEntry("Plaga foliar", "Alta"),
-                    new PathoEntry("Estr\u00e9s solar", "Alta")
-            )
-    );
-
     public static final Map<String, String> TINTS = Map.ofEntries(
             Map.entry("Sano", "radial-gradient(circle at 35% 30%, #5BBE82, #2C7A4E)"),
             Map.entry("Estr\u00e9s solar", "radial-gradient(circle at 35% 30%, #E89B5A, #B5572A)"),
@@ -133,9 +121,6 @@ public final class NurseryConstants {
     }
 
     public record ZonaDef(String id, String name, String sub) {
-    }
-
-    public record PathoEntry(String estado, String sev) {
     }
 
     public record ActMeta(String tint, String ink, String path) {

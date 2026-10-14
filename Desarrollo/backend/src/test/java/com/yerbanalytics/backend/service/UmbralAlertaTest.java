@@ -67,7 +67,7 @@ class UmbralAlertaTest {
                 .map(sp -> "humAmb".equals(sp.key()) ? humAmb : new UmbralMetrica(sp.key(), sp.label(), sp.unit(),
                         sp.dec(), sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1], sp.crit()[0], sp.crit()[1], false))
                 .toList();
-        return new Configuracion(lista, new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "x", 1L, null, null), List.of());
+        return new Configuracion(lista, new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null, null), List.of());
     }
 
     @Test

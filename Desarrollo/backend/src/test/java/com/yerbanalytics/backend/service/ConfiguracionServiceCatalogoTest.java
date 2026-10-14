@@ -66,7 +66,7 @@ class ConfiguracionServiceCatalogoTest {
 
     private static Configuracion cfg(List<RustificacionEtapa> etapas) {
         return new Configuracion(umbralesDeFabrica(),
-                new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "x", 1L, null, null), etapas);
+                new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null, null), etapas);
     }
 
     // ------------------------------------------------------------------ 5.1
@@ -77,7 +77,8 @@ class ConfiguracionServiceCatalogoTest {
 
         assertThat(json).doesNotContain("riegoTiempoMaxSeg").doesNotContain("mediasombraAperturaMaxPct");
         assertThat(json).doesNotContain("riegoVolMaxDiarioMl").contains("insumoDosisMax24hMl")
-                .contains("seguimientoLatenciaMin").contains("intervaloEvaluacionMinutos");
+                .contains("seguimientoLatenciaMin").contains("pasadaDiariaHora")
+                .doesNotContain("intervaloEvaluacionMinutos").doesNotContain("sensingPullIntervalSeconds");
     }
 
     @Test

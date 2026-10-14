@@ -78,7 +78,10 @@ export class HttpRepository implements DataRepository {
   async getHistory(filtro: FiltroHistorial = {}): Promise<ActionRecord[]> {
     const params = new URLSearchParams({ t: String(Date.now()) });
     if (filtro.tipo) params.set('tipo', filtro.tipo);
+    if (filtro.sector) params.set('sector', filtro.sector);
     if (filtro.desde != null) params.set('desde', String(filtro.desde));
+    if (filtro.hasta != null) params.set('hasta', String(filtro.hasta));
+    if (filtro.limit != null) params.set('limit', String(filtro.limit));
     const res = await apiFetch(`${this.baseUrl}/historial?${params}`);
     if (!res.ok) {
       throw new Error(`Error ${res.status} al obtener el historial desde ${this.baseUrl}`);
@@ -370,8 +373,8 @@ function normalizeConfig(data: Configuracion): Configuracion {
   if (data.operativa) {
     const op = data.operativa;
     op.intervaloSensadoMinutos = op.intervaloSensadoMinutos ?? 240;
-    op.intervaloEvaluacionMinutos = op.intervaloEvaluacionMinutos ?? 5;
-    op.sensingPullIntervalSeconds = op.sensingPullIntervalSeconds ?? 60;
+    op.pasadaDiariaActiva = op.pasadaDiariaActiva ?? false;
+    op.pasadaDiariaHora = op.pasadaDiariaHora ?? '11:00';
     op.mediasombraAbiertaDesde = op.mediasombraAbiertaDesde ?? HORARIO_MEDIASOMBRA_DEFAULT.desde;
     op.mediasombraAbiertaHasta = op.mediasombraAbiertaHasta ?? HORARIO_MEDIASOMBRA_DEFAULT.hasta;
   }

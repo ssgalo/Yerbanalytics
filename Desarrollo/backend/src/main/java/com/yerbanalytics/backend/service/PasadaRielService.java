@@ -410,8 +410,7 @@ public class PasadaRielService implements UsoDelHardware {
      * de MZ-9) y sus sectores por id. Posición 1 es el primero; posición 2, el segundo.
      */
     private List<SectorEntity> sectoresDeLaPasada() {
-        ZonaEntity zona = zonaRepo.findAllWithSectors().stream()
-                .min(Comparator.comparingInt((ZonaEntity z) -> numeroFinal(z.getId())).thenComparing(ZonaEntity::getId))
+        ZonaEntity zona = zonaDelRecorrido()
                 .orElseThrow(() -> new PasadaRechazadaException("No hay topología configurada."));
         List<SectorEntity> sectores = zona.getSectors().stream()
                 .sorted(Comparator.comparing(SectorEntity::getId))
@@ -421,6 +420,12 @@ public class PasadaRielService implements UsoDelHardware {
                     + " (hay " + sectores.size() + ").");
         }
         return sectores;
+    }
+
+    /** La macro-zona que recorre la pasada (la de menor número), o vacío si no hay topología. */
+    public Optional<ZonaEntity> zonaDelRecorrido() {
+        return zonaRepo.findAllWithSectors().stream()
+                .min(Comparator.comparingInt((ZonaEntity z) -> numeroFinal(z.getId())).thenComparing(ZonaEntity::getId));
     }
 
     private static int numeroFinal(String id) {

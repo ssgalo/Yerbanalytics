@@ -22,7 +22,7 @@ import java.util.List;
  * vieja que {@code seguridad.antiguedad-max-lectura} (catálogo de parámetros), o no hay lectura
  * (queda como {@code SIN_DATO} en la traza y bloquea igual).
  *
- * <p>Note: the threshold in the snapshot is the effective one, {@code max(floor, 3 x sensing pull interval)}
+ * <p>Note: the threshold in the snapshot is the effective one, {@code max(floor, pulse interval + response window)}
  * (see {@code SensingCadence}); the catalog parameter is only its floor.
  *
  * <p>Además compara la antigüedad de la <b>humedad de sustrato</b> ({@code zona.humSusTs}) contra el

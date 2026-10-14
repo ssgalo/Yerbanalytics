@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Configuración agronómica (HU-15): lectura, validación y persistencia de umbrales,
@@ -39,6 +40,10 @@ public class ConfiguracionService {
 
     /** Identidad de la fila única de configuración operativa. */
     private static final int OPERATIVA_ID = 1;
+
+    /** Hora de fábrica de la pasada diaria del riel. */
+    public static final String PASADA_HORA_FABRICA = "11:00";
+    private static final Pattern HORA_HH_MM = Pattern.compile("([01]\\d|2[0-3]):[0-5]\\d");
 
     private final UmbralMetricaRepository umbralRepository;
     private final ConfiguracionOperativaRepository operativaRepository;
@@ -109,10 +114,9 @@ public class ConfiguracionService {
         return new ConfiguracionOperativa(
                 e.getInsumoDosisMax24hMl(),
                 e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
-                e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : 240,
-                e.getIntervaloEvaluacionMinutos() != null ? e.getIntervaloEvaluacionMinutos() : 5,
+                e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : SensingCadence.DEFAULT_MINUTES,
                 e.getUpdatedBy(), e.getUpdatedTs(),
-                SensingCadence.pullSeconds(e.getSensingPullIntervalSeconds()),
+                pasadaDiariaActiva(e), pasadaDiariaHora(e),
                 (int) Math.ceil(catalogoParametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)));
     }
 
@@ -155,9 +159,11 @@ public class ConfiguracionService {
         oe.setSeguimientoLatenciaMin(op.seguimientoLatenciaMin());
         oe.setSeguimientoDeltaMin(op.seguimientoDeltaMin());
         oe.setIntervaloSensadoMinutos(op.intervaloSensadoMinutos());
-        oe.setIntervaloEvaluacionMinutos(op.intervaloEvaluacionMinutos());
-        if (op.sensingPullIntervalSeconds() != null) {
-            oe.setSensingPullIntervalSeconds(op.sensingPullIntervalSeconds());
+        if (op.pasadaDiariaActiva() != null) {
+            oe.setPasadaDiariaActiva(op.pasadaDiariaActiva());
+        }
+        if (op.pasadaDiariaHora() != null) {
+            oe.setPasadaDiariaHora(op.pasadaDiariaHora());
         }
         oe.setUpdatedBy(usuario != null && !usuario.isBlank() ? usuario : "Ingeniero Agrónomo");
         oe.setUpdatedTs(System.currentTimeMillis());
@@ -172,7 +178,7 @@ public class ConfiguracionService {
         }
 
         invalidateCache();
-        // The effective stale threshold depends on the pull interval: drop the rules snapshot now and again after commit.
+        // The effective stale threshold depends on the pulse interval: drop the rules snapshot now and again after commit.
         catalogoParametros.invalidarAlTerminar();
         // Registro inmutable del cambio en el historial (HU-15 CA-02).
         historialService.registrarConfiguracion(oe.getUpdatedBy());
@@ -242,14 +248,16 @@ public class ConfiguracionService {
         requirePositive(op.insumoDosisMax24hMl(), "la dosis máxima de insumo por 24 h");
         requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
         requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
-        // Es también el ciclo de lectura del riego, pero ahí se acota a 60–360 min (CicloLectura.acotarMinutos):
-        // al guardar sólo se exige un valor positivo, para no romper bases viejas ni frenar al simulador.
-        requirePositive(op.intervaloSensadoMinutos(), "el intervalo de sensado");
-        requirePositive(op.intervaloEvaluacionMinutos(), "el intervalo de evaluación");
-        Integer pull = op.sensingPullIntervalSeconds();
-        if (pull != null && (pull < SensingCadence.MIN_SECONDS || pull > SensingCadence.MAX_SECONDS)) {
-            throw new InvalidConfigurationException("sensingPullIntervalSeconds must be between "
-                    + SensingCadence.MIN_SECONDS + " and " + SensingCadence.MAX_SECONDS + " seconds.");
+        // Intervalo del pulso de sensado y del ciclo de lectura del riego. Una base vieja con un valor fuera de
+        // rango se sigue leyendo acotado (SensingCadence.intervalMinutes); lo que no se acepta es guardarlo.
+        int intervalo = op.intervaloSensadoMinutos();
+        if (intervalo < SensingCadence.MIN_MINUTES || intervalo > SensingCadence.MAX_MINUTES) {
+            throw new InvalidConfigurationException("intervaloSensadoMinutos: el intervalo de sensado y evaluación "
+                    + "debe estar entre " + SensingCadence.MIN_MINUTES + " y " + SensingCadence.MAX_MINUTES + " min.");
+        }
+        if (op.pasadaDiariaHora() != null && !horaValida(op.pasadaDiariaHora())) {
+            throw new InvalidConfigurationException("pasadaDiariaHora: la hora de la pasada diaria debe tener el "
+                    + "formato HH:mm, entre 00:00 y 23:59.");
         }
     }
 
@@ -370,9 +378,24 @@ public class ConfiguracionService {
         e.setInsumoDosisMax24hMl(15);
         e.setSeguimientoLatenciaMin(2);
         e.setSeguimientoDeltaMin(5);
-        e.setIntervaloSensadoMinutos(240);
-        e.setIntervaloEvaluacionMinutos(5);
+        e.setIntervaloSensadoMinutos(SensingCadence.DEFAULT_MINUTES);
         return e;
+    }
+
+    /** Pasada diaria activa; una fila sin valor se lee como desactivada (de fábrica). */
+    public static boolean pasadaDiariaActiva(ConfiguracionOperativaEntity e) {
+        return Boolean.TRUE.equals(e.getPasadaDiariaActiva());
+    }
+
+    /** Hora de la pasada diaria ({@code HH:mm}); sin valor, o con uno inválido en la base, la de fábrica. */
+    public static String pasadaDiariaHora(ConfiguracionOperativaEntity e) {
+        String hora = e.getPasadaDiariaHora();
+        return hora != null && horaValida(hora) ? hora : PASADA_HORA_FABRICA;
+    }
+
+    /** {@code HH:mm} con dos dígitos en cada parte, de 00:00 a 23:59. */
+    static boolean horaValida(String hora) {
+        return hora != null && HORA_HH_MM.matcher(hora).matches();
     }
 
     private synchronized void invalidateCache() {

@@ -31,7 +31,7 @@ import type {
 import { validateConfig } from '@/lib/configValidation';
 import { addDays, todayIso } from '@/lib/horario';
 import { ETAPAS_SUGERIDAS, planErrors, planVigente, progreso } from '@/lib/planRustificacion';
-import { buildConfig } from './config';
+import { buildConfig, mockStaleThresholdSeconds } from './config';
 import { buildNursery, type TopologiaGrid } from './generators';
 import { buildHistory } from './history';
 import {
@@ -107,11 +107,18 @@ export class MockRepository implements DataRepository {
     if (!this.historyCache) {
       this.historyCache = buildHistory(this.seed);
     }
-    const { tipo, desde } = filtro;
-    if (tipo == null && desde == null) return this.historyCache;
-    return this.historyCache.filter(
-      (h) => (tipo == null || h.tipo === tipo) && (desde == null || h.ts >= desde),
-    );
+    const { tipo, sector, desde, hasta, limit } = filtro;
+    const filtrado =
+      tipo == null && sector == null && desde == null && hasta == null
+        ? this.historyCache
+        : this.historyCache.filter(
+            (h) =>
+              (tipo == null || h.tipo === tipo) &&
+              (sector == null || h.sectorId === sector) &&
+              (desde == null || h.ts >= desde) &&
+              (hasta == null || h.ts <= hasta),
+          );
+    return limit == null ? filtrado : filtrado.slice(0, limit);
   }
 
   async getConfig(): Promise<Configuracion> {
@@ -135,7 +142,7 @@ export class MockRepository implements DataRepository {
         updatedTs: Date.now(),
         // The real backend computes this read-only value; the mock stands in for it so the
         // UI hint refreshes on save exactly like against the real API.
-        effectiveStaleThresholdSeconds: Math.max(90, 3 * config.operativa.sensingPullIntervalSeconds),
+        effectiveStaleThresholdSeconds: mockStaleThresholdSeconds(config.operativa.intervaloSensadoMinutos),
       },
     };
     this.configCache = saved;
@@ -370,21 +377,19 @@ export class MockRepository implements DataRepository {
     const regando = sector.actuadores.valve === 'Regando';
     const ultimoRiegoMs = regando ? ref - 60_000 : ultimo(delSector('Riego'));
 
-    // La telemetría dispara la evaluación al llegar (lectura fresca y con métricas); el barrido
-    // corre 5 min después y no trae métricas, igual que `NurseryWatchdog`.
-    const telemetria = origen === 'TELEMETRIA';
-    const ts = lecturaTs === null ? ref : ref + (telemetria ? 0 : 300_000);
-
     return evaluarMotor(await this.getCatalogoReglas(), {
       sectorId,
       zonaId: sector.zona,
       origen,
-      ts: new Date(ts).toISOString(),
-      antiguedadSeg: lecturaTs === null ? null : telemetria ? 1 : 300,
+      // El motor corre con la lectura del pulso, apenas llega: lectura fresca y con métricas.
+      ts: new Date(ref).toISOString(),
+      antiguedadSeg: lecturaTs === null ? null : 1,
       bloqueoManual: false,
-      humSus: telemetria
-        ? (zona.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null)
-        : null,
+      humSus: zona.lectura.metrics.find((m) => m.key === 'humSus')?.raw ?? null,
+      // En la demo, el diagnóstico de un sector con alguna patología es nuevo (lo trajo la última
+      // pasada); el de uno sano ya se usó en un pulso anterior, y uno sin diagnóstico no tiene nada
+      // nuevo. Así se ven los dos casos.
+      diagnosticoNuevo: sector.diagnosis.estado !== 'Sano' && sector.diagnosis.estado !== 'Sin diagnóstico',
       lluviaPct: slot?.rain ?? null,
       uvIndex: slot?.uv ?? null,
       dosis24h,

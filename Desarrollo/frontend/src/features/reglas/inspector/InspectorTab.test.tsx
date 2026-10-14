@@ -30,12 +30,12 @@ function montar(props: Partial<React.ComponentProps<typeof InspectorTab>> = {}) 
 const nodo = (id: string) => document.querySelector(`.react-flow__node[data-id="${id}"]`) as HTMLElement;
 
 describe('InspectorTab · selección (8.4)', () => {
-  it('ofrece zona, sector y origen, y un botón Actualizar', async () => {
+  it('ofrece zona y sector (sin origen), y un botón Actualizar', async () => {
     montar();
 
     expect(await screen.findByLabelText('Macro-zona')).toBeTruthy();
     expect(screen.getByLabelText('Sector')).toBeTruthy();
-    expect(screen.getByLabelText('Origen')).toBeTruthy();
+    expect(screen.queryByLabelText('Origen')).toBeNull();
     expect(screen.getByRole('button', { name: 'Actualizar' })).toBeTruthy();
     expect(screen.getByLabelText(/Actualizar cada 5 s/)).toBeTruthy();
   });
@@ -79,15 +79,12 @@ describe('InspectorTab · selección (8.4)', () => {
     expect(screen.getByText(/Telemetría · .* · parámetros #/)).toBeTruthy();
   });
 
-  it('el barrido muestra su propia traza', async () => {
+  it('no ofrece elegir origen: sin barrido, la única evaluación es la del pulso', async () => {
     montar({ sectorInicial: 'MZ-1-001' });
     await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
 
-    fireEvent.change(screen.getByLabelText('Origen'), { target: { value: 'BARRIDO' } });
-
-    await waitFor(() =>
-      expect(nodo('StaleSensorRule').querySelector('[data-estado="bloqueo"]')).toBeTruthy(),
-    );
+    expect(screen.queryByLabelText('Origen')).toBeNull();
+    expect(screen.queryByText(/Barrido/)).toBeNull();
   });
 
   it('sin traza dice "sin evaluaciones desde el último arranque" y no dibuja el DAG', async () => {

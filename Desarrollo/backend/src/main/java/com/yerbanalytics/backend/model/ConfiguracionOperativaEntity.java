@@ -37,15 +37,18 @@ public class ConfiguracionOperativaEntity {
     private double seguimientoDeltaMin;
 
     // --- Tiempos y Frecuencias ---
+    /** Intervalo del pulso de sensado y evaluación (60–360 min, franjas ancladas a las 02:00). */
     @Column(name = "intervalo_sensado_minutos")
     private Integer intervaloSensadoMinutos = 240;
 
-    @Column(name = "intervalo_evaluacion_minutos")
-    private Integer intervaloEvaluacionMinutos = 5;
+    // --- Pasada diaria del riel (pasada-programada) ---
+    /** Nullable: las filas anteriores a este cambio no tienen valor y se leen como {@code false}. */
+    @Column(name = "pasada_diaria_activa")
+    private Boolean pasadaDiariaActiva;
 
-    /** Backend pull interval in seconds. Nullable: existing rows have no value and read as 60 (see SensingCadence). */
-    @Column(name = "sensing_pull_interval_seconds")
-    private Integer sensingPullIntervalSeconds;
+    /** Hora local del vivero, {@code HH:mm}. Nullable: se lee como {@code "11:00"}. */
+    @Column(name = "pasada_diaria_hora", length = 5)
+    private String pasadaDiariaHora;
 
     // --- Auditoría (HU-15 CA-02) ---
     @Column(name = "updated_by")

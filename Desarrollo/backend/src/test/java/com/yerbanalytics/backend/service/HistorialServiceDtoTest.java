@@ -56,9 +56,9 @@ class HistorialServiceDtoTest {
         e.setAlerta("INFO");
         e.setVolumenL(4.2);
         e.setDuracionSeg(504);
-        when(historialRepository.findFiltered(any(), any(), any(), any(), any())).thenReturn(List.of(e));
+        when(historialRepository.findFiltered(any(), any(), any(), any(), any(), any())).thenReturn(List.of(e));
 
-        HistorialEvento dto = service().getHistorial(null, null, null, null, null).get(0);
+        HistorialEvento dto = service().getHistorial(null, null, null, null, null, null).get(0);
 
         assertThat(dto.regla()).isEqualTo("RiegoPorDeficitRule");
         assertThat(dto.alerta()).isEqualTo("INFO");
@@ -68,9 +68,9 @@ class HistorialServiceDtoTest {
 
     @Test
     void sinDatosLosCamposNuevosSonNulos() {
-        when(historialRepository.findFiltered(any(), any(), any(), any(), any())).thenReturn(List.of(entidad()));
+        when(historialRepository.findFiltered(any(), any(), any(), any(), any(), any())).thenReturn(List.of(entidad()));
 
-        HistorialEvento dto = service().getHistorial(null, null, null, null, null).get(0);
+        HistorialEvento dto = service().getHistorial(null, null, null, null, null, null).get(0);
 
         assertThat(dto.regla()).isNull();
         assertThat(dto.alerta()).isNull();

@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 
 /**
  * Estado técnico y registro de la flota de hardware (HU-18 / HU-21). El estado operativo
- * se deriva en cada lectura (watchdog + batería + falla) para no almacenar un valor que
+ * se deriva en cada lectura (pulsos sin respuesta + batería + falla) para no almacenar un valor que
  * quede stale, igual que el {@code offline} del sector. La telemetría MQTT alimenta el
  * heartbeat de los nodos testigo vía {@link #actualizarHeartbeat}.
  */
@@ -70,21 +70,15 @@ public class HardwareService {
     private final ZonaRepository zonaRepository;
     private final SectorRepository sectorRepository;
     private final int bateriaMinPct;
-    private final long watchdogIntermitenteMs;
-    private final long watchdogCriticoMs;
 
     public HardwareService(DispositivoRepository dispositivoRepository,
                            ZonaRepository zonaRepository,
                            SectorRepository sectorRepository,
-                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct,
-                           @Value("${yerbanalytics.hardware.watchdog-intermitente-ms:60000}") long watchdogIntermitenteMs,
-                           @Value("${yerbanalytics.hardware.watchdog-critico-ms:120000}") long watchdogCriticoMs) {
+                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.dispositivoRepository = dispositivoRepository;
         this.zonaRepository = zonaRepository;
         this.sectorRepository = sectorRepository;
         this.bateriaMinPct = bateriaMinPct;
-        this.watchdogIntermitenteMs = watchdogIntermitenteMs;
-        this.watchdogCriticoMs = watchdogCriticoMs;
     }
 
     // ------------------------------------------------------------------
@@ -93,10 +87,11 @@ public class HardwareService {
 
     @Transactional(readOnly = true)
     public HardwareData getHardware() {
-        long now = System.currentTimeMillis();
         Map<String, String> zonaNames = new LinkedHashMap<>();
+        Map<String, Integer> pulsosSinRespuesta = new LinkedHashMap<>();
         for (ZonaEntity z : zonaRepository.findAll()) {
             zonaNames.put(z.getId(), z.getName());
+            pulsosSinRespuesta.put(z.getId(), EscalamientoNodoService.cuenta(z));
         }
 
         List<DispositivoEntity> entities = dispositivoRepository.findAll();
@@ -105,7 +100,7 @@ public class HardwareService {
         List<Dispositivo> dtos = new ArrayList<>();
         int operativos = 0, bateriaBaja = 0, fueraDeServicio = 0, averiados = 0;
         for (DispositivoEntity e : entities) {
-            Dispositivo d = toDto(e, now);
+            Dispositivo d = toDto(e, pulsosSinRespuesta);
             dtos.add(d);
             if (OPERATIVO.equals(d.estado())) operativos++;
             if (FUERA_DE_SERVICIO.equals(d.estado())) fueraDeServicio++;
@@ -118,9 +113,9 @@ public class HardwareService {
         return new HardwareData(dtos, dtos.size(), operativos, bateriaBaja, fueraDeServicio, averiados, incompletos);
     }
 
-    private Dispositivo toDto(DispositivoEntity e, long now) {
+    private Dispositivo toDto(DispositivoEntity e, Map<String, Integer> pulsosSinRespuesta) {
         boolean esNodo = NODO_TESTIGO.equals(e.getTipo());
-        String estado = deriveEstado(e, now, esNodo);
+        String estado = deriveEstado(e, esNodo, pulsosSinRespuesta.getOrDefault(e.getZonaId(), 0));
         boolean bateriaBaja = e.getBateria() != null && e.getBateria() < bateriaMinPct;
         String ubicacion = e.getSectorId() != null ? e.getSectorId() : e.getZonaId();
         String luLabel = e.getUltimoUpdate() != null
@@ -149,20 +144,20 @@ public class HardwareService {
         );
     }
 
-    /** Estado operativo derivado: la falla manda; el nodo testigo usa el watchdog. */
-    private String deriveEstado(DispositivoEntity e, long now, boolean esNodo) {
+    /**
+     * Estado operativo derivado: la falla manda. El nodo testigo sigue los pulsos de sensado consecutivos sin
+     * respuesta de su macro-zona (0 → operativo, 1–2 → intermitente, 3 o más → fuera de servicio), no el tiempo
+     * desde su último reporte: entre pulsos el nodo no reporta. Uno que nunca reportó está fuera de servicio.
+     */
+    private String deriveEstado(DispositivoEntity e, boolean esNodo, int pulsosSinRespuesta) {
         if (blankToNull(e.getFalla()) != null) {
             return FUERA_DE_SERVICIO;
         }
         if (esNodo) {
-            Long lu = e.getUltimoUpdate();
-            if (lu == null || now - lu > watchdogCriticoMs) {
+            if (e.getUltimoUpdate() == null || pulsosSinRespuesta >= EscalamientoNodoService.FUERA_DE_SERVICIO) {
                 return FUERA_DE_SERVICIO;
             }
-            if (now - lu > watchdogIntermitenteMs) {
-                return INTERMITENTE;
-            }
-            return OPERATIVO;
+            return pulsosSinRespuesta > 0 ? INTERMITENTE : OPERATIVO;
         }
         // Actuadores: alimentados por relé/PSU, sin heartbeat propio en el MVP.
         return OPERATIVO;

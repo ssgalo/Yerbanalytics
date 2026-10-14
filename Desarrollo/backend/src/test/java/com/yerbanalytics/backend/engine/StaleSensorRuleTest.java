@@ -215,27 +215,32 @@ class StaleSensorRuleTest {
         assertThat(acciones.get(0).detalle()).isNull();
     }
 
-    // --- Backend-driven sensing: the rule sees the EFFECTIVE threshold max(floor, 3 x pull interval) ---
+    // --- Pulso de sensado: la regla ve el umbral EFECTIVO max(piso, intervalo + ventana de respuesta) ---
 
-    private List<RuleAction> evaluarConUmbralEfectivo(RuleContext ctx, int pullSeconds) {
-        double efectivo = SensingCadence.staleThresholdSeconds(90, pullSeconds);
-        return rule.evaluate(ctx, ev(rule, Map.of(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA,
-                String.valueOf((long) efectivo))));
+    /** Valores de fábrica con el umbral efectivo puesto tal cual (como lo superpone el catálogo, sin validar rango). */
+    private List<RuleAction> evaluarConUmbralEfectivo(RuleContext ctx, int intervaloMin) {
+        double efectivo = SensingCadence.staleThresholdSeconds(90, intervaloMin, 180);
+        java.util.Map<String, com.yerbanalytics.backend.engine.parametros.ValorParametro> valores =
+                new java.util.HashMap<>(ReglaTestSupport.fabrica().valores());
+        valores.put(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(),
+                new com.yerbanalytics.backend.engine.parametros.ValorParametro.Numero(efectivo));
+        return rule.evaluate(ctx, new com.yerbanalytics.backend.engine.traza.Evaluacion(rule,
+                com.yerbanalytics.backend.engine.parametros.ParametrosVigentes.de(valores)));
     }
 
     @Test
-    @DisplayName("125 s old reading is not stale at the default 60 s pull interval (effective threshold 180 s)")
-    void reading125sOld_isNotStaleAtDefaultPull() {
-        assertThat(evaluarConUmbralEfectivo(conLecturaHace(125.0), 60)).extracting(RuleAction::type)
+    @DisplayName("una lectura de hace 1 h no es vieja con pulsos de 60 min (umbral efectivo 3 780 s)")
+    void lecturaDeUnaHora_noEsViejaConPulsoDe60() {
+        assertThat(evaluarConUmbralEfectivo(conLecturaHace(3600.0), 60)).extracting(RuleAction::type)
                 .containsExactly(ActionType.NOOP_INFO);
     }
 
     @Test
-    @DisplayName("200 s old reading is stale at X=60 and no longer stale once X is raised to 120")
-    void reading200sOld_staleAt60ButNotAt120() {
-        assertThat(evaluarConUmbralEfectivo(conLecturaHace(200.0), 60)).extracting(RuleAction::type)
+    @DisplayName("una lectura de hace 4 000 s es vieja con pulsos de 60 min y deja de serlo con 120 min")
+    void lectura4000s_viejaCon60PeroNoCon120() {
+        assertThat(evaluarConUmbralEfectivo(conLecturaHace(4000.0), 60)).extracting(RuleAction::type)
                 .containsExactly(ActionType.ABORT_RIEGO);
-        assertThat(evaluarConUmbralEfectivo(conLecturaHace(200.0), 120)).extracting(RuleAction::type)
+        assertThat(evaluarConUmbralEfectivo(conLecturaHace(4000.0), 120)).extracting(RuleAction::type)
                 .containsExactly(ActionType.NOOP_INFO);
     }
 }

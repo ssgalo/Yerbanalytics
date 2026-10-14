@@ -21,6 +21,7 @@ const TITULO_ESTADO: Partial<Record<EstadoNodo, string>> = {
   pospuso: 'Pospuso',
   accion: 'Accionó',
   omitida: 'Omitida',
+  sinDiagnostico: 'Sin diagnóstico nuevo',
   noAlcanzada: 'No alcanzada',
   error: 'Error',
 };
@@ -49,6 +50,12 @@ export function NodoPanel({ regla, label, tieneParametros, nombreDe, onEditar, o
 
       {regla.estado === 'OMITIDA_RAMA_BLOQUEADA' && (
         <p className={styles.panelNota}>Omitida: la rama la cortó {corto}. No llegó a evaluar nada.</p>
+      )}
+      {regla.estado === 'OMITIDA_SIN_DIAGNOSTICO_NUEVO' && (
+        <p className={styles.panelNota}>
+          Omitida: sin diagnóstico nuevo. La regla usa el diagnóstico de IA y el sector no tiene uno que
+          todavía no se haya usado; corre de nuevo cuando llegue el de la próxima pasada.
+        </p>
       )}
       {regla.estado === 'NO_ALCANZADA' && (
         <p className={styles.panelNota}>No alcanzada: el motor se detuvo en {corto} antes de llegar acá.</p>

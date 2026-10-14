@@ -62,7 +62,8 @@ public class RuleOrchestrator {
      * (ej. RIEGO) no afecta a los demás (ej. MEDIASOMBRA).
      *
      * <p>Además de las acciones arma la traza: TODAS las reglas figuran, las que no corrieron con
-     * el motivo ({@code OMITIDA_RAMA_BLOQUEADA} o {@code NO_ALCANZADA}) y la regla que cortó.
+     * el motivo ({@code OMITIDA_RAMA_BLOQUEADA}, {@code NO_ALCANZADA} u {@code OMITIDA_SIN_DIAGNOSTICO_NUEVO}) y la
+     * regla que cortó.
      * Los valores vigentes del catálogo se toman UNA vez, así todo el ciclo ve lo mismo.
      *
      * <p>Si una regla lanza, la excepción se propaga tal cual (la actuación no cambia), pero antes
@@ -83,6 +84,8 @@ public class RuleOrchestrator {
         String abortAll = null;
         String abortRiego = null;
         String abortInsumo = null;
+        boolean diagnosticoNuevo = ctx.diagnosticoNuevo();
+        boolean usoDiagnostico = false;
 
         for (Rule rule : rules) {
             RuleBranch branch = rule.branch();
@@ -103,6 +106,12 @@ public class RuleOrchestrator {
                 continue;
             }
 
+            // Una regla de diagnóstico actúa una vez por diagnóstico: sin uno nuevo, no corre.
+            if (rule.usaDiagnostico() && !diagnosticoNuevo) {
+                trazas.add(omitida(rule, EstadoRegla.OMITIDA_SIN_DIAGNOSTICO_NUEVO, null));
+                continue;
+            }
+
             Evaluacion ev = new Evaluacion(rule, vigentes);
             List<RuleAction> actions;
             try {
@@ -112,6 +121,7 @@ public class RuleOrchestrator {
                 throw e;
             }
             accumulated.addAll(actions);
+            usoDiagnostico |= rule.usaDiagnostico();
             trazas.add(new TrazaRegla(rule.name(), branch, rule.priority(), EstadoRegla.EVALUADA,
                     List.copyOf(ev.comparaciones()),
                     actions.stream().map(a -> new AccionTrazada(a.type(), a.motivo())).toList(),
@@ -136,7 +146,7 @@ public class RuleOrchestrator {
             }
         }
 
-        return new ResultadoEvaluacion(accumulated, armarTraza(ctx, origen, vigentes, trazas));
+        return new ResultadoEvaluacion(accumulated, armarTraza(ctx, origen, vigentes, trazas), usoDiagnostico);
     }
 
     private static TrazaEvaluacion armarTraza(RuleContext ctx, OrigenEvaluacion origen,

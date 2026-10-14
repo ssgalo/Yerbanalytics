@@ -9,7 +9,6 @@ import { RuleGraph } from '@/components/DAGViewer/RuleGraph';
 import { useNurseryData } from '@/hooks/NurseryContext';
 import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
 import { useTrazaEvaluacion } from '@/hooks/useTrazaEvaluacion';
-import type { OrigenEvaluacion } from '@/types/domain';
 import { etiquetaOrigen, resumenTraza } from './lecturaTraza';
 import { NodoPanel } from './NodoPanel';
 import styles from './Inspector.module.css';
@@ -35,7 +34,6 @@ export function InspectorTab({ sectorInicial, onEditarRegla, onSectorChange }: I
   const valido = (id: string | null): id is string => !!id && !!byId[id];
 
   const [sectorId, setSectorId] = useState(valido(sectorInicial) ? sectorInicial : primero);
-  const [origen, setOrigen] = useState<OrigenEvaluacion>('TELEMETRIA');
   const [auto, setAuto] = useState(false);
   const [seleccionada, setSeleccionada] = useState<string | null>(null);
 
@@ -53,7 +51,7 @@ export function InspectorTab({ sectorInicial, onEditarRegla, onSectorChange }: I
   const sectoresDeZona = useMemo(() => zonas.find((z) => z.id === zonaId)?.sectors ?? [], [zonas, zonaId]);
 
   const { schema, loading: cargandoEsquema, error: errorEsquema } = useRuleEngineSchema();
-  const { traza: ultima, loading, error, refrescar } = useTrazaEvaluacion(sectorId, origen, auto);
+  const { traza: ultima, loading, error, refrescar } = useTrazaEvaluacion(sectorId, 'TELEMETRIA', auto);
 
   // Mientras llega la traza del sector nuevo no se muestra la del anterior.
   const traza = ultima && ultima.sectorId === sectorId ? ultima : null;
@@ -97,18 +95,6 @@ export function InspectorTab({ sectorInicial, onEditarRegla, onSectorChange }: I
             ))}
           </select>
         </label>
-        <label className={styles.campo}>
-          <span className={styles.campoEtiqueta}>Origen</span>
-          <select
-            className={styles.select}
-            aria-label="Origen"
-            value={origen}
-            onChange={(e) => setOrigen(e.target.value as OrigenEvaluacion)}
-          >
-            <option value="TELEMETRIA">Telemetría (al llegar una lectura)</option>
-            <option value="BARRIDO">Barrido (cada 5 min)</option>
-          </select>
-        </label>
         <button type="button" className={styles.btn} onClick={refrescar}>
           Actualizar
         </button>
@@ -128,8 +114,8 @@ export function InspectorTab({ sectorInicial, onEditarRegla, onSectorChange }: I
         <div className={styles.estado}>
           Este sector todavía no se evaluó: sin evaluaciones desde el último arranque del backend.
           <br />
-          La traza vive en memoria: el barrido la regenera como máximo cada 5 minutos, y la telemetría con cada
-          lectura nueva de la zona.
+          La traza vive en memoria: se regenera en cada pulso de sensado con motor, con la primera lectura de la
+          zona (o al pedir «Leer y ejecutar motor» desde Demo Expo).
         </div>
       ) : errorEsquema ? (
         <div className={`${styles.estado} ${styles.estadoError}`}>
