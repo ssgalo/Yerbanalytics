@@ -108,6 +108,13 @@ public class ZonaEntity {
     private Long humSusTs;
 
     /**
+     * Pulsos de sensado consecutivos sin respuesta del nodo testigo (ver {@code EscalamientoNodoService}).
+     * Con 3 o más el nodo está fuera de servicio. Nullable: se lee como 0. Vuelve a 0 con cualquier telemetría.
+     */
+    @Column(name = "pulsos_sin_respuesta")
+    private Integer pulsosSinRespuesta;
+
+    /**
      * Valor crudo de una métrica por su clave del contrato, o {@code null} si el nodo nunca
      * la reportó. Evita que cada consumidor repita la cadena de {@code if}s por clave.
      */

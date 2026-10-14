@@ -1,7 +1,9 @@
 package com.yerbanalytics.backend.sensing;
 
-import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
-import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.config.PulsoProperties;
+import com.yerbanalytics.backend.engine.riego.CicloLectura;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService.OrigenPulso;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService.PulsoEnCursoException;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,20 +11,23 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.TriggerContext;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 /**
- * Backend-driven sensing: every X seconds asks every zone for a reading ({@code LEER_AHORA}).
+ * Planificador del pulso de sensado: emite un pulso con motor al comienzo de cada franja de
+ * {@code intervaloSensadoMinutos}, anclada a las 02:00 ({@link CicloLectura}, la misma función que usa el riego:
+ * el pulso coincide con el ciclo de lectura por construcción), y en cada tick avanza los reintentos del pulso en
+ * curso.
  *
- * <p>X is {@code sensingPullIntervalSeconds} from the operating configuration, re-read each time the
- * next tick is computed, so a saved change applies without a restart. Cycles never overlap (the next
- * tick is computed from the previous completion) and a missed pull is neither queued nor replayed.
- * There is no autonomous fallback: if this scheduler does not pull, no periodic data is produced.
+ * <p>En lugar de calcular el próximo disparo una vez, cada tick compara la franja actual con la del último pulso:
+ * así un cambio de intervalo guardado rige en el tick siguiente, sin reiniciar. Al arrancar se toma la franja en
+ * curso como ya atendida: un pulso perdido mientras el backend estaba caído no se recupera. Si al empezar una
+ * franja hay un pulso en curso (uno manual largo), el programado se omite y queda en el log. Un pulso manual no
+ * corre las franjas.
  */
 // Explicit name: the default ("sensingScheduler") is taken by the TaskScheduler lane bean in SchedulersConfig.
 @Component("sensingPullScheduler")
@@ -30,77 +35,79 @@ public class SensingScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(SensingScheduler.class);
 
-    private final ZonaRepository zonaRepository;
-    private final ComandoZonaPublisher publisher;
+    private final PulsoSensadoService pulsos;
     private final ConfiguracionService configuracionService;
     private final TaskScheduler scheduler;
+    private final PulsoProperties properties;
     private final Clock clock;
 
-    public SensingScheduler(ZonaRepository zonaRepository,
-                            ComandoZonaPublisher publisher,
+    /** Inicio de la franja del último pulso programado (o de la vigente al arrancar). Sólo lo toca el tick. */
+    private Instant ultimaFranja;
+
+    public SensingScheduler(PulsoSensadoService pulsos,
                             ConfiguracionService configuracionService,
                             @Qualifier("sensingScheduler") TaskScheduler scheduler,
+                            PulsoProperties properties,
                             Clock clock) {
-        this.zonaRepository = zonaRepository;
-        this.publisher = publisher;
+        this.pulsos = pulsos;
         this.configuracionService = configuracionService;
         this.scheduler = scheduler;
+        this.properties = properties;
         this.clock = clock;
     }
 
-    /**
-     * Starts the periodic pull once the application is ready. The task is scheduled on the dedicated
-     * lane directly (not through the shared {@code ScheduledTaskRegistrar}) so {@code NurseryWatchdog}
-     * stays on the default {@code taskScheduler}.
-     */
+    /** Arranca el tick en su carril propio, para que el pulso nunca espere detrás de otra tarea. */
     @EventListener(ApplicationReadyEvent.class)
     public void start() {
-        scheduler.schedule(this::pullAll, this::nextExecution);
-        log.info("SensingScheduler: periodic pull started.");
+        ultimaFranja = franjaActual();
+        scheduler.scheduleWithFixedDelay(this::tick, Duration.ofMillis(properties.getTickMs()));
+        log.info("Pulso de sensado: planificador iniciado (franja vigente desde {}).", ultimaFranja);
     }
 
-    /** Next tick: last completion (or now) plus the interval stored right now, clamped. */
-    Instant nextExecution(TriggerContext context) {
-        Instant base = context.lastCompletion();
-        if (base == null) {
-            base = clock.instant();
-        }
-        return base.plusSeconds(currentIntervalSeconds());
-    }
-
-    private int currentIntervalSeconds() {
+    /** Un tick: dispara el pulso de una franja nueva y avanza los reintentos. Nada escapa. */
+    void tick() {
         try {
-            return SensingCadence.pullSeconds(configuracionService.getConfiguracionOperativa().getSensingPullIntervalSeconds());
-        } catch (Exception e) {
-            log.warn("SensingScheduler: could not read the pull interval, using {} s. {}",
-                    SensingCadence.DEFAULT_SECONDS, e.getMessage());
-            return SensingCadence.DEFAULT_SECONDS;
+            revisarFranja();
+        } catch (RuntimeException e) {
+            log.error("Pulso de sensado: falló la revisión de la franja.", e);
+        }
+        try {
+            pulsos.revisarReintentos();
+        } catch (RuntimeException e) {
+            log.error("Pulso de sensado: fallaron los reintentos del pulso en curso.", e);
         }
     }
 
-    /** One pull cycle: one {@code LEER_AHORA} per zone. Failures are isolated per zone and never escape. */
-    public void pullAll() {
-        List<String> zoneIds;
-        try {
-            zoneIds = zonaRepository.findAllIds();
-        } catch (Exception e) {
-            log.warn("SensingScheduler: could not list zones, skipping this cycle. {}", e.getMessage());
+    /** Si empezó una franja posterior a la del último pulso, emite el pulso programado. */
+    void revisarFranja() {
+        Instant franja = franjaActual();
+        if (ultimaFranja == null) {
+            ultimaFranja = franja;
             return;
         }
-
-        int failed = 0;
-        for (String zoneId : zoneIds) {
-            try {
-                if (!publisher.leerAhora(zoneId).publicado()) {
-                    failed++;
-                }
-            } catch (Exception e) {
-                failed++;
-                log.warn("SensingScheduler: pull to zone {} failed. {}", zoneId, e.getMessage());
-            }
+        if (!franja.isAfter(ultimaFranja)) {
+            return;
         }
-        if (!zoneIds.isEmpty()) {
-            log.info("SensingScheduler: pull cycle done — requested={}, failed={}", zoneIds.size(), failed);
+        ultimaFranja = franja;
+        try {
+            pulsos.iniciar(OrigenPulso.PROGRAMADO, true);
+        } catch (PulsoEnCursoException e) {
+            log.warn("Pulso de sensado: el pulso programado de la franja {} se omite, hay otro en curso.", franja);
+        }
+    }
+
+    private Instant franjaActual() {
+        return CicloLectura.inicio(clock.instant(), currentIntervalMinutes());
+    }
+
+    private int currentIntervalMinutes() {
+        try {
+            return SensingCadence.intervalMinutes(
+                    configuracionService.getConfiguracionOperativa().getIntervaloSensadoMinutos());
+        } catch (RuntimeException e) {
+            log.warn("Pulso de sensado: no se pudo leer el intervalo, se usan {} min. {}",
+                    SensingCadence.DEFAULT_MINUTES, e.getMessage());
+            return SensingCadence.DEFAULT_MINUTES;
         }
     }
 }

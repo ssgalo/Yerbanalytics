@@ -12,9 +12,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
  * de la aplicación, y acá conviven dos familias de tareas con exigencias incompatibles:
  *
  * <ul>
- *   <li><b>El motor de reglas</b> ({@code NurseryWatchdog}, {@code HistorialService}): barre las
- *       seis zonas y sus 600 sectores, y consulta el pronóstico por HTTP con reintentos. Tarda lo
- *       que tarde, y no pasa nada — es proactivo.</li>
+ *   <li><b>El seguimiento del historial</b> ({@code HistorialService}): recorre las acciones
+ *       pendientes de evaluar. Tarda lo que tarde, y no pasa nada — es proactivo.</li>
  *   <li><b>El subsistema de captura</b> ({@code CapturaService}): el keep-alive del canal SSE
  *       tiene que salir cada 20 s <em>sí o sí</em>, porque el dispositivo da por muerto un canal
  *       que lleva 45 s callado y reconecta. Y el vencimiento de órdenes marca el plazo que el
@@ -109,8 +108,8 @@ public class SchedulersConfig {
     }
 
     /**
-     * Lane of the backend-driven sensing pull ({@code SensingScheduler}): one thread, one tick every X seconds.
-     * Separate from the engine lane so the pull never waits behind the 600-sector sweep.
+     * Carril del pulso de sensado ({@code SensingScheduler}): un hilo, un tick cada pocos segundos que detecta la
+     * franja nueva y avanza los reintentos. Aparte del resto para que el pedido de lectura no espere detrás de nada.
      */
     @Bean
     public TaskScheduler sensingScheduler() {

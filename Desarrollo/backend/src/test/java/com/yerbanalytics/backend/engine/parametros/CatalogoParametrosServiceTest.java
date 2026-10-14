@@ -99,7 +99,7 @@ class CatalogoParametrosServiceTest {
         lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
 
         service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
-                operativaRepository);
+                operativaRepository, new com.yerbanalytics.backend.config.PulsoProperties());
     }
 
     private void override(String clave, String valor) {
@@ -452,56 +452,50 @@ class CatalogoParametrosServiceTest {
         assertThat(tabla.get("riego.humedad-objetivo").getValor()).isEqualTo("75");
     }
 
-    // ------------------------------------------------------------------ backend-driven sensing: effective stale threshold
+    // ------------------------------------------------------------------ pulso de sensado: umbral efectivo de lectura vieja
 
     private static final String STALE_KEY = ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave();
 
-    private void pullInterval(Integer seconds) {
+    /** Intervalo del pulso guardado en la fila de configuración operativa. */
+    private void pullInterval(Integer minutos) {
         ConfiguracionOperativaEntity op = new ConfiguracionOperativaEntity();
         op.setId(1);
-        op.setSensingPullIntervalSeconds(seconds);
+        op.setIntervaloSensadoMinutos(minutos);
         lenient().when(operativaRepository.findById(1)).thenReturn(Optional.of(op));
     }
 
     @Test
-    void vigentes_overlaysThreeTimesThePullIntervalWhenLargerThanTheFloor() {
+    void vigentes_superponeElIntervaloDelPulsoMasLaVentana() {
         pullInterval(120);
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(360.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
     }
 
     @Test
-    void vigentes_nullPullIntervalReadsAsSixtyGivingOneHundredEighty() {
+    void vigentes_intervaloNuloSeLeeComo240() {
         pullInterval(null);
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(180.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(14580.0);
     }
 
     @Test
-    void vigentes_noOperatingConfigRowReadsAsSixty() {
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(180.0);
+    void vigentes_sinFilaDeConfiguracionSeLeeComo240() {
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(14580.0);
     }
 
     @Test
-    void vigentes_floorDominatesWhenThePullIntervalIsShort() {
-        pullInterval(10);
-
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(90.0);
-    }
-
-    @Test
-    void vigentes_aStoredFloorOverrideIsHonouredWhenLarger() {
+    void vigentes_unPisoGuardadoMenorQueElPulsoNoGana() {
         pullInterval(60);
         override(STALE_KEY, "200");
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(200.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(3780.0);
     }
 
     @Test
-    void vigentes_outOfRangeStoredIntervalIsClamped() {
+    void vigentes_intervaloGuardadoFueraDeRangoSeAcota() {
         pullInterval(99999);
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(10800.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(21780.0);
     }
 
     @Test
@@ -518,14 +512,14 @@ class CatalogoParametrosServiceTest {
     @Test
     void invalidarAlTerminar_makesTheNextReadSeeTheNewInterval() {
         pullInterval(60);
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(180.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(3780.0);
 
         pullInterval(120);
-        assertThat(service.vigentes().numero(STALE_KEY)).as("cached until invalidated").isEqualTo(180.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).as("cached until invalidated").isEqualTo(3780.0);
 
         service.invalidarAlTerminar();
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(360.0);
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
     }
 
     @Test
@@ -541,7 +535,7 @@ class CatalogoParametrosServiceTest {
                 sync.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
             }
 
-            assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(360.0);
+            assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }

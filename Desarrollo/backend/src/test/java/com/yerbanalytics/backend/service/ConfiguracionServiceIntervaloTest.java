@@ -30,12 +30,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * El intervalo de sensado define el ciclo de lectura del riego, que SE ACOTA a 60–360 min dentro del cálculo
- * del ciclo ({@code CicloLectura.acotarMinutos}); el guardado sigue exigiendo sólo un valor positivo. Validar
- * 60–360 al guardar rompería las bases con un valor viejo fuera de rango y le impediría al simulador emitir
- * más rápido que cada hora, que es la forma de probar el sistema.
+ * El intervalo de sensado es el del pulso (y el del ciclo de lectura del riego): se guarda sólo dentro de 60–360 min.
+ * Una base vieja con un valor fuera de rango se sigue leyendo acotada. La pasada diaria se guarda con hora
+ * {@code HH:mm}; los nulos se leen como valores de fábrica.
  */
-@DisplayName("ConfiguracionService - intervalo de sensado")
+@DisplayName("ConfiguracionService - intervalo de sensado y pasada diaria")
 class ConfiguracionServiceIntervaloTest {
 
     private ConfiguracionOperativaRepository operativaRepo;
@@ -58,37 +57,17 @@ class ConfiguracionServiceIntervaloTest {
     }
 
     private static Configuracion cfg(int intervaloSensadoMinutos) {
-        return cfg(intervaloSensadoMinutos, null);
+        return cfg(intervaloSensadoMinutos, null, null);
     }
 
-    private static Configuracion cfg(int intervaloSensadoMinutos, Integer sensingPullSeconds) {
+    private static Configuracion cfg(int intervaloSensadoMinutos, Boolean pasadaActiva, String pasadaHora) {
         List<UmbralMetrica> umbrales = NurseryConstants.SPECS.stream().map(sp -> new UmbralMetrica(sp.key(),
                 sp.label(), sp.unit(), sp.dec(), sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1],
                 sp.crit()[0], sp.crit()[1], false)).toList();
         return new Configuracion(umbrales,
-                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, 5, "x", 1L, sensingPullSeconds, null),
+                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, "x", 1L, pasadaActiva, pasadaHora, null),
                 List.of());
     }
-
-    @ParameterizedTest
-    @ValueSource(ints = {0, -1, -240})
-    void rechazaUnIntervaloNoPositivo(int minutos) {
-        assertThatThrownBy(() -> service.updateConfiguracion(cfg(minutos), "Ana"))
-                .isInstanceOf(InvalidConfigurationException.class)
-                .hasMessageContaining("intervalo de sensado");
-        verify(operativaRepo, never()).save(any());
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = {1, 5, 59, 60, 240, 360, 361, 600})
-    void aceptaCualquierIntervaloPositivoSinAcotarloAlGuardar(int minutos) {
-        assertThatCode(() -> service.updateConfiguracion(cfg(minutos), "Ana")).doesNotThrowAnyException();
-        ArgumentCaptor<ConfiguracionOperativaEntity> guardada = ArgumentCaptor.forClass(ConfiguracionOperativaEntity.class);
-        verify(operativaRepo).save(guardada.capture());
-        assertThat(guardada.getValue().getIntervaloSensadoMinutos()).isEqualTo(minutos);
-    }
-
-    // --- Backend-driven sensing: pull interval in seconds ---
 
     private ConfiguracionOperativaEntity savedEntity() {
         ArgumentCaptor<ConfiguracionOperativaEntity> saved = ArgumentCaptor.forClass(ConfiguracionOperativaEntity.class);
@@ -96,37 +75,76 @@ class ConfiguracionServiceIntervaloTest {
         return saved.getValue();
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {10, 30, 60, 3600})
-    void acceptsPullIntervalInRange(int seconds) {
-        assertThatCode(() -> service.updateConfiguracion(cfg(240, seconds), "Ana")).doesNotThrowAnyException();
-        assertThat(savedEntity().getSensingPullIntervalSeconds()).isEqualTo(seconds);
-    }
+    // --- intervalo del pulso ---
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 5, 9, 3601, 4000})
-    void rejectsPullIntervalOutOfRangeNamingTheParameter(int seconds) {
-        assertThatThrownBy(() -> service.updateConfiguracion(cfg(240, seconds), "Ana"))
+    @ValueSource(ints = {0, 30, 59, 361, 600})
+    void rechazaUnIntervaloFueraDe60a360NombrandoElParametro(int minutos) {
+        assertThatThrownBy(() -> service.updateConfiguracion(cfg(minutos), "Ana"))
                 .isInstanceOf(InvalidConfigurationException.class)
-                .hasMessageContaining("sensingPullIntervalSeconds");
+                .hasMessageContaining("intervaloSensadoMinutos");
         verify(operativaRepo, never()).save(any());
     }
 
-    @org.junit.jupiter.api.Test
-    void nullPullIntervalKeepsTheStoredValue() {
-        ConfiguracionOperativaEntity stored = new ConfiguracionOperativaEntity();
-        stored.setId(1);
-        stored.setSensingPullIntervalSeconds(45);
-        when(operativaRepo.findById(1)).thenReturn(Optional.of(stored));
+    @ParameterizedTest
+    @ValueSource(ints = {60, 120, 240, 360})
+    void aceptaUnIntervaloEnRango(int minutos) {
+        assertThatCode(() -> service.updateConfiguracion(cfg(minutos), "Ana")).doesNotThrowAnyException();
+        assertThat(savedEntity().getIntervaloSensadoMinutos()).isEqualTo(minutos);
+    }
 
-        service.updateConfiguracion(cfg(240, null), "Ana");
+    // --- pasada diaria ---
 
-        assertThat(savedEntity().getSensingPullIntervalSeconds()).isEqualTo(45);
+    @ParameterizedTest
+    @ValueSource(strings = {"25:00", "9:5", "", "10:60", "1030", "ab:cd"})
+    void rechazaUnaHoraInvalidaNombrandoElParametro(String hora) {
+        assertThatThrownBy(() -> service.updateConfiguracion(cfg(240, true, hora), "Ana"))
+                .isInstanceOf(InvalidConfigurationException.class)
+                .hasMessageContaining("pasadaDiariaHora");
+        verify(operativaRepo, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"00:00", "10:30", "23:59"})
+    void aceptaUnaHoraValida(String hora) {
+        service.updateConfiguracion(cfg(240, true, hora), "Ana");
+
+        ConfiguracionOperativaEntity e = savedEntity();
+        assertThat(e.getPasadaDiariaHora()).isEqualTo(hora);
+        assertThat(e.getPasadaDiariaActiva()).isTrue();
     }
 
     @org.junit.jupiter.api.Test
-    void pullIntervalRoundTripsThroughTheDto() {
-        // The repository behaves like a table: what was saved is what findById returns afterwards.
+    void sinCamposDeLaPasadaConservaLoGuardado() {
+        ConfiguracionOperativaEntity stored = new ConfiguracionOperativaEntity();
+        stored.setId(1);
+        stored.setPasadaDiariaActiva(true);
+        stored.setPasadaDiariaHora("09:15");
+        when(operativaRepo.findById(1)).thenReturn(Optional.of(stored));
+
+        service.updateConfiguracion(cfg(240, null, null), "Ana");
+
+        assertThat(savedEntity().getPasadaDiariaActiva()).isTrue();
+        assertThat(savedEntity().getPasadaDiariaHora()).isEqualTo("09:15");
+    }
+
+    @org.junit.jupiter.api.Test
+    void nulosSeLeenComoValoresDeFabrica() {
+        ConfiguracionOperativaEntity stored = new ConfiguracionOperativaEntity();
+        stored.setId(1);
+        stored.setIntervaloSensadoMinutos(null);
+        when(operativaRepo.findById(1)).thenReturn(Optional.of(stored));
+
+        ConfiguracionOperativa op = service.getConfiguracion().operativa();
+
+        assertThat(op.intervaloSensadoMinutos()).isEqualTo(240);
+        assertThat(op.pasadaDiariaActiva()).isFalse();
+        assertThat(op.pasadaDiariaHora()).isEqualTo("11:00");
+    }
+
+    @org.junit.jupiter.api.Test
+    void laPasadaIdaYVueltaPorElDto() {
+        // El repositorio se comporta como una tabla: lo guardado es lo que devuelve findById después.
         java.util.concurrent.atomic.AtomicReference<ConfiguracionOperativaEntity> table =
                 new java.util.concurrent.atomic.AtomicReference<>();
         when(operativaRepo.save(any())).thenAnswer(i -> {
@@ -135,34 +153,21 @@ class ConfiguracionServiceIntervaloTest {
         });
         when(operativaRepo.findById(1)).thenAnswer(i -> Optional.ofNullable(table.get()));
 
-        Configuracion returned = service.updateConfiguracion(cfg(240, 30), "Ana");
+        Configuracion returned = service.updateConfiguracion(cfg(240, true, "10:30"), "Ana");
 
-        assertThat(returned.operativa().sensingPullIntervalSeconds()).isEqualTo(30);
-        assertThat(service.getConfiguracion().operativa().sensingPullIntervalSeconds()).isEqualTo(30);
+        assertThat(returned.operativa().pasadaDiariaActiva()).isTrue();
+        assertThat(service.getConfiguracion().operativa().pasadaDiariaHora()).isEqualTo("10:30");
     }
 
     @org.junit.jupiter.api.Test
-    void unsetPullIntervalReadsAsSixtyAndLeavesTheIrrigationCycleUntouched() {
-        ConfiguracionOperativaEntity stored = new ConfiguracionOperativaEntity();
-        stored.setId(1);
-        stored.setIntervaloSensadoMinutos(240);
-        when(operativaRepo.findById(1)).thenReturn(Optional.of(stored));
-
-        ConfiguracionOperativa op = service.getConfiguracion().operativa();
-
-        assertThat(op.sensingPullIntervalSeconds()).isEqualTo(60);
-        assertThat(op.intervaloSensadoMinutos()).isEqualTo(240);
-    }
-
-    @org.junit.jupiter.api.Test
-    void exposesTheEffectiveStaleThresholdFromTheCatalogSnapshot() {
-        // ReglaTestSupport.fabrica() holds the 90 s floor and the mock catalog returns it as-is.
+    void exponeElUmbralEfectivoDelCatalogo() {
+        // ReglaTestSupport.fabrica() tiene el piso de 90 s y el catálogo simulado lo devuelve tal cual.
         assertThat(service.getConfiguracion().operativa().effectiveStaleThresholdSeconds()).isEqualTo(90);
     }
 
     @org.junit.jupiter.api.Test
-    void savingInvalidatesTheCatalogSnapshot() {
-        service.updateConfiguracion(cfg(240, 30), "Ana");
+    void guardarInvalidaElCatalogo() {
+        service.updateConfiguracion(cfg(240), "Ana");
 
         verify(catalogo).invalidarAlTerminar();
     }

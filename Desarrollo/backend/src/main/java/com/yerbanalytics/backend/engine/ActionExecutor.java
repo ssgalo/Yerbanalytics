@@ -7,15 +7,12 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +31,7 @@ import java.util.regex.Pattern;
  *   <li>En una evaluación de <b>telemetría</b> una solicitud en cola pertenece a la ronda decidida y se completa:
  *       sólo la retira una <b>cancelación explícita de seguridad</b> ({@link CancelaRiego}: sustrato saturado,
  *       bloqueo manual, sensor sin datos y, para R-01, ventana cerrada o pausa por aplicación). "La humedad se
- *       recuperó" no cancela. El <b>barrido</b> del watchdog evalúa sin lectura fresca y no toca la cola.</li>
+ *       recuperó" no cancela.</li>
  *   <li>{@code ACTIVAR_BOMBA}: actualiza el campo del sector, registra en historial y publica
  *       {@code pump ON}.</li>
  *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} con el porcentaje del motivo
@@ -42,30 +39,19 @@ import java.util.regex.Pattern;
  *   <li>{@code ALERTA}: se persiste como evento "Alerta", una sola vez por macro-zona, regla y ciclo de
  *       lectura (el motor evalúa 100 sectores por mensaje: sin esto serían 100 alertas iguales).</li>
  *   <li>{@code NOOP_INFO} y las bloqueantes ({@code ABORT_*}, {@code POSTPONE_RIEGO}): se persiste el motivo
- *       como Registro de Inacción, <b>sólo cuando cambia la decisión del sector</b> (ver abajo); el corte ya lo
- *       aplicó el {@link RuleOrchestrator}.</li>
+ *       como Registro de Inacción, completo en cada evaluación (ver abajo); el corte ya lo aplicó el
+ *       {@link RuleOrchestrator}.</li>
  * </ul>
  *
- * <p><b>Registro de Inacción sólo ante un cambio.</b> Con el nodo real publicando cada 30 s, una fila "Info" por
- * sector, por regla y por mensaje eran ~1.300 filas por mensaje de una zona (millones por día) que repetían lo mismo.
- * Por cada sector (y por origen: telemetría o barrido) se recuerda la última decisión registrada: el tipo de acción y
- * una clave estable del motivo (el texto sin los números, que cambian en cada lectura) de cada regla. Si la
- * evaluación coincide no se escribe nada; si cambió la decisión de CUALQUIER regla se escribe el conjunto completo de
- * ese sector en esa evaluación, así el DAG del Historial (que pinta los nodos con las filas del sector en ese minuto)
- * sigue teniendo todas las reglas. El barrido tampoco repite lo que ya registró la telemetría. Es estado en memoria:
- * tras un reinicio se registra una vez más y {@link #reiniciarEstado()} lo limpia al regenerar la topología.
+ * <p><b>Registro de Inacción completo en cada pulso.</b> El motor sólo decide en el pulso de sensado (cada
+ * {@code intervaloSensadoMinutos}), así que en cada evaluación se escribe una fila por cada inacción del sector, haya
+ * cambiado o no la decisión: cada pulso queda como un ciclo completo en el historial y el DAG de cada sector tiene
+ * siempre todas sus reglas. Sin deduplicación ni tope temporal: la cadencia del pulso acota el volumen (~7.800 filas
+ * por pulso con motor). Si molesta, volver a "sólo ante un cambio" es local a {@link #registrarInacciones}.
  *
- * <p><b>Y a lo sumo una vez cada {@code yerbanalytics.historial.inaccion-intervalo-min} por sector.</b> "Sólo ante un
- * cambio" no alcanza con lecturas ruidosas: la lectura es de la macro-zona, así que si oscila alrededor de un umbral
- * (la humedad cruzando el de riego, el estado de la zona alternando entre ok y warning) cambia la decisión de los 100
- * sectores en cada mensaje, y con el sondeo cada 60 s eran ~7.800 filas por minuto (cientos de miles por hora). Un
- * cambio dentro del intervalo no se escribe ni se marca: se compara siempre contra lo último ESCRITO, así que si al
- * vencer el intervalo la decisión sigue distinta se registra la vigente, y si volvió a la registrada no se escribe
- * nada. La traza del Inspector sigue mostrando cada evaluación; esto sólo acota lo que queda en el historial.
- *
- * <p><b>Ese estado se marca recién tras el commit.</b> {@code updateTelemetry} y el barrido evalúan dentro de una
- * transacción: si se marcara "inacción registrada" o "alerta del ciclo enviada" antes y la transacción revirtiera, la
- * memoria diría "registrado" para filas que no existen y no se volverían a escribir. Con una transacción activa las
+ * <p><b>La alerta del ciclo se marca recién tras el commit.</b> {@code updateTelemetry} evalúa dentro de una
+ * transacción: si se marcara "alerta del ciclo enviada" antes y la transacción revirtiera, la memoria diría
+ * "registrado" para filas que no existen y no se volverían a escribir. Con una transacción activa las
  * marcas quedan pendientes (una por transacción, también para deduplicar los 100 sectores de la zona dentro de ella) y
  * se aplican en {@code afterCommit}; en un rollback se descartan. Sin transacción se aplican de inmediato. Lo que NO
  * se revierte con la transacción son las solicitudes ya encoladas en la {@link ColaRiego}: una lectura que no se guardó
@@ -95,27 +81,10 @@ public class ActionExecutor {
      */
     private final Map<String, Instant> alertasPorCiclo = new ConcurrentHashMap<>();
 
-    /**
-     * Última decisión de inacción registrada por sector: {@code regla → firma (tipo + clave estable del motivo)}.
-     * Una por origen: la telemetría y el barrido evalúan con datos distintos (el barrido, sin métricas) y no
-     * deben pisarse el estado entre sí.
-     */
-    private final Map<String, InaccionRegistrada> inaccionTelemetria = new ConcurrentHashMap<>();
-    private final Map<String, InaccionRegistrada> inaccionBarrido = new ConcurrentHashMap<>();
-
-    /** Lo último que se escribió de un sector: la firma de cada regla y cuándo (instante de la evaluación). */
-    private record InaccionRegistrada(Map<String, String> firmas, Instant ts) {
-    }
-
-    /** Tiempo mínimo entre dos registros de inacción de un mismo sector (y origen). */
-    private final Duration intervaloInaccion;
-
-    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola,
-                          @Value("${yerbanalytics.historial.inaccion-intervalo-min:30}") long intervaloInaccionMin) {
+    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola) {
         this.historialService = historialService;
         this.publisher = publisher;
         this.cola = cola;
-        this.intervaloInaccion = Duration.ofMinutes(Math.max(0, intervaloInaccionMin));
     }
 
     /**
@@ -123,15 +92,13 @@ public class ActionExecutor {
      *
      * @param actions lista de acciones a ejecutar (puede ser vacía)
      * @param ctx     snapshot inmutable del sector para extraer datos de persistencia
-     * @param origen  qué disparó la evaluación: sólo la telemetría decide sobre la cola de riego
+     * @param origen  qué disparó la evaluación (hoy sólo la respuesta a un pulso con motor)
      */
     public void execute(List<RuleAction> actions, RuleContext ctx, OrigenEvaluacion origen) {
         String oldPump = ctx.sector().getActuadorPump();
 
-        if (origen == OrigenEvaluacion.TELEMETRIA) {
-            actualizarCola(actions, ctx);
-        }
-        registrarInacciones(actions, ctx, origen);
+        actualizarCola(actions, ctx);
+        registrarInacciones(actions, ctx);
 
         for (RuleAction action : actions) {
             switch (action.type()) {
@@ -159,8 +126,8 @@ public class ActionExecutor {
                     publishCommand(ctx, "shade", "SET", Map.of("targetPct", apertura));
                 }
 
-                // Registro de Inacción: el usuario puede ver por qué el motor no actuó. Ya se persistió arriba
-                // (sólo si cambió la decisión del sector); acá queda el log.
+                // Registro de Inacción: el usuario puede ver por qué el motor no actuó. Ya se persistió arriba;
+                // acá queda el log.
                 case NOOP_INFO -> log.debug("Sector {}: NOOP_INFO — {}", ctx.sector().getId(), action.motivo());
 
                 // El corte ya fue aplicado por el RuleOrchestrator.
@@ -176,8 +143,6 @@ public class ActionExecutor {
 
     /** Olvida lo que recuerda de lo ya registrado (al regenerar la topología los ids de sector se reutilizan). */
     public void reiniciarEstado() {
-        inaccionTelemetria.clear();
-        inaccionBarrido.clear();
         alertasPorCiclo.clear();
     }
 
@@ -185,79 +150,19 @@ public class ActionExecutor {
     // Registro de Inacción
     // -------------------------------------------------------------------------
 
-    /** Números (con signo y decimales): lo que cambia en cada lectura y no es una decisión distinta. */
-    private static final Pattern NUMEROS = Pattern.compile("-?\\d+(?:[.,]\\d+)?");
-
     private static boolean esInaccion(RuleAction a) {
         return a.type() == ActionType.NOOP_INFO || a.type().isBlocking();
     }
 
-    /** Tipo de acción y motivo sin números: "humedad 44% bajo 45%" y "humedad 40% bajo 45%" son la misma decisión. */
-    private static String firma(RuleAction a) {
-        String motivo = a.motivo() == null ? "" : NUMEROS.matcher(a.motivo()).replaceAll("#");
-        return a.type() + "|" + motivo;
-    }
-
     /**
-     * Escribe las filas "Info" del sector sólo si su decisión cambió (cualquier regla) y pasó el intervalo mínimo
-     * desde el último registro: en ese caso, el conjunto completo de la evaluación. Si la escritura falla se propaga
-     * y NO se da por registrada: la próxima evaluación lo reintenta.
+     * Escribe una fila "Info" por cada inacción de la evaluación: el conjunto completo del sector en este pulso. Si
+     * la escritura falla se propaga (la transacción de la ingesta revierte).
      */
-    private void registrarInacciones(List<RuleAction> actions, RuleContext ctx, OrigenEvaluacion origen) {
-        List<RuleAction> inacciones = actions.stream().filter(ActionExecutor::esInaccion).toList();
-        if (inacciones.isEmpty()) {
-            return;
-        }
-        // Una regla puede emitir más de una acción de inacción: la clave lleva el orden para no pisarlas.
-        Map<String, String> actual = new LinkedHashMap<>();
-        for (RuleAction a : inacciones) {
-            String clave = a.ruleName();
-            for (int n = 2; actual.containsKey(clave); n++) {
-                clave = a.ruleName() + "#" + n;
+    private void registrarInacciones(List<RuleAction> actions, RuleContext ctx) {
+        for (RuleAction a : actions) {
+            if (esInaccion(a)) {
+                historialService.registrarInaccion(ctx.sector(), a.type(), a.ruleName(), a.motivo());
             }
-            actual.put(clave, firma(a));
-        }
-        String sectorId = ctx.sector().getId();
-        boolean telemetria = origen == OrigenEvaluacion.TELEMETRIA;
-        Pendiente pendiente = pendiente();
-        InaccionRegistrada previa = ultimaInaccion(telemetria, sectorId, pendiente);
-        if (previa != null && actual.equals(previa.firmas())) {
-            return;
-        }
-        // El barrido no repite lo que la telemetría ya dejó asentado.
-        if (!telemetria) {
-            InaccionRegistrada deTelemetria = ultimaInaccion(true, sectorId, pendiente);
-            if (deTelemetria != null && actual.equals(deTelemetria.firmas())) {
-                marcarInaccion(false, sectorId, new InaccionRegistrada(actual, ctx.now()), pendiente);
-                return;
-            }
-        }
-        // Cambió, pero el sector se registró hace poco: se espera, sin marcar nada, a que venza el intervalo.
-        if (previa != null && ctx.now().isBefore(previa.ts().plus(intervaloInaccion))) {
-            return;
-        }
-        for (RuleAction a : inacciones) {
-            historialService.registrarInaccion(ctx.sector(), a.type(), a.ruleName(), a.motivo());
-        }
-        marcarInaccion(telemetria, sectorId, new InaccionRegistrada(actual, ctx.now()), pendiente);
-    }
-
-    private InaccionRegistrada ultimaInaccion(boolean telemetria, String sectorId, Pendiente pendiente) {
-        if (pendiente != null) {
-            InaccionRegistrada enVuelo = (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).get(sectorId);
-            if (enVuelo != null) {
-                return enVuelo;
-            }
-        }
-        return (telemetria ? inaccionTelemetria : inaccionBarrido).get(sectorId);
-    }
-
-    /** Marca la decisión como registrada: ya, o recién tras el commit si hay una transacción en curso. */
-    private void marcarInaccion(boolean telemetria, String sectorId, InaccionRegistrada registrada, Pendiente pendiente) {
-        if (pendiente != null) {
-            (telemetria ? pendiente.inaccionTelemetria : pendiente.inaccionBarrido).put(sectorId, registrada);
-        } else {
-            (telemetria ? inaccionTelemetria : inaccionBarrido).put(sectorId, registrada);
         }
     }
 
@@ -271,14 +176,10 @@ public class ActionExecutor {
      */
     private final class Pendiente implements TransactionSynchronization {
         final Map<String, Instant> alertas = new HashMap<>();
-        final Map<String, InaccionRegistrada> inaccionTelemetria = new HashMap<>();
-        final Map<String, InaccionRegistrada> inaccionBarrido = new HashMap<>();
 
         @Override
         public void afterCommit() {
             alertasPorCiclo.putAll(alertas);
-            ActionExecutor.this.inaccionTelemetria.putAll(inaccionTelemetria);
-            ActionExecutor.this.inaccionBarrido.putAll(inaccionBarrido);
         }
 
         @Override

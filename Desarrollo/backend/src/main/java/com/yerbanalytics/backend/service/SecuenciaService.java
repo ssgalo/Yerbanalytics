@@ -15,6 +15,9 @@ import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.repository.ZonaRepository;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService.OrigenPulso;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService.PulsoEnCursoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -44,7 +47,10 @@ import java.util.regex.Pattern;
  * los de un actuador.
  *
  * <p>Comandan el actuador <strong>directo</strong> por {@link ComandoActuadorPublisher}, sin pasar por
- * el motor de reglas, y no hay ningún {@code if (demo)}: son una capacidad más del backend. Una a la
+ * el motor de reglas, y no hay ningún {@code if (demo)}: son una capacidad más del backend. La única que
+ * puede tocar el motor es la lectura con {@code ejecutarMotor}: su pedido sale como un pulso de sensado de la
+ * zona ({@link PulsoSensadoService}), y es la respuesta a ese pulso la que evalúa las reglas, igual que en un
+ * pulso programado. Una a la
  * vez, y ninguna mientras corre una pasada del riel ({@link GuardiaHardware}: hay un único ESP32).
  * El estado vive <strong>en memoria</strong>; un reinicio a mitad la pierde (la bomba se apaga sola a
  * los {@code durationSec}).
@@ -114,6 +120,7 @@ public class SecuenciaService implements UsoDelHardware {
 
     private final ComandoActuadorPublisher actuadores;
     private final ComandoZonaPublisher zonaPublisher;
+    private final PulsoSensadoService pulsos;
     private final ZonaRepository zonaRepo;
     private final GuardiaHardware guardia;
     private final SecuenciaProperties props;
@@ -133,12 +140,14 @@ public class SecuenciaService implements UsoDelHardware {
 
     public SecuenciaService(ComandoActuadorPublisher actuadores,
                             ComandoZonaPublisher zonaPublisher,
+                            PulsoSensadoService pulsos,
                             ZonaRepository zonaRepo,
                             GuardiaHardware guardia,
                             SecuenciaProperties props,
                             Clock relojVivero) {
         this.actuadores = actuadores;
         this.zonaPublisher = zonaPublisher;
+        this.pulsos = pulsos;
         this.zonaRepo = zonaRepo;
         this.guardia = guardia;
         this.props = props;
@@ -265,7 +274,7 @@ public class SecuenciaService implements UsoDelHardware {
                 return new ParametrosSecuencia(null, espera);
             }
             case LECTURA -> {
-                return new ParametrosSecuencia(null, null);
+                return new ParametrosSecuencia(null, null, Boolean.TRUE.equals(pedidos.ejecutarMotor()));
             }
             default -> throw new SecuenciaInvalidaException(
                     "Tipo de secuencia desconocido: " + tipo + " (RIEGO, MEDIASOMBRA o LECTURA).");
@@ -275,6 +284,9 @@ public class SecuenciaService implements UsoDelHardware {
     private synchronized Secuencia iniciarSecuencia(String tipo, ParametrosSecuencia parametros) {
         if (actual != null && EN_CURSO.equals(actual.estado)) {
             throw new SecuenciaRechazadaException("Ya hay una secuencia en curso.");
+        }
+        if (conMotor(parametros) && pulsos.enCurso()) {
+            throw new SecuenciaRechazadaException("Ya hay una lectura de sensores en curso. Esperá a que termine.");
         }
         ZonaEntity zona = zonaDestino();
         String sectorId = null;
@@ -320,6 +332,27 @@ public class SecuenciaService implements UsoDelHardware {
         return zonaRepo.findAllWithSectors().stream()
                 .min(Comparator.comparingInt((ZonaEntity z) -> numeroFinal(z.getId())).thenComparing(ZonaEntity::getId))
                 .orElseThrow(() -> new SecuenciaRechazadaException("No hay topología configurada."));
+    }
+
+    private static boolean conMotor(ParametrosSecuencia parametros) {
+        return parametros != null && Boolean.TRUE.equals(parametros.ejecutarMotor());
+    }
+
+    /**
+     * El pedido de la lectura con motor: un pulso de sensado sólo para la zona de la secuencia. El pulso publica el
+     * {@code LEER_AHORA} (y lo reintenta si hace falta); la telemetría que lo responde evalúa el motor en la ingesta y
+     * es, a la vez, la que esta secuencia muestra.
+     */
+    private void pedirConMotor(SecuenciaInterna p, Paso paso) {
+        try {
+            PulsoSensadoService.Pulso pulso = pulsos.iniciar(OrigenPulso.MANUAL, true, List.of(p.zonaId));
+            paso.commandId = pulso.id();
+            cerrarYSeguir(p, paso, OK, null, null);
+        } catch (PulsoEnCursoException e) {
+            cerrarYSeguir(p, paso, ERROR, "PULSO_EN_CURSO", e.getMessage());
+        } catch (RuntimeException e) {
+            cerrarYSeguir(p, paso, ERROR, "PUBLICACION_FALLIDA", detallePublicacion(e.getMessage()));
+        }
     }
 
     private static int numeroFinal(String id) {
@@ -388,6 +421,10 @@ public class SecuenciaService implements UsoDelHardware {
             }
             case PEDIR -> {
                 p.pedidoEn = reloj.millis();
+                if (conMotor(p.parametros)) {
+                    pedirConMotor(p, paso);
+                    return;
+                }
                 ComandoZonaPublisher.Resultado r = zonaPublisher.leerAhora(p.zonaId);
                 paso.commandId = r.commandId();
                 if (r.publicado()) {

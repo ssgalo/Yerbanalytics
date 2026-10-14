@@ -84,16 +84,16 @@ class ReglasEvaluacionesControllerTest {
     @Test
     void origenFiltraLaTraza() throws Exception {
         when(sectorRepository.existsById("MZ-2-006")).thenReturn(true);
-        when(store.ultima("MZ-2-006", OrigenEvaluacion.BARRIDO))
-                .thenReturn(java.util.Optional.of(traza(OrigenEvaluacion.BARRIDO, 2000)));
+        when(store.ultima("MZ-2-006", OrigenEvaluacion.TELEMETRIA))
+                .thenReturn(java.util.Optional.of(traza(OrigenEvaluacion.TELEMETRIA, 2000)));
 
-        mockMvc.perform(get("/api/rules/evaluaciones/MZ-2-006").param("origen", "BARRIDO"))
+        mockMvc.perform(get("/api/rules/evaluaciones/MZ-2-006").param("origen", "TELEMETRIA"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.origen").value("BARRIDO"));
+                .andExpect(jsonPath("$.origen").value("TELEMETRIA"));
     }
 
     @Test
-    void origenSinTraza_devuelve204AunqueElOtroOrigenTengaUna() throws Exception {
+    void origenSinTraza_devuelve204() throws Exception {
         when(sectorRepository.existsById("MZ-2-006")).thenReturn(true);
         when(store.ultima("MZ-2-006", OrigenEvaluacion.TELEMETRIA)).thenReturn(java.util.Optional.empty());
 

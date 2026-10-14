@@ -42,6 +42,12 @@ class SupplyRuleTest {
     }
 
     @Test
+    @DisplayName("usa el diagnóstico de IA: sólo corre con un diagnóstico nuevo")
+    void usaElDiagnostico() {
+        org.assertj.core.api.Assertions.assertThat(rule.usaDiagnostico()).isTrue();
+    }
+
+    @Test
     void sectorQueNoEstaCritico_noDosifica() {
         List<RuleAction> acciones = evaluar(rule, con("warning", 99.0));
 

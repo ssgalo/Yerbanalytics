@@ -45,7 +45,7 @@ class ActionExecutorColaTest {
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
         cola = new ColaRiego();
-        executor = new ActionExecutor(historial, publisher, cola, 0);
+        executor = new ActionExecutor(historial, publisher, cola);
     }
 
     private static RuleContext ctx(String zonaId, int n, String inicioCiclo) {
@@ -220,19 +220,6 @@ class ActionExecutorColaTest {
     }
 
     @Test
-    @DisplayName("el barrido NO toca la cola: ni retira ni encola")
-    void barrido_noToca() {
-        executor.execute(List.of(riego(5.0, 600)), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
-
-        executor.execute(List.of(RuleAction.of(ActionType.ABORT_RIEGO, "StaleSensorRule", "sin lectura")),
-                ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.BARRIDO);
-        executor.execute(List.of(riego(6.0, 720)), ctx("MZ-2", 9, "10:00"), OrigenEvaluacion.BARRIDO);
-
-        assertThat(cola.pendientes("MZ-2")).extracting(SolicitudRiego::sectorId).containsExactly("MZ-2-007");
-        assertThat(cola.pendientes("MZ-2").get(0).detalle().duracionSeg()).isEqualTo(600);
-    }
-
-    @Test
     @DisplayName("una orden de 0 s o sin detalle no se encola (y cancela la anterior del sector)")
     void ordenInvalida_noSeEncola() {
         executor.execute(List.of(riego(5.0, 600)), ctx("MZ-2", 7, "10:00"), OrigenEvaluacion.TELEMETRIA);
@@ -287,7 +274,7 @@ class ActionExecutorColaTest {
     }
 
     @Test
-    @DisplayName("sin inicio de ciclo en el contexto (barrido) el ciclo se calcula del reloj y del intervalo")
+    @DisplayName("sin inicio de ciclo en el contexto (sin contexto de riego) el ciclo se calcula del reloj y del intervalo")
     void alerta_sinCicloEnElContexto() {
         ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-2");
         SectorEntity sector = RuleContextTestFactory.sectorBasico("MZ-2-001");
@@ -296,8 +283,8 @@ class ActionExecutorColaTest {
                 "ok", AHORA, null, false);
         RuleAction a = alerta("SustratoSaturadoRule", NivelAlerta.WARNING, "x");
 
-        executor.execute(List.of(a), vacio, OrigenEvaluacion.BARRIDO);
-        executor.execute(List.of(a), vacio, OrigenEvaluacion.BARRIDO);
+        executor.execute(List.of(a), vacio, OrigenEvaluacion.TELEMETRIA);
+        executor.execute(List.of(a), vacio, OrigenEvaluacion.TELEMETRIA);
 
         verify(historial, times(1)).registrarAlerta(any(), any(), any(), any(), anyLong());
     }

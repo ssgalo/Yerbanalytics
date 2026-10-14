@@ -1,31 +1,34 @@
 package com.yerbanalytics.backend.sensing;
 
 /**
- * Single source of truth for the backend-driven sensing cadence: the pull interval X (clamped)
- * and the effective stale threshold {@code max(floor, 3 * X)}.
+ * Single source of truth for the sensing cadence: the pulse interval (minutes, clamped) and the effective
+ * stale threshold {@code max(floor, interval + response window)}.
+ *
+ * <p>The threshold only protects irrigation (a reading older than it is not used to irrigate). Whether a
+ * node is out of service follows the missed-pulses count, not this threshold.
  */
 public final class SensingCadence {
 
-    public static final int DEFAULT_SECONDS = 60;
-    public static final int MIN_SECONDS = 10;
-    public static final int MAX_SECONDS = 3600;
-
-    /** A reading is stale after this many missed pull intervals. */
-    private static final int STALE_INTERVALS = 3;
+    public static final int DEFAULT_MINUTES = 240;
+    public static final int MIN_MINUTES = 60;
+    public static final int MAX_MINUTES = 360;
 
     private SensingCadence() {
     }
 
-    /** Pull interval in seconds: {@code null} reads as the default, anything else is clamped to the range. */
-    public static int pullSeconds(Integer raw) {
+    /** Pulse interval in minutes: {@code null} reads as the default, anything else is clamped to 60–360. */
+    public static int intervalMinutes(Integer raw) {
         if (raw == null) {
-            return DEFAULT_SECONDS;
+            return DEFAULT_MINUTES;
         }
-        return Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, raw));
+        return Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, raw));
     }
 
-    /** Effective stale threshold: the catalog floor, or three pull intervals if that is larger. */
-    public static double staleThresholdSeconds(double floorSeconds, int pullSeconds) {
-        return Math.max(floorSeconds, (double) STALE_INTERVALS * pullSeconds);
+    /**
+     * Effective stale threshold: the catalog floor, or one pulse interval plus the response window (the time a
+     * zone has to answer, retries included) if that is larger.
+     */
+    public static double staleThresholdSeconds(double floorSeconds, int intervalMinutes, int windowSeconds) {
+        return Math.max(floorSeconds, intervalMinutes * 60.0 + windowSeconds);
     }
 }

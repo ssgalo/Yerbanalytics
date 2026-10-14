@@ -57,6 +57,15 @@ public interface Rule extends ConsumidorParametros {
     }
 
     /**
+     * {@code true} si la regla decide con el diagnóstico de IA del sector. Una regla así sólo se evalúa si el sector
+     * tiene un diagnóstico nuevo (todavía no usado en un pulso); si no, figura en la traza como
+     * {@code OMITIDA_SIN_DIAGNOSTICO_NUEVO}. Al evaluarse, el diagnóstico queda marcado como usado.
+     */
+    default boolean usaDiagnostico() {
+        return false;
+    }
+
+    /**
      * Evalúa la regla contra el snapshot inmutable del sector. Los umbrales se leen y se comparan
      * a través de la {@link Evaluacion}, que sólo deja leer los {@link #parametros()} declarados y
      * registra cada comparación en la traza: decidir y registrar son el mismo gesto.

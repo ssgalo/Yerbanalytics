@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.ConfiguracionOperativa;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,7 +41,7 @@ class ConfiguracionControllerContratoTest {
     private ConfiguracionService service;
 
     private static Configuracion cfg() {
-        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, 5, "Ana", 1L, 60, 180), List.of());
+        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, "Ana", 1L, false, "11:00", 14580), List.of());
     }
 
     @Test
@@ -62,7 +64,7 @@ class ConfiguracionControllerContratoTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
                                 + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
-                                + "\"intervaloSensadoMinutos\":240,\"intervaloEvaluacionMinutos\":5}}"))
+                                + "\"intervaloSensadoMinutos\":240}}"))
                 .andExpect(status().isOk());
 
         verify(service).updateConfiguracion(any(), eq("Ana"));
@@ -82,44 +84,63 @@ class ConfiguracionControllerContratoTest {
     }
 
     @Test
-    void get_exposesThePullIntervalAndTheReadOnlyEffectiveThreshold() throws Exception {
+    void get_exponeLaPasadaDiariaYElUmbralEfectivoDeSoloLectura() throws Exception {
         when(service.getConfiguracion()).thenReturn(cfg());
 
         mockMvc.perform(get("/api/configuracion"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.operativa.sensingPullIntervalSeconds").value(60))
-                .andExpect(jsonPath("$.operativa.effectiveStaleThresholdSeconds").value(180))
-                .andExpect(jsonPath("$.operativa.intervaloSensadoMinutos").value(240));
+                .andExpect(jsonPath("$.operativa.pasadaDiariaActiva").value(false))
+                .andExpect(jsonPath("$.operativa.pasadaDiariaHora").value("11:00"))
+                .andExpect(jsonPath("$.operativa.effectiveStaleThresholdSeconds").value(14580))
+                .andExpect(jsonPath("$.operativa.intervaloSensadoMinutos").value(240))
+                .andExpect(jsonPath("$.operativa.sensingPullIntervalSeconds").doesNotExist())
+                .andExpect(jsonPath("$.operativa.intervaloEvaluacionMinutos").doesNotExist());
     }
 
     @Test
-    void put_acceptsThePullIntervalAndDeserializesIt() throws Exception {
+    void put_aceptaLaPasadaDiariaEIgnoraLosCamposRetirados() throws Exception {
         when(service.updateConfiguracion(any(), any())).thenReturn(cfg());
 
         mockMvc.perform(put("/api/configuracion").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
                                 + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
                                 + "\"intervaloSensadoMinutos\":240,\"intervaloEvaluacionMinutos\":5,"
-                                + "\"sensingPullIntervalSeconds\":30}}"))
+                                + "\"sensingPullIntervalSeconds\":30,"
+                                + "\"pasadaDiariaActiva\":true,\"pasadaDiariaHora\":\"10:30\"}}"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<Configuracion> sent = ArgumentCaptor.forClass(Configuracion.class);
         verify(service).updateConfiguracion(sent.capture(), any());
-        assertThat(sent.getValue().operativa().sensingPullIntervalSeconds()).isEqualTo(30);
+        assertThat(sent.getValue().operativa().pasadaDiariaActiva()).isTrue();
+        assertThat(sent.getValue().operativa().pasadaDiariaHora()).isEqualTo("10:30");
     }
 
     @Test
-    void put_withoutThePullIntervalDeserializesItAsNull() throws Exception {
+    void put_sinLaPasadaDiariaLaDeserializaComoNula() throws Exception {
         when(service.updateConfiguracion(any(), any())).thenReturn(cfg());
 
         mockMvc.perform(put("/api/configuracion").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
                                 + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
-                                + "\"intervaloSensadoMinutos\":240,\"intervaloEvaluacionMinutos\":5}}"))
+                                + "\"intervaloSensadoMinutos\":240}}"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<Configuracion> sent = ArgumentCaptor.forClass(Configuracion.class);
         verify(service).updateConfiguracion(sent.capture(), any());
-        assertThat(sent.getValue().operativa().sensingPullIntervalSeconds()).isNull();
+        assertThat(sent.getValue().operativa().pasadaDiariaActiva()).isNull();
+        assertThat(sent.getValue().operativa().pasadaDiariaHora()).isNull();
+    }
+
+    @Test
+    void put_horaInvalida_responde400NombrandoElParametro() throws Exception {
+        when(service.updateConfiguracion(any(), any())).thenThrow(new InvalidConfigurationException(
+                "pasadaDiariaHora: la hora de la pasada diaria debe tener el formato HH:mm, entre 00:00 y 23:59."));
+
+        mockMvc.perform(put("/api/configuracion").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"umbrales\":[],\"rustificacion\":[],\"operativa\":{"
+                                + "\"insumoDosisMax24hMl\":15,\"seguimientoLatenciaMin\":2,\"seguimientoDeltaMin\":5.0,"
+                                + "\"intervaloSensadoMinutos\":240,\"pasadaDiariaHora\":\"25:00\"}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("pasadaDiariaHora")));
     }
 }

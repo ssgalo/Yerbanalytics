@@ -41,46 +41,31 @@ class TrazaEvaluacionStoreTest {
     }
 
     @Test
-    void laTrazaDeBarridoNoPisaLaDeTelemetria() {
-        TrazaEvaluacion tel = traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 1000);
-        TrazaEvaluacion bar = traza("MZ-1-001", OrigenEvaluacion.BARRIDO, 2000);
-        store.guardar(tel);
-        store.guardar(bar);
+    void masRecienteDevuelveLaUltimaGuardada() {
+        store.guardar(traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 2000));
+        TrazaEvaluacion nueva = traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 4000);
+        store.guardar(nueva);
 
-        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA)).containsSame(tel);
-        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.BARRIDO)).containsSame(bar);
-    }
-
-    @Test
-    void masRecienteDevuelveLaDeMayorMomentoSeaCualSeaElOrigen() {
-        TrazaEvaluacion tel = traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 3000);
-        TrazaEvaluacion bar = traza("MZ-1-001", OrigenEvaluacion.BARRIDO, 2000);
-        store.guardar(tel);
-        store.guardar(bar);
-        assertThat(store.masReciente("MZ-1-001")).containsSame(tel);
-
-        TrazaEvaluacion barNuevo = traza("MZ-1-001", OrigenEvaluacion.BARRIDO, 4000);
-        store.guardar(barNuevo);
-        assertThat(store.masReciente("MZ-1-001")).containsSame(barNuevo);
+        assertThat(store.masReciente("MZ-1-001")).containsSame(nueva);
     }
 
     @Test
     void masRecienteConUnSoloOrigenDevuelveEse() {
-        TrazaEvaluacion bar = traza("MZ-1-001", OrigenEvaluacion.BARRIDO, 2000);
+        TrazaEvaluacion bar = traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 2000);
         store.guardar(bar);
 
         assertThat(store.masReciente("MZ-1-001")).containsSame(bar);
     }
 
     @Test
-    void escriturasConcurrentesDeAmbosOrigenesNoPierdenNiRompenNada() throws Exception {
+    void escriturasConcurrentesNoRompenNada() throws Exception {
         int escrituras = 1_000;
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch largada = new CountDownLatch(1);
         try {
             List<Future<?>> trabajos = List.of(
                     pool.submit(() -> escribir(largada, OrigenEvaluacion.TELEMETRIA, escrituras)),
-                    pool.submit(() -> escribir(largada, OrigenEvaluacion.BARRIDO, escrituras)));
+                    pool.submit(() -> escribir(largada, OrigenEvaluacion.TELEMETRIA, escrituras)));
             largada.countDown();
             for (Future<?> f : trabajos) {
                 f.get(10, TimeUnit.SECONDS); // propaga cualquier excepción del hilo
@@ -89,11 +74,7 @@ class TrazaEvaluacionStoreTest {
             pool.shutdownNow();
         }
 
-        // Sobrevive la última de cada origen: ninguna escritura del otro origen la pisó.
-        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA).orElseThrow().ts())
-                .isEqualTo(Instant.ofEpochMilli(escrituras));
-        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.BARRIDO).orElseThrow().ts())
-                .isEqualTo(Instant.ofEpochMilli(escrituras));
+        assertThat(store.ultima("MZ-1-001", OrigenEvaluacion.TELEMETRIA)).isPresent();
     }
 
     private void escribir(CountDownLatch largada, OrigenEvaluacion origen, int n) {
@@ -111,7 +92,7 @@ class TrazaEvaluacionStoreTest {
     @Test
     void limpiar_descartaTodasLasTrazasDeTodosLosSectores() {
         store.guardar(traza("MZ-1-001", OrigenEvaluacion.TELEMETRIA, 1000));
-        store.guardar(traza("MZ-1-002", OrigenEvaluacion.BARRIDO, 1000));
+        store.guardar(traza("MZ-1-002", OrigenEvaluacion.TELEMETRIA, 1000));
 
         store.limpiar();
 

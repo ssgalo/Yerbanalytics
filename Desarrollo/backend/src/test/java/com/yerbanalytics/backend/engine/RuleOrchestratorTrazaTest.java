@@ -60,6 +60,8 @@ class RuleOrchestratorTrazaTest {
         @Override public String name() { return name; }
         @Override public RuleBranch branch() { return branch; }
         @Override public List<DefinicionParametro> parametros() { return parametros; }
+        @Override public boolean usaDiagnostico() { return usaDiagnostico; }
+        boolean usaDiagnostico;
 
         @Override
         public List<RuleAction> evaluate(RuleContext ctx, com.yerbanalytics.backend.engine.traza.Evaluacion ev) {
@@ -185,9 +187,9 @@ class RuleOrchestratorTrazaTest {
     @Test
     void elOrigenDeLaTrazaEsElQueSePide() {
         ResultadoEvaluacion r = new RuleOrchestrator(List.of(new ReglaFalsa("Riego", 10, RuleBranch.RIEGO)), parametros, store)
-                .evaluate(ctx, OrigenEvaluacion.BARRIDO);
+                .evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
 
-        assertThat(r.traza().origen()).isEqualTo(OrigenEvaluacion.BARRIDO);
+        assertThat(r.traza().origen()).isEqualTo(OrigenEvaluacion.TELEMETRIA);
     }
 
     @Test
@@ -196,7 +198,7 @@ class RuleOrchestratorTrazaTest {
                 ctx.finalStatus(), ctx.now(), null, false);
 
         ResultadoEvaluacion r = new RuleOrchestrator(List.of(new ReglaFalsa("Riego", 10, RuleBranch.RIEGO)), parametros, store)
-                .evaluate(sinZona, OrigenEvaluacion.BARRIDO);
+                .evaluate(sinZona, OrigenEvaluacion.TELEMETRIA);
 
         assertThat(r.traza().zonaId()).isNull();
     }
@@ -230,5 +232,61 @@ class RuleOrchestratorTrazaTest {
                 (c, ev) -> { ev.numero(ParametrosRiego.UMBRAL_HUMEDAD); return List.of(); });
 
         assertThatThrownBy(() -> evaluar(mala)).isInstanceOf(ParametroNoDeclaradoException.class);
+    }
+
+    // ------------------------------------------------------------------ reglas de diagnóstico (diagnóstico nuevo)
+
+    private static ReglaFalsa deDiagnostico() {
+        ReglaFalsa r = new ReglaFalsa("Dosificacion", 11, RuleBranch.INSUMO, ActionType.NOOP_INFO);
+        r.usaDiagnostico = true;
+        return r;
+    }
+
+    @Test
+    void reglaDeDiagnosticoSinDiagnosticoNuevo_quedaOmitidaYNoUsaElDiagnostico() {
+        ReglaFalsa dosis = deDiagnostico();
+
+        ResultadoEvaluacion r = evaluar(dosis, new ReglaFalsa("Riego", 10, RuleBranch.RIEGO, ActionType.NOOP_INFO));
+
+        assertThat(de(r, "Dosificacion").estado()).isEqualTo(EstadoRegla.OMITIDA_SIN_DIAGNOSTICO_NUEVO);
+        assertThat(de(r, "Dosificacion").acciones()).isEmpty();
+        assertThat(dosis.llamadas).isEmpty();
+        assertThat(de(r, "Riego").estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(r.usoDiagnostico()).isFalse();
+    }
+
+    @Test
+    void reglaDeDiagnosticoConDiagnosticoNuevo_seEvaluaYUsaElDiagnostico() {
+        ctx.sector().setDiagnosisTs(5000L);
+        ctx.sector().setDiagnosisUsadoTs(1000L);
+        ReglaFalsa dosis = deDiagnostico();
+
+        ResultadoEvaluacion r = evaluar(dosis);
+
+        assertThat(de(r, "Dosificacion").estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(dosis.llamadas).hasSize(1);
+        assertThat(r.usoDiagnostico()).isTrue();
+    }
+
+    @Test
+    void diagnosticoYaUsado_noEsNuevo() {
+        ctx.sector().setDiagnosisTs(5000L);
+        ctx.sector().setDiagnosisUsadoTs(5000L);
+
+        ResultadoEvaluacion r = evaluar(deDiagnostico());
+
+        assertThat(de(r, "Dosificacion").estado()).isEqualTo(EstadoRegla.OMITIDA_SIN_DIAGNOSTICO_NUEVO);
+        assertThat(r.usoDiagnostico()).isFalse();
+    }
+
+    @Test
+    void reglaDeDiagnosticoBajoAbortAll_noAlcanzadaYElDiagnosticoSigueNuevo() {
+        ctx.sector().setDiagnosisTs(5000L);
+        Rule bloqueo = new ReglaFalsa("Bloqueo", 1, RuleBranch.GLOBAL, ActionType.ABORT_ALL);
+
+        ResultadoEvaluacion r = evaluar(bloqueo, deDiagnostico());
+
+        assertThat(de(r, "Dosificacion").estado()).isEqualTo(EstadoRegla.NO_ALCANZADA);
+        assertThat(r.usoDiagnostico()).isFalse();
     }
 }

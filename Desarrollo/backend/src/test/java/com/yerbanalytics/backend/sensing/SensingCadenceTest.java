@@ -9,35 +9,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SensingCadenceTest {
 
     @Test
-    void nullReadsAsDefault() {
-        assertThat(SensingCadence.pullSeconds(null)).isEqualTo(60);
+    void intervaloNuloSeLeeComo240() {
+        assertThat(SensingCadence.intervalMinutes(null)).isEqualTo(240);
     }
 
     @Test
-    void clampsBelowMinimum() {
-        assertThat(SensingCadence.pullSeconds(9)).isEqualTo(10);
-        assertThat(SensingCadence.pullSeconds(-5)).isEqualTo(10);
+    void intervaloFueraDeRangoSeAcota() {
+        assertThat(SensingCadence.intervalMinutes(30)).isEqualTo(60);
+        assertThat(SensingCadence.intervalMinutes(-5)).isEqualTo(60);
+        assertThat(SensingCadence.intervalMinutes(600)).isEqualTo(360);
     }
 
     @Test
-    void clampsAboveMaximum() {
-        assertThat(SensingCadence.pullSeconds(3601)).isEqualTo(3600);
+    void intervaloEnRangoQuedaIgual() {
+        assertThat(SensingCadence.intervalMinutes(60)).isEqualTo(60);
+        assertThat(SensingCadence.intervalMinutes(240)).isEqualTo(240);
+        assertThat(SensingCadence.intervalMinutes(360)).isEqualTo(360);
     }
 
     @Test
-    void keepsValuesInRange() {
-        assertThat(SensingCadence.pullSeconds(10)).isEqualTo(10);
-        assertThat(SensingCadence.pullSeconds(30)).isEqualTo(30);
-        assertThat(SensingCadence.pullSeconds(3600)).isEqualTo(3600);
+    @DisplayName("piso 90 s, pulso de 240 min y ventana de 180 s: 14 580 s")
+    void umbralPorDefecto() {
+        assertThat(SensingCadence.staleThresholdSeconds(90, 240, 180)).isEqualTo(14_580.0);
     }
 
     @Test
-    void floorDominatesWhenPullIsShort() {
-        assertThat(SensingCadence.staleThresholdSeconds(90, 10)).isEqualTo(90.0);
+    @DisplayName("piso 90 s, pulso de 120 min y ventana de 180 s: 7 380 s")
+    void umbralCon120() {
+        assertThat(SensingCadence.staleThresholdSeconds(90, 120, 180)).isEqualTo(7_380.0);
     }
 
     @Test
-    void threeTimesPullDominatesWhenLarger() {
-        assertThat(SensingCadence.staleThresholdSeconds(90, 60)).isEqualTo(180.0);
+    void elPisoDominaSiEsMayor() {
+        assertThat(SensingCadence.staleThresholdSeconds(20_000, 60, 180)).isEqualTo(20_000.0);
     }
 }

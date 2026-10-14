@@ -91,7 +91,8 @@ class RelojInyectadoTest {
         NurseryService service = new NurseryService(new NurseryProperties(), zonaRepository, sectorRepository,
                 mock(HistorialService.class), mock(ConfiguracionService.class), mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, mock(WeatherService.class),
-                mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, parametros, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class), RELOJ, 20);
+                mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), RELOJ, 20);
 
         // timestamp del nodo = 10 segundos antes del "ahora" del reloj fijo, en segundos epoch.
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, AHORA.getEpochSecond() - 10,
@@ -99,21 +100,6 @@ class RelojInyectadoTest {
 
         ArgumentCaptor<RuleContext> ctx = ArgumentCaptor.forClass(RuleContext.class);
         verify(actionExecutor).execute(any(), ctx.capture(), eq(OrigenEvaluacion.TELEMETRIA));
-        assertThat(ctx.getValue().now()).isEqualTo(AHORA);
-    }
-
-    @Test
-    @DisplayName("evaluarTodos (barrido) arma el RuleContext con el instante del Clock inyectado")
-    void barridoUsaElClock() {
-        when(zonaRepository.findAllWithSectors()).thenReturn(List.of(zona));
-        NurseryWatchdog watchdog = new NurseryWatchdog(zonaRepository, sectorRepository, orchestrator,
-                actionExecutor, mock(ConfiguracionService.class), mock(WeatherService.class),
-                mock(ManualLockRepository.class), store, RELOJ);
-
-        watchdog.evaluarTodos();
-
-        ArgumentCaptor<RuleContext> ctx = ArgumentCaptor.forClass(RuleContext.class);
-        verify(actionExecutor).execute(any(), ctx.capture(), eq(OrigenEvaluacion.BARRIDO));
         assertThat(ctx.getValue().now()).isEqualTo(AHORA);
     }
 }
