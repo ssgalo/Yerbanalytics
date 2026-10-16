@@ -1,0 +1,86 @@
+/* Cajas de detección sobre la fotografía del diagnóstico */
+
+/* Ocupa exactamente la imagen: su contenedor toma el tamaño de la <img> renderizada */
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.box,
+.boxMain,
+.halo,
+.haloMain {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Estado diagnosticado: trazo continuo grueso */
+.boxMain {
+  stroke-width: 3px;
+}
+
+/* Las demás clases: trazo discontinuo fino */
+.box {
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 3;
+}
+
+/* Halo oscuro debajo de cada trazo, para que se lea sobre hojas claras y oscuras */
+.halo,
+.haloMain {
+  stroke: var(--tray);
+  stroke-opacity: 0.55;
+}
+.haloMain {
+  stroke-width: 5px;
+}
+/* Con el mismo guion que su caja: el halo no puede volverla continua */
+.halo {
+  stroke-width: 3px;
+  stroke-dasharray: 5 3;
+}
+
+/* --- Leyenda (sobre la bandeja oscura del modal) --- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-13);
+  color: var(--on-tray);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.swatch {
+  width: 24px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.labelMain {
+  font-weight: 650;
+}
+
+.count {
+  color: var(--on-tray-muted);
+  font-stretch: var(--w-cond);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--on-tray-muted);
+}

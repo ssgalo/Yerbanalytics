@@ -1,8 +1,9 @@
 /* Filtros, orden y conteos de la vista de Diagnósticos de IA.
 
-   Funciones puras sobre `DiagnosisCard`. Las columnas categóricas (macro-zona, sector, severidad)
-   se filtran como en una planilla, eligiendo valores; las continuas (fecha, confianza), con un
-   rango. La fecha es `creadoEn`, que manda el backend. */
+   Funciones puras sobre `DiagnosisCard`. Las columnas categóricas (macro-zona, sector, nivel de
+   confianza, severidad) se filtran como en una planilla, eligiendo valores; la fecha, con un
+   rango. La fecha es `creadoEn`, que manda el backend. La confianza es el NIVEL: el score
+   promedio no se muestra en el dashboard. */
 import type { DiagnosisCard } from '@/types/domain';
 
 /** Clases del dashboard, en el orden en que se muestran los KPI. */
@@ -17,16 +18,16 @@ export const DIAGNOSIS_CLASSES = [
 
 export type ColumnKey = 'zone' | 'sector' | 'date' | 'confidence' | 'severity';
 /** Columnas que se filtran eligiendo valores. */
-export type ValueColumn = 'zone' | 'sector' | 'severity';
+export type ValueColumn = 'zone' | 'sector' | 'confidence' | 'severity';
 /** Columnas que se filtran por rango. */
-export type RangeColumn = 'date' | 'confidence';
+export type RangeColumn = 'date';
 export type SortDir = 'asc' | 'desc';
 export interface SortState {
   column: ColumnKey;
   dir: SortDir;
 }
 
-/** Rango cerrado; un extremo ausente no limita. Fecha en ms epoch; confianza en %. */
+/** Rango cerrado; un extremo ausente no limita. Fecha en ms epoch. */
 export interface Range {
   min?: number;
   max?: number;
@@ -44,8 +45,8 @@ export const NO_COLUMN_FILTERS: ColumnFilters = {
   severity: null,
 };
 
-/** De más a menos grave; sin severidad ("—") queda última. */
-const SEVERITY_RANK: Record<string, number> = { Alta: 3, Media: 2, Baja: 1, '—': 0 };
+/** Severidad y confianza comparten escala. Sin nivel ("—") queda última. */
+const LEVEL_RANK: Record<string, number> = { Alta: 3, Media: 2, Baja: 1, '—': 0 };
 
 const byText = (a: string, b: string) => a.localeCompare(b, 'es', { numeric: true });
 
@@ -53,15 +54,20 @@ const byText = (a: string, b: string) => a.localeCompare(b, 'es', { numeric: tru
 export function columnValue(d: DiagnosisCard, column: ValueColumn): string {
   if (column === 'zone') return d.zonaName;
   if (column === 'sector') return d.sectorId;
+  // Sin nivel: No concluyente, o un diagnóstico anterior a los niveles
+  if (column === 'confidence') return d.confidence ?? '—';
   return d.sev;
 }
 
 /** Texto visible de un valor de columna. */
 export function valueLabel(column: ValueColumn, value: string): string {
-  return column === 'severity' && value === '—' ? 'Sin severidad' : value;
+  if (value !== '—') return value;
+  if (column === 'severity') return 'Sin severidad';
+  if (column === 'confidence') return 'Sin nivel';
+  return value;
 }
 
-const SEVERITY_ORDER = ['Alta', 'Media', 'Baja', '—'];
+const LEVEL_ORDER = ['Alta', 'Media', 'Baja', '—'];
 
 /** Valores presentes en una columna, con cuántas tarjetas tiene cada uno. */
 export function columnOptions(
@@ -74,14 +80,16 @@ export function columnOptions(
     counts.set(v, (counts.get(v) ?? 0) + 1);
   }
   const values = [...counts.keys()].sort((a, b) =>
-    column === 'severity' ? SEVERITY_ORDER.indexOf(a) - SEVERITY_ORDER.indexOf(b) : byText(a, b),
+    column === 'severity' || column === 'confidence'
+      ? LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b)
+      : byText(a, b),
   );
   return values.map((value) => ({ value, count: counts.get(value)! }));
 }
 
 /** Valor numérico de la tarjeta en una columna de rango. */
-export function rangeValue(d: DiagnosisCard, column: RangeColumn): number | null {
-  return column === 'confidence' ? d.conf : d.creadoEn;
+export function rangeValue(d: DiagnosisCard, _column: RangeColumn): number | null {
+  return d.creadoEn;
 }
 
 /** Extremos presentes en una columna de rango; `null` si no hay ningún valor conocido. */
@@ -93,8 +101,8 @@ export function columnExtent(list: DiagnosisCard[], column: RangeColumn): Requir
 const inRange = (v: number | null, r: Range) =>
   v != null && (r.min == null || v >= r.min) && (r.max == null || v <= r.max);
 
-const VALUE_COLUMNS: ValueColumn[] = ['zone', 'sector', 'severity'];
-const RANGE_COLUMNS: RangeColumn[] = ['date', 'confidence'];
+const VALUE_COLUMNS: ValueColumn[] = ['zone', 'sector', 'confidence', 'severity'];
+const RANGE_COLUMNS: RangeColumn[] = ['date'];
 
 /** Aplica los filtros de columna; `except` deja una afuera (para armar sus propias opciones). */
 export function filterByColumns(
@@ -145,10 +153,10 @@ export function sortDiagnoses(list: DiagnosisCard[], sort: SortState | null): Di
         cmp = byText(a.sectorId, b.sectorId);
         break;
       case 'confidence':
-        cmp = a.conf - b.conf;
+        cmp = (LEVEL_RANK[a.confidence ?? '—'] ?? 0) - (LEVEL_RANK[b.confidence ?? '—'] ?? 0);
         break;
       case 'severity':
-        cmp = (SEVERITY_RANK[a.sev] ?? 0) - (SEVERITY_RANK[b.sev] ?? 0);
+        cmp = (LEVEL_RANK[a.sev] ?? 0) - (LEVEL_RANK[b.sev] ?? 0);
         break;
     }
     return cmp * sign || byText(a.sectorId, b.sectorId);

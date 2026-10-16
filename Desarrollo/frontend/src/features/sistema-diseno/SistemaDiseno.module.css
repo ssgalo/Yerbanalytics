@@ -141,3 +141,24 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Muestra de las cajas de detección sobre una captura */
+.deteccion {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  max-width: 420px;
+}
+.deteccionFoto {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  max-width: 100%;
+  border-radius: var(--r-m);
+  overflow: hidden;
+}
+.deteccionFoto img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}

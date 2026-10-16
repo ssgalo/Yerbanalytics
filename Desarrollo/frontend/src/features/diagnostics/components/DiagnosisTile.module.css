@@ -135,32 +135,17 @@ a.sector:hover {
   text-underline-offset: 3px;
 }
 
-.confHead {
+.conf {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: var(--t-12);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.inconclusive {
+  margin: 0;
+  font-size: var(--t-13);
   color: var(--muted);
-}
-
-.confHead b {
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
-  color: var(--ink);
-}
-
-.meter {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--line2);
-  overflow: hidden;
-}
-
-.meter i {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--brand);
 }
 
 .foot {

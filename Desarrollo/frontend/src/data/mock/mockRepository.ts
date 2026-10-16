@@ -13,6 +13,8 @@ import type {
   CatalogoReglas,
   Configuracion,
   DagSchema,
+  Detection,
+  DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
   NurseryData,
@@ -29,6 +31,8 @@ import type {
   PlanRustificacion,
 } from '@/types/domain';
 import { validateConfig } from '@/lib/configValidation';
+import { criteriaErrors, defaultDiagnosisCriteria } from '@/lib/diagnosisCriteria';
+import { mockDetections } from './detections';
 import { addDays, todayIso } from '@/lib/horario';
 import { ETAPAS_SUGERIDAS, planErrors, planVigente, progreso } from '@/lib/planRustificacion';
 import { buildConfig, mockStaleThresholdSeconds } from './config';
@@ -75,6 +79,9 @@ export class MockRepository implements DataRepository {
   private planes: Map<string, PlanRustificacion> | null = null;
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
+
+  /** Criterio de diagnóstico guardado en la sesión; arranca con el de fábrica, como el backend. */
+  private diagnosisCriteria: DiagnosisCriteria = defaultDiagnosisCriteria();
 
   /** Visibilidad de la pestaña "Demo Expo"; apagada por defecto, igual que el backend. */
   private demoExpo = false;
@@ -147,6 +154,27 @@ export class MockRepository implements DataRepository {
     };
     this.configCache = saved;
     return structuredClone(saved);
+  }
+
+  async getDiagnosisCriteria(): Promise<DiagnosisCriteria> {
+    return structuredClone(this.diagnosisCriteria);
+  }
+
+  async saveDiagnosisCriteria(criteria: DiagnosisCriteria): Promise<DiagnosisCriteria> {
+    // Mismo comportamiento que el backend: un criterio inválido se rechaza entero, con su motivo.
+    const errores = criteriaErrors(criteria);
+    if (errores.length > 0) throw new Error(errores[0]);
+    this.diagnosisCriteria = structuredClone(criteria);
+    return structuredClone(this.diagnosisCriteria);
+  }
+
+  async getDiagnosisDetections(diagnosisId: string): Promise<Detection[]> {
+    const card = (await this.getNursery()).diagById[diagnosisId];
+    // Igual que el backend: un id que no existe es un 404. (La demo no tiene tarjetas `DG-`.)
+    if (!card) {
+      throw new Error(`El diagnóstico ${diagnosisId} no existe.`);
+    }
+    return mockDetections(card.id, card.estado, card.sev, card.conf);
   }
 
   /**

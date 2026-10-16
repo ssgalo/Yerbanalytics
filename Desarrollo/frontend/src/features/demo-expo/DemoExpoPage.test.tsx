@@ -224,7 +224,7 @@ describe('DemoExpoPage', () => {
     expect(btn(/Iniciar pasada/)!.disabled).toBe(false);
   });
 
-  it('con diagnóstico muestra estado, confianza, severidad y el enlace a Diagnósticos de IA', () => {
+  it('con diagnóstico muestra estado, nivel de confianza, severidad y el enlace a Diagnósticos de IA', () => {
     estado.visible = true;
     hook(
       pasada('COMPLETADA', pasos(['OK', 'OK', 'OK', 'OK', 'OK'], [
@@ -233,7 +233,7 @@ describe('DemoExpoPage', () => {
           estadoOrden: 'RECIBIDA',
           capturaId: 'CAP-1',
           imagenUrl: '/a.jpg',
-          diagnostico: { estado: 'Clorosis', conf: 87, sev: 'Media', creadoEn: 1 },
+          diagnostico: { estado: 'Clorosis', conf: 62, confidence: 'Media', sev: 'Media', creadoEn: 1 },
         },
       ])),
     );
@@ -242,7 +242,8 @@ describe('DemoExpoPage', () => {
 
     const fila = screen.getByText('Foto del sector MZ-1-001').closest('li') as HTMLElement;
     expect(within(fila).getByText('Clorosis')).toBeTruthy();
-    expect(within(fila).getByText(/87\s?%/)).toBeTruthy();
+    expect(within(fila).getByText('Confianza media')).toBeTruthy();
+    expect(within(fila).queryByText(/62/)).toBeNull();
     expect(within(fila).getByText('Media')).toBeTruthy();
     expect(within(fila).queryByText(/Esperando diagnóstico/)).toBeNull();
     expect(within(fila).getByRole('link', { name: /Ver en Diagnósticos de IA/ }).getAttribute('href')).toBe('/diagnosticos');

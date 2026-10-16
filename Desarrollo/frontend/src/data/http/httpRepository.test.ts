@@ -19,6 +19,8 @@ describe('HttpRepository · resolución de imágenes', () => {
     zonaName: 'Macro-zona 1',
     estado: 'Clorosis',
     conf: 92,
+    confidence: 'Alta',
+    detectionCount: 0,
     sev: 'Alta',
     sevSoft: '#fff',
     sevInk: '#000',
@@ -248,5 +250,93 @@ describe('HttpRepository · campos del pulso y de la pasada diaria', () => {
     expect(op).toMatchObject({ pasadaDiariaActiva: true, pasadaDiariaHora: '10:30' });
     expect(op).not.toHaveProperty('sensingPullIntervalSeconds');
     expect(op).not.toHaveProperty('intervaloEvaluacionMinutos');
+  });
+});
+
+/** Diagnóstico por detecciones: criterio y cajas (design D12). */
+describe('HttpRepository · criterio y detecciones de diagnóstico', () => {
+  const BASE = 'http://localhost:8000/api';
+
+  function stubFetch(respuesta: { status: number; body?: unknown }) {
+    const llamadas: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        llamadas.push({ url, init });
+        return {
+          ok: respuesta.status >= 200 && respuesta.status < 300,
+          status: respuesta.status,
+          json: async () => respuesta.body,
+        };
+      }),
+    );
+    return llamadas;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  const criterio = {
+    severityBands: [{ state: 'Clorosis', minimum: 5, mediumFrom: 10, highFrom: 20 }],
+    criticality: ['Clorosis'],
+  };
+
+  it('getDiagnosisCriteria pide GET /configuracion/diagnostico', async () => {
+    const llamadas = stubFetch({ status: 200, body: criterio });
+
+    expect(await new HttpRepository(BASE).getDiagnosisCriteria()).toEqual(criterio);
+    expect(llamadas[0].url).toMatch(/^http:\/\/localhost:8000\/api\/configuracion\/diagnostico\?t=\d+$/);
+  });
+
+  it('saveDiagnosisCriteria hace PUT con el criterio completo y devuelve el guardado', async () => {
+    const llamadas = stubFetch({ status: 200, body: criterio });
+
+    expect(await new HttpRepository(BASE).saveDiagnosisCriteria(criterio)).toEqual(criterio);
+    expect(llamadas[0].url).toBe(`${BASE}/configuracion/diagnostico`);
+    expect(llamadas[0].init?.method).toBe('PUT');
+    expect(JSON.parse(llamadas[0].init?.body as string)).toEqual(criterio);
+  });
+
+  it('un 400 rechaza con el mensaje del backend', async () => {
+    stubFetch({ status: 400, body: { error: 'Clorosis: el mínimo tiene que ser menor que la media.' } });
+
+    await expect(new HttpRepository(BASE).saveDiagnosisCriteria(criterio)).rejects.toThrow(
+      'Clorosis: el mínimo tiene que ser menor que la media.',
+    );
+  });
+
+  it('getDiagnosisDetections pide las cajas de un diagnóstico y devuelve la lista', async () => {
+    const detections = [{ label: 'Clorosis', score: 0.62, box: [0.12, 0.3, 0.18, 0.37] }];
+    const llamadas = stubFetch({ status: 200, body: { detections } });
+
+    expect(await new HttpRepository(BASE).getDiagnosisDetections('DX-00001')).toEqual(detections);
+    expect(llamadas[0].url).toBe(`${BASE}/diagnosticos/DX-00001/detecciones`);
+  });
+
+  it('un 404 (id inexistente o DG- derivado) rechaza', async () => {
+    stubFetch({ status: 404, body: { error: 'No existe el diagnóstico DG-001' } });
+
+    await expect(new HttpRepository(BASE).getDiagnosisDetections('DG-001')).rejects.toThrow(/DG-001/);
+  });
+
+  it('completa confidence y detectionCount si el backend todavía no los manda', async () => {
+    const vieja = {
+      id: 'DX-00002',
+      sectorId: 'MZ-1-001',
+      zonaName: 'Macro-zona 1',
+      estado: 'Clorosis',
+      conf: 88,
+      sev: 'Media',
+      sevSoft: '',
+      sevInk: '',
+      thumb: '',
+      time: 'recién',
+      creadoEn: 0,
+      concluyente: true,
+      imagenUrl: null,
+    };
+    stubFetch({ status: 200, body: { diagnoses: [vieja], diagById: {}, recentDiag: [] } });
+
+    const nursery = await new HttpRepository(BASE).getNursery();
+    expect(nursery.diagnoses[0]).toMatchObject({ confidence: null, detectionCount: 0 });
   });
 });

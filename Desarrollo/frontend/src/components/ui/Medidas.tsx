@@ -1,6 +1,5 @@
-import type { ReactNode } from 'react';
 import type { MetricSpec, Status } from '@/types/domain';
-import { ETIQUETA_ESTADO, TONO, cx } from './estado';
+import { ETIQUETA_ESTADO, TONO } from './estado';
 import { escalaDeRango, fmtNum } from './rango';
 import styles from './Medidas.module.css';
 
@@ -50,44 +49,6 @@ export function RangeBar({ value, spec, scale = false }: RangeBarProps) {
           <span>{f(spec.crit[1])}</span>
         </div>
       )}
-    </div>
-  );
-}
-
-interface ConfidenceBarProps {
-  /** Confianza del modelo, en %. */
-  value: number;
-  /** Mínimo para que el motor actúe, en %. Siempre del catálogo de parámetros, nunca fijo. */
-  min: number;
-  /** Texto debajo; por defecto dice si alcanza el mínimo. */
-  children?: ReactNode;
-}
-
-/** Confianza del diagnóstico con el mínimo marcado sobre la barra. */
-export function ConfidenceBar({ value, min, children }: ConfidenceBarProps) {
-  const alcanza = value >= min;
-  return (
-    <div>
-      <div className={styles.confHead}>
-        <span>Confianza del modelo</span>
-        <b className={styles.confValor}>{fmtNum(value)} %</b>
-      </div>
-      <div
-        className={cx(styles.conf, !alcanza && styles.low)}
-        role="img"
-        aria-label={`Confianza ${fmtNum(value)} %, mínimo para actuar ${fmtNum(min)} %`}
-      >
-        <i style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
-        <span className={styles.thr} style={{ left: `${min}%` }}>
-          <span className={styles.thrLabel}>mín. {fmtNum(min)} %</span>
-        </span>
-      </div>
-      <p className={styles.confNota}>
-        {children ??
-          (alcanza
-            ? 'Alcanza el mínimo para que el motor actúe.'
-            : 'No alcanza el mínimo: el motor no actúa con este diagnóstico.')}
-      </p>
     </div>
   );
 }

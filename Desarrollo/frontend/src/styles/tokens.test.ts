@@ -50,7 +50,24 @@ describe('sistema de diseño', () => {
       ['--off', theme.off],
       ['--info', theme.info],
       ['--tray', theme.tray],
+      ['--det-sano', theme.detSano],
+      ['--det-clorosis', theme.detClorosis],
+      ['--det-estres-solar', theme.detEstresSolar],
+      ['--det-plaga-foliar', theme.detPlagaFoliar],
+      ['--det-dano-fungico', theme.detDanoFungico],
     ];
     for (const [token, hex] of pares) expect(valor(token), token).toBe(hex);
+  });
+
+  it('los colores de las cajas de detección sólo se usan sobre la fotografía (y en el catálogo)', () => {
+    // Su uso está restringido a superposiciones sobre una foto: si aparecen en otro módulo, es
+    // tinta saturada fuera de lugar.
+    const permitidos = [
+      'styles/tokens.css',
+      'features/sector/components/detectionView.ts',
+      'features/sistema-diseno/SistemaDisenoPage.tsx',
+    ];
+    const fuera = usos(/--det-/).filter((u) => !permitidos.some((p) => u.split('\\').join('/').startsWith(p)));
+    expect(fuera).toEqual([]);
   });
 });

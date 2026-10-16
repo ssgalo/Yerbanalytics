@@ -71,6 +71,16 @@
   --dx-nc: #9ba39e;
   --dx-nc-2: #c9cec9;
 
+  /* cajas de detección: SÓLO para superponer a una fotografía (las cajas del diagnóstico sobre
+     la captura). Saturadas y claras a propósito, para leerse sobre follaje verde (siempre con un
+     halo de --tray debajo) y distinguirse entre sí; la forma del trazo distingue además el estado
+     diagnosticado. Fuera de una foto no se usan: ni texto, ni estado, ni composición (eso es --dx-*). */
+  --det-sano: #5cd6ff;
+  --det-clorosis: #ffe45c;
+  --det-estres-solar: #ff9a3c;
+  --det-plaga-foliar: #ff5ccb;
+  --det-dano-fungico: #c9a2ff;
+
   /* texto sobre un fondo de marca / acción primaria */
   --on-brand: #ffffff;
 

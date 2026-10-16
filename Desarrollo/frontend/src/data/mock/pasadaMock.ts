@@ -8,7 +8,7 @@
    Duraciones: mover 4 s · foto 3 s · mover 4 s · foto 3 s · home 6 s (20 s en total). Los
    diagnósticos llegan 5 s después de terminar (el servicio real tarda ~1 min).
    ============================================================ */
-import type { DiagnosticoPaso, EstadoPaso, Pasada, PasoPasada, TipoPaso } from '@/types/domain';
+import type { ConfidenceLevel, DiagnosticoPaso, EstadoPaso, Pasada, PasoPasada, TipoPaso } from '@/types/domain';
 import { capturasDemo } from './capturasDemo';
 
 interface Plantilla {
@@ -17,7 +17,7 @@ interface Plantilla {
   sectorId: string | null;
   duracionMs: number;
   /** Sólo en CAPTURAR: diagnóstico que dará la IA de demostración. */
-  foto?: { estado: string; conf: number; sev: string };
+  foto?: { estado: string; conf: number; confidence: ConfidenceLevel; sev: string };
 }
 
 const PLAN: Plantilla[] = [
@@ -27,7 +27,7 @@ const PLAN: Plantilla[] = [
     posicion: 1,
     sectorId: 'MZ-1-001',
     duracionMs: 3000,
-    foto: { estado: 'Clorosis', conf: 87, sev: 'Media' },
+    foto: { estado: 'Clorosis', conf: 62, confidence: 'Media', sev: 'Media' },
   },
   { tipo: 'MOVER', posicion: 2, sectorId: null, duracionMs: 4000 },
   {
@@ -35,7 +35,7 @@ const PLAN: Plantilla[] = [
     posicion: 2,
     sectorId: 'MZ-1-002',
     duracionMs: 3000,
-    foto: { estado: 'Estrés solar', conf: 91, sev: 'Alta' },
+    foto: { estado: 'Estrés solar', conf: 91, confidence: 'Alta', sev: 'Alta' },
   },
   { tipo: 'HOME', posicion: 0, sectorId: null, duracionMs: 6000 },
 ];

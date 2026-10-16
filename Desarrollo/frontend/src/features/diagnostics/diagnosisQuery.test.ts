@@ -8,6 +8,7 @@ import {
   filterByClass,
   filterByColumns,
   sortDiagnoses,
+  valueLabel,
 } from './diagnosisQuery';
 
 const NOW = 1_000_000_000;
@@ -18,6 +19,8 @@ const card = (p: Partial<DiagnosisCard>): DiagnosisCard => ({
   zonaName: 'MZ-1',
   estado: 'Clorosis',
   conf: 90,
+  confidence: 'Alta',
+  detectionCount: 0,
   sev: 'Media',
   sevSoft: '',
   sevInk: '',
@@ -34,6 +37,7 @@ const list = [
     sectorId: 'MZ2-S010',
     zonaName: 'MZ-2',
     conf: 72,
+    confidence: 'Media',
     sev: 'Alta',
     time: 'hace 30 s',
     creadoEn: NOW - 30_000,
@@ -50,11 +54,13 @@ const list = [
   card({
     id: 'c',
     sectorId: 'MZ1-S100',
-    conf: 60,
+    conf: null,
+    confidence: null,
     sev: '—',
     time: 'hace —',
     creadoEn: null,
     estado: 'No concluyente',
+    concluyente: false,
   }),
 ];
 const ids = (l: DiagnosisCard[]) => l.map((d) => d.id);
@@ -67,10 +73,11 @@ describe('filterByColumns', () => {
     expect(ids(filterByClass(list, 'Sano'))).toEqual(['b']);
   });
 
-  it('filtra confianza y fecha por rango, con extremos opcionales', () => {
+  it('filtra la confianza por nivel y la fecha por rango, con extremos opcionales', () => {
     const f = NO_COLUMN_FILTERS;
-    expect(ids(filterByColumns(list, { ...f, confidence: { min: 70, max: 90 } }))).toEqual(['a']);
-    expect(ids(filterByColumns(list, { ...f, confidence: { max: 72 } }))).toEqual(['a', 'c']);
+    expect(ids(filterByColumns(list, { ...f, confidence: ['Alta'] }))).toEqual(['b']);
+    // No concluyente no tiene nivel: se elige como "—" ("Sin nivel")
+    expect(ids(filterByColumns(list, { ...f, confidence: ['—'] }))).toEqual(['c']);
     // Último minuto: sólo "hace 30 s"; los de fecha desconocida quedan afuera
     expect(ids(filterByColumns(list, { ...f, date: { min: NOW - 60_000 } }))).toEqual(['a']);
     expect(ids(filterByColumns(list, { ...f, date: { max: NOW - 60_000 } }))).toEqual(['b']);
@@ -82,7 +89,9 @@ describe('filterByColumns', () => {
       { value: 'MZ-2', count: 1 },
     ]);
     expect(columnOptions(list, 'severity').map((o) => o.value)).toEqual(['Alta', 'Baja', '—']);
-    expect(columnExtent(list, 'confidence')).toEqual({ min: 60, max: 95 });
+    expect(columnOptions(list, 'confidence').map((o) => o.value)).toEqual(['Alta', 'Media', '—']);
+    expect(valueLabel('confidence', '—')).toBe('Sin nivel');
+    expect(valueLabel('severity', '—')).toBe('Sin severidad');
     expect(columnExtent(list, 'date')).toEqual({ min: NOW - 5_400_000, max: NOW - 30_000 });
   });
 });
@@ -97,6 +106,8 @@ describe('sortDiagnoses', () => {
       'a',
       'c',
     ]);
+    // Por nivel, no por score: sin nivel (No concluyente) es el más bajo
+    expect(ids(sortDiagnoses(list, { column: 'confidence', dir: 'asc' }))).toEqual(['c', 'a', 'b']);
     expect(ids(sortDiagnoses(list, { column: 'severity', dir: 'desc' }))).toEqual(['a', 'b', 'c']);
     expect(ids(sortDiagnoses(list, { column: 'sector', dir: 'asc' }))).toEqual(['b', 'c', 'a']);
     expect(ids(sortDiagnoses(list, { column: 'zone', dir: 'desc' }))).toEqual(['a', 'b', 'c']);

@@ -48,6 +48,12 @@ export const theme = {
   dxFungico: '#7A5A40',
   dxNc: '#9BA39E',
   dxNc2: '#C9CEC9',
+  /* cajas de detección (sólo sobre fotografía) */
+  detSano: '#5CD6FF',
+  detClorosis: '#FFE45C',
+  detEstresSolar: '#FF9A3C',
+  detPlagaFoliar: '#FF5CCB',
+  detDanoFungico: '#C9A2FF',
 } as const;
 
 export type Theme = typeof theme;

@@ -1,8 +1,8 @@
 /* Filtros del menú de columna. Las columnas categóricas se filtran eligiendo valores con casillas;
-   las continuas (fecha, confianza), con un rango "desde / hasta". Los dos confirman con "Aplicar". */
+   la fecha, con un rango "desde / hasta". Los dos confirman con "Aplicar". */
 import { useId, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, InputUnit } from '@/components/ui/Field';
+import { Field, Input } from '@/components/ui/Field';
 import { cx } from '@/components/ui/estado';
 import type { Range } from '../diagnosisQuery';
 import styles from './ColumnFilters.module.css';
@@ -142,29 +142,20 @@ export function ValuesFilter({
   );
 }
 
-/** Cómo se escribe y se lee cada tipo de rango. */
-const KINDS = {
-  percent: {
-    toInput: (v: number) => String(Math.round(v)),
-    fromInput: (s: string, _end: boolean) => Number(s.replace(',', '.')),
-    show: (v: number) => `${Math.round(v)} %`,
-  },
-  datetime: {
-    // datetime-local trabaja en hora local y sin segundos
-    toInput: (v: number) => {
-      const d = new Date(v);
-      const p = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-    },
-    // "Hasta las 14:05" incluye todo ese minuto
-    fromInput: (s: string, end: boolean) => new Date(s).getTime() + (end ? 59_999 : 0),
-    show: (v: number) =>
-      new Date(v).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }),
-  },
-} as const;
+// datetime-local trabaja en hora local y sin segundos
+function toInput(v: number): string {
+  const d = new Date(v);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// "Hasta las 14:05" incluye todo ese minuto
+const fromInput = (s: string, end: boolean) => new Date(s).getTime() + (end ? 59_999 : 0);
+
+const show = (v: number) =>
+  new Date(v).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
 interface RangeFilterProps {
-  kind: keyof typeof KINDS;
   value: Range | null;
   /** Extremos presentes en los datos, para orientar al completar. */
   extent: Required<Range> | null;
@@ -172,17 +163,15 @@ interface RangeFilterProps {
   close: () => void;
 }
 
-/** Rango "desde / hasta"; un extremo vacío no limita. */
-export function RangeFilter({ kind, value, extent, onApply, close }: RangeFilterProps) {
-  const k = KINDS[kind];
+/** Rango de fechas "desde / hasta"; un extremo vacío no limita. */
+export function RangeFilter({ value, extent, onApply, close }: RangeFilterProps) {
   const id = useId();
-  const [from, setFrom] = useState(value?.min != null ? k.toInput(value.min) : '');
-  const [to, setTo] = useState(value?.max != null ? k.toInput(value.max) : '');
+  const [from, setFrom] = useState(value?.min != null ? toInput(value.min) : '');
+  const [to, setTo] = useState(value?.max != null ? toInput(value.max) : '');
 
-  const min = from.trim() === '' ? undefined : k.fromInput(from, false);
-  const max = to.trim() === '' ? undefined : k.fromInput(to, true);
-  const invalid = (v: number | undefined) =>
-    v != null && (Number.isNaN(v) || (kind === 'percent' && (v < 0 || v > 100)));
+  const min = from.trim() === '' ? undefined : fromInput(from, false);
+  const max = to.trim() === '' ? undefined : fromInput(to, true);
+  const invalid = (v: number | undefined) => v != null && Number.isNaN(v);
   const reversed = min != null && max != null && min > max;
   const fromError = invalid(min) ? 'Valor no válido' : undefined;
   const toError = invalid(max) ? 'Valor no válido' : reversed ? 'Es anterior al inicio' : undefined;
@@ -192,33 +181,7 @@ export function RangeFilter({ kind, value, extent, onApply, close }: RangeFilter
     close();
   }
 
-  const fields =
-    kind === 'percent' ? (
-      <>
-        <Field label="Desde" htmlFor={`${id}-from`} error={fromError}>
-          <InputUnit
-            id={`${id}-from`}
-            unit="%"
-            inputMode="numeric"
-            placeholder="0"
-            value={from}
-            invalid={!!fromError}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </Field>
-        <Field label="Hasta" htmlFor={`${id}-to`} error={toError}>
-          <InputUnit
-            id={`${id}-to`}
-            unit="%"
-            inputMode="numeric"
-            placeholder="100"
-            value={to}
-            invalid={!!toError}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </Field>
-      </>
-    ) : (
+  const fields = (
       <>
         <Field label="Desde" htmlFor={`${id}-from`} error={fromError}>
           <Input
@@ -239,16 +202,16 @@ export function RangeFilter({ kind, value, extent, onApply, close }: RangeFilter
           />
         </Field>
       </>
-    );
+  );
 
   return (
     <>
       <div className={styles.body}>
         <span className={styles.caption}>Mostrar el rango</span>
-        <div className={cx(styles.range, kind === 'datetime' && styles.stacked)}>{fields}</div>
+        <div className={cx(styles.range, styles.stacked)}>{fields}</div>
         <span className={styles.hint}>
           {extent
-            ? `En los datos: de ${k.show(extent.min)} a ${k.show(extent.max)}`
+            ? `En los datos: de ${show(extent.min)} a ${show(extent.max)}`
             : 'No hay valores conocidos'}
         </span>
       </div>

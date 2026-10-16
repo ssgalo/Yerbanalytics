@@ -6,8 +6,14 @@
 /** Estado de salud de un sector / métrica. */
 export type Status = 'ok' | 'warning' | 'critical' | 'offline';
 
-/** Severidad de un diagnóstico. '—' = no aplica. */
+/** Severidad de un diagnóstico. '—' = no aplica (Sano, No concluyente, Sin diagnóstico). */
 export type Severity = 'Alta' | 'Media' | 'Baja' | '—';
+
+/**
+ * Nivel de confianza de un diagnóstico: el score promedio del estado diagnosticado ubicado en las
+ * bandas de confianza de su clase, que calibra el equipo en el servicio de inferencia.
+ */
+export type ConfidenceLevel = 'Baja' | 'Media' | 'Alta';
 
 /** Rango temporal del gráfico principal del detalle de sector. */
 export type Range = '24h' | '7d' | '30d';
@@ -56,7 +62,10 @@ export interface Metric {
 /** Diagnóstico de IA de un sector. */
 export interface Diagnosis {
   estado: string;
+  /** Score promedio × 100 del estado diagnosticado; `null` en No concluyente o sin diagnóstico. */
   conf: number | null;
+  /** `null` en No concluyente, sin diagnóstico, o en un diagnóstico anterior a los niveles. */
+  confidence: ConfidenceLevel | null;
   sev: Severity;
 }
 
@@ -156,13 +165,22 @@ export interface DiagnosisCard {
   sectorId: string;
   zonaName: string;
   estado: string;
-  conf: number;
+  /** Score promedio × 100 del estado diagnosticado; `null` en No concluyente. */
+  conf: number | null;
+  /** `null` en No concluyente o en un diagnóstico anterior a los niveles ("sin nivel"). */
+  confidence: ConfidenceLevel | null;
+  /**
+   * Detecciones guardadas con el diagnóstico. Con más de cero, el modal ofrece las cajas; se piden
+   * aparte (`getDiagnosisDetections`) porque no viajan en el snapshot. 0 en los `DG-` derivados.
+   */
+  detectionCount: number;
   sev: Severity;
   sevSoft: string;
   sevInk: string;
   /** Gradiente CSS de respaldo. NO es una imagen: se usa cuando no hay captura asociada. */
   thumb: string;
   time: string;
+  /** Estado distinto de No concluyente. */
   concluyente: boolean;
   /**
    * Ruta de la fotografía real de la captura que originó el diagnóstico. Viene vacía en los
@@ -300,6 +318,7 @@ export type NivelAlerta = 'INFO' | 'WARNING' | 'CRITICAL';
 export interface DiagnosisDetail {
   estado: string;
   conf: number | null;
+  confidence: ConfidenceLevel | null;
   sev: Severity;
   sevSoft: string;
   sevInk: string;
@@ -307,6 +326,46 @@ export interface DiagnosisDetail {
   concluyente: boolean;
   hasFoto: boolean;
   imagenUrl?: string;
+  /**
+   * Id del diagnóstico `DX-` más reciente del sector (el que nació de una captura), para pedir sus
+   * cajas; `null` si el sector no tiene ninguno. Lo resuelve el dashboard, no viene del backend.
+   */
+  diagnosisId: string | null;
+  /** Detecciones de ese diagnóstico; 0 si no tiene (o no hay diagnóstico `DX-`). */
+  detectionCount: number;
+}
+
+/**
+ * Una caja que detectó el modelo y sobrevivió al filtro y a la resolución de solapes.
+ * `box` = [x1, y1, x2, y2] normalizadas a la imagen (0–1, `xyxyn`), independientes de la resolución.
+ */
+export interface Detection {
+  /** Estado de la plataforma ("Clorosis", "Sano"…), no el nombre interno del modelo. */
+  label: string;
+  /** 0–1. */
+  score: number;
+  box: [number, number, number, number];
+}
+
+/** Bandas de severidad de un estado anómalo, en cantidad de hojas detectadas por sector. */
+export interface SeverityBand {
+  state: string;
+  /** Debajo de este mínimo, el estado no cuenta para el diagnóstico. */
+  minimum: number;
+  mediumFrom: number;
+  highFrom: number;
+}
+
+/**
+ * Criterio agronómico del diagnóstico: con qué cantidad de hojas cada estado anómalo es de
+ * severidad baja, media o alta, y cuál pesa más ante un empate. Espejo de
+ * `GET/PUT /api/configuracion/diagnostico`.
+ */
+export interface DiagnosisCriteria {
+  /** Las cuatro clases anómalas del modelo, en orden fijo. */
+  severityBands: SeverityBand[];
+  /** Permutación de los cuatro estados; el primero es el más crítico. */
+  criticality: string[];
 }
 
 /**
@@ -697,10 +756,13 @@ export type EstadoPasada = 'EN_CURSO' | 'COMPLETADA' | 'FALLIDA' | 'CANCELADA';
 export type TipoPaso = 'MOVER' | 'CAPTURAR' | 'HOME';
 export type EstadoPaso = 'PENDIENTE' | 'EN_CURSO' | 'OK' | 'ERROR' | 'OMITIDO';
 
-/** Diagnóstico de IA de la captura de un paso. `conf` ya es un porcentaje 0–100. */
+/** Diagnóstico de IA de la captura de un paso. `conf` es el score promedio × 100 (0–100). */
 export interface DiagnosticoPaso {
   estado: string;
-  conf: number;
+  /** `null` en No concluyente. */
+  conf: number | null;
+  /** `null` en No concluyente o en un diagnóstico anterior a los niveles. */
+  confidence: ConfidenceLevel | null;
   sev: string;
   creadoEn: number;
 }

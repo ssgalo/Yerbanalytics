@@ -1,6 +1,6 @@
 /* Barra de columnas de la grilla de Diagnósticos: cada columna se ordena y se filtra desde su
-   propio menú, como el encabezado de una planilla. Las categóricas se filtran por valores; fecha
-   y confianza, por rango. */
+   propio menú, como el encabezado de una planilla. Las categóricas (incluidos los niveles de
+   confianza y severidad) se filtran por valores; la fecha, por rango. */
 import type { DiagnosisCard } from '@/types/domain';
 import { Button } from '@/components/ui/Button';
 import {
@@ -22,7 +22,7 @@ import styles from './DiagnosisColumns.module.css';
 
 type Column = { label: string; sortLabels: Record<SortDir, string> } & (
   | { key: ValueColumn; searchable?: boolean }
-  | { key: RangeColumn; kind: 'percent' | 'datetime' }
+  | { key: RangeColumn; range: true }
 );
 
 const COLUMNS: Column[] = [
@@ -36,13 +36,12 @@ const COLUMNS: Column[] = [
   {
     key: 'date',
     label: 'Fecha',
-    kind: 'datetime',
+    range: true,
     sortLabels: { asc: 'Más antiguos primero', desc: 'Más recientes primero' },
   },
   {
     key: 'confidence',
     label: 'Confianza',
-    kind: 'percent',
     sortLabels: { asc: 'De menor a mayor', desc: 'De mayor a menor' },
   },
   {
@@ -92,9 +91,8 @@ export function DiagnosisColumns({
               alignEnd={i >= COLUMNS.length - 2}
             >
               {(close) =>
-                'kind' in c ? (
+                'range' in c ? (
                   <RangeFilter
-                    kind={c.kind}
                     value={filters[c.key]}
                     extent={columnExtent(pool, c.key)}
                     onApply={(range) => onFilter(c.key, range)}

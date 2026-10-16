@@ -1,0 +1,204 @@
+/* Vista Criterio de diagnóstico: bandas de severidad y orden de criticidad */
+
+/* --- Bandas de severidad --- */
+
+.bands {
+  display: grid;
+}
+
+.bandRow {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) repeat(3, minmax(120px, 190px));
+  gap: 10px 16px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--line2);
+}
+
+.bandHead {
+  padding: 0 0 8px;
+  border-top: 0;
+  font-size: var(--t-12);
+  font-weight: 600;
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.bandState {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.bandState b {
+  font-size: var(--t-15);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.bandSummary {
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.bandError {
+  font-size: var(--t-12);
+  color: var(--crit-ink);
+}
+
+.bandCell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* En escritorio el encabezado ya nombra cada columna */
+.bandCellLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .bandHead {
+    display: none;
+  }
+  .bandRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .bandState {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+  .bandCellLabel {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    font-size: var(--t-12);
+    font-weight: 600;
+    font-stretch: var(--w-cond);
+    color: var(--muted);
+  }
+}
+
+/* Teléfono: tres campos lado a lado no dejan ver el número; cada campo va en su renglón,
+   con la etiqueta a la izquierda. */
+@media (max-width: 560px) {
+  .bandRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .bandCell {
+    grid-template-columns: minmax(0, 1fr) 140px;
+    align-items: center;
+  }
+}
+
+/* --- Orden de criticidad --- */
+
+.order {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orderItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--card);
+}
+
+/* Cambió de lugar respecto de lo guardado: el mismo borde agua que un campo modificado */
+.orderMoved {
+  border-color: var(--info);
+}
+
+.rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-13);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.orderName {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.orderTag {
+  font-size: var(--t-12);
+  font-weight: 500;
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.orderActions {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.orderBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-field);
+  border-radius: var(--r-s);
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.orderBtn:hover:not(:disabled) {
+  background: var(--card-2);
+}
+
+.orderBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.orderBtn:disabled {
+  border-color: var(--line);
+  color: var(--faint);
+  cursor: default;
+}
+
+.orderNote {
+  margin: 12px 0 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}

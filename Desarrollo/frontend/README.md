@@ -206,7 +206,7 @@ el catálogo: tokens, tipografía, estados y todos los componentes. No existe en
   cifras —va junto a `--font-display`—, normal para el cuerpo, semicondensada (`--w-cond`) para tablas.
 - **Componentes** en `src/components/ui/`: `Button` (y `buttonClass` para links), `Chip`, `StateGlyph`,
   `Callout`, `Field`/`Input`/`Select`/`InputUnit`, `Segmented`, `FilterChip`, `Switch`, `SaveBar`,
-  `Skeleton`, `EmptyState`, `OfflineBanner`, `CompositionBar`, `RangeBar`, `ConfidenceBar`,
+  `Skeleton`, `EmptyState`, `OfflineBanner`, `CompositionBar`, `RangeBar`,
   `TrayCell`/`GridCell`/`Bandeja`. Una vista nueva los usa en vez de reimplementar el control.
 
 Los estilos estáticos van en CSS Modules; los valores dinámicos (color de un sector,

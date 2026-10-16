@@ -1,7 +1,14 @@
 /* ============================================================
-   Borrador de la configuración agronómica (HU-15), compartido por las vistas Umbrales,
-   Rustificación y Preferencias. Cada vista edita su parte, pero el guardado manda la
-   configuración entera: es un único recurso en el backend (`PUT /api/configuracion`).
+   Borradores de las vistas de Configuración.
+
+   `useResourceDraft` es el borrador genérico de un recurso que se guarda entero: lo que se edita,
+   cuántos cambios hay respecto de lo guardado, guardar y descartar. Lo usan:
+
+   - `useConfigDraft`: la configuración agronómica (HU-15), compartida por las vistas Umbrales,
+     Rustificación y Preferencias. Cada vista edita su parte, pero el guardado manda la
+     configuración entera: es un único recurso en el backend (`PUT /api/configuracion`).
+   - `useDiagnosisCriteriaDraft`: el criterio de diagnóstico, que es otro recurso
+     (`PUT /api/configuracion/diagnostico`).
    ============================================================ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useConfig } from '@/hooks/useConfig';
@@ -10,35 +17,50 @@ import { countChanges } from './changes';
 
 export type Feedback = { kind: 'ok' | 'err'; msg: string } | null;
 
-export interface ConfigDraft {
-  config: Configuracion | null;
-  /** Null hasta que carga la configuración. */
-  draft: Configuracion | null;
+export interface ConfigDraft<T = Configuracion> {
+  /** Lo guardado. */
+  config: T | null;
+  /** Null hasta que carga el recurso. */
+  draft: T | null;
   loading: boolean;
   error: Error | null;
   saving: boolean;
   /** Valores cambiados respecto de lo guardado (lo que cuenta la barra de guardado). */
   changes: number;
   feedback: Feedback;
-  update: (fn: (d: Configuracion) => Configuracion) => void;
+  update: (fn: (d: T) => T) => void;
   save: () => Promise<void>;
   /** Vuelve a lo guardado. */
   discard: () => void;
 }
 
-export function useConfigDraft(): ConfigDraft {
-  const { config, loading, error, saving, save: persist } = useConfig();
-  const [draft, setDraft] = useState<Configuracion | null>(null);
+/** De dónde sale y adónde va el recurso (un hook de datos como `useConfig`). */
+export interface DraftSource<T> {
+  data: T | null;
+  loading: boolean;
+  error: Error | null;
+  saving: boolean;
+  /** Guarda; resuelve con la versión persistida o rechaza con el error a mostrar. */
+  save: (value: T) => Promise<T>;
+}
+
+export function useResourceDraft<T>(
+  source: DraftSource<T>,
+  count: (saved: T, draft: T) => number,
+  savedMessage: string,
+): ConfigDraft<T> {
+  const { data, loading, error, saving, save: persist } = source;
+  const [draft, setDraft] = useState<T | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
-  // El borrador se reinicia con la config cargada o recién guardada.
+  // El borrador se reinicia con lo cargado o recién guardado.
   useEffect(() => {
-    if (config) setDraft(structuredClone(config));
-  }, [config]);
+    if (data) setDraft(structuredClone(data));
+  }, [data]);
 
-  const changes = useMemo(() => (draft && config ? countChanges(config, draft) : 0), [draft, config]);
+  const changes = useMemo(() => (draft && data ? count(data, draft) : 0), [draft, data, count]);
 
-  const update = useCallback((fn: (d: Configuracion) => Configuracion) => {
+  const update = useCallback((fn: (d: T) => T) => {
     setDraft((d) => (d ? fn(d) : d));
     setFeedback(null);
   }, []);
@@ -48,18 +70,32 @@ export function useConfigDraft(): ConfigDraft {
     setFeedback(null);
     try {
       await persist(draft);
-      setFeedback({ kind: 'ok', msg: 'Configuración guardada correctamente.' });
+      setFeedback({ kind: 'ok', msg: savedMessage });
     } catch (e) {
       setFeedback({ kind: 'err', msg: e instanceof Error ? e.message : String(e) });
     }
   };
 
   const discard = () => {
-    if (config) setDraft(structuredClone(config));
+    if (data) setDraft(structuredClone(data));
     setFeedback(null);
   };
 
-  return { config, draft, loading, error, saving, changes, feedback, update, save, discard };
+  return { config: data, draft, loading, error, saving, changes, feedback, update, save, discard };
+}
+
+export function useConfigDraft(): ConfigDraft<Configuracion> {
+  const { config, loading, error, saving, save } = useConfig();
+  return useResourceDraft(
+    { data: config, loading, error, saving, save },
+    countChanges,
+    'Configuración guardada correctamente.',
+  );
+}
+
+/** Quién y cuándo editó la configuración agronómica por última vez (encabezado de la vista). */
+export function configAudit(c: Configuracion): { by: string | null; ts: number | null } {
+  return { by: c.operativa.updatedBy, ts: c.operativa.updatedTs };
 }
 
 /** Mensaje de la barra cuando hay valores para corregir. */

@@ -1,0 +1,33 @@
+/* Chip del nivel de confianza: neutro (no es un estado de salud) */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--t-12);
+  font-weight: 600;
+  font-stretch: var(--w-cond);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.bars i {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.bars i.on {
+  background: var(--ink-2);
+}

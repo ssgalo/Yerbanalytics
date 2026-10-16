@@ -9,7 +9,7 @@ import { IntervalosForm } from './components/IntervalosForm';
 import { DailyPassForm } from './components/DailyPassForm';
 import { DemoExpoSwitch } from './components/DemoExpoSwitch';
 import { ConfigFieldset, ConfigLayout, ConfigSection } from './components/ConfigLayout';
-import { pendingFixes, useConfigDraft } from './useConfigDraft';
+import { configAudit, pendingFixes, useConfigDraft } from './useConfigDraft';
 
 export function PreferencesPage() {
   const state = useConfigDraft();
@@ -37,6 +37,7 @@ export function PreferencesPage() {
   return (
     <ConfigLayout
       state={state}
+      audit={configAudit}
       editable={editable}
       onReset={onReset}
       blockedReason={pendingFixes(errors)}

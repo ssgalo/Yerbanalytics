@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
 import type { EstadoPaso, PasoPasada } from '@/types/domain';
+import { hasConfidence, isAnomalous } from '@/lib/diagnosis';
+import { ConfidenceChip } from '@/features/diagnostics/components/ConfidenceChip';
 import { duracionPasoSeg, textoPaso, tituloPaso } from '../pasadaPresentacion';
 import { COLOR } from './colorPaso';
 import styles from './PasoItem.module.css';
@@ -67,10 +69,13 @@ function Diagnostico({ paso }: { paso: PasoPasada }) {
   return (
     <div className={styles.diagnostico}>
       <span className={styles.diagEstado}>{d.estado}</span>
-      <span className={styles.diagConf}>{Math.round(d.conf)} %</span>
-      <Badge soft={sev.soft} ink={sev.ink}>
-        {d.sev}
-      </Badge>
+      {/* Nivel de confianza y severidad sólo donde existen: No concluyente no tiene ninguno */}
+      {hasConfidence(d.estado) && <ConfidenceChip level={d.confidence ?? null} />}
+      {isAnomalous(d.estado) && d.sev !== '—' && (
+        <Badge soft={sev.soft} ink={sev.ink}>
+          {d.sev}
+        </Badge>
+      )}
       <Link to="/diagnosticos" className={styles.enlace}>
         Ver en Diagnósticos de IA
       </Link>

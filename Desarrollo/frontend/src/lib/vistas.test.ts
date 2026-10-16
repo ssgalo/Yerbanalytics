@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MATRIZ_POR_DEFECTO, CATALOGO_PERMISOS } from '@/lib/catalogoSeguridad';
-import { destinoTrasLogin, primeraVistaHabilitada, vistaDeRuta, VISTAS } from './vistas';
+import { destinoTrasLogin, primeraVistaHabilitada, puedeVer, vistaDeRuta, VISTAS } from './vistas';
 import type { Permiso, Rol } from '@/types/seguridad';
 
 const puedeRol = (rol: Rol) => (p: Permiso) => MATRIZ_POR_DEFECTO[rol].includes(p);
@@ -26,5 +26,26 @@ describe('tabla vista → permiso (7.2)', () => {
   it('un rol sin vistas no tiene primera vista', () => {
     expect(primeraVistaHabilitada(() => false)).toBeNull();
     expect(primeraVistaHabilitada((p) => p === 'historial.ver')).toBe(VISTAS.historial);
+  });
+});
+
+describe('vista Criterio de diagnóstico', () => {
+  const vista = VISTAS.criterioDiagnostico;
+
+  it('vive en /criterio-diagnostico (primer segmento propio) y pide configuracion.ver y diagnosticos.ver', () => {
+    expect(vistaDeRuta('/criterio-diagnostico')).toBe(vista);
+    expect([...vista.permisos]).toEqual(['configuracion.ver', 'diagnosticos.ver']);
+  });
+
+  it('no alcanza con uno solo de los dos permisos', () => {
+    expect(puedeVer(vista, (p) => p === 'configuracion.ver')).toBe(false);
+    expect(puedeVer(vista, (p) => p === 'diagnosticos.ver')).toBe(false);
+    expect(puedeVer(vista, (p) => p === 'configuracion.ver' || p === 'diagnosticos.ver')).toBe(true);
+  });
+
+  it('con la matriz por defecto la ven el Ingeniero Agrónomo y el Administrador, no el Operario', () => {
+    expect(puedeVer(vista, puedeRol('INGENIERO_AGRONOMO'))).toBe(true);
+    expect(puedeVer(vista, puedeRol('ADMINISTRADOR'))).toBe(true);
+    expect(puedeVer(vista, puedeRol('OPERARIO'))).toBe(false);
   });
 });

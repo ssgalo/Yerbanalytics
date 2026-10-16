@@ -2,7 +2,15 @@
    Detalle de sector — portado EXACTO desde buildDetail().
    Deriva gráficos, tiles, actuadores, historial y seguimiento.
    ============================================================ */
-import type { ActuatorRow, HistoryEntry, LecturaZona, Sector, SectorDetail } from '@/types/domain';
+import type {
+  ActuatorRow,
+  DiagnosisCard,
+  DiagnosisDetail,
+  HistoryEntry,
+  LecturaZona,
+  Sector,
+  SectorDetail,
+} from '@/types/domain';
 import { sevMap, tints } from './specs';
 
 /**
@@ -13,18 +21,28 @@ import { sevMap, tints } from './specs';
  * Recibe la `lectura` de su macro-zona porque el seguimiento post-acción compara la
  * humedad de sustrato antes y ahora, y ese valor es de la zona.
  */
-export function buildSectorDetail(s: Sector, lectura: LecturaZona, imagenUrl?: string): SectorDetail {
+export function buildSectorDetail(
+  s: Sector,
+  lectura: LecturaZona,
+  imagenUrl?: string,
+  /** Diagnóstico `DX-` más reciente del sector: el modal pide sus cajas. */
+  latestCapture?: Pick<DiagnosisCard, 'id' | 'detectionCount'> | null,
+): SectorDetail {
   // presentación del diagnóstico
-  const diag = {
+  const diag: DiagnosisDetail = {
     estado: s.diagnosis.estado,
     conf: s.diagnosis.conf,
+    // Un backend anterior a los niveles no manda el campo: "sin nivel".
+    confidence: s.diagnosis.confidence ?? null,
     sev: s.diagnosis.sev,
     sevSoft: sevMap[s.diagnosis.sev].soft,
     sevInk: sevMap[s.diagnosis.sev].ink,
     thumb: imagenUrl ? `url("${imagenUrl}") center/cover no-repeat` : (tints[s.diagnosis.estado] || tints['Sin diagnóstico']),
-    concluyente: s.diagnosis.conf != null && s.diagnosis.conf >= 85,
+    concluyente: s.diagnosis.estado !== 'No concluyente' && s.diagnosis.estado !== 'Sin diagnóstico',
     hasFoto: !!imagenUrl || s.status !== 'offline',
     imagenUrl,
+    diagnosisId: latestCapture?.id ?? null,
+    detectionCount: latestCapture?.detectionCount ?? 0,
   };
 
   // actuadores
