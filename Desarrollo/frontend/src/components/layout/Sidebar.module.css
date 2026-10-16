@@ -29,11 +29,18 @@
 }
 
 .brandName {
-  display: block;
-  min-width: 0;
-  width: 100%;
-  max-width: 160px;
-  height: auto;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.brandSub {
+  font-size: var(--t-12);
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 .section {
@@ -118,45 +125,6 @@
   color: var(--brand);
 }
 
-.count {
-  margin-left: auto;
-  font-size: var(--t-12);
-  font-stretch: var(--w-cond);
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.status {
-  margin-top: auto;
-  background: var(--card-2);
-  border: 1px solid var(--line2);
-  border-radius: var(--r-m);
-  padding: 12px 13px;
-}
-
-.statusRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--t-13);
-  font-weight: 600;
-}
-
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 0 3px var(--ok-soft);
-}
-
-.statusSub {
-  font-size: var(--t-12);
-  color: var(--muted);
-  margin-top: 6px;
-  line-height: 1.45;
-}
-
 /* ── Grupo desplegable (Configuración) ── */
 .groupHead {
   color: var(--ink-2);
@@ -172,10 +140,20 @@
   color: var(--brand);
 }
 
+/* La flecha aparece al pasar el mouse (o con foco) y queda fija mientras el grupo está abierto. */
 .chevron {
   display: grid;
   margin-left: auto;
-  transition: transform 0.15s;
+  opacity: 0;
+  transition:
+    transform 0.15s,
+    opacity 0.15s;
+}
+
+.groupHead:hover .chevron,
+.groupHead:focus-visible .chevron,
+.chevronOpen {
+  opacity: 1;
 }
 
 .chevronOpen {

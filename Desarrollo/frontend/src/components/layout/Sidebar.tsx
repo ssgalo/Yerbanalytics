@@ -1,6 +1,5 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, NavLink, matchPath, useLocation } from 'react-router-dom';
-import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
 import { useAuth } from '@/hooks/AuthContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { puedeVer, VISTAS, type Vista } from '@/lib/vistas';
@@ -14,8 +13,6 @@ interface NavItem {
   label: string;
   /** ruta exacta (para '/') */
   end?: boolean;
-  /** muestra el contador de diagnósticos */
-  showCount?: boolean;
 }
 
 /* El detalle de macro-zona (/mapa?zona=) NO está acá a propósito: se entra eligiendo una
@@ -23,7 +20,7 @@ interface NavItem {
    la vista no tiene de dónde sacar qué zona mostrar. */
 const PRINCIPAL: NavItem[] = [
   { to: '/', vista: VISTAS.panel, icon: 'dashboard', label: 'Panel general', end: true },
-  { to: '/diagnosticos', vista: VISTAS.diagnosticos, icon: 'diagnostics', label: 'Diagnósticos de IA', showCount: true },
+  { to: '/diagnosticos', vista: VISTAS.diagnosticos, icon: 'diagnostics', label: 'Diagnósticos de IA' },
 ];
 
 const GESTION: NavItem[] = [{ to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' }];
@@ -47,7 +44,7 @@ const CONFIGURACION: NavItem[] = [
   { to: '/preferencias', vista: VISTAS.preferencias, icon: 'toggle', label: 'Preferencias' },
 ];
 
-function NavItemLink({ item, count, sub }: { item: NavItem; count: number; sub?: boolean }) {
+function NavItemLink({ item, sub }: { item: NavItem; sub?: boolean }) {
   const base = sub ? `${styles.item} ${styles.subItem}` : styles.item;
   return (
     <NavLink
@@ -57,7 +54,6 @@ function NavItemLink({ item, count, sub }: { item: NavItem; count: number; sub?:
     >
       <Icon name={item.icon} size={sub ? 16 : 18} />
       <span>{item.label}</span>
-      {item.showCount && <span className={styles.count}>{count}</span>}
     </NavLink>
   );
 }
@@ -66,7 +62,7 @@ function NavItemLink({ item, count, sub }: { item: NavItem; count: number; sub?:
  * Grupo que se despliega y colapsa con un clic en su encabezado (no navega). Se abre solo al
  * entrar a una de sus vistas, para que el ítem activo quede siempre a la vista.
  */
-function NavGroup({ icon, label, items, count }: { icon: IconName; label: string; items: NavItem[]; count: number }) {
+function NavGroup({ icon, label, items }: { icon: IconName; label: string; items: NavItem[] }) {
   const { pathname } = useLocation();
   const contieneActiva = items.some((i) => matchPath({ path: i.to, end: false }, pathname));
   const [abierto, setAbierto] = useState(contieneActiva);
@@ -98,7 +94,7 @@ function NavGroup({ icon, label, items, count }: { icon: IconName; label: string
       {abierto && (
         <div id={idLista} className={styles.subNav} role="group" aria-label={label}>
           {items.map((item) => (
-            <NavItemLink key={item.to} item={item} count={count} sub />
+            <NavItemLink key={item.to} item={item} sub />
           ))}
         </div>
       )}
@@ -107,8 +103,6 @@ function NavGroup({ icon, label, items, count }: { icon: IconName; label: string
 }
 
 export function Sidebar() {
-  const vivero = useNurseryDataOpcional();
-  const diagCount = vivero?.stats.diagCount ?? 0;
   const { puede } = useAuth();
   // Cada ítem sólo si el rol puede ver la vista; un grupo sin ítems no se muestra.
   const habilitados = (items: NavItem[]) => items.filter((i) => puedeVer(i.vista, puede));
@@ -121,7 +115,10 @@ export function Sidebar() {
     <aside className={styles.sidebar}>
       <Link to="/" className={styles.brand} aria-label="Ir al panel general">
         <img className={styles.logo} src="/yerbanalytics_simbolo.svg" alt="" />
-        <img className={styles.brandName} src="/yerbanalytics_texto.svg" alt="Yerbanalytics" />
+        <div>
+          <div className={styles.brandName}>Yerbanalytics</div>
+          <div className={styles.brandSub}>Datos bajados a tierra</div>
+        </div>
       </Link>
 
       {principal.length > 0 && (
@@ -129,7 +126,7 @@ export function Sidebar() {
           <div className={styles.section}>Principal</div>
           <nav className={styles.nav} aria-label="Principal">
             {principal.map((item) => (
-              <NavItemLink key={item.to} item={item} count={diagCount} />
+              <NavItemLink key={item.to} item={item} />
             ))}
           </nav>
         </>
@@ -142,26 +139,14 @@ export function Sidebar() {
           </div>
           <nav className={styles.nav} aria-label="Gestión">
             {gestion.map((item) => (
-              <NavItemLink key={item.to} item={item} count={diagCount} />
+              <NavItemLink key={item.to} item={item} />
             ))}
             {configuracion.length > 0 && (
-              <NavGroup icon="config" label="Configuración" items={configuracion} count={diagCount} />
+              <NavGroup icon="config" label="Configuración" items={configuracion} />
             )}
           </nav>
         </>
       )}
-
-      <div className={styles.status}>
-        <div className={styles.statusRow}>
-          <span className={styles.statusDot} />
-          Sistema en línea
-        </div>
-        <div className={styles.statusSub}>
-          Edge activo · sincronizado
-          <br />
-          hace 40 segundos
-        </div>
-      </div>
     </aside>
   );
 }
