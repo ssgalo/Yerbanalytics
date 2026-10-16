@@ -25,6 +25,7 @@ Yerbanalytics/
 │   ├── camara/        App de captura (PWA iOS) — proyecto propio (ver §6.1)
 │   ├── camara-android/ App de captura nativa Android — proyecto propio (ver §6.1)
 │   ├── simulador/     Simulador de hardware — proyecto propio y borrable (ver §6.2)
+│   ├── servicio-inferencia/ Daemon Python: YOLOv8 (`modelo_final.pt`) + módulo de diagnóstico (ver §5)
 │   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
 │   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
 │   ├── embebido/      Firmware ESP32 (nodo testigo y actuadores); fuente del contrato MQTT. `prototipo_hardware/` = sketches del hardware real, incl. el riel por MQTT (§6.1)
@@ -36,8 +37,9 @@ Yerbanalytics/
 └── README.md
 ```
 
-Cuatro áreas de trabajo: **frontend**, **backend**, **camara** y **Modelo_IA**. El frontend
-consume el backend vía `VITE_DATA_SOURCE=http`; la integración con el modelo de IA es futura.
+Cinco áreas de trabajo: **frontend**, **backend**, **camara**, **Modelo_IA** y
+**servicio-inferencia**. El frontend consume el backend vía `VITE_DATA_SOURCE=http`; el servicio de
+inferencia toma las capturas pendientes, diagnostica y registra por la API, como un cliente más.
 
 `Desarrollo/camara/` y `Desarrollo/simulador/` son **proyectos aparte a propósito**, y por
 motivos distintos. La cámara es la implementación de referencia de un contrato, no la
@@ -72,6 +74,12 @@ hardware real.
   `Fuera de servicio` (offline).
 - **Diagnósticos de IA**: Sano, Clorosis (trastorno nutricional), Estrés solar,
   Daño biótico (plagas/hongos — ácaro, plaga foliar, daño fúngico), No concluyente.
+  Uno por sector: **estado + nivel de severidad** (Baja/Media/Alta, sólo anómalos; sale de la
+  *cantidad* de hojas) **+ nivel de confianza** (Baja/Media/Alta, salvo No concluyente; sale del
+  score promedio en las bandas de su clase). `conf` numérico = score promedio × 100.
+- **Criterio de diagnóstico**: bandas de severidad por clase y orden de criticidad; lo edita el
+  agrónomo (Configuración → Criterio de diagnóstico). Los umbrales y bandas de **confianza** son del
+  equipo y viven en el entorno del servicio de inferencia, no en el dashboard.
 - **Actuadores**: electroválvula (riego), bomba peristáltica (insumos), mediasombra.
 - **Orden de captura**: pedido de una foto cenital, con el sector y la **posición de riel**.
   Es la entidad de primera clase del pipeline de visión: la imagen se sube citando su
@@ -153,14 +161,15 @@ npm run dev          # http://localhost:5173
 - **Tipos de dominio** (`src/types/domain.ts`): contratos compartidos.
 - **Componentes del sistema de diseño** (`src/components/ui/`): Button, Chip, StateGlyph, Callout,
   Field/Input/Select/InputUnit, Segmented, FilterChip, Switch, SaveBar, Skeleton, EmptyState,
-  OfflineBanner, CompositionBar, RangeBar, ConfidenceBar, SectorCell, ScrollArea (grilla desplazable
+  OfflineBanner, CompositionBar, RangeBar, SectorCell, ScrollArea (grilla desplazable
   sin barra, con fade y flechas en los bordes); y los previos Card, Badge,
   StatusDot, ProgressBar, Sparkline, Icon.
 - **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown. En el Sidebar,
   **Configuración** es un grupo desplegable (Umbrales —la vista `/configuracion`—, Rustificación,
-  Motor de reglas, Hardware, Topología, Usuarios, Preferencias); se abre solo al entrar a una de sus
-  vistas. Umbrales, Rustificación y Preferencias editan partes de la misma configuración agronómica
-  (`useConfigDraft`): cada una guarda el recurso entero.
+  Criterio de diagnóstico, Motor de reglas, Hardware, Topología, Usuarios, Preferencias); se abre
+  solo al entrar a una de sus vistas. Umbrales, Rustificación y Preferencias editan partes de la
+  misma configuración agronómica (`useConfigDraft`): cada una guarda el recurso entero. Criterio de
+  diagnóstico (`/criterio-diagnostico`) es otro recurso, con su propio borrador.
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
   diagnostics, reglas, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
   *Parámetros* (edita el catálogo de umbrales) e *Inspector* (el grafo de reglas con la última
@@ -196,10 +205,19 @@ Detalle completo en `Desarrollo/frontend/README.md`.
 
 ## 5. Modelo de IA (`Desarrollo/Modelo_IA/`)
 
-Modelo de visión para clasificar el estado del plantín.
+Modelo de visión para diagnosticar el estado del sector.
 
-- **Enfoque**: transfer learning con **MobileNetV3-Large** (TF/Keras), single-label
-  en el MVP. Unidad = un plantín.
+- **Modelo vigente**: **YOLOv8 de detección** (`Desarrollo/servicio-inferencia/modelo_final.pt`,
+  no se versiona; `imgsz=1024`; 5 clases: sano, clorosis, estrés solar, plaga foliar y daño
+  fúngico —`colapso_hongos` en el checkpoint—). Detecta hojas; no clasifica la imagen entera.
+  (Los notebooks de esta carpeta empezaron con MobileNetV3-Large como clasificador.)
+- **Módulo de diagnóstico** (`servicio-inferencia/src/diagnosis.py`, lógica pura): filtro por
+  umbral de clase → cajas superpuestas (NMS calibrado: nivel de confianza, luego criticidad, luego
+  score) → severidad por cantidad → confianza por promedio → gana la mayor relevancia
+  (severidad + confianza), desempata la criticidad. **El filtro va antes que los solapes, a
+  propósito**: una caja inválida no debe poder borrar a una válida de otra clase. Spec y porqués:
+  `openspec/changes/add-diagnostico-por-detecciones/`.
+- **El diagnóstico describe; el motor decide.** El módulo no conoce reglas ni acciones.
 - **Datasets**: NO se versionan en Git (pesados; viven en Google Drive y se
   re-descargan de sus fuentes/DOIs). Donantes curados por homología fenotípica del
   tejido (CoLeaf, RoCoLe, Tea Leaf, etc.). Ver `datasets/README.md` y
@@ -221,7 +239,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay cinco scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay seis scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -231,6 +249,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   que eran estado de una herramienta de prueba dentro de la base de producción (ver §6.2).
 > - `resources/migracion-pulso-sensado.sql` — borra `sensing_pull_interval_seconds` e
 >   `intervalo_evaluacion_minutos`, que reemplazó el pulso de sensado.
+> - `resources/migracion-diagnostico-detecciones.sql` — quita el `NOT NULL` de `diagnostico.conf`
+>   (un No concluyente no tiene score).
 >
 > Detalle en el README del backend.
 
@@ -259,9 +279,12 @@ cd Desarrollo/backend
   secuencias guionadas de Demo Expo (riego, mediasombra, lectura): comandan el actuador directo, sin
   pasar por el motor, y no corren a la vez que una pasada. Ver README del backend y
   `openspec/changes/add-secuencias-demo-expo/`.
-- `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usa una carga manual
-  hoy y lo usará el servicio de inferencia mañana. Sin variantes, sin marca de origen y sin
-  ningún estado global que lo condicione (ver §6.1).
+- `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usan la carga manual del
+  simulador y el servicio de inferencia. Sin variantes, sin marca de origen y sin ningún estado
+  global que lo condicione (ver §6.1). Lleva estado, `sev`, `confidence`, `conf` y `detections`, con
+  coherencia exigida por estado; `GET /api/diagnosticos/{id}/detecciones` devuelve las cajas.
+- `GET/PUT /api/configuracion/diagnostico` → criterio de diagnóstico (lee `diagnosticos.ver`, así
+  lo lee la cuenta Servicio de la inferencia en cada ciclo; edita `configuracion.editar`).
 
 ### Convenciones internas
 - Entidades con Lombok + `JpaRepository` + service + controller.
@@ -311,8 +334,8 @@ cd Desarrollo/backend
 ## 6.1 Captura de imágenes (`Desarrollo/camara*/` + `Desarrollo/contratos/`)
 
 Un teléfono montado en el riel hace de cámara cenital. Cubre HU-04 CA-01 y habilita HU-05 CA-02.
-**No incluye el modelo de IA**: hasta que exista, el diagnóstico se carga a mano desde el
-simulador, por el mismo camino exacto que va a usar el modelo.
+**No incluye el modelo de IA**: el diagnóstico lo registra el servicio de inferencia (§5), o se
+carga a mano desde el simulador, por el mismo camino exacto.
 
 **El entregable es el contrato, no una app.** Hay **dos clientes** del mismo contrato, y conviven
 a propósito:
@@ -439,6 +462,7 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Cómo correr la app de cámara (PWA) | `Desarrollo/camara/README.md` |
 | Cómo generar la APK de cámara | `Desarrollo/camara-android/README.md` |
 | Curación de datasets | `Desarrollo/Modelo_IA/informe-curacion-datasets.md` |
+| Servicio de inferencia y módulo de diagnóstico | `Desarrollo/servicio-inferencia/README.md`, `openspec/changes/add-diagnostico-por-detecciones/` |
 | Negocio / alcance | `Documentacion/` |
 | Reglas agronómicas y su estado en el motor | `docs-motor-reglas-e-integracion/` (`reglas_v2.md`, `diferencias-motor-reglas-vs-reglas-v2.md`) |
 | Secuencias de Demo Expo (riego, mediasombra, lectura) | `openspec/changes/add-secuencias-demo-expo/`, `Desarrollo/backend/README.md` ("Secuencias"), `docs-motor-reglas-e-integracion/analisis-demo-expo-vs-vivero.md` §9 |
