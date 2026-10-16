@@ -12,7 +12,6 @@ import { DiagnosisCriteriaPage } from '@/features/configuracion/DiagnosisCriteri
 import { HardwarePage } from '@/features/hardware/HardwarePage';
 import { TopologiaPage } from '@/features/topologia/TopologiaPage';
 import { ReglasPage } from '@/features/reglas/ReglasPage';
-import { DemoExpoPage } from '@/features/demo-expo/DemoExpoPage';
 import { UsuariosPage } from '@/features/usuarios/UsuariosPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { CambiarClavePage } from '@/features/auth/CambiarClavePage';
@@ -79,7 +78,6 @@ export const routes: RouteObject[] = [
       { path: 'reglas', element: con(VISTAS.reglas, <ReglasPage />) },
       { path: 'hardware', element: con(VISTAS.hardware, <HardwarePage />) },
       { path: 'topologia', element: con(VISTAS.topologia, <TopologiaPage />) },
-      { path: 'demo-expo', element: con(VISTAS.demoExpo, <DemoExpoPage />) },
       { path: 'usuarios', element: con(VISTAS.usuarios, <UsuariosPage />) },
     ],
   },

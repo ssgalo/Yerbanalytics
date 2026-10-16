@@ -2,8 +2,8 @@
 /* ============================================================
    Sesión del usuario (HU-01): perfil, permisos, login, logout y motivo del último cierre.
 
-   Envuelve a toda la app y existe ANTES que los datos del vivero: el `NurseryProvider` y el
-   `DemoExpoProvider` se montan recién con sesión, así que sin sesión no se sondea nada.
+   Envuelve a toda la app y existe ANTES que los datos del vivero: el `NurseryProvider` se
+   monta recién con sesión, así que sin sesión no se sondea nada.
 
    Escucha a la capa de datos (`escucharSesion`): cualquier 401 —de un sondeo, de un guardado—
    cierra la sesión acá y el router muestra el login con el aviso que corresponda; un 403

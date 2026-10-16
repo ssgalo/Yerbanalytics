@@ -113,28 +113,4 @@ describe('HttpRepository · pasada del riel', () => {
     stubFetch(409, { error: 'No hay una pasada en curso.' });
     await expect(new HttpRepository(BASE).cancelarPasada()).rejects.toThrow(PasadaRechazadaError);
   });
-
-  it('getDemoExpo lee /configuracion/demo-expo y devuelve el booleano', async () => {
-    const fetchFn = stubFetch(200, { visible: true });
-
-    expect(await new HttpRepository(BASE).getDemoExpo()).toBe(true);
-    expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toMatch(/\/configuracion\/demo-expo/);
-  });
-
-  it('setDemoExpo hace PUT con {visible} y devuelve lo guardado', async () => {
-    const fetchFn = stubFetch(200, { visible: false });
-
-    const r = await new HttpRepository(BASE).setDemoExpo(false);
-
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`${BASE}/configuracion/demo-expo`);
-    expect(init.method).toBe('PUT');
-    expect(JSON.parse(init.body as string)).toEqual({ visible: false });
-    expect(r).toBe(false);
-  });
-
-  it('setDemoExpo con error rechaza', async () => {
-    stubFetch(400, { error: 'falta visible' });
-    await expect(new HttpRepository(BASE).setDemoExpo(true)).rejects.toThrow('falta visible');
-  });
 });

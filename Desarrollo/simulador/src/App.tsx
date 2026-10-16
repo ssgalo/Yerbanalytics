@@ -7,26 +7,25 @@
    production behaviour.
    ============================================================ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AutoEmission } from './components/AutoEmission';
 import { CameraPanel } from './components/CameraPanel';
-import { NewSensor } from './components/NewSensor';
-import { ReadNowButton } from './components/ReadNowButton';
-import { RuleToggles } from './components/RuleToggles';
+import { DemoExpoSection } from './components/DemoExpoSection';
+import { GeneralConfigSection } from './components/GeneralConfigSection';
+import { NavigationTabs, useActiveTab } from './components/NavigationTabs';
+import { RuleAutomationSection } from './components/RuleAutomationSection';
 import { Section } from './components/Section';
-import { SensorCard } from './components/SensorCard';
 import { StatusBar } from './components/StatusBar';
-import { Topology } from './components/Topology';
-import { WeatherSimulation } from './components/WeatherSimulation';
+import { TelemetryRulesSection } from './components/TelemetryRulesSection';
 import * as api from './api';
 import type {
   NurseryTopology,
   SectorRef,
   SimulatedSensor,
   SimulatorStatus,
-  TelemetryInput,
 } from './types';
 
 export function App() {
+  const [activeTab, setActiveTab] = useActiveTab();
+
   const [status, setStatus] = useState<SimulatorStatus | null>(null);
   const [sensors, setSensors] = useState<SimulatedSensor[]>([]);
   const [topology, setTopology] = useState<NurseryTopology | null>(null);
@@ -53,12 +52,13 @@ export function App() {
     };
   }, []);
 
-  useEffect(() => {
-    void api
-      .getSensors()
-      .then(setSensors)
-      .catch(() => setSensors([]));
+  const reloadSensors = useCallback(async () => {
+    setSensors(await api.getSensors().catch(() => []));
   }, []);
+
+  useEffect(() => {
+    void reloadSensors();
+  }, [reloadSensors]);
 
   // Detect demo mode: if GET /api/demo/rules succeeds, the backend is in demo mode.
   useEffect(() => {
@@ -70,8 +70,6 @@ export function App() {
 
   /** Topology and sectors: used by the sensor form and the camera panel. */
   const loadNursery = useCallback(async () => {
-    // The backend may not be up: the simulator starts anyway and the status bar says so, so
-    // leaving the lists empty is enough here.
     setTopology(await api.getTopology().catch(() => null));
     setSectors(await api.getSectors().catch(() => []));
   }, []);
@@ -86,18 +84,13 @@ export function App() {
     [topology],
   );
 
-  const createSensor = async (sensor: SimulatedSensor) => {
-    await api.createSensor(sensor);
-    setSensors(await api.getSensors());
+  const handleTopologyRegenerated = (next: NurseryTopology) => {
+    setTopology(next);
+    void loadNursery();
   };
 
-  const deleteSensor = async (serial: string) => {
-    await api.deleteSensor(serial);
-    setSensors(await api.getSensors());
-  };
-
-  const sendTelemetry = async (input: TelemetryInput) => {
-    await api.sendTelemetry(input);
+  const handleStatusChanged = (active: boolean) => {
+    setStatus((prev) => (prev ? { ...prev, emission: { ...prev.emission, active } } : prev));
   };
 
   return (
@@ -107,81 +100,46 @@ export function App() {
         <span className="brand">Yerbanalytics · herramienta de prueba</span>
       </header>
 
-      <p className="intro">
-        Simulá el comportamiento del hardware sin equipos físicos: creá sensores, asignalos a
-        una macro-zona y publicá sus lecturas en el broker MQTT, exactamente como las emitiría
-        un nodo ESP32. El sistema las ingiere sin distinguirlas de las reales. Para que además
-        un nodo actualice su estado técnico, registrá el hardware en la sección Hardware del
-        dashboard con el <strong>mismo serial/MAC y la misma macro-zona</strong>.
-      </p>
-
       <StatusBar status={status} />
 
-      <Topology
-        topology={topology}
-        onRegenerated={(next) => {
-          setTopology(next);
-          void loadNursery();
-        }}
-      />
+      <NavigationTabs active={activeTab} onChange={setActiveTab} />
 
-      {status && (
-        <AutoEmission
-          active={status.emission.active}
-          onChange={(active) =>
-            setStatus((prev) =>
-              prev ? { ...prev, emission: { ...prev.emission, active } } : prev,
-            )
-          }
-        />
-      )}
+      <main>
+        {activeTab === 'configuracion' && (
+          <GeneralConfigSection
+            topology={topology}
+            zones={zones}
+            sensors={sensors}
+            status={status}
+            onTopologyRegenerated={handleTopologyRegenerated}
+            onSensorsChanged={() => void reloadSensors()}
+            onStatusChanged={handleStatusChanged}
+          />
+        )}
 
-      <NewSensor zones={zones} onCreate={createSensor} />
+        {activeTab === 'telemetria' && (
+          <TelemetryRulesSection
+            sensors={sensors}
+            status={status}
+            demoEnabled={demoEnabled}
+          />
+        )}
 
-      {sensors.length === 0 ? (
-        <Section title="Sensores simulados">
-          <p className="empty">
-            No hay sensores simulados todavía. Creá uno arriba para empezar a publicar lecturas.
-          </p>
-        </Section>
-      ) : (
-        <div className="sensors">
-          {sensors.map((s) => (
-            <SensorCard
-              key={s.serial}
-              sensor={s}
-              onSend={sendTelemetry}
-              onDelete={deleteSensor}
-            />
-          ))}
-        </div>
-      )}
+        {activeTab === 'automatizacion' && (
+          <RuleAutomationSection sensors={sensors} sectors={sectors} demoEnabled={demoEnabled} />
+        )}
 
-      {demoEnabled && (
-        <>
-          <h2 className="sectionTitle" style={{ margin: '28px 0 4px' }}>
-            Modo demo
-          </h2>
-          <p className="sectionHint">
-            El backend está en modo simulado ({' '}
-            <code>yerbanalytics.demo.enabled=true</code>). Controlá las reglas, los cooldowns y el
-            clima sin tocar la configuración productiva.
-          </p>
-          <ReadNowButton demoEnabled={demoEnabled} />
-          <WeatherSimulation />
-          <RuleToggles />
-        </>
-      )}
+        {activeTab === 'camara' && (
+          <Section
+            title="Cámara del riel"
+            hint="Banco de pruebas del dispositivo de captura y del recorrido completo hasta el diagnóstico."
+          >
+            <CameraPanel sectors={sectors} />
+          </Section>
+        )}
 
-      <h2 className="sectionTitle" style={{ margin: '28px 0 4px' }}>
-        Cámara del riel
-      </h2>
-      <p className="sectionHint">
-        Banco de pruebas del dispositivo de captura y del recorrido completo hasta el
-        diagnóstico.
-      </p>
-
-      <CameraPanel sectors={sectors} />
+        {activeTab === 'demo-expo' && <DemoExpoSection />}
+      </main>
     </div>
   );
 }

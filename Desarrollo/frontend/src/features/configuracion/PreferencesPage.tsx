@@ -1,4 +1,4 @@
-/* Vista Preferencias: pulso de sensado y evaluación, pasada diaria del riel y visualización (Demo Expo). */
+/* Vista Preferencias: pulso de sensado y evaluación, y pasada diaria del riel. */
 import { useMemo } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useAuth } from '@/hooks/AuthContext';
@@ -7,7 +7,6 @@ import { buildConfig } from '@/data/mock/config';
 import type { ConfigOperativa } from '@/types/domain';
 import { IntervalosForm } from './components/IntervalosForm';
 import { DailyPassForm } from './components/DailyPassForm';
-import { DemoExpoSwitch } from './components/DemoExpoSwitch';
 import { ConfigFieldset, ConfigLayout, ConfigSection } from './components/ConfigLayout';
 import { configAudit, pendingFixes, useConfigDraft } from './useConfigDraft';
 
@@ -17,7 +16,7 @@ export function PreferencesPage() {
   const { puede } = useAuth();
   const editable = puede('configuracion.editar');
 
-  usePageTitle('Preferencias', 'Frecuencias de operación y visualización del dashboard');
+  usePageTitle('Preferencias', 'Frecuencias de operación del sistema');
 
   const errors = useMemo(() => (draft ? operativaErrors(draft.operativa) : []), [draft]);
 
@@ -41,7 +40,7 @@ export function PreferencesPage() {
       editable={editable}
       onReset={onReset}
       blockedReason={pendingFixes(errors)}
-      intro="Cada cuánto el sistema lee los nodos y evalúa los sectores, cuándo pasa el riel y qué muestra el dashboard."
+      intro="Cada cuánto el sistema lee los nodos y evalúa los sectores, y cuándo pasa el riel."
     >
       {draft && (
         <>
@@ -55,11 +54,6 @@ export function PreferencesPage() {
             <ConfigFieldset disabled={!editable}>
               <DailyPassForm value={draft.operativa} saved={config?.operativa} onChange={patchOperativa} />
             </ConfigFieldset>
-          </ConfigSection>
-
-          <ConfigSection title="Demo Expo" hint="Preferencia de visualización · se guarda al instante">
-            {/* No pasa por el borrador: depende de otro permiso y se aplica en el momento. */}
-            <DemoExpoSwitch editable={puede('demo-expo.configurar')} />
           </ConfigSection>
         </>
       )}
