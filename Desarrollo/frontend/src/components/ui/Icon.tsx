@@ -31,6 +31,7 @@ export type IconName =
   | 'calendar'
   | 'chevron-down'
   | 'chevron-up'
+  | 'grip'
   | 'detections'
   | 'sort'
   | 'sort-asc'
@@ -231,6 +232,17 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-up': <path d="M6 15l6-6 6 6" />,
+  // Asa de arrastre: dos columnas de puntos.
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="6" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="9" cy="18" r="1" />
+      <circle cx="15" cy="18" r="1" />
+    </>
+  ),
   // Criterio de diagnóstico: cajas de detección sobre hojas, una resaltada.
   detections: (
     <>
