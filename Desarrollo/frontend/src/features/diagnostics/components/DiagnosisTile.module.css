@@ -83,11 +83,11 @@
 }
 
 .body {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   padding: 14px 16px 14px;
   flex: 1;
-  align-content: start;
 }
 
 .title {
@@ -145,6 +145,8 @@ a.sector:hover {
 }
 
 .foot {
+  /* Siempre al pie: el separador y la hora quedan a la misma altura sin importar el contenido */
+  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
