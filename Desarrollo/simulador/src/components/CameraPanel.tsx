@@ -26,7 +26,7 @@ import {
   getDeviceToken,
   uploadImage,
 } from '../api';
-import { DIAGNOSIS_STATES, SEVERITIES } from '../metrics';
+import { DIAGNOSIS_STATES, LEVELS, isAnomalous } from '../metrics';
 import type { CameraDevice, CaptureOrder, CaptureOrderState, PairingCode, SectorRef } from '../types';
 
 /** How often an in-flight order's progress is polled. */
@@ -64,7 +64,8 @@ export function CameraPanel({ sectors }: Props) {
 
   const [state, setState] = useState('Clorosis');
   const [severity, setSeverity] = useState('Media');
-  const [confidence, setConfidence] = useState('92');
+  const [confidenceLevel, setConfidenceLevel] = useState('Alta');
+  const [score, setScore] = useState('92');
   const [diagSector, setDiagSector] = useState('');
   const [diagZone, setDiagZone] = useState('');
   const [saving, setSaving] = useState(false);
@@ -203,8 +204,10 @@ export function CameraPanel({ sectors }: Props) {
         sectorId: diagSector,
         zonaId: diagZone,
         estado: state,
-        conf: Number(confidence),
-        sev: severity,
+        // Misma coherencia que exige el alta: severidad sólo en anómalos; confianza y score,
+        // salvo en No concluyente. Lo que no aplica no se manda.
+        ...(isAnomalous(state) ? { sev: severity } : {}),
+        ...(state !== 'No concluyente' ? { confidence: confidenceLevel, conf: Number(score) } : {}),
       });
       setNotice(
         `Diagnóstico ${created.id} registrado. Ya aparece en la vista de Diagnósticos de IA` +
@@ -474,28 +477,44 @@ export function CameraPanel({ sectors }: Props) {
                   ))}
                 </select>
               </label>
-              <label className="field">
-                <span className="label">Severidad</span>
-                <select value={severity} onChange={(e) => setSeverity(e.target.value)}>
-                  {SEVERITIES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span className="label">Confianza (%)</span>
-                <input
-                  className="num"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  value={confidence}
-                  onChange={(e) => setConfidence(e.target.value)}
-                />
-              </label>
+              {isAnomalous(state) && (
+                <label className="field">
+                  <span className="label">Severidad</span>
+                  <select value={severity} onChange={(e) => setSeverity(e.target.value)}>
+                    {LEVELS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {state !== 'No concluyente' && (
+                <>
+                  <label className="field">
+                    <span className="label">Confianza</span>
+                    <select value={confidenceLevel} onChange={(e) => setConfidenceLevel(e.target.value)}>
+                      {LEVELS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span className="label">Score promedio (%)</span>
+                    <input
+                      className="num"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.1"
+                      value={score}
+                      onChange={(e) => setScore(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
               <button
                 type="button"
                 className="primary"
@@ -506,8 +525,9 @@ export function CameraPanel({ sectors }: Props) {
               </button>
             </div>
             <p className="sectionHint" style={{ marginTop: 14, marginBottom: 0 }}>
-              Por debajo del 85 % de confianza el diagnóstico queda marcado como no
-              concluyente (HU-04 CA-03), igual que cuando lo emita el modelo.
+              Es el mismo alta que hace el servicio de inferencia, sin las detecciones: la
+              severidad sólo aplica a estados anómalos, y No concluyente no lleva confianza ni
+              score. El backend rechaza cualquier otra combinación.
             </p>
           </>
         )}

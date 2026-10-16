@@ -105,8 +105,12 @@ export interface NewDiagnosis {
   sectorId?: string;
   zonaId?: string;
   estado: string;
-  conf: number;
-  sev: string;
+  /** Mean score of the diagnosed state, 0-100. Absent in "No concluyente". */
+  conf?: number;
+  /** Severity level. Only anomalous states carry it. */
+  sev?: string;
+  /** Confidence level. Absent in "No concluyente". */
+  confidence?: string;
 }
 
 /** A persisted diagnosis. */
