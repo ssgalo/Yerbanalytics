@@ -80,6 +80,11 @@ public final class MapaPermisos {
         permiso(r, get, "/api/configuracion/demo-expo", Permiso.VIVERO_VER);
         permiso(r, put, "/api/configuracion/demo-expo", Permiso.DEMO_EXPO_CONFIGURAR);
 
+        // Criterio de diagnóstico: lo lee el servicio de inferencia (rol Servicio, con diagnosticos.ver y sin
+        // configuracion.ver), así que la lectura va con el permiso de diagnósticos.
+        permiso(r, get, "/api/configuracion/diagnostico", Permiso.DIAGNOSTICOS_VER);
+        permiso(r, put, "/api/configuracion/diagnostico", Permiso.CONFIGURACION_EDITAR);
+
         permiso(r, get, "/api/configuracion", Permiso.CONFIGURACION_VER);
         permiso(r, put, "/api/configuracion", Permiso.CONFIGURACION_EDITAR);
 

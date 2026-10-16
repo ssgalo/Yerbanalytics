@@ -1,11 +1,16 @@
 package com.yerbanalytics.backend.controller;
 
+import com.yerbanalytics.backend.dto.DetectionsResponse;
 import com.yerbanalytics.backend.dto.Diagnostico;
+import com.yerbanalytics.backend.exception.DiagnosisNotFoundException;
 import com.yerbanalytics.backend.service.DiagnosticoService;
+import com.yerbanalytics.backend.service.DiagnosticoService.NuevoDiagnostico;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,12 +23,11 @@ import java.util.Map;
  * Alta y consulta de diagnósticos.
  *
  * <p><strong>Un único camino de escritura, sin variantes.</strong> Este endpoint es el mismo
- * que va a usar el servicio de inferencia cuando exista el modelo, y el mismo que usa hoy una
- * carga manual. No hay endpoint alternativo, no hay parámetro de origen y no hay ningún estado
- * global del backend que condicione el alta: el modelo tampoco va a depender de uno.
+ * que usa el servicio de inferencia y el mismo que usa una carga manual desde el simulador. No
+ * hay endpoint alternativo, no hay parámetro de origen y no hay ningún estado global del backend
+ * que condicione el alta: el modelo tampoco depende de uno.
  *
- * <p>El modelo es Keras/Python; aunque corra en la misma máquina, no vive dentro del JVM. El
- * diagnóstico entra por HTTP en cualquier caso.
+ * <p>El modelo corre en Python, fuera del JVM: el diagnóstico entra por HTTP en cualquier caso.
  */
 @RestController
 @RequestMapping("/api/diagnosticos")
@@ -36,25 +40,18 @@ public class DiagnosticoController {
     }
 
     /**
-     * Alta de un diagnóstico sobre una captura.
+     * Alta de un diagnóstico sobre una captura (contrato en design D7/D12 de
+     * {@code add-diagnostico-por-detecciones}).
      *
-     * <p>{@code sectorId} y {@code zonaId} son opcionales: si no vienen, se toman de la
-     * captura. El emisor puede sobrescribirlos, pero no puede omitir la captura.
+     * <p>El cuerpo es {@link NuevoDiagnostico}: {@code capturaId}, {@code estado}, {@code sev}
+     * (sólo en estados anómalos), {@code confidence} y {@code conf} (salvo en No concluyente) y
+     * {@code detections} (opcional). {@code sectorId} y {@code zonaId} son opcionales: si no
+     * vienen, se toman de la captura. El emisor puede sobrescribirlos, pero no puede omitir la
+     * captura.
      */
-    public record NuevoDiagnostico(
-            String capturaId, String sectorId, String zonaId,
-            String estado, Double conf, String sev) {}
-
     @PostMapping
-    public ResponseEntity<Diagnostico> alta(@RequestBody NuevoDiagnostico body) {
-        Diagnostico d = service.alta(
-                body != null ? body.capturaId() : null,
-                body != null ? body.sectorId() : null,
-                body != null ? body.zonaId() : null,
-                body != null ? body.estado() : null,
-                body != null ? body.conf() : null,
-                body != null ? body.sev() : null);
-        return ResponseEntity.status(HttpStatus.CREATED).body(d);
+    public ResponseEntity<Diagnostico> alta(@RequestBody(required = false) NuevoDiagnostico body) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.alta(body));
     }
 
     @GetMapping
@@ -62,8 +59,26 @@ public class DiagnosticoController {
         return ResponseEntity.ok(service.listar());
     }
 
+    /** Las cajas de un diagnóstico persistido: no viajan en el listado ni en el snapshot (design D8). */
+    @GetMapping("/{id}/detecciones")
+    public ResponseEntity<DetectionsResponse> detecciones(@PathVariable String id) {
+        return ResponseEntity.ok(new DetectionsResponse(service.detecciones(id)));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleInvalido(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    /** Cuerpo que no se puede leer (p. ej. una caja con un valor que no es número). */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleIlegible(HttpMessageNotReadableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "El cuerpo del diagnóstico no es un JSON válido para el alta."));
+    }
+
+    @ExceptionHandler(DiagnosisNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNoEncontrado(DiagnosisNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
     }
 }

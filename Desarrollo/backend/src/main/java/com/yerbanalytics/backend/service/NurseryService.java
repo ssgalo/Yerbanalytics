@@ -17,6 +17,7 @@ import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService;
+import com.yerbanalytics.backend.model.DiagnosticoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -158,7 +159,8 @@ public class NurseryService {
                     diagnosis = new Diagnosis(
                             se.getDiagnosisEstado(),
                             se.getDiagnosisConf(),
-                            se.getDiagnosisSev()
+                            se.getDiagnosisSev(),
+                            se.getDiagnosisConfidence()
                     );
                     reason = "Fuera de servicio";
                     actuators = new Actuadores("Cerrada", "En espera", se.getActuadorShade());
@@ -172,7 +174,8 @@ public class NurseryService {
                     diagnosis = new Diagnosis(
                             se.getDiagnosisEstado(),
                             se.getDiagnosisConf(),
-                            se.getDiagnosisSev()
+                            se.getDiagnosisSev(),
+                            se.getDiagnosisConfidence()
                     );
                     actuators = new Actuadores(
                             // Derivado por tiempo del despacho (Regando / En cola / Cerrada): la columna
@@ -265,9 +268,11 @@ public class NurseryService {
                     SEV_MAP.get(d.sev()).ink(),
                     TINTS.getOrDefault(d.estado(), TINTS.get("Sin diagnóstico")),
                     agoPorZona.getOrDefault(s.zona(), "hace —"),
-                    d.conf() != null && d.conf() >= 85,
+                    DiagnosticoService.esConcluyente(d.estado()),
                     null, // derivada del sector: no tiene captura asociada
-                    lecturaPorZona.get(s.zona())
+                    lecturaPorZona.get(s.zona()),
+                    d.confidence(),
+                    0 // derivada del sector: sin detecciones propias
             ));
         }
 
@@ -283,7 +288,7 @@ public class NurseryService {
                     s.id(),
                     s.zonaName(),
                     "No concluyente",
-                    75.0,
+                    null, // No concluyente no lleva score
                     EMDASH,
                     SEV_MAP.get(EMDASH).soft(),
                     SEV_MAP.get(EMDASH).ink(),
@@ -291,7 +296,9 @@ public class NurseryService {
                     agoPorZona.getOrDefault(s.zona(), "hace —"),
                     false,
                     null, // derivada del sector: no tiene captura asociada
-                    lecturaPorZona.get(s.zona())
+                    lecturaPorZona.get(s.zona()),
+                    null, // ni nivel de confianza
+                    0
             ));
         }
 
@@ -811,8 +818,10 @@ public class NurseryService {
         Map<String, String> nombrePorZona = new HashMap<>();
         zonaRepository.findAll().forEach(z -> nombrePorZona.put(z.getId(), z.getName()));
 
+        List<DiagnosticoEntity> persistidos = diagnosticoService.entidadesRecientes();
+        Map<String, String> imagenes = diagnosticoService.imagenUrls(persistidos);
         List<DiagnosisCard> out = new ArrayList<>();
-        for (var e : diagnosticoService.entidadesRecientes()) {
+        for (var e : persistidos) {
             String sev = e.getSev();
             ColorPair color = SEV_MAP.getOrDefault(sev, SEV_MAP.get(EMDASH));
             out.add(new DiagnosisCard(
@@ -826,9 +835,11 @@ public class NurseryService {
                     color.ink(),
                     TINTS.getOrDefault(e.getEstado(), TINTS.get("Sin diagnóstico")),
                     formatAgo(e.getCreadoEn()),
-                    diagnosticoService.esConcluyente(e.getConf()),
-                    CapturaService.imagenUrl(e.getCapturaId()),
-                    e.getCreadoEn()
+                    DiagnosticoService.esConcluyente(e.getEstado()),
+                    imagenes.get(e.getCapturaId()),
+                    e.getCreadoEn(),
+                    e.getConfidence(),
+                    e.getDetectionCount()
             ));
         }
         return out;

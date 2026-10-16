@@ -601,15 +601,32 @@ class PasadaRielServiceTest {
         assertThat(paso(2).diagnostico()).isNull();
 
         when(diagRepo.findFirstByCapturaIdOrderByCreadoEnDesc("CAP-000001")).thenReturn(Optional.of(
-                new DiagnosticoEntity("D1", "MZ-2-001", "MZ-2", "CAP-000001", "Clorosis", 87.0, "Media", 1759514530000L)));
+                diagnostico("D1", "CAP-000001", "Clorosis", 87.0, "Media", "Alta", 1759514530000L)));
 
         PasoPasada p2 = paso(2);
         assertThat(p2.diagnostico()).isNotNull();
         assertThat(p2.diagnostico().estado()).isEqualTo("Clorosis");
         assertThat(p2.diagnostico().conf()).isEqualTo(87.0);
         assertThat(p2.diagnostico().sev()).isEqualTo("Media");
+        assertThat(p2.diagnostico().confidence()).isEqualTo("Alta");
         assertThat(p2.diagnostico().creadoEn()).isEqualTo(1759514530000L);
         assertThat(paso(4).diagnostico()).isNull();
         verify(diagRepo, never()).findFirstByCapturaIdOrderByCreadoEnDesc(eq("CAP-000009"));
+    }
+
+    private static DiagnosticoEntity diagnostico(String id, String capturaId, String estado, Double conf,
+                                                 String sev, String confidence, long creadoEn) {
+        DiagnosticoEntity d = new DiagnosticoEntity();
+        d.setId(id);
+        d.setSectorId("MZ-2-001");
+        d.setZonaId("MZ-2");
+        d.setCapturaId(capturaId);
+        d.setEstado(estado);
+        d.setConf(conf);
+        d.setSev(sev);
+        d.setConfidence(confidence);
+        d.setDetectionCount(0);
+        d.setCreadoEn(creadoEn);
+        return d;
     }
 }
