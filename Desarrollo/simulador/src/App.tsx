@@ -10,10 +10,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AutoEmission } from './components/AutoEmission';
 import { CameraPanel } from './components/CameraPanel';
 import { NewSensor } from './components/NewSensor';
+import { ReadNowButton } from './components/ReadNowButton';
+import { RuleToggles } from './components/RuleToggles';
 import { Section } from './components/Section';
 import { SensorCard } from './components/SensorCard';
 import { StatusBar } from './components/StatusBar';
 import { Topology } from './components/Topology';
+import { WeatherSimulation } from './components/WeatherSimulation';
 import * as api from './api';
 import type {
   NurseryTopology,
@@ -28,6 +31,7 @@ export function App() {
   const [sensors, setSensors] = useState<SimulatedSensor[]>([]);
   const [topology, setTopology] = useState<NurseryTopology | null>(null);
   const [sectors, setSectors] = useState<SectorRef[]>([]);
+  const [demoEnabled, setDemoEnabled] = useState(false);
 
   // Status is polled: the broker or the backend may go down and come back while the
   // simulator stays open, and the bar has to reflect it without a reload.
@@ -54,6 +58,14 @@ export function App() {
       .getSensors()
       .then(setSensors)
       .catch(() => setSensors([]));
+  }, []);
+
+  // Detect demo mode: if GET /api/demo/rules succeeds, the backend is in demo mode.
+  useEffect(() => {
+    api
+      .getDemoRules()
+      .then(() => setDemoEnabled(true))
+      .catch(() => setDemoEnabled(false));
   }, []);
 
   /** Topology and sectors: used by the sensor form and the camera panel. */
@@ -143,6 +155,22 @@ export function App() {
             />
           ))}
         </div>
+      )}
+
+      {demoEnabled && (
+        <>
+          <h2 className="sectionTitle" style={{ margin: '28px 0 4px' }}>
+            Modo demo
+          </h2>
+          <p className="sectionHint">
+            El backend está en modo simulado ({' '}
+            <code>yerbanalytics.demo.enabled=true</code>). Controlá las reglas, los cooldowns y el
+            clima sin tocar la configuración productiva.
+          </p>
+          <ReadNowButton demoEnabled={demoEnabled} />
+          <WeatherSimulation />
+          <RuleToggles />
+        </>
       )}
 
       <h2 className="sectionTitle" style={{ margin: '28px 0 4px' }}>

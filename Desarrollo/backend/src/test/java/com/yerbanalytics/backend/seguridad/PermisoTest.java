@@ -19,7 +19,8 @@ class PermisoTest {
         assertThat(codigos(Rol.OPERARIO)).containsExactlyInAnyOrder(
                 "vivero.ver", "diagnosticos.ver", "historial.ver", "capturas.ver", "pasadas.ver");
         assertThat(codigos(Rol.SERVICIO)).containsExactlyInAnyOrder("vivero.ver", "topologia.ver", "capturas.ver",
-                "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar");
+                "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar",
+                "simulacion.gestionar");
         assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar")
                 .doesNotContain("auditoria.ver", "pasadas.operar", "usuarios.gestionar");
         assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver")

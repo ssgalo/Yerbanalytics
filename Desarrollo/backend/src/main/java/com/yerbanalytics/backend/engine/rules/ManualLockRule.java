@@ -32,7 +32,9 @@ import java.util.List;
 public class ManualLockRule implements Rule {
 
     private static final int PRIORITY = 0;
-    private static final String NAME = "ManualLockRule";
+    public static final String NAME = "ManualLockRule";
+    /** Bypass key: forces evaluation even when a manual lock is active. */
+    public static final String BYPASS_LOCK = "lock";
 
     @SuppressWarnings("unused") // injected for future direct-query use in Watchdog mode
     private final ManualLockRepository manualLockRepository;
@@ -57,9 +59,14 @@ public class ManualLockRule implements Rule {
     }
 
     @Override
+    public java.util.Set<String> bypassKeys() {
+        return java.util.Set.of(BYPASS_LOCK);
+    }
+
+    @Override
     public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
-        // Condición fija (no configurable): queda en la traza marcada como tal.
-        if (ev.compararFijo("Bloqueo manual activo", ctx.bloqueoManualActivo(), Operador.EQ, true)) {
+        boolean locked = ctx.bloqueoManualActivo() && !ctx.isBypassed(NAME, BYPASS_LOCK);
+        if (ev.compararFijo("Bloqueo manual activo", locked, Operador.EQ, true)) {
             String reason = String.format(
                     "Manual override lock active on sector %s or its zone. " +
                     "All autonomous actuation suspended until the operator deactivates it.",

@@ -19,12 +19,15 @@
 import type {
   CameraDevice,
   CaptureOrder,
+  DemoRule,
+  DemoRuleUpdate,
   NewDiagnosis,
   NurseryTopology,
   PairingCode,
   RegisteredDiagnosis,
   SectorRef,
   SimulatedSensor,
+  SimulatedWeather,
   SimulatorStatus,
   TelemetryInput,
 } from './types';
@@ -193,6 +196,58 @@ export async function getDeviceToken(refreshToken: string): Promise<{ accessToke
     body: JSON.stringify({ refreshToken }),
   });
   return json(res, 'obtener el token de acceso del dispositivo');
+}
+
+/* ----------------------------------------------------------------
+   Demo mode — rule overrides and simulated weather (through proxy)
+   ---------------------------------------------------------------- */
+
+export async function getDemoRules(): Promise<DemoRule[]> {
+  return json(await fetch(`${BACKEND}/api/demo/rules`), 'listar reglas del modo demo');
+}
+
+export async function updateDemoRule(name: string, update: DemoRuleUpdate): Promise<DemoRule> {
+  const res = await fetch(`${BACKEND}/api/demo/rules/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+  });
+  return json(res, 'actualizar la regla');
+}
+
+export async function zeroDemoCooldowns(): Promise<DemoRule[]> {
+  const res = await fetch(`${BACKEND}/api/demo/rules/cooldowns/zero`, { method: 'PUT' });
+  return json(res, 'poner todos los cooldowns en 0');
+}
+
+export async function getSimulatedWeather(): Promise<SimulatedWeather | null> {
+  const res = await fetch(`${BACKEND}/api/demo/weather`);
+  if (res.status === 204) return null;
+  return json(res, 'consultar el clima simulado');
+}
+
+export async function setSimulatedWeather(weather: SimulatedWeather): Promise<SimulatedWeather> {
+  const res = await fetch(`${BACKEND}/api/demo/weather`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(weather),
+  });
+  return json(res, 'configurar el clima simulado');
+}
+
+export async function clearSimulatedWeather(): Promise<void> {
+  const res = await fetch(`${BACKEND}/api/demo/weather`, { method: 'DELETE' });
+  await check(res, 'eliminar el clima simulado');
+}
+
+/** Triggers a manual sensing pulse with the rule engine. 409 if one is already in progress. */
+export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void> {
+  const res = await fetch(`${BACKEND}/api/pulsos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ejecutarMotor }),
+  });
+  await check(res, 'disparar el pulso de sensado');
 }
 
 export async function uploadImage(ordenId: string, file: File, token: string): Promise<void> {

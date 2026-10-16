@@ -40,6 +40,7 @@ public enum Permiso {
     PASADAS_VER("pasadas.ver", "Pasadas del riel", "Ver el estado de la pasada del riel", null),
     PASADAS_OPERAR("pasadas.operar", "Pasadas del riel", "Iniciar y cancelar la pasada del riel", PASADAS_VER),
     DEMO_EXPO_CONFIGURAR("demo-expo.configurar", "Demo Expo", "Mostrar u ocultar la pestaña Demo Expo", null),
+    SIMULACION_GESTIONAR("simulacion.gestionar", "Simulación", "Controlar reglas, cooldowns y clima en modo demo", null),
     USUARIOS_GESTIONAR("usuarios.gestionar", "Seguridad", "Usuarios, matriz de permisos y política de sesión", null),
     AUDITORIA_VER("auditoria.ver", "Seguridad", "Registro de auditoría de seguridad", null);
 
@@ -103,7 +104,7 @@ public enum Permiso {
             case PRODUCTOR_VIVERISTA -> con(LECTURAS, PASADAS_OPERAR);
             case OPERARIO -> EnumSet.of(VIVERO_VER, DIAGNOSTICOS_VER, HISTORIAL_VER, CAPTURAS_VER, PASADAS_VER);
             case SERVICIO -> EnumSet.of(VIVERO_VER, TOPOLOGIA_VER, CAPTURAS_VER, CAPTURAS_ORDENAR,
-                    DIAGNOSTICOS_VER, DIAGNOSTICOS_REGISTRAR, CAMARA_GESTIONAR);
+                    DIAGNOSTICOS_VER, DIAGNOSTICOS_REGISTRAR, CAMARA_GESTIONAR, SIMULACION_GESTIONAR);
         };
     }
 

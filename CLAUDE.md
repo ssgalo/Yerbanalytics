@@ -146,7 +146,10 @@ npm run dev          # http://localhost:5173
   > con datos del backend. `http` es el sistema real (producción); `mock` es la demo
   > ilustrativa, no funcional y sin backend (`npm run dev:demo`, preconfigurado en
   > `.env.demo`). Se resuelve al arrancar: cambiar de modo exige reiniciar el dashboard.
-  > Ninguna vista consulta el modo al backend — el backend no tiene modos.
+  > Ninguna vista consulta el modo al backend.
+  > **Sin controles de demo:** Ninguna interfaz ni botón de demo interactiva (bypass de reglas,
+  > botón "Leer ahora", clima ficticio) vive en este dashboard; todo control de demo vive
+  > exclusivamente en el simulador (`Desarrollo/simulador/`).
 - **Tipos de dominio** (`src/types/domain.ts`): contratos compartidos.
 - **Componentes del sistema de diseño** (`src/components/ui/`): Button, Chip, StateGlyph, Callout,
   Field/Input/Select/InputUnit, Segmented, FilterChip, Switch, SaveBar, Skeleton, EmptyState,
@@ -292,12 +295,18 @@ cd Desarrollo/backend
   `spring.config.import`): el Administrador (`YERBANALYTICS_ADMIN_*`) y una lista genérica
   `YERBANALYTICS_USUARIOS_INICIALES` (`usuario:ROL:clave,…`). Se crean si no existen y nunca se pisan.
   Sus claves de desarrollo coinciden con los `env.example` del simulador y de la inferencia.
-- **La auditoría de seguridad es append-only también en la base** (triggers que instala la app al
-  arrancar). No la toques con `UPDATE`/`DELETE` ni le agregues endpoints de escritura.
-- **El backend no tiene modos de operación.** Ningún endpoint, tabla ni propiedad depende de
-  que el sistema esté "en simulación": se comporta siempre como en producción.
+- **Patrón para agregar una nueva regla agronómica**:
+  - Toda regla nueva debe seguir estrictamente el patrón de las existentes: implementar `Rule`, anotarse como `@Component`, definir `priority()` ascendente, `name()`, `label()` legible para el usuario, `branch()` (GLOBAL, RIEGO, INSUMO, MEDIASOMBRA, SEGUIMIENTO) y declarar sus umbrales en `parametros()`.
+  - **Feature Flag (FF) de activación por regla**: Toda regla debe soportar su flag de activación (`enabled: true/false`, ON/OFF) gestionado por `RuleOrchestrator` para poder ser encendida o apagada a merced. En producción arranca siempre encendida; en modo demo se puede apagar dinámicamente (`OMITIDA_DESHABILITADA`).
+  - **Flags de Cooldowns y variables de bypass en modo demo**: Si la regla impone restricciones temporales (esperas entre riegos, límites por hora, ventanas horarias, pausas tras insumos) o variables que condicionan la acción, debe implementar las flags de cooldown o variables de bypass correspondientes:
+    - **Cada regla puede tener más de una flag de cooldown o variable a bypasear**: Por ejemplo, una regla puede tener un cooldown de ciclo de lectura Y una guarda de riego en curso, o una pausa tras aplicación Y un límite de dosis.
+    - En producción (`yerbanalytics.mode=REAL`), cada regla aplica estrictamente los valores y cooldowns establecidos por el usuario en la configuración agronómica.
+    - En modo demo (`yerbanalytics.mode=SIMULATED` / `yerbanalytics.demo.enabled=true`), los cooldowns y variables de bypass se pueden setear en 0 o conmutar independientemente vía `/api/demo/rules/{ruleName}`, permitiendo re-regar o re-actuar de inmediato sin esperar las 4 horas ni depender de la hora del día.
+- **Modos de operación y Feature Flags**:
+  - Controlado por `yerbanalytics.mode` (`REAL` | `SIMULATED`) y `yerbanalytics.demo.enabled` (`false` | `true`), sobreescribible en Docker por `YERBANALYTICS_MODE` y `YERBANALYTICS_DEMO_ENABLED`.
+  - En modo `REAL` (producción), el backend no expone ningún rastro de simulación: los endpoints `/api/demo/**` no se registran (retornan 404), no existen tablas demo en base de datos y todas las reglas respetan sus cooldowns productivos.
+  - **Aislamiento estricto: ninguna implementación de demo en la app productiva.** Todo lo que se haga para demo (botón "Leer ahora", switches para encender/apagar reglas, bypass de cooldowns, ingreso de clima simulado) DEBE vivir exclusivamente en el simulador (`Desarrollo/simulador/`). El frontend productivo (`Desarrollo/frontend/`) no debe tener ningún rastro, botón ni vista de demo.
 
----
 
 ## 6.1 Captura de imágenes (`Desarrollo/camara*/` + `Desarrollo/contratos/`)
 
@@ -384,6 +393,10 @@ Invariantes a respetar al tocar esta área:
   dispositivos y diagnósticos son endpoints públicos, los mismos que usan el planificador de
   pasadas y el servicio de inferencia. **No toca `/api/camara/v1/**`**, que es el contrato del
   dispositivo.
+- **Toda funcionalidad y control de demo vive exclusivamente acá, NUNCA en la app productiva.**
+  El botón "Leer ahora", los controles de clima ficticio, el bypass de cooldowns y los interruptores de
+  activación de reglas son herramientas del simulador (`:5180`). El frontend productivo (`Desarrollo/frontend/`)
+  no contiene ninguna implementación, vista ni control de demo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
   El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. El comando de

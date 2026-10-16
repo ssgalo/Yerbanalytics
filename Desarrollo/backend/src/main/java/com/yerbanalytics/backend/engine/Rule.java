@@ -66,6 +66,24 @@ public interface Rule extends ConsumidorParametros {
     }
 
     /**
+     * Cooldown keys this rule declares (e.g. {@code "cycle"}, {@code "cap"}).
+     * The demo controller uses these to list available cooldown controls in the simulator UI.
+     * Defaults to none.
+     */
+    default java.util.Set<String> cooldownKeys() {
+        return java.util.Set.of();
+    }
+
+    /**
+     * Bypass keys this rule declares (e.g. {@code "in-progress"}, {@code "window"}).
+     * The demo controller uses these to list available bypass toggles in the simulator UI.
+     * Defaults to none.
+     */
+    default java.util.Set<String> bypassKeys() {
+        return java.util.Set.of();
+    }
+
+    /**
      * Evalúa la regla contra el snapshot inmutable del sector. Los umbrales se leen y se comparan
      * a través de la {@link Evaluacion}, que sólo deja leer los {@link #parametros()} declarados y
      * registra cada comparación en la traza: decidir y registrar son el mismo gesto.

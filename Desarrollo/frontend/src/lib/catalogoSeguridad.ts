@@ -46,6 +46,7 @@ export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'pasadas.ver', grupo: 'Pasadas del riel', descripcion: 'Estado de la pasada del riel', lectura: null },
   { codigo: 'pasadas.operar', grupo: 'Pasadas del riel', descripcion: 'Iniciar y cancelar la pasada', lectura: 'pasadas.ver' },
   { codigo: 'demo-expo.configurar', grupo: 'Demo Expo', descripcion: 'Mostrar u ocultar la pestaña Demo Expo', lectura: null },
+  { codigo: 'simulacion.gestionar', grupo: 'Simulación', descripcion: 'Controlar reglas, cooldowns y clima en modo demo', lectura: null },
   { codigo: 'usuarios.gestionar', grupo: 'Seguridad', descripcion: 'Usuarios, matriz de permisos y política de sesión', lectura: null },
   { codigo: 'auditoria.ver', grupo: 'Seguridad', descripcion: 'Registro de auditoría de seguridad', lectura: null },
 ];
@@ -77,6 +78,7 @@ export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
     'diagnosticos.ver',
     'diagnosticos.registrar',
     'camara.gestionar',
+    'simulacion.gestionar',
   ],
 };
 

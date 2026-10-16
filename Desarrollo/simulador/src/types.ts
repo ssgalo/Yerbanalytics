@@ -114,3 +114,40 @@ export interface RegisteredDiagnosis {
   id: string;
   imagenUrl: string;
 }
+
+/* ----------------------------------------------------------------
+   Demo mode — rule overrides and simulated weather
+   ---------------------------------------------------------------- */
+
+/** Current state of one rule as returned by GET /api/demo/rules. */
+export interface DemoRule {
+  name: string;
+  label: string;
+  branch: string;
+  priority: number;
+  enabled: boolean;
+  /** Cooldown keys this rule declares (one numeric input per key). */
+  cooldownKeys: string[];
+  /** Bypass keys this rule declares (one toggle per key). */
+  bypassKeys: string[];
+  /** Current cooldown overrides, by key. Empty = use production values. */
+  cooldownMinutes: Record<string, number>;
+  /** Bypass keys currently active. */
+  bypassed: string[];
+}
+
+/** Body for PUT /api/demo/rules/{ruleName}. All fields optional. */
+export interface DemoRuleUpdate {
+  enabled?: boolean;
+  cooldownMinutes?: Record<string, number>;
+  bypassed?: string[];
+}
+
+/** Simulated weather forecast. */
+export interface SimulatedWeather {
+  tempC: number;
+  humedadRelPct: number;
+  probLluviaPct: number;
+  precipMm: number;
+  uvIndex: number;
+}

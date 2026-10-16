@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.dto.Metric;
 import com.yerbanalytics.backend.dto.MetricSpec;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -9,6 +10,7 @@ import com.yerbanalytics.backend.model.ZonaEntity;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Snapshot inmutable de todo lo que las reglas del motor necesitan para decidir.
@@ -46,15 +48,52 @@ public record RuleContext(
          * aplicación de insumo, inicio del ciclo de lectura…). {@link ContextoRiego#vacio()} si
          * el llamador no lo arma.
          */
-        ContextoRiego riego
+        ContextoRiego riego,
+
+        /**
+         * Overrides en vigor (cooldowns y guardas). {@link RuleOverrides#NONE} en producción: cada regla usa su
+         * configuración. Nunca {@code null}.
+         */
+        RuleOverrides overrides
 
 ) {
+    public RuleContext {
+        overrides = overrides == null ? RuleOverrides.NONE : overrides;
+    }
+
+    /** Constructor sin overrides: mantiene la firma de antes de los overrides de reglas. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
+                RuleOverrides.NONE);
+    }
+
     /** Constructor sin contexto de riego: mantiene la firma de antes de las reglas de riego v2. */
     public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
                        ConfiguracionOperativaEntity config, String finalStatus, Instant now,
                        WeatherForecast forecast, boolean bloqueoManualActivo) {
         this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo,
                 ContextoRiego.vacio());
+    }
+
+    /** Copia de este contexto con otros overrides. Lo usa el orquestador: el llamador no los conoce. */
+    public RuleContext withOverrides(RuleOverrides nuevos) {
+        return new RuleContext(sector, zona, specs, metrics, config, finalStatus, now, forecast,
+                bloqueoManualActivo, riego, nuevos);
+    }
+
+    /**
+     * Cooldown (en minutos) que reemplaza al configurado para {@code key} de la regla, si hay uno. {@code 0} es "sin
+     * cooldown". Vacío en producción.
+     */
+    public Optional<Double> cooldownOverrideMinutes(String ruleName, String key) {
+        return overrides.cooldownMinutes(ruleName, key);
+    }
+
+    /** {@code true} si la guarda {@code key} de la regla no se aplica. {@code false} en producción. */
+    public boolean isBypassed(String ruleName, String key) {
+        return overrides.isBypassed(ruleName, key);
     }
 
     /**

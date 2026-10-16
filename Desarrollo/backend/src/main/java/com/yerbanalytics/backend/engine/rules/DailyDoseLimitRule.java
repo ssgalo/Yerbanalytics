@@ -39,7 +39,9 @@ import java.util.List;
 public class DailyDoseLimitRule implements Rule {
 
     private static final int PRIORITY = 5;
-    private static final String NAME = "DailyDoseLimitRule";
+    public static final String NAME = "DailyDoseLimitRule";
+    /** Bypass key: ignores the daily dose limit. */
+    public static final String BYPASS_DAILY_LIMIT = "daily-limit";
     private static final long MS_PER_24H = 24L * 60 * 60 * 1000;
 
     private final HistorialRepository historialRepository;
@@ -69,6 +71,11 @@ public class DailyDoseLimitRule implements Rule {
     }
 
     @Override
+    public java.util.Set<String> bypassKeys() {
+        return java.util.Set.of(BYPASS_DAILY_LIMIT);
+    }
+
+    @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosInsumo.MAX_DOSIS_24H);
     }
@@ -87,7 +94,8 @@ public class DailyDoseLimitRule implements Rule {
         long dosesIn24h = historialRepository.countByTipoAndSectorAndPeriod(
                 ctx.sector().getId(), "Insumo", since);
 
-        if (ev.comparar("Dosificaciones en las últimas 24 h", (double) dosesIn24h, Operador.GE,
+        if (!ctx.isBypassed(NAME, BYPASS_DAILY_LIMIT)
+                && ev.comparar("Dosificaciones en las últimas 24 h", (double) dosesIn24h, Operador.GE,
                 ParametrosInsumo.MAX_DOSIS_24H)) {
             String reason = String.format(
                     "El sector %s ya recibió %d dosificación(es) de insumo en las últimas 24 h. " +
