@@ -29,7 +29,9 @@ import java.util.List;
 public class PausaTrasAplicacionRule implements Rule {
 
     private static final int PRIORITY = 7;
-    private static final String NAME = "PausaTrasAplicacionRule";
+    public static final String NAME = "PausaTrasAplicacionRule";
+    /** Clave de cooldown: minutos de pausa tras una aplicación de insumo (0 la desactiva). */
+    public static final String COOLDOWN_PAUSE = "pause";
 
     @Override
     public int priority() {
@@ -52,6 +54,11 @@ public class PausaTrasAplicacionRule implements Rule {
     }
 
     @Override
+    public java.util.Set<String> cooldownKeys() {
+        return java.util.Set.of(COOLDOWN_PAUSE);
+    }
+
+    @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosRiego.PAUSA_TRAS_APLICACION, ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
     }
@@ -68,11 +75,21 @@ public class PausaTrasAplicacionRule implements Rule {
             return List.of(RuleAction.noopInfo(NAME, "El sector no tiene aplicaciones recientes de insumo."));
         }
         double horas = RiegoRuleSupport.horasDesde(aplicacion, ctx.now());
-        if (ev.comparar("Horas desde la última aplicación de insumo", horas, Operador.LT,
-                ParametrosRiego.PAUSA_TRAS_APLICACION)) {
+        java.util.Optional<Double> pausaOverride = ctx.cooldownOverrideMinutes(NAME, COOLDOWN_PAUSE);
+        boolean enPausa;
+        if (pausaOverride.isPresent()) {
+            enPausa = pausaOverride.get() > 0 && ev.compararFijo("Minutos desde la última aplicación de insumo",
+                    horas * 60.0, Operador.LT, pausaOverride.get());
+        } else {
+            enPausa = ev.comparar("Horas desde la última aplicación de insumo", horas, Operador.LT,
+                    ParametrosRiego.PAUSA_TRAS_APLICACION);
+        }
+        if (enPausa) {
             return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, String.format(
                     "Al sector se le aplicó un insumo a las %s (hace menos de %s h): no se riega para no lavar el producto.",
-                    RiegoRuleSupport.hora(aplicacion), RiegoRuleSupport.num(ev.numero(ParametrosRiego.PAUSA_TRAS_APLICACION))),
+                    RiegoRuleSupport.hora(aplicacion), pausaOverride.isPresent()
+                            ? RiegoRuleSupport.num(pausaOverride.get() / 60.0)
+                            : RiegoRuleSupport.num(ev.numero(ParametrosRiego.PAUSA_TRAS_APLICACION))),
                     CancelaRiego.SOLO_DEFICIT_COMUN));
         }
         return List.of(RuleAction.noopInfo(NAME, "La pausa tras la última aplicación de insumo ya se cumplió."));

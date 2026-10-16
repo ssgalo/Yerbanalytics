@@ -41,7 +41,11 @@ import java.util.List;
 public class CicloLecturaRiegoRule implements Rule {
 
     private static final int PRIORITY = 3;
-    private static final String NAME = "CicloLecturaRiegoRule";
+    public static final String NAME = "CicloLecturaRiegoRule";
+    /** Clave de cooldown: minutos que dura la guarda "ya regó en este ciclo" (0 la desactiva). */
+    public static final String COOLDOWN_CYCLE = "cycle";
+    /** Clave de bypass: ignora la guarda "riego en curso". */
+    public static final String BYPASS_IN_PROGRESS = "in-progress";
     private static final double MS_POR_MINUTO = 60_000.0;
 
     @Override
@@ -65,6 +69,16 @@ public class CicloLecturaRiegoRule implements Rule {
     }
 
     @Override
+    public java.util.Set<String> cooldownKeys() {
+        return java.util.Set.of(COOLDOWN_CYCLE);
+    }
+
+    @Override
+    public java.util.Set<String> bypassKeys() {
+        return java.util.Set.of(BYPASS_IN_PROGRESS);
+    }
+
+    @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosRiego.UMBRAL_CRITICO);
     }
@@ -79,6 +93,11 @@ public class CicloLecturaRiegoRule implements Rule {
                 : (ahora - riego.ultimoRiegoMs()) / MS_POR_MINUTO;
         Double minutosDeCiclo = riego.inicioCiclo() == null ? null
                 : (ahora - riego.inicioCiclo().toEpochMilli()) / MS_POR_MINUTO;
+        java.util.Optional<Double> cicloOverride = ctx.cooldownOverrideMinutes(NAME, COOLDOWN_CYCLE);
+        if (cicloOverride.isPresent()) {
+            // Override: la ventana de la guarda la fija quien lo configuró (<= 0 la apaga)
+            minutosDeCiclo = cicloOverride.get() <= 0 ? null : cicloOverride.get();
+        }
         boolean yaRegado = minutosDesdeRiego != null && minutosDeCiclo != null
                 && ev.compararFijo("Minutos desde el último riego (contra los del ciclo en curso)",
                         minutosDesdeRiego, Operador.LE, minutosDeCiclo);
@@ -89,7 +108,8 @@ public class CicloLecturaRiegoRule implements Rule {
         // ¿Hay un riego abierto? (segundos que le quedan > 0)
         double segundosRestantes = riego.riegoEnCursoHastaMs() == null ? 0.0
                 : Math.max(0.0, (riego.riegoEnCursoHastaMs() - ahora) / 1000.0);
-        boolean enCurso = ev.compararFijo("Segundos restantes del riego en curso", segundosRestantes, Operador.GT, 0.0);
+        boolean enCurso = ev.compararFijo("Segundos restantes del riego en curso", segundosRestantes, Operador.GT, 0.0)
+                && !ctx.isBypassed(NAME, BYPASS_IN_PROGRESS);
 
         // Bajo el umbral crítico decide R-02, que no tiene guarda de ciclo. Sólo se pregunta si ya regó.
         boolean deficitCritico = yaRegado

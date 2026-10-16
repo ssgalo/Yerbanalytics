@@ -27,6 +27,7 @@ export type Permiso =
   | 'pasadas.ver'
   | 'pasadas.operar'
   | 'demo-expo.configurar'
+  | 'simulacion.gestionar'
   | 'usuarios.gestionar'
   | 'auditoria.ver';
 

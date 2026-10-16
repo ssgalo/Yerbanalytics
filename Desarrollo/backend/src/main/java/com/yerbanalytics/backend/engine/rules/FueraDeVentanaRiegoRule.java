@@ -26,7 +26,9 @@ import java.util.List;
 public class FueraDeVentanaRiegoRule implements Rule {
 
     private static final int PRIORITY = 6;
-    private static final String NAME = "FueraDeVentanaRiegoRule";
+    public static final String NAME = "FueraDeVentanaRiegoRule";
+    /** Clave de bypass: ignora la ventana horaria de riego. */
+    public static final String BYPASS_WINDOW = "window";
 
     @Override
     public int priority() {
@@ -49,6 +51,11 @@ public class FueraDeVentanaRiegoRule implements Rule {
     }
 
     @Override
+    public java.util.Set<String> bypassKeys() {
+        return java.util.Set.of(BYPASS_WINDOW);
+    }
+
+    @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosRiego.VENTANA_NORMAL, ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
     }
@@ -60,7 +67,8 @@ public class FueraDeVentanaRiegoRule implements Rule {
             return List.of(RuleAction.noopInfo(NAME, RiegoRuleSupport.noAplica(humedad,
                     ev.numero(ParametrosRiego.UMBRAL_CRITICO), ev.numero(ParametrosRiego.UMBRAL_HUMEDAD))));
         }
-        boolean dentro = ev.compararVentana("Hora local", RiegoRuleSupport.horaLocal(ctx), ParametrosRiego.VENTANA_NORMAL);
+        boolean dentro = ev.compararVentana("Hora local", RiegoRuleSupport.horaLocal(ctx), ParametrosRiego.VENTANA_NORMAL)
+                || ctx.isBypassed(NAME, BYPASS_WINDOW);
         if (!dentro) {
             return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, String.format(
                     "Fuera de la ventana de riego (%s): el riego por déficit espera a la próxima lectura dentro de ella. "

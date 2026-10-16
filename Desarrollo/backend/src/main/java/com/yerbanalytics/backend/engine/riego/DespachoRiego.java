@@ -12,6 +12,11 @@ import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.parametros.VentanaHoraria;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
+import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
+import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
+import com.yerbanalytics.backend.engine.rules.FueraDeVentanaRiegoRule;
+import com.yerbanalytics.backend.engine.rules.PausaTrasAplicacionRule;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
@@ -136,6 +141,13 @@ public class DespachoRiego implements ConsumidorParametros {
     private volatile boolean reconstruido;
     /** Zonas que están en pausa por falta de lectura vigente: para loguear la transición y no cada 10 s. */
     private final Set<String> zonasEnPausa = ConcurrentHashMap.newKeySet();
+    /** Overrides de reglas: sin ellos (producción) el despacho aplica todas las guardas configuradas. */
+    private volatile RuleOverrides overrides = RuleOverrides.NONE;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOverrides(RuleOverrides overrides) {
+        this.overrides = overrides == null ? RuleOverrides.NONE : overrides;
+    }
 
     public DespachoRiego(ColaRiego cola,
                          ComandoActuadorPublisher publisher,
@@ -365,7 +377,8 @@ public class DespachoRiego implements ConsumidorParametros {
         }
 
         boolean enVentana = ventana(ParametrosRiego.VENTANA_NORMAL)
-                .contieneHastaElMinuto(LocalTime.ofInstant(reloj.instant(), ZonaHorariaVivero.ZONA));
+                .contieneHastaElMinuto(LocalTime.ofInstant(reloj.instant(), ZonaHorariaVivero.ZONA))
+                || overrides.skipsGuard(FueraDeVentanaRiegoRule.NAME, FueraDeVentanaRiegoRule.BYPASS_WINDOW);
         boolean hayR01 = pendientes.stream().anyMatch(s -> !s.esDeficitCritico());
         // Sólo R-01 depende del pronóstico: se pide una vez por zona y tick, y sin esperar (cacheado).
         WeatherForecast pronostico = hayR01 ? pronosticoSinEspera() : null;
@@ -480,8 +493,7 @@ public class DespachoRiego implements ConsumidorParametros {
             return MOTIVO_ESPERA;                      // sin saber si hay pausa o si ya regó, no se abre
         }
         String sector = s.sectorId();
-        if (PrecondicionesRiego.enPausaPorAplicacion(historia.aplicacion().get(sector), ahora,
-                numero(ParametrosRiego.PAUSA_TRAS_APLICACION))) {
+        if (enPausaPorAplicacion(historia.aplicacion().get(sector), ahora)) {
             return MOTIVO_PAUSA_APLICACION;           // R-06
         }
         int horas = (int) numero(ParametrosRiego.LLUVIA_VENTANA);
@@ -492,20 +504,60 @@ public class DespachoRiego implements ConsumidorParametros {
             return MOTIVO_LLUVIA;                      // R-03 (sin pronóstico: no pospone)
         }
         Long ultimo = masReciente(historia.riego().get(sector), ultimoRiego.get(sector));
-        if (PrecondicionesRiego.yaRegoEnElCiclo(ultimo, inicioCiclo)) {
+        if (yaRegoEnElCiclo(ultimo, ahora, inicioCiclo)) {
             return MOTIVO_CICLO;                       // guarda de ciclo: un riego por sector y ciclo
         }
         return null;
+    }
+
+    /** R-06 con los overrides: regla apagada o cooldown 0 no aplica la pausa; un cooldown fija los minutos. */
+    private boolean enPausaPorAplicacion(Long aplicacion, Instant ahora) {
+        String regla = PausaTrasAplicacionRule.NAME;
+        if (!overrides.isEnabled(regla)) {
+            return false;
+        }
+        java.util.Optional<Double> minutos = overrides.cooldownMinutes(regla, PausaTrasAplicacionRule.COOLDOWN_PAUSE);
+        if (minutos.isPresent()) {
+            return minutos.get() > 0 && PrecondicionesRiego.enPausaPorAplicacion(aplicacion, ahora, minutos.get() / 60.0);
+        }
+        return PrecondicionesRiego.enPausaPorAplicacion(aplicacion, ahora, numero(ParametrosRiego.PAUSA_TRAS_APLICACION));
+    }
+
+    /** Guarda de ciclo con los overrides (misma semántica que {@code CicloLecturaRiegoRule}). */
+    private boolean yaRegoEnElCiclo(Long ultimo, Instant ahora, Instant inicioCiclo) {
+        String regla = CicloLecturaRiegoRule.NAME;
+        if (!overrides.isEnabled(regla)) {
+            return false;
+        }
+        java.util.Optional<Double> minutos = overrides.cooldownMinutes(regla, CicloLecturaRiegoRule.COOLDOWN_CYCLE);
+        if (minutos.isPresent()) {
+            return minutos.get() > 0 && PrecondicionesRiego.yaRegoEnElCiclo(ultimo,
+                    ahora.minusMillis((long) (minutos.get() * 60_000.0)));
+        }
+        return PrecondicionesRiego.yaRegoEnElCiclo(ultimo, inicioCiclo);
     }
 
     /** Tope de R-02 (un riego crítico cada {@code riego.exceptuado-bloqueo} h por sector); lo demás no la afecta. */
     private String motivoDeDescarteDeR02(SolicitudRiego s, Instant ahora, Historia historia) {
         // Sin historial se usa lo que el despacho recuerda: un déficit crítico no se deja sin regar por una falla de lectura.
         Long ultimo = masReciente(historia.riegoCritico().get(s.sectorId()), ultimoRiegoCritico.get(s.sectorId()));
-        if (PrecondicionesRiego.dentroDelTopeCritico(ultimo, ahora, numero(ParametrosRiego.EXCEPTUADO_BLOQUEO))) {
+        if (dentroDelTopeCritico(ultimo, ahora)) {
             return MOTIVO_TOPE_CRITICO;
         }
         return null;
+    }
+
+    /** Tope de R-02 con los overrides: regla apagada o cooldown 0 no lo aplica; un cooldown fija los minutos. */
+    private boolean dentroDelTopeCritico(Long ultimo, Instant ahora) {
+        String regla = DeficitCriticoRule.NAME;
+        if (!overrides.isEnabled(regla)) {
+            return false;
+        }
+        java.util.Optional<Double> minutos = overrides.cooldownMinutes(regla, DeficitCriticoRule.COOLDOWN_CAP);
+        if (minutos.isPresent()) {
+            return minutos.get() > 0 && PrecondicionesRiego.dentroDelTopeCritico(ultimo, ahora, minutos.get() / 60.0);
+        }
+        return PrecondicionesRiego.dentroDelTopeCritico(ultimo, ahora, numero(ParametrosRiego.EXCEPTUADO_BLOQUEO));
     }
 
     private static Long masReciente(Long a, Long b) {

@@ -76,6 +76,8 @@ public class WeatherService {
 
     /** Cache thread-safe del último pronóstico válido. */
     private final AtomicReference<WeatherForecast> cache = new AtomicReference<>(null);
+    /** Pronóstico ficticio inyectado en modo demo. Tiene prioridad sobre la cache y la API. */
+    private final AtomicReference<WeatherForecast> mockForecast = new AtomicReference<>(null);
     /** Cuándo (epoch ms) falló por última vez una consulta completa; {@link #SIN_FALLO} si no hay fallo vigente. */
     private final AtomicLong ultimoFalloMs = new AtomicLong(SIN_FALLO);
     /** El refresco en vuelo (identidad, no valor), o {@code null}. Un refresco colgado se reemplaza pasado {@link #REFRESCO_MAX}. */
@@ -116,6 +118,27 @@ public class WeatherService {
     }
 
     /**
+     * Inyecta un pronóstico ficticio en modo demo. Mientras esté presente, {@link #getForecast()} y
+     * {@link #getForecastSinEspera()} lo retornan sin llamar a la API.
+     */
+    public void setMockForecast(WeatherForecast forecast) {
+        mockForecast.set(forecast);
+        log.info("WeatherService: pronóstico ficticio inyectado — lluvia {}%, UV {}.",
+                forecast.probLluviaPct(), forecast.uvIndex());
+    }
+
+    /** Limpia el pronóstico ficticio; los métodos de consulta vuelven a usar la API. */
+    public void clearMockForecast() {
+        mockForecast.set(null);
+        log.info("WeatherService: pronóstico ficticio eliminado.");
+    }
+
+    /** Pronóstico ficticio activo, o {@code null} si no hay ninguno. */
+    public WeatherForecast getMockForecast() {
+        return mockForecast.get();
+    }
+
+    /**
      * Retorna el pronóstico climático vigente, usando la cache si está fresca o
      * llamando a la API con retry si venció. <b>Puede bloquear</b> (HTTP y esperas del backoff): no usar desde el
      * hilo de la telemetría, ver {@link #getForecastSinEspera()}.
@@ -124,6 +147,11 @@ public class WeatherService {
      *         responder (el motor opera en modo degradado) o falló hace menos de {@code failureCacheTtlMs}.
      */
     public WeatherForecast getForecast() {
+        WeatherForecast mock = mockForecast.get();
+        if (mock != null) {
+            log.debug("WeatherService: retornando pronóstico ficticio (modo demo).");
+            return mock;
+        }
         WeatherForecast cached = cache.get();
         if (cached != null && cached.isFresh(cacheTtlMs, reloj.instant())) {
             log.debug("WeatherService: retornando pronóstico desde cache.");
@@ -137,13 +165,18 @@ public class WeatherService {
     }
 
     /**
-     * Pronóstico para el hilo de la telemetría: <b>nunca espera ni duerme</b>. Devuelve el cacheado si es fresco;
+     * Pronóstico para el hilo de la telemetría: <b>nunca espera ni duerme</b>. Si hay un pronóstico ficticio inyectado
+     * lo retorna directamente. Caso contrario, devuelve el cacheado si es fresco;
      * si venció pero tiene menos de {@value #FACTOR_USABLE_VENCIDO} TTL lo sigue devolviendo (mejor un pronóstico
      * de hace 20 min que ninguno); y en cualquier caso, si no hay un fallo reciente, lanza el refresco en un hilo
      * aparte (a lo sumo uno a la vez). Sin nada usable devuelve {@code null}: la evaluación sigue sin pronóstico y
      * la traza muestra la comparación sin dato (O-01).
      */
     public WeatherForecast getForecastSinEspera() {
+        WeatherForecast mock = mockForecast.get();
+        if (mock != null) {
+            return mock;
+        }
         WeatherForecast cached = cache.get();
         Instant ahora = reloj.instant();
         if (cached != null && cached.isFresh(cacheTtlMs, ahora)) {

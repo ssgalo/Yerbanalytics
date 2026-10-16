@@ -322,3 +322,153 @@ button:hover:not(:disabled) {
   color: var(--muted);
   padding: 8px 0;
 }
+
+/* ---- Demo mode ---- */
+
+.demoCard {
+  border-left: 3px solid var(--accent);
+}
+
+.demoCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.demoCardHeader h3 {
+  margin: 0;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.badgeOn {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badgeOff {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: 160px 100px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.fieldRowCompact {
+  grid-template-columns: 120px 80px auto;
+  padding: 3px 0;
+}
+
+.fieldRow label {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.fieldRow input[type='number'] {
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  width: 100%;
+}
+
+.hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.loading {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.errorMsg {
+  color: var(--error);
+  background: var(--error-soft);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.ruleList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ruleRow {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--paper);
+}
+
+.ruleDisabled {
+  opacity: 0.55;
+}
+
+.ruleHeader {
+  display: flex;
+  align-items: center;
+}
+
+.ruleToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.ruleLabel {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.ruleMeta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ruleCooldowns,
+.ruleBypass {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.bypassToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 3px 0;
+}
+
+.unit {
+  font-size: 12px;
+  color: var(--muted);
+}

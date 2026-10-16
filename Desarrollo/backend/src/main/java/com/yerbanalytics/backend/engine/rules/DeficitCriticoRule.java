@@ -42,6 +42,8 @@ public class DeficitCriticoRule implements Rule {
     /** Nombre de la regla: también es la {@code regla} que queda en los eventos "Riego" que ordenó R-02. */
     public static final String NAME = SolicitudRiego.REGLA_DEFICIT_CRITICO;
     static final String TEXTO_ALERTA = "Déficit hídrico crítico";
+    /** Clave de cooldown: minutos del tope de un riego crítico por sector (0 lo desactiva). */
+    public static final String COOLDOWN_CAP = "cap";
 
     @Override
     public int priority() {
@@ -64,6 +66,11 @@ public class DeficitCriticoRule implements Rule {
     }
 
     @Override
+    public java.util.Set<String> cooldownKeys() {
+        return java.util.Set.of(COOLDOWN_CAP);
+    }
+
+    @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosRiego.UMBRAL_CRITICO, ParametrosRiego.VOLUMEN_MAX_EVENTO,
                 ParametrosRiego.CAUDAL_EMISOR, ParametrosRiego.EXCEPTUADO_BLOQUEO);
@@ -83,16 +90,21 @@ public class DeficitCriticoRule implements Rule {
 
         // Tope: un riego crítico por sector cada N horas (sin riego crítico previo no hay nada que comparar).
         Long ultimoCritico = ctx.riego().ultimoRiegoCriticoMs();
-        if (ultimoCritico != null) {
+        java.util.Optional<Double> topeOverride = ctx.cooldownOverrideMinutes(NAME, COOLDOWN_CAP);
+        if (ultimoCritico != null && !(topeOverride.isPresent() && topeOverride.get() <= 0)) {
             double horas = RiegoRuleSupport.horasDesde(ultimoCritico, ctx.now());
-            boolean dentroDelTope = ev.comparar("Horas desde el último riego por déficit crítico", horas,
-                    Operador.LT, ParametrosRiego.EXCEPTUADO_BLOQUEO);
+            boolean dentroDelTope = topeOverride.isPresent()
+                    ? ev.compararFijo("Minutos desde el último riego por déficit crítico", horas * 60.0,
+                            Operador.LT, topeOverride.get())
+                    : ev.comparar("Horas desde el último riego por déficit crítico", horas,
+                            Operador.LT, ParametrosRiego.EXCEPTUADO_BLOQUEO);
             if (dentroDelTope) {
                 return List.of(RuleAction.of(ActionType.ABORT_RIEGO, NAME, String.format(
                         "Déficit crítico (%s%%), pero el sector ya recibió un riego crítico a las %s: se respeta el tope de "
                                 + "un riego cada %s h para no regar sin fin con un sensor que pueda estar fallando.",
                         RiegoRuleSupport.num(humedad), RiegoRuleSupport.hora(ultimoCritico),
-                        RiegoRuleSupport.num(ev.numero(ParametrosRiego.EXCEPTUADO_BLOQUEO)))));
+                        topeOverride.isPresent() ? RiegoRuleSupport.num(topeOverride.get() / 60.0)
+                                : RiegoRuleSupport.num(ev.numero(ParametrosRiego.EXCEPTUADO_BLOQUEO)))));
             }
         }
 

@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
 import com.yerbanalytics.backend.engine.traza.AccionTrazada;
@@ -11,6 +12,7 @@ import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.traza.TrazaRegla;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -42,10 +44,19 @@ public class RuleOrchestrator {
     private final List<Rule> rules;
     private final CatalogoParametrosService parametros;
     private final TrazaEvaluacionStore trazaStore;
+    private final RuleOverrides overrides;
 
+    /** Sin overrides: cada regla corre con su configuración. */
     public RuleOrchestrator(List<Rule> rules, CatalogoParametrosService parametros, TrazaEvaluacionStore trazaStore) {
+        this(rules, parametros, trazaStore, RuleOverrides.NONE);
+    }
+
+    @Autowired
+    public RuleOrchestrator(List<Rule> rules, CatalogoParametrosService parametros, TrazaEvaluacionStore trazaStore,
+                            RuleOverrides overrides) {
         this.parametros = parametros;
         this.trazaStore = trazaStore;
+        this.overrides = overrides;
         // Ordenamiento explícito obligatorio — Spring no ordena @Component por prioridad.
         this.rules = rules.stream()
                 .sorted(Comparator.comparingInt(Rule::priority))
@@ -74,7 +85,9 @@ public class RuleOrchestrator {
      * @param origen qué disparó la evaluación; la traza se guarda por origen
      * @return acciones acumuladas (puede estar vacía, nunca null) y la traza de la evaluación
      */
-    public ResultadoEvaluacion evaluate(RuleContext ctx, OrigenEvaluacion origen) {
+    public ResultadoEvaluacion evaluate(RuleContext original, OrigenEvaluacion origen) {
+        // Los overrides los pone el orquestador: quien arma el contexto no sabe que existen.
+        RuleContext ctx = original.withOverrides(overrides);
         List<RuleAction> accumulated = new ArrayList<>();
         List<TrazaRegla> trazas = new ArrayList<>(rules.size());
         String sectorId = ctx.sector().getId();
@@ -89,6 +102,12 @@ public class RuleOrchestrator {
 
         for (Rule rule : rules) {
             RuleBranch branch = rule.branch();
+
+            // Una regla apagada con un override no corre ni corta nada; queda en la traza.
+            if (!overrides.isEnabled(rule.name())) {
+                trazas.add(omitida(rule, EstadoRegla.OMITIDA_DESHABILITADA, null));
+                continue;
+            }
 
             // Si hay un bloqueo global, no se evalúa nada más.
             if (abortAll != null) {
