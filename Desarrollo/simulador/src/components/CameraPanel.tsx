@@ -22,10 +22,9 @@ import {
   generatePairingCode,
   getCameraDevices,
   getCaptureOrder,
-  enrollDevice,
-  getDeviceToken,
   uploadImage,
 } from '../api';
+import { getDeviceAccessToken } from '../captureFlow';
 import { DIAGNOSIS_STATES, LEVELS, isAnomalous } from '../metrics';
 import type { CameraDevice, CaptureOrder, CaptureOrderState, PairingCode, SectorRef } from '../types';
 
@@ -72,7 +71,6 @@ export function CameraPanel({ sectors }: Props) {
 
   const [directFile, setDirectFile] = useState<File | null>(null);
   const [directUploading, setDirectUploading] = useState(false);
-  const directTokenRef = useRef<string | null>(null);
 
   const pollRef = useRef<number | null>(null);
   const deadlineRef = useRef(0);
@@ -228,18 +226,13 @@ export function CameraPanel({ sectors }: Props) {
     stopPoll();
 
     try {
-      if (!directTokenRef.current) {
-        const codeRes = await generatePairingCode();
-        const enrollRes = await enrollDevice(codeRes.codigo);
-        const tokenRes = await getDeviceToken(enrollRes.refreshToken);
-        directTokenRef.current = tokenRes.accessToken;
-      }
+      const token = await getDeviceAccessToken();
 
       const rail = Number(railPosition) || 1200;
       const emitted = await emitCaptureOrder(sectorId, rail);
       setOrder(emitted);
 
-      await uploadImage(emitted.ordenId, directFile, directTokenRef.current);
+      await uploadImage(emitted.ordenId, directFile, token);
       setNotice('¡Imagen subida exitosamente como dispositivo!');
 
       deadlineRef.current = Date.now() + MAX_WAIT_MS;

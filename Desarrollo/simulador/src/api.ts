@@ -133,11 +133,11 @@ export async function generateTopology(
 
 /** Sectors of the current topology, to choose where to capture. */
 export async function getSectors(): Promise<SectorRef[]> {
-  const data = await json<{ sectors?: SectorRef[] }>(
+  const data = await json<{ sectors?: { id: string; zona: string; zonaName: string }[] }>(
     await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
     'consultar los sectores del vivero',
   );
-  return (data.sectors ?? []).map((s) => ({ id: s.id, zonaName: s.zonaName }));
+  return (data.sectors ?? []).map((s) => ({ id: s.id, zonaId: s.zona, zonaName: s.zonaName }));
 }
 
 export async function getCameraDevices(): Promise<CameraDevice[]> {

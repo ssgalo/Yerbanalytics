@@ -27,6 +27,7 @@
 - [ ] 4.2 Crear el componente `RuleSelector.tsx` con checkboxes por regla agronómica (R-01, R-02, R-04, R-03, ShadingRule, SupplyRule)
 - [ ] 4.3 Implementar validación de compatibilidad visual ante combinaciones contradictorias de humedad
 - [ ] 4.4 Implementar la orquestación de disparo automático: cooldowns a 0 en demo, inyección de clima si aplica, publicación MQTT al broker y pulso con motor (`POST /api/pulsos`)
+- [ ] 4.4.1 Registrar el diagnóstico de IA previo (`captureFlow.ts`: orden → imagen sintética como dispositivo → alta) cuando se selecciona SupplyRule, antes del pulso, con test del módulo puro
 - [ ] 4.5 Construir la tarjeta de feedback y traza de ejecución en `RuleAutomationSection.tsx`
 
 ## 5. Apartado 4: Sección de la Cámara

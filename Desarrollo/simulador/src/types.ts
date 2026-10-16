@@ -57,6 +57,8 @@ export interface NurseryTopology {
 /** A sector of the current topology, to choose where to capture. */
 export interface SectorRef {
   id: string;
+  /** Macro-zone id (`MZ-1`…): the key sensors and telemetry use. */
+  zonaId: string;
   zonaName: string;
 }
 

@@ -126,7 +126,7 @@ export function App() {
         )}
 
         {activeTab === 'automatizacion' && (
-          <RuleAutomationSection sensors={sensors} demoEnabled={demoEnabled} />
+          <RuleAutomationSection sensors={sensors} sectors={sectors} demoEnabled={demoEnabled} />
         )}
 
         {activeTab === 'camara' && (

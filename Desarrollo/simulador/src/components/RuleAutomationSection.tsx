@@ -7,13 +7,15 @@
      1. Zeroes demo cooldowns (if in demo mode and the rules need it).
      2. Injects simulated weather when needed (R-03 / ShadingRule).
      3. Publishes the calculated MQTT telemetry for the target sensor.
-     4. Triggers a sensing pulse with the rule engine.
+     4. Registers the prior AI diagnosis (SupplyRule only acts on a NEW one).
+     5. Triggers a sensing pulse with the rule engine.
 
    No backend modifications: everything goes through existing public endpoints.
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
-import type { ParametroRegla, SimulatedSensor } from '../types';
+import { registerDiagnosisWithCapture } from '../captureFlow';
+import type { ParametroRegla, SectorRef, SimulatedSensor } from '../types';
 import {
   buildThresholds,
   calculateConditions,
@@ -23,12 +25,13 @@ import {
 
 interface Props {
   sensors: SimulatedSensor[];
+  sectors: SectorRef[];
   demoEnabled: boolean;
 }
 
 type ExecutionState = 'idle' | 'running' | 'ok' | 'conflict' | 'error';
 
-export function RuleAutomationSection({ sensors, demoEnabled }: Props) {
+export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) {
   const [parametros, setParametros] = useState<ParametroRegla[]>([]);
   const [loadingParams, setLoadingParams] = useState(true);
   const [selectedRules, setSelectedRules] = useState<Set<RuleKey>>(new Set());
@@ -77,6 +80,9 @@ export function RuleAutomationSection({ sensors, demoEnabled }: Props) {
     : null;
 
   const targetSensor = sensors.find((s) => s.serial === targetSerial);
+  // The diagnosis is per sector, the sensing per zone: the first sector of the target zone stands in.
+  const diagnosisSector = sectors.find((s) => s.zonaId === targetSensor?.zonaId);
+  const missingDiagnosisSector = conditions?.diagnostico != null && !diagnosisSector;
 
   const execute = async () => {
     if (!targetSensor || !conditions || selectedRules.size === 0) return;
@@ -111,7 +117,21 @@ export function RuleAutomationSection({ sensors, demoEnabled }: Props) {
       log.push(`✓ Telemetría publicada para ${targetSensor.zonaId} (humSus: ${conditions.telemetria.humSus}%)`);
       setExecLog([...log]);
 
-      // Step 4: trigger sensing pulse with motor.
+      // Step 4: register the prior diagnosis. It must exist before the pulse: that is the only
+      // moment the engine decides, and the rule acts once per new diagnosis.
+      if (conditions.diagnostico && diagnosisSector) {
+        const created = await registerDiagnosisWithCapture({
+          ...conditions.diagnostico,
+          sectorId: diagnosisSector.id,
+          zonaId: diagnosisSector.zonaId,
+        });
+        log.push(
+          `✓ Diagnóstico IA ${created.id} registrado en ${diagnosisSector.id} (${conditions.diagnostico.estado}, conf. ${conditions.diagnostico.conf}%)`,
+        );
+        setExecLog([...log]);
+      }
+
+      // Step 5: trigger sensing pulse with motor.
       await api.triggerSensingPulse(true);
       log.push('✓ Pulso de sensado con motor disparado');
       setExecLog([...log]);
@@ -136,6 +156,7 @@ export function RuleAutomationSection({ sensors, demoEnabled }: Props) {
     targetSensor !== undefined &&
     conditions !== null &&
     conditions.conflictos.length === 0 &&
+    !missingDiagnosisSector &&
     execState !== 'running';
 
   return (
@@ -194,6 +215,13 @@ export function RuleAutomationSection({ sensors, demoEnabled }: Props) {
             {conditions.conflictos.map((c, i) => (
               <div key={i}>{c}</div>
             ))}
+          </div>
+        )}
+
+        {missingDiagnosisSector && (
+          <div className="errorMsg" style={{ marginTop: 12 }}>
+            La zona {targetSensor?.zonaId} no tiene sectores en la topología vigente: no hay dónde
+            registrar el diagnóstico que necesita la dosificación.
           </div>
         )}
 

@@ -33,7 +33,8 @@ Al presionar el botón "Ejecutar reglas seleccionadas", el simulador SHALL orque
 1. Si el backend está en modo demo y hay cooldowns activos, ponerlos en 0 llamando a `PUT /backend/api/demo/rules/cooldowns/zero`.
 2. Si la regla requiere condiciones meteorológicas (lluvia para R-03 o radiación UV para ShadingRule), inyectar el pronóstico ficticio vía `POST /backend/api/demo/weather`.
 3. Publicar directamente al broker MQTT (`nursery/zone/{zonaId}/telemetry`) el payload de telemetría ajustado con los valores requeridos para la macro-zona seleccionada.
-4. Disparar el pulso de lectura con motor mediante `POST /backend/api/pulsos` con `{ ejecutarMotor: true }`.
+4. Si alguna regla seleccionada decide con el diagnóstico de IA (`SupplyRule`), registrar antes del pulso un diagnóstico previo, según el requisito "Diagnóstico de IA previo para reglas que lo consumen".
+5. Disparar el pulso de lectura con motor mediante `POST /backend/api/pulsos` con `{ ejecutarMotor: true }`.
 
 #### Scenario: Ejecución de R-01 (Riego por déficit)
 - **WHEN** el usuario ejecuta R-01 con umbral crítico en 35% y umbral de riego en 45%
@@ -50,3 +51,18 @@ Al presionar el botón "Ejecutar reglas seleccionadas", el simulador SHALL orque
 #### Scenario: Colisión por operación en curso
 - **WHEN** el disparo del pulso retorna HTTP 409 porque ya hay una pasada o secuencia ejecutándose
 - **THEN** el simulador informa claramente que el hardware está ocupado y sugiere reintentar al finalizar
+
+### Requirement: Diagnóstico de IA previo para reglas que lo consumen
+Cuando el operador selecciona `SupplyRule`, el simulador SHALL registrar un diagnóstico de IA para un sector de la macro-zona destino ANTES de disparar el pulso, porque el motor decide únicamente en el pulso y la regla actúa una sola vez por diagnóstico nuevo. El diagnóstico SHALL tener estado anómalo, severidad y confianza `Alta` y un score no menor a `diagnostico.confianza-minima` (85 por defecto si el backend no responde), y SHALL registrarse por el camino único del sistema: orden de captura, imagen subida como dispositivo y `POST /backend/api/diagnosticos`, sin endpoints ni marcas propias del simulador. Como la regla solo dosifica con el sector en estado crítico y ese estado sale de las métricas, el simulador SHALL además enviar una temperatura del aire crítica (40 °C) sin alterar la humedad de sustrato. Si la zona destino no tiene sectores, el simulador SHALL bloquear la ejecución e informarlo.
+
+#### Scenario: Ejecución de SupplyRule
+- **WHEN** el usuario ejecuta SupplyRule con confianza mínima en 85%
+- **THEN** el simulador registra un diagnóstico con confianza ≥ 85% en un sector de la zona destino, y recién después dispara el pulso con motor
+
+#### Scenario: Falla el registro del diagnóstico
+- **WHEN** la orden de captura, la subida de la imagen o el alta del diagnóstico fallan
+- **THEN** el simulador no dispara el pulso e informa el error en la traza de ejecución
+
+#### Scenario: Zona sin sectores
+- **WHEN** la macro-zona del sensor destino no tiene sectores en la topología vigente
+- **THEN** el botón de ejecutar queda deshabilitado y se explica el motivo
