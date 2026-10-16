@@ -57,6 +57,8 @@ interface DiagnosisColumnsProps {
   filters: ColumnFilters;
   onFilter: (column: ColumnKey, value: string[] | Range | null) => void;
   onClear: () => void;
+  /** Hay otro filtro activo fuera de las columnas (la clase elegida en los KPI). */
+  otherFilter?: boolean;
   /** `null` = sin orden. */
   sort: SortState | null;
   onSort: (sort: SortState | null) => void;
@@ -68,11 +70,12 @@ export function DiagnosisColumns({
   filters,
   onFilter,
   onClear,
+  otherFilter = false,
   sort,
   onSort,
   resultCount,
 }: DiagnosisColumnsProps) {
-  const anyFilter = Object.values(filters).some((v) => v != null);
+  const anyFilter = otherFilter || Object.values(filters).some((v) => v != null);
 
   return (
     <section className={styles.bar} aria-label="Ordenar y filtrar diagnósticos">
