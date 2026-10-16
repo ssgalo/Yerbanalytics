@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { PageMetaProvider } from '@/hooks/PageMeta';
 import { NurseryProvider } from '@/hooks/NurseryContext';
 import { useAuth } from '@/hooks/AuthContext';
+import { SidebarProvider } from '@/hooks/SidebarContext';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { VigilanteInactividad } from './VigilanteInactividad';
@@ -20,13 +21,15 @@ export function AppLayout() {
   return (
     <NurseryProvider habilitado={vivero}>
       <PageMetaProvider>
-        <Sidebar />
-        <div className={styles.main}>
-          <Topbar />
-          <main className={styles.scroll}>
-            <Outlet />
-          </main>
-        </div>
+        <SidebarProvider>
+          <Sidebar />
+          <div className={styles.main}>
+            <Topbar />
+            <main className={styles.scroll}>
+              <Outlet />
+            </main>
+          </div>
+        </SidebarProvider>
         <VigilanteInactividad />
       </PageMetaProvider>
     </NurseryProvider>

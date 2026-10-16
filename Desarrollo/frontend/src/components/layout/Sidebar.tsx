@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, NavLink, matchPath, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/AuthContext';
+import { useSidebar } from '@/hooks/SidebarContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { puedeVer, VISTAS, type Vista } from '@/lib/vistas';
 import styles from './Sidebar.module.css';
@@ -20,10 +21,17 @@ interface NavItem {
    la vista no tiene de dónde sacar qué zona mostrar. */
 const PRINCIPAL: NavItem[] = [
   { to: '/', vista: VISTAS.panel, icon: 'dashboard', label: 'Panel general', end: true },
-  { to: '/diagnosticos', vista: VISTAS.diagnosticos, icon: 'diagnostics', label: 'Diagnósticos de IA' },
+  {
+    to: '/diagnosticos',
+    vista: VISTAS.diagnosticos,
+    icon: 'diagnostics',
+    label: 'Diagnósticos de IA',
+  },
 ];
 
-const GESTION: NavItem[] = [{ to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' }];
+const GESTION: NavItem[] = [
+  { to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' },
+];
 
 /* Grupo desplegable "Configuración": todo lo que ajusta cómo opera el sistema. Umbrales y
    Preferencias editan partes de la misma configuración agronómica (Umbrales sigue en
@@ -44,26 +52,54 @@ const CONFIGURACION: NavItem[] = [
   { to: '/preferencias', vista: VISTAS.preferencias, icon: 'toggle', label: 'Preferencias' },
 ];
 
-function NavItemLink({ item, sub }: { item: NavItem; sub?: boolean }) {
+/** Muestra el nombre del ítem al costado mientras la sidebar está colapsada a íconos. */
+type ShowHint = (label: string, el: HTMLElement) => void;
+
+interface HintHandlers {
+  onHint: ShowHint;
+  onHintEnd: () => void;
+}
+
+const hintProps = (label: string, { onHint, onHintEnd }: HintHandlers) => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLElement>) => onHint(label, e.currentTarget),
+  onFocus: (e: React.FocusEvent<HTMLElement>) => onHint(label, e.currentTarget),
+  onMouseLeave: onHintEnd,
+  onBlur: onHintEnd,
+});
+
+function NavItemLink({ item, sub, hint }: { item: NavItem; sub?: boolean; hint: HintHandlers }) {
   const base = sub ? `${styles.item} ${styles.subItem}` : styles.item;
   return (
     <NavLink
       to={item.to}
       end={item.end}
       className={({ isActive }) => (isActive ? `${base} ${styles.itemActive}` : base)}
+      {...(sub ? {} : hintProps(item.label, hint))}
     >
       <Icon name={item.icon} size={sub ? 16 : 18} />
-      <span>{item.label}</span>
+      <span className={styles.label}>{item.label}</span>
     </NavLink>
   );
 }
 
 /**
  * Grupo que se despliega y colapsa con un clic en su encabezado (no navega). Se abre solo al
- * entrar a una de sus vistas, para que el ítem activo quede siempre a la vista.
+ * entrar a una de sus vistas, para que el ítem activo quede siempre a la vista. Con la sidebar
+ * colapsada sus vistas no entran: el clic la expande y abre el grupo.
  */
-function NavGroup({ icon, label, items }: { icon: IconName; label: string; items: NavItem[] }) {
+function NavGroup({
+  icon,
+  label,
+  items,
+  hint,
+}: {
+  icon: IconName;
+  label: string;
+  items: NavItem[];
+  hint: HintHandlers;
+}) {
   const { pathname } = useLocation();
+  const { collapsed, setCollapsed } = useSidebar();
   const contieneActiva = items.some((i) => matchPath({ path: i.to, end: false }, pathname));
   const [abierto, setAbierto] = useState(contieneActiva);
   const idLista = useId();
@@ -72,30 +108,49 @@ function NavGroup({ icon, label, items }: { icon: IconName; label: string; items
     if (contieneActiva) setAbierto(true);
   }, [contieneActiva, pathname]);
 
-  const clase = [styles.item, styles.groupHead, !abierto && contieneActiva && styles.groupHeadActive]
+  const expandido = abierto && !collapsed;
+  const clase = [
+    styles.item,
+    styles.groupHead,
+    contieneActiva && collapsed && styles.itemActive,
+    contieneActiva && !abierto && !collapsed && styles.groupHeadActive,
+  ]
     .filter(Boolean)
     .join(' ');
+
+  const onClick = () => {
+    if (collapsed) {
+      setCollapsed(false);
+      setAbierto(true);
+      hint.onHintEnd();
+    } else {
+      setAbierto((a) => !a);
+    }
+  };
 
   return (
     <div>
       <button
         type="button"
         className={clase}
-        aria-expanded={abierto}
+        aria-expanded={expandido}
         aria-controls={idLista}
-        onClick={() => setAbierto((a) => !a)}
+        onClick={onClick}
+        {...hintProps(label, hint)}
       >
         <Icon name={icon} size={18} />
-        <span>{label}</span>
-        <span className={abierto ? `${styles.chevron} ${styles.chevronOpen}` : styles.chevron}>
+        <span className={styles.label}>{label}</span>
+        <span className={expandido ? `${styles.chevron} ${styles.chevronOpen}` : styles.chevron}>
           <Icon name="chevron-down" size={16} />
         </span>
       </button>
       {abierto && (
-        <div id={idLista} className={styles.subNav} role="group" aria-label={label}>
-          {items.map((item) => (
-            <NavItemLink key={item.to} item={item} sub />
-          ))}
+        <div className={styles.subWrap}>
+          <div id={idLista} className={styles.subNav} role="group" aria-label={label}>
+            {items.map((item) => (
+              <NavItemLink key={item.to} item={item} sub hint={hint} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -104,6 +159,8 @@ function NavGroup({ icon, label, items }: { icon: IconName; label: string; items
 
 export function Sidebar() {
   const { puede } = useAuth();
+  const { collapsed, toggle } = useSidebar();
+  const [tip, setTip] = useState<{ label: string; top: number } | null>(null);
   // Cada ítem sólo si el rol puede ver la vista; un grupo sin ítems no se muestra.
   const habilitados = (items: NavItem[]) => items.filter((i) => puedeVer(i.vista, puede));
   const principal = habilitados(PRINCIPAL);
@@ -111,11 +168,27 @@ export function Sidebar() {
   const configuracion = habilitados(CONFIGURACION);
   const hayGestion = gestion.length > 0 || configuracion.length > 0;
 
+  useEffect(() => {
+    if (!collapsed) setTip(null);
+  }, [collapsed]);
+
+  const hint: HintHandlers = {
+    onHint: (label, el) => {
+      if (!collapsed) return;
+      const r = el.getBoundingClientRect();
+      setTip({ label, top: r.top + r.height / 2 });
+    },
+    onHintEnd: () => setTip(null),
+  };
+
   return (
-    <aside className={styles.sidebar}>
+    <aside
+      className={collapsed ? `${styles.sidebar} ${styles.collapsed}` : styles.sidebar}
+      data-collapsed={collapsed}
+    >
       <Link to="/" className={styles.brand} aria-label="Ir al panel general">
         <img className={styles.logo} src="/yerbanalytics_simbolo.svg" alt="" />
-        <div>
+        <div className={styles.brandText}>
           <div className={styles.brandName}>Yerbanalytics</div>
           <div className={styles.brandSub}>Datos bajados a tierra</div>
         </div>
@@ -123,10 +196,12 @@ export function Sidebar() {
 
       {principal.length > 0 && (
         <>
-          <div className={styles.section}>Principal</div>
+          <div className={styles.section} aria-hidden={collapsed}>
+            Principal
+          </div>
           <nav className={styles.nav} aria-label="Principal">
             {principal.map((item) => (
-              <NavItemLink key={item.to} item={item} />
+              <NavItemLink key={item.to} item={item} hint={hint} />
             ))}
           </nav>
         </>
@@ -134,18 +209,40 @@ export function Sidebar() {
 
       {hayGestion && (
         <>
-          <div className={principal.length > 0 ? `${styles.section} ${styles.sectionTop}` : styles.section}>
+          <div
+            className={
+              principal.length > 0 ? `${styles.section} ${styles.sectionTop}` : styles.section
+            }
+            aria-hidden={collapsed}
+          >
             Gestión
           </div>
           <nav className={styles.nav} aria-label="Gestión">
             {gestion.map((item) => (
-              <NavItemLink key={item.to} item={item} />
+              <NavItemLink key={item.to} item={item} hint={hint} />
             ))}
             {configuracion.length > 0 && (
-              <NavGroup icon="config" label="Configuración" items={configuracion} />
+              <NavGroup icon="config" label="Configuración" items={configuracion} hint={hint} />
             )}
           </nav>
         </>
+      )}
+
+      {/* Borde clickeable, como el de shadcn: no entra en el orden de tabulación (está el botón
+          de la topbar y Ctrl/⌘ + B). */}
+      <button
+        type="button"
+        className={styles.rail}
+        tabIndex={-1}
+        aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+        title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+        onClick={toggle}
+      />
+
+      {tip && (
+        <div className={styles.tooltip} style={{ top: tip.top }} role="tooltip">
+          {tip.label}
+        </div>
       )}
     </aside>
   );

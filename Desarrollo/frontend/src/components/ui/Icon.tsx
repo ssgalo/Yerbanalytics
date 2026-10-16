@@ -45,7 +45,8 @@ export type IconName =
   | 'logout'
   | 'info'
   | 'gauge'
-  | 'toggle';
+  | 'toggle'
+  | 'sidebar';
 
 const PATHS: Record<IconName, JSX.Element> = {
   // Seguridad: personas, candado, llave y salida.
@@ -223,6 +224,12 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
+  sidebar: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+    </>
+  ),
   'chevron-up': <path d="M6 15l6-6 6 6" />,
   // Criterio de diagnóstico: cajas de detección sobre hojas, una resaltada.
   detections: (

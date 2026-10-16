@@ -169,7 +169,9 @@ npm run dev          # http://localhost:5173
   Criterio de diagnóstico, Motor de reglas, Hardware, Topología, Usuarios, Preferencias); se abre
   solo al entrar a una de sus vistas. Umbrales, Rustificación y Preferencias editan partes de la
   misma configuración agronómica (`useConfigDraft`): cada una guarda el recurso entero. Criterio de
-  diagnóstico (`/criterio-diagnostico`) es otro recurso, con su propio borrador.
+  diagnóstico (`/criterio-diagnostico`) es otro recurso, con su propio borrador. La sidebar se
+  colapsa a íconos (botón de la Topbar, borde de la sidebar o Ctrl/⌘ + B; estado en
+  `hooks/SidebarContext`, recordado por navegador).
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
   diagnostics, reglas, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
   *Parámetros* (edita el catálogo de umbrales) e *Inspector* (el grafo de reglas con la última
