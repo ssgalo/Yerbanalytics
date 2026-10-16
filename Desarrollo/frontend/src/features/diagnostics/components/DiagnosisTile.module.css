@@ -11,6 +11,11 @@
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
+  /* La grilla tiene cientos de tarjetas: las que están fuera de pantalla no se maquetan ni se
+     pintan. Sin esto, cada cambio de ancho (p. ej. la animación de la sidebar) re-maqueta todas.
+     El alto de reserva es el de una tarjeta típica; `auto` recuerda el real una vez visto. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 358px;
 }
 
 .tile:hover {
