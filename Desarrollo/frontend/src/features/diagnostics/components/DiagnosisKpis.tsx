@@ -33,9 +33,6 @@ export function DiagnosisKpis({ classes, total, selected, onSelect }: DiagnosisK
     <section className={styles.summary} aria-label="Diagnósticos por clase">
       <div className={styles.head}>
         <h2 className={styles.heading}>Clases de los {total} diagnósticos</h2>
-        <span className={styles.meta}>
-          Según los filtros de la grilla · elegí una clase para verla sola
-        </span>
       </div>
 
       <div className={styles.figures} role="group" aria-label="Filtrar por clase">

@@ -26,11 +26,6 @@
   color: var(--ink);
 }
 
-.meta {
-  font-size: var(--t-13);
-  color: var(--muted);
-  font-stretch: var(--w-cond);
-}
 
 .figures {
   display: flex;

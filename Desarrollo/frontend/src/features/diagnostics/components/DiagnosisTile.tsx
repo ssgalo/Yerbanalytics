@@ -24,6 +24,23 @@ const SEVERITY_TONE: Record<Severity, ChipTone> = {
   '—': 'offline',
 };
 
+/** "MZ-6-003" → 3. Si el código no tiene ese formato, se muestra tal cual. */
+function sectorNumber(sectorId: string): string {
+  const last = sectorId.split('-').pop() ?? '';
+  return /^\d+$/.test(last) ? String(Number(last)) : sectorId;
+}
+
+/** Hace cuánto: en minutos, horas o días según corresponda. */
+function elapsed(createdAt: number): string {
+  const min = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
+  if (min < 1) return 'recién';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} ${h === 1 ? 'hora' : 'horas'}`;
+  const days = Math.floor(h / 24);
+  return `hace ${days} ${days === 1 ? 'día' : 'días'}`;
+}
+
 interface DiagnosisTileProps {
   d: DiagnosisCard;
   onExpand: (id: string) => void;
@@ -69,33 +86,32 @@ export function DiagnosisTile({ d, onExpand, canOpenSector }: DiagnosisTileProps
             }}
           />
         )}
-        <span className={styles.idTag}>{d.id}</span>
         <span className={styles.expand} aria-hidden="true">
           Ampliar
         </span>
       </button>
 
       <div className={styles.body}>
-        <div className={styles.head}>
-          <h3 className={styles.title}>{d.estado}</h3>
-          {anomalous && d.sev !== '—' && (
-            <Chip tone={SEVERITY_TONE[d.sev] ?? 'offline'}>Severidad {d.sev.toLowerCase()}</Chip>
-          )}
-        </div>
+        <h3 className={styles.title} title={d.estado}>
+          {d.estado}
+        </h3>
 
         <div className={styles.where}>
           {canOpenSector ? (
             <Link className={styles.sector} to={`/sector/${encodeURIComponent(d.sectorId)}`}>
-              {d.sectorId}
+              {d.zonaName}
             </Link>
           ) : (
-            <span className={styles.sector}>{d.sectorId}</span>
+            <span className={styles.sector}>{d.zonaName}</span>
           )}
-          <span>{d.zonaName}</span>
+          <span>Sector {sectorNumber(d.sectorId)}</span>
         </div>
 
         {withConfidence ? (
           <div className={styles.conf}>
+            {anomalous && d.sev !== '—' && (
+              <Chip tone={SEVERITY_TONE[d.sev] ?? 'offline'}>Severidad {d.sev.toLowerCase()}</Chip>
+            )}
             <ConfidenceChip level={d.confidence} />
           </div>
         ) : (
@@ -113,7 +129,7 @@ export function DiagnosisTile({ d, onExpand, canOpenSector }: DiagnosisTileProps
               })}
             >
               <Icon name="clock" size={13} />
-              {d.time}
+              {elapsed(d.creadoEn)}
             </time>
           ) : (
             <span className={styles.time}>

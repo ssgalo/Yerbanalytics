@@ -118,11 +118,17 @@ export function DiagnosisColumns({
       </div>
 
       <div className={styles.result}>
-        {anyFilter && (
-          <Button variant="ghost" size="sm" onClick={onClear}>
-            Quitar filtros
-          </Button>
-        )}
+        {/* Siempre ocupa su lugar: que aparezca no achica las columnas */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClear}
+          className={anyFilter ? undefined : styles.hidden}
+          aria-hidden={!anyFilter}
+          tabIndex={anyFilter ? undefined : -1}
+        >
+          Quitar filtros
+        </Button>
         <span className={styles.count} aria-live="polite">
           <b>{resultCount}</b> {resultCount === 1 ? 'diagnóstico' : 'diagnósticos'}
         </span>
