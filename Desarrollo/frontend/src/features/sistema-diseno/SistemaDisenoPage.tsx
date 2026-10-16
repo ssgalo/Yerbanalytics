@@ -4,7 +4,8 @@
    Spec: openspec/changes/add-sistema-diseno.
    ============================================================ */
 import { useState } from 'react';
-import type { MetricSpec, Status } from '@/types/domain';
+import type { Detection, MetricSpec, Status } from '@/types/domain';
+import { DetectionLegend, DetectionOverlay } from '@/features/sector/components/DetectionOverlay';
 import { Button } from '@/components/ui/Button';
 import { linkClass } from '@/components/ui/clases';
 import { Chip } from '@/components/ui/Chip';
@@ -13,7 +14,7 @@ import { Callout } from '@/components/ui/Callout';
 import { Field, Input, InputUnit, Select } from '@/components/ui/Field';
 import { FilterChip, FilterChips, Segmented, Switch } from '@/components/ui/Seleccion';
 import { EmptyState, OfflineBanner, SaveBar, Skeleton } from '@/components/ui/EstadosPantalla';
-import { CompositionBar, ConfidenceBar, RangeBar } from '@/components/ui/Medidas';
+import { CompositionBar, RangeBar } from '@/components/ui/Medidas';
 import { Bandeja, GridCell, TrayCell } from '@/components/ui/SectorCell';
 import { ETIQUETA_ESTADO } from '@/components/ui/estado';
 import styles from './SistemaDiseno.module.css';
@@ -44,6 +45,23 @@ const CLASES_DIAGNOSTICO: [string, string, string][] = [
   ['--dx-plaga', '#4F8F86', 'Plaga foliar'],
   ['--dx-fungico', '#7A5A40', 'Daño fúngico'],
   ['--dx-nc', '#9BA39E', 'No concluyente · rayado con --dx-nc-2'],
+];
+
+const CAJAS_DETECCION: [string, string, string][] = [
+  ['--det-sano', '#5CD6FF', 'Sano'],
+  ['--det-clorosis', '#FFE45C', 'Clorosis'],
+  ['--det-estres-solar', '#FF9A3C', 'Estrés solar'],
+  ['--det-plaga-foliar', '#FF5CCB', 'Plaga foliar'],
+  ['--det-dano-fungico', '#C9A2FF', 'Daño fúngico'],
+];
+
+/** Muestra de cajas sobre una captura de la demo: el único lugar donde van los --det-*. */
+const DETECCIONES_MUESTRA: Detection[] = [
+  { label: 'Clorosis', score: 0.74, box: [0.43, 0.3, 0.59, 0.74] },
+  { label: 'Clorosis', score: 0.66, box: [0.7, 0.48, 0.93, 0.89] },
+  { label: 'Sano', score: 0.88, box: [0.15, 0.27, 0.45, 0.6] },
+  { label: 'Sano', score: 0.81, box: [0.45, 0.04, 0.69, 0.36] },
+  { label: 'Plaga foliar', score: 0.41, box: [0.31, 0.62, 0.47, 0.92] },
 ];
 
 const TODOS: Status[] = ['ok', 'warning', 'critical', 'offline'];
@@ -97,6 +115,20 @@ export function SistemaDisenoPage() {
           <Swatches items={ESTADOS} />
           <h3 className={styles.h3}>Clases de diagnóstico (sólo composición, nunca texto)</h3>
           <Swatches items={CLASES_DIAGNOSTICO} />
+          <h3 className={styles.h3}>Cajas de detección (sólo superpuestas a una fotografía)</h3>
+          <p className={styles.meta}>
+            Saturadas y claras para leerse sobre follaje, siempre con un halo de --tray debajo. El estado
+            diagnosticado va con trazo continuo grueso; las demás clases, discontinuo fino. Fuera de una foto no se
+            usan: ni texto, ni estado, ni composición.
+          </p>
+          <Swatches items={CAJAS_DETECCION} />
+          <Bandeja className={styles.deteccion}>
+            <div className={styles.deteccionFoto}>
+              <img src="/demo/capturas/clorosis/01.jpg" alt="Captura de muestra con cajas de detección" width={360} />
+              <DetectionOverlay detections={DETECCIONES_MUESTRA} diagnosedState="Clorosis" view="all" />
+            </div>
+            <DetectionLegend detections={DETECCIONES_MUESTRA} diagnosedState="Clorosis" view="all" />
+          </Bandeja>
         </section>
 
         <section className={styles.sec}>
@@ -150,10 +182,6 @@ export function SistemaDisenoPage() {
             <div className={styles.box}>
               <span className={styles.meta}>Valor contra su rango</span>
               <RangeBar value={40} spec={HUMEDAD} scale />
-            </div>
-            <div className={styles.box}>
-              <span className={styles.meta}>Confianza con mínimo</span>
-              <ConfidenceBar value={79} min={85} />
             </div>
           </div>
         </section>

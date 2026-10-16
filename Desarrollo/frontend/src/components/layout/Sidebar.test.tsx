@@ -68,6 +68,7 @@ describe('Sidebar · permisos (7.3)', () => {
     expect(enlacesDe('Gestión')).toEqual([
       'Historial',
       'Umbrales',
+      'Criterio de diagnóstico',
       'Motor de reglas',
       'Hardware',
       'Topología',
@@ -123,6 +124,7 @@ describe('Sidebar · grupo Configuración', () => {
     expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('true');
     expect(enlacesDe('Configuración', 'group')).toEqual([
       'Umbrales',
+      'Criterio de diagnóstico',
       'Motor de reglas',
       'Hardware',
       'Topología',
@@ -135,6 +137,22 @@ describe('Sidebar · grupo Configuración', () => {
     fireEvent.click(grupoConfiguracion());
     expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('link', { name: /Umbrales/ })).toBeNull();
+  });
+
+  it('"Criterio de diagnóstico" lleva a su vista y pide también diagnosticos.ver', () => {
+    demo.visible = false;
+    montar('ADMINISTRADOR', undefined, '/criterio-diagnostico');
+
+    // Se abre solo: la vista actual es del grupo
+    expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('true');
+    const link = screen.getByRole('link', { name: /Criterio de diagnóstico/ });
+    expect(link.getAttribute('href')).toBe('/criterio-diagnostico');
+    expect(link.getAttribute('aria-current')).toBe('page');
+
+    cleanup();
+    montar('INGENIERO_AGRONOMO', ['configuracion.ver', 'vivero.ver'], '/configuracion');
+    expect(screen.queryByRole('link', { name: /Criterio de diagnóstico/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /Umbrales/ })).toBeTruthy();
   });
 
   it('se abre solo si la vista actual es una de las suyas', () => {

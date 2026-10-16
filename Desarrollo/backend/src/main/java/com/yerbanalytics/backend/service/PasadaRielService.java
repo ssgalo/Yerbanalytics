@@ -327,8 +327,8 @@ public class PasadaRielService implements UsoDelHardware {
             paso.estadoOrden = orden.estado();
             if (RECIBIDA.equals(orden.estado())) {
                 paso.capturaId = orden.capturaId();
-                paso.imagenUrl = orden.imagenUrl() != null
-                        ? orden.imagenUrl() : CapturaService.imagenUrl(orden.capturaId());
+                // Ya viene versionada por el hash de la captura (ver CapturaService.imagenUrl)
+                paso.imagenUrl = orden.imagenUrl();
                 cerrarYSeguir(p, paso, OK, null, null);
                 return;
             }
@@ -435,7 +435,7 @@ public class PasadaRielService implements UsoDelHardware {
 
     private DiagnosticoPaso diagnosticoDe(String capturaId) {
         return diagnosticoRepo.findFirstByCapturaIdOrderByCreadoEnDesc(capturaId)
-                .map(d -> new DiagnosticoPaso(d.getEstado(), d.getConf(), d.getSev(), d.getCreadoEn()))
+                .map(d -> new DiagnosticoPaso(d.getEstado(), d.getConf(), d.getSev(), d.getConfidence(), d.getCreadoEn()))
                 .orElse(null);
     }
 

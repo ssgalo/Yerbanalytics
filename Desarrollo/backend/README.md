@@ -35,6 +35,20 @@ La configuración principal se encuentra en `src/main/resources/application.prop
 El esquema lo genera Hibernate (`ddl-auto=update`) y se siembra con
 `src/main/resources/data.sql` (600 sectores, 6 macro-zonas, umbrales de fábrica).
 
+### Migración manual pendiente · diagnóstico por detecciones
+
+El alta de diagnósticos pasó a llevar nivel de confianza y detecciones (ver
+[Diagnósticos](#diagnósticos-contrato-del-alta-y-criterio)). `ddl-auto=update` crea la tabla
+`diagnosis_criteria` y agrega las columnas nuevas (`diagnostico.confidence`, `diagnostico.detections`,
+`diagnostico.detection_count`, `sector.diagnosis_confidence`), todas nullable: las filas anteriores
+quedan sin nivel de confianza (el dashboard las muestra "sin nivel") y con 0 detecciones. Lo que **no**
+hace es quitar el `NOT NULL` de `diagnostico.conf`, y un No concluyente ya no lleva score: sin el
+script, su alta falla con un `500`.
+
+Corré `src/main/resources/migracion-diagnostico-detecciones.sql` (antes o después de arrancar la
+versión nueva; es idempotente). No se pierde nada. Para volver a la versión anterior, primero
+`UPDATE diagnostico SET conf = 0 WHERE conf IS NULL`: el backend viejo lee `conf` en un `double`.
+
 ### Migración manual pendiente · pulso de sensado y pasada diaria
 
 El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso
@@ -229,8 +243,9 @@ ninguna rama para ellos: son usuarios como cualquier otro.
 |---|---|
 | `GET /api/nursery`, `GET /api/configuracion/demo-expo` | `vivero.ver` |
 | `PUT /api/configuracion/demo-expo` | `demo-expo.configurar` |
+| `GET` / `PUT /api/configuracion/diagnostico` | `diagnosticos.ver` / `configuracion.editar` |
 | `GET` / `PUT /api/configuracion` | `configuracion.ver` / `configuracion.editar` |
-| `GET` / `POST /api/diagnosticos` | `diagnosticos.ver` / `diagnosticos.registrar` |
+| `GET /api/diagnosticos/**` / `POST /api/diagnosticos` | `diagnosticos.ver` / `diagnosticos.registrar` |
 | `GET /api/historial` | `historial.ver` |
 | `GET /api/rules/**` / `PUT /api/rules/parametros` | `reglas.ver` / `reglas.editar` |
 | `GET` / `POST`,`PUT /api/hardware/**` | `hardware.ver` / `hardware.gestionar` |
@@ -487,9 +502,11 @@ el servicio de inferencia. Un dispositivo de captura no debe usarlas.
 | `GET` | `/api/camara/dispositivos` | Estado técnico de la flota de cámaras |
 | `POST` | `/api/capturas/ordenes` | Emisor de órdenes (hoy, el simulador y el planificador de pasadas) |
 | `GET` | `/api/capturas/ordenes/{id}` | Seguimiento de una orden |
-| `GET` | `/api/capturas/{capturaId}/imagen` | El dashboard, para mostrar la foto |
-| `POST` | `/api/diagnosticos` | **Alta de diagnóstico** |
+| `GET` | `/api/capturas/{capturaId}/imagen?v={hash}` | El dashboard, para mostrar la foto. Se sirve inmutable por un año; por eso la URL que publica el backend lleva `?v=` con el comienzo del sha256: los ids de captura salen de un contador y se repiten si se purgan capturas, y sin la versión el navegador mostraría la foto vieja que tenía en caché |
+| `POST` | `/api/diagnosticos` | **Alta de diagnóstico** (servicio de inferencia y carga manual del simulador) |
 | `GET` | `/api/diagnosticos` | Listado de diagnósticos persistidos |
+| `GET` | `/api/diagnosticos/{id}/detecciones` | Las cajas de un diagnóstico (el modal de la imagen) |
+| `GET` / `PUT` | `/api/configuracion/diagnostico` | Criterio agronómico del diagnóstico (lo lee el servicio de inferencia en cada ciclo) |
 
 > **`POST /api/diagnosticos` es un camino único, sin variantes.** Es el mismo endpoint que va
 > a usar el servicio de inferencia y el mismo que usa hoy una carga manual. No hay endpoint
@@ -502,6 +519,86 @@ el servicio de inferencia. Un dispositivo de captura no debe usarlas.
 > Consecuencia asumida: no se pueden purgar selectivamente los diagnósticos de prueba. La
 > purga posible es por fecha o por sector, que alcanza porque todo diagnóstico está anclado a
 > una captura fechada.
+
+### Diagnósticos: contrato del alta y criterio
+
+Cambio `openspec/changes/add-diagnostico-por-detecciones/` (design D5, D7-D9 y D12, que es el
+contrato compartido con el frontend, el servicio de inferencia y el simulador). El diagnóstico lo
+elige el **módulo de diagnóstico** del servicio de inferencia a partir de todas las detecciones del
+modelo; el backend lo valida, lo guarda y lo sirve, pero no lo recalcula.
+
+**Alta — `POST /api/diagnosticos`** (BREAKING respecto del contrato anterior):
+
+```json
+{
+  "capturaId": "CAP-…",
+  "estado": "Clorosis",
+  "sev": "Baja",
+  "confidence": "Media",
+  "conf": 62.0,
+  "detections": [{"label": "Clorosis", "score": 0.62, "box": [0.12, 0.30, 0.18, 0.37]}]
+}
+```
+
+| estado | `sev` | `confidence` | `conf` |
+|---|---|---|---|
+| anómalo (Clorosis, Estrés solar, Plaga foliar, Daño fúngico, Daño biótico, Ácaro) | obligatoria | obligatoria | obligatorio |
+| Sano | ausente | obligatoria | obligatorio |
+| No concluyente | ausente | ausente | ausente |
+
+- `sev` y `confidence` son `Baja`, `Media` o `Alta`. En `sev`, ausente / `null` / `"—"` significan
+  "sin severidad", y se persiste `—` (convención de `diagnosis_sev`).
+- `conf` es el **score promedio × 100** del estado diagnosticado (0-100), ya no "la confianza".
+- `detections` es opcional (la carga manual no trae): como máximo 2000; cada una con `label` de la
+  taxonomía, `score` en `[0, 1]` y `box` = `[x1, y1, x2, y2]` normalizada en `[0, 1]` con `x1 < x2` e
+  `y1 < y2`. Una sola detección inválida rechaza el alta completa.
+- Todo error es `400 {"error": "<mensaje apto para mostrar>"}`, que nombra el campo.
+- El alta actualiza el diagnóstico vigente del sector, incluido el nivel (`sector.diagnosis_confidence`).
+
+**Concluyente** = estado distinto de No concluyente (D9). Ya no depende de
+`diagnostico.confianza-minima`, que sigue siendo un parámetro del motor (lo usa `SupplyRule`).
+
+**Lectura.** `Diagnostico` (listado), `DiagnosisCard` (snapshot) y `Diagnosis` (sector) traen
+`conf` (nulo en No concluyente), `confidence` y —las dos primeras— `detectionCount`; **no** traen las
+cajas, que serían decenas de KB por tarjeta. Se piden aparte:
+`GET /api/diagnosticos/{id}/detecciones` → `{"detections": [...]}`, o `404 {"error": …}` si el id no
+existe (incluye los `DG-` que el snapshot deriva del sector). Las detecciones se guardan como JSON en
+`diagnostico.detections` (texto): sólo se leen juntas para dibujarlas.
+
+**Criterio de diagnóstico — `GET/PUT /api/configuracion/diagnostico`** (tabla `diagnosis_criteria`):
+bandas de severidad por estado anómalo, en cantidad de hojas, y orden de criticidad.
+
+```json
+{
+  "severityBands": [
+    {"state": "Clorosis",     "minimum": 5, "mediumFrom": 10, "highFrom": 20},
+    {"state": "Estrés solar", "minimum": 5, "mediumFrom": 10, "highFrom": 20},
+    {"state": "Plaga foliar", "minimum": 2, "mediumFrom": 5,  "highFrom": 10},
+    {"state": "Daño fúngico", "minimum": 2, "mediumFrom": 4,  "highFrom": 8}
+  ],
+  "criticality": ["Daño fúngico", "Plaga foliar", "Clorosis", "Estrés solar"]
+}
+```
+
+- Se siembra con esos valores si la tabla está vacía; nunca pisa uno editado.
+- `severityBands` sale siempre en ese orden; `criticality[0]` es el más crítico.
+- El `PUT` reemplaza el criterio completo y devuelve el guardado. Rechaza con `400 {"error"}`
+  bandas que no sean enteros con `1 ≤ minimum < mediumFrom < highFrom`, un estado que falte, sobre o
+  se repita, y una criticidad que no sea una permutación de los cuatro estados. Cada cambio queda en
+  el historial como recalibración, firmado por el usuario de la sesión.
+- Es un recurso aparte de `/api/configuracion` a propósito: la lectura pide `diagnosticos.ver`,
+  que tiene la cuenta de rol Servicio del servicio de inferencia (no tiene `configuracion.ver`). No
+  vive en el catálogo de parámetros del motor: describe el diagnóstico, no una acción.
+- Los umbrales de **confianza** por clase no están acá: son del equipo y se configuran por variables
+  de entorno del servicio de inferencia.
+
+> **`SupplyRule` compara ahora el score promedio × 100.** El motor no se tocó en este cambio:
+> `SupplyRule` sigue leyendo `sector.diagnosis_conf` contra `diagnostico.confianza-minima` (85 %), pero
+> ese número dejó de ser "la confianza del diagnóstico" y pasó a ser el score promedio de las
+> detecciones del estado elegido, que con bandas de confianza por clase no es comparable entre
+> clases. Un No concluyente llega con `conf` nulo y la regla lo trata como "sin dato". La regla
+> queda **por rediseñar** sobre los niveles de severidad y confianza en un cambio posterior (ver
+> `docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md`, §4.5).
 
 ### Autenticación
 

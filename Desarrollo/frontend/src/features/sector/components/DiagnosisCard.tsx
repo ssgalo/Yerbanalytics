@@ -4,10 +4,11 @@ import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { buttonClass } from '@/components/ui/clases';
 import { useAuth } from '@/hooks/AuthContext';
 import { puedeVer, VISTAS } from '@/lib/vistas';
+import { hasConfidence, isAnomalous } from '@/lib/diagnosis';
+import { ConfidenceChip } from '@/features/diagnostics/components/ConfidenceChip';
 import type { DiagnosisDetail } from '@/types/domain';
 import { CapturaModal } from './CapturaModal';
 import styles from './DiagnosisCard.module.css';
@@ -72,6 +73,8 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
             estado={diag.estado}
             ago={ago}
             sectorId={sectorId}
+            diagnosisId={diag.diagnosisId}
+            detectionCount={diag.detectionCount}
             onClose={() => setCapturaAbierta(false)}
           />
         )}
@@ -80,33 +83,19 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
         <div className={styles.info}>
           <div className={styles.estadoRow}>
             <span className={styles.estadoText}>{diag.estado}</span>
-            <Badge soft={diag.sevSoft} ink={diag.sevInk} style={{ fontSize: '11.5px', fontWeight: 700, padding: '3px 10px' }}>
-              Severidad {diag.sev}
-            </Badge>
+            {/* La severidad sólo existe en los estados anómalos */}
+            {isAnomalous(diag.estado) && diag.sev !== '—' && (
+              <Badge soft={diag.sevSoft} ink={diag.sevInk} style={{ fontSize: '11.5px', fontWeight: 700, padding: '3px 10px' }}>
+                Severidad {diag.sev}
+              </Badge>
+            )}
           </div>
 
-          {/* Barra de confianza */}
-          <div className={styles.confSection}>
-            <div className={styles.confRow}>
-              <span>Nivel de confianza del modelo</span>
-              <span className={styles.confValue}>{diag.conf}%</span>
-            </div>
-            <ProgressBar value={diag.conf ?? 0} color="var(--brand)" height={8} />
-          </div>
-
-          {/* Caja concluyente — solo si supera el umbral */}
-          {diag.concluyente && (
-            <div className={styles.conclusionBox}>
-              <Icon
-                name="check"
-                size={17}
-                stroke="var(--ok)"
-                strokeWidth={2.2}
-                style={{ flexShrink: 0, marginTop: 1 }}
-              />
-              <span className={styles.conclusionText}>
-                Supera el umbral (85%): habilita acciones automáticas.
-              </span>
+          {/* Nivel de confianza. Qué hace el motor con el diagnóstico no se dice acá: es decisión
+              del motor. */}
+          {hasConfidence(diag.estado) && (
+            <div className={styles.confSection}>
+              <ConfidenceChip level={diag.confidence} />
             </div>
           )}
 

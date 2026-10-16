@@ -19,8 +19,11 @@ import type {
   CatalogoReglas,
   Configuracion,
   DagSchema,
+  Detection,
+  DiagnosisCriteria,
   ErrorParametro,
   DisposicionTopologia,
+  DiagnosisCard,
   HardwareData,
   NurseryData,
   NuevaTopologia,
@@ -63,7 +66,7 @@ export class HttpRepository implements DataRepository {
     }
     const data = (await res.json()) as NurseryData;
 
-    const diagnoses = data.diagnoses.map((d) => this.absolutizarImagen(d));
+    const diagnoses = data.diagnoses.map((d) => this.absolutizarImagen(normalizeCard(d)));
     const diagById: NurseryData['diagById'] = {};
     diagnoses.forEach((d) => (diagById[d.id] = d));
 
@@ -71,7 +74,7 @@ export class HttpRepository implements DataRepository {
       ...data,
       diagnoses,
       diagById,
-      recentDiag: data.recentDiag.map((d) => this.absolutizarImagen(d)),
+      recentDiag: data.recentDiag.map((d) => this.absolutizarImagen(normalizeCard(d))),
     };
   }
 
@@ -109,6 +112,38 @@ export class HttpRepository implements DataRepository {
       throw new Error(body?.error ?? `Error ${res.status} al guardar la configuración`);
     }
     return normalizeConfig((await res.json()) as Configuracion);
+  }
+
+  async getDiagnosisCriteria(): Promise<DiagnosisCriteria> {
+    const res = await apiFetch(`${this.baseUrl}/configuracion/diagnostico?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener el criterio de diagnóstico desde ${this.baseUrl}`);
+    }
+    return (await res.json()) as DiagnosisCriteria;
+  }
+
+  async saveDiagnosisCriteria(criteria: DiagnosisCriteria): Promise<DiagnosisCriteria> {
+    const res = await apiFetch(`${this.baseUrl}/configuracion/diagnostico`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(criteria),
+    });
+    if (!res.ok) {
+      // Un 400 trae { error } con un mensaje apto para mostrar (design D12).
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al guardar el criterio de diagnóstico`);
+    }
+    return (await res.json()) as DiagnosisCriteria;
+  }
+
+  async getDiagnosisDetections(diagnosisId: string): Promise<Detection[]> {
+    const res = await apiFetch(`${this.baseUrl}/diagnosticos/${encodeURIComponent(diagnosisId)}/detecciones`);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al obtener las detecciones de ${diagnosisId}`);
+    }
+    const body = (await res.json()) as { detections?: Detection[] | null };
+    return body.detections ?? [];
   }
 
   async getPlanRustificacion(zonaId: string): Promise<PlanRustificacion | null> {
@@ -363,6 +398,14 @@ export class HttpRepository implements DataRepository {
     }
     return ((await res.json()) as { visible: boolean }).visible === true;
   }
+}
+
+/**
+ * Tarjeta de diagnóstico con los campos del diagnóstico por detecciones siempre presentes: un
+ * backend anterior al cambio no los manda, y la vista los trata como "sin nivel" y sin cajas.
+ */
+function normalizeCard(d: DiagnosisCard): DiagnosisCard {
+  return { ...d, confidence: d.confidence ?? null, detectionCount: d.detectionCount ?? 0 };
 }
 
 /**

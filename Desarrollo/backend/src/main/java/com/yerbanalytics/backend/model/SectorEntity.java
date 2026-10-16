@@ -53,6 +53,10 @@ public class SectorEntity {
     @Column(name = "diagnosis_sev", nullable = false)
     private String diagnosisSev;
 
+    /** Nivel de confianza del diagnóstico vigente (Baja, Media, Alta); {@code null} si no aplica o es anterior. */
+    @Column(name = "diagnosis_confidence")
+    private String diagnosisConfidence;
+
     /**
      * Epoch ms de llegada del diagnóstico vigente ({@code creadoEn} del alta). Lo escribe sólo el alta de
      * diagnósticos; {@code null} si el sector nunca recibió uno.

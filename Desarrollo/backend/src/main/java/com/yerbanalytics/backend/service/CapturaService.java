@@ -20,7 +20,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -334,7 +336,7 @@ public class CapturaService {
         if (yaExiste.isPresent()) {
             CapturaEntity c = yaExiste.get();
             throw new OrdenYaResueltaException(
-                    new CapturaCreada(c.getId(), ordenId, imagenUrl(c.getId())));
+                    new CapturaCreada(c.getId(), ordenId, imagenUrl(c)));
         }
 
         if (o.getDispositivoId() != null && !o.getDispositivoId().equals(dispositivoId)) {
@@ -400,7 +402,7 @@ public class CapturaService {
             // Evidencia para evaluar si la consistencia fotométrica alcanza para entrenar.
             log.info("Captura {} — constraints aplicados: {}", capturaId, constraintsJson);
         }
-        return new CapturaCreada(capturaId, ordenId, imagenUrl(capturaId));
+        return new CapturaCreada(capturaId, ordenId, imagenUrl(capturaId, sha256Real));
     }
 
     // ==================================================================
@@ -571,16 +573,41 @@ public class CapturaService {
     }
 
     private EstadoOrden aEstadoOrden(OrdenCapturaEntity o) {
-        String capturaId = capturaRepo.findByOrdenId(o.getId()).map(CapturaEntity::getId).orElse(null);
+        CapturaEntity captura = capturaRepo.findByOrdenId(o.getId()).orElse(null);
         return new EstadoOrden(
                 o.getId(), o.getSectorId(), o.getZonaId(), o.getPosicionRiel(),
                 o.getEstado().name(), o.getIntentos(), o.getMotivoFallo(), o.getDetalleFallo(),
-                capturaId, capturaId != null ? imagenUrl(capturaId) : null,
+                captura != null ? captura.getId() : null,
+                captura != null ? imagenUrl(captura) : null,
                 o.getCreadaEn(), o.getEntregadaEn(), o.getVenceEn());
     }
 
-    public static String imagenUrl(String capturaId) {
-        return "/api/capturas/" + capturaId + "/imagen";
+    /**
+     * Ruta de la imagen, versionada por su contenido ({@code ?v=} con el comienzo del sha256).
+     *
+     * <p>La imagen se sirve como inmutable por un año, y eso sólo es correcto si una URL nunca
+     * cambia de contenido. El id solo no lo garantiza: los ids salen de un contador y se repiten
+     * si se purgan capturas, con lo que el navegador mostraría la foto vieja que tenía en caché.
+     * Atar la URL al hash hace que una foto distinta sea siempre una URL distinta. El endpoint
+     * ignora el parámetro: es sólo para el caché.
+     */
+    public static String imagenUrl(String capturaId, String sha256) {
+        String base = "/api/capturas/" + capturaId + "/imagen";
+        return sha256 == null || sha256.isBlank()
+                ? base
+                : base + "?v=" + sha256.substring(0, Math.min(16, sha256.length()));
+    }
+
+    public static String imagenUrl(CapturaEntity c) {
+        return imagenUrl(c.getId(), c.getSha256());
+    }
+
+    /** Ruta de la imagen de cada captura pedida que exista, por id. Una sola consulta. */
+    @Transactional(readOnly = true)
+    public Map<String, String> imagenUrls(Collection<String> capturaIds) {
+        Map<String, String> out = new HashMap<>();
+        capturaRepo.findAllById(capturaIds).forEach(c -> out.put(c.getId(), imagenUrl(c)));
+        return out;
     }
 
     private String siguienteCapturaId() {

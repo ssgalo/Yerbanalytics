@@ -54,27 +54,36 @@ services:
       #     POLLING_INTERVAL_SECONDS=20 docker compose up -d servicio-inferencia
       POLLING_INTERVAL_SECONDS: ${POLLING_INTERVAL_SECONDS:-14400}
       # Ruta al .pt dentro del contenedor (montado en volumes más abajo).
-      MODEL_PATH: /best.pt
+      MODEL_PATH: /modelo_final.pt
       # Orden de clases del modelo entrenado. NO es la taxonomía del backend:
-      # es la lista de ESTADOS_VALIDOS reordenada para que la posición N de esta
-      # lista corresponda a la clase N del modelo. model.py mapea por índice, no
-      # por nombre, así que un orden equivocado produce diagnósticos plausibles
-      # y completamente errados, sin ningún error que lo delate.
+      # es la lista de estados reordenada para que la posición N de esta lista
+      # corresponda a la clase N del modelo. model.py mapea por índice, no por
+      # nombre (al arrancar loguea el mapeo y exige la misma cantidad de clases),
+      # así que un orden equivocado produce diagnósticos plausibles y errados.
       #
       # Fuente de verdad: el propio checkpoint.
       #     docker compose run --rm --entrypoint python servicio-inferencia \
-      #       -c "from ultralytics import YOLO; print(YOLO('/best.pt').names)"
+      #       -c "from ultralytics import YOLO; print(YOLO('/modelo_final.pt').names)"
       #
-      # best.pt (YOLOv8s, detect, 5 clases) declara:
+      # modelo_final.pt (YOLOv8, detect, imgsz 1024, 5 clases) declara:
       #   0 clorosis · 1 colapso_hongos · 2 estres_solar · 3 plaga_foliar · 4 sano
-      #
-      # Este modelo NO predice Daño biótico, No concluyente ni Ácaro: no los vio.
       MODEL_CLASSES: "Clorosis,Daño fúngico,Estrés solar,Plaga foliar,Sano"
+      # Parámetros del equipo para el módulo de diagnóstico (ver README del servicio).
+      # PROVISORIOS hasta calibrarlos con las curvas PR; se cambian por entorno:
+      #     BANDAS_CONFIANZA_CLOROSIS=0.45,0.60,0.75 docker compose up -d servicio-inferencia
+      # Bandas = "válida desde, media desde, alta desde" sobre el score crudo.
+      YOLO_CONF_GLOBAL: ${YOLO_CONF_GLOBAL:-0.10}
+      SOLAPAMIENTO_IOU: ${SOLAPAMIENTO_IOU:-0.60}
+      BANDAS_CONFIANZA_SANO: ${BANDAS_CONFIANZA_SANO:-0.60,0.70,0.80}
+      BANDAS_CONFIANZA_CLOROSIS: ${BANDAS_CONFIANZA_CLOROSIS:-0.40,0.55,0.70}
+      BANDAS_CONFIANZA_ESTRES_SOLAR: ${BANDAS_CONFIANZA_ESTRES_SOLAR:-0.40,0.55,0.70}
+      BANDAS_CONFIANZA_PLAGA_FOLIAR: ${BANDAS_CONFIANZA_PLAGA_FOLIAR:-0.35,0.50,0.65}
+      BANDAS_CONFIANZA_DANO_FUNGICO: ${BANDAS_CONFIANZA_DANO_FUNGICO:-0.35,0.50,0.65}
     volumes:
       # Volumen compartido de imágenes con el backend.
       - ./Desarrollo/backend/capturas:/capturas
-      # Bind-mount del archivo .pt desde el host a la raíz del contenedor.
-      - ./best.pt:/best.pt:ro
+      # El modelo no se versiona (*.pt en .gitignore): se monta desde la carpeta del servicio.
+      - ./Desarrollo/servicio-inferencia/modelo_final.pt:/modelo_final.pt:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

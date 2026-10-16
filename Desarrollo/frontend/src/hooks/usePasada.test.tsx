@@ -25,7 +25,7 @@ const captura = (n: number, conDiag: boolean): PasoPasada => ({
   estadoOrden: 'RECIBIDA',
   capturaId: 'CAP-1',
   imagenUrl: '/x.jpg',
-  diagnostico: conDiag ? { estado: 'Clorosis', conf: 80, sev: 'Media', creadoEn: 1 } : null,
+  diagnostico: conDiag ? { estado: 'Clorosis', conf: 80, confidence: 'Alta', sev: 'Media', creadoEn: 1 } : null,
   iniciadoEn: 1,
   terminadoEn: 2,
 });

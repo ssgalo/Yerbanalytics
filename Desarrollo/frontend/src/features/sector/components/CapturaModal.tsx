@@ -6,9 +6,19 @@
    Si el diagnóstico nació de una captura real muestra la fotografía
    entera (sin recortar); si no hay foto —o no se puede cargar—, cae al
    gradiente que representa el estado detectado.
+
+   Si el diagnóstico tiene detecciones, ofrece Original · Diagnóstico ·
+   Todas. Arranca en Original (la foto tal cual) y las cajas se piden al
+   backend recién cuando se elige una vista que las muestra. Si el pedido
+   falla, la foto sigue a la vista con un aviso.
    ============================================================ */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { getRepository } from '@/data';
 import { Icon } from '@/components/ui/Icon';
+import { Segmented } from '@/components/ui/Seleccion';
+import type { Detection } from '@/types/domain';
+import { DetectionLegend, DetectionOverlay } from './DetectionOverlay';
+import type { BoxView } from './detectionView';
 import styles from './CapturaModal.module.css';
 
 interface CapturaModalProps {
@@ -18,13 +28,53 @@ interface CapturaModalProps {
   estado: string;
   ago: string;
   sectorId: string;
+  /** Diagnóstico cuyas cajas se pueden pedir; sin él, no hay selector. */
+  diagnosisId?: string | null;
+  /** Detecciones guardadas con el diagnóstico; con 0, no hay selector. */
+  detectionCount?: number;
   onClose: () => void;
 }
 
-export function CapturaModal({ thumb, imagenUrl, estado, ago, sectorId, onClose }: CapturaModalProps) {
+type BoxesState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ok'; detections: Detection[] }
+  | { status: 'error' };
+
+const VIEWS: { value: BoxView; label: string }[] = [
+  { value: 'original', label: 'Original' },
+  { value: 'diagnosis', label: 'Diagnóstico' },
+  { value: 'all', label: 'Todas' },
+];
+
+/** Un clic sobre la foto o los controles no cierra el modal. */
+const keepOpen = (e: MouseEvent) => e.stopPropagation();
+
+export function CapturaModal({
+  thumb,
+  imagenUrl,
+  estado,
+  ago,
+  sectorId,
+  diagnosisId,
+  detectionCount = 0,
+  onClose,
+}: CapturaModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [imagenRota, setImagenRota] = useState(false);
+  const [view, setView] = useState<BoxView>('original');
+  const [boxes, setBoxes] = useState<BoxesState>({ status: 'idle' });
+  const mounted = useRef(true);
   const conFoto = !!imagenUrl && !imagenRota;
+  // Las cajas sólo tienen sentido sobre la fotografía
+  const offersBoxes = conFoto && !!diagnosisId && detectionCount > 0;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -41,6 +91,23 @@ export function CapturaModal({ thumb, imagenUrl, estado, ago, sectorId, onClose 
       document.body.style.overflow = overflowPrevio;
     };
   }, [onClose]);
+
+  function loadBoxes() {
+    if (!diagnosisId) return;
+    setBoxes({ status: 'loading' });
+    getRepository()
+      .getDiagnosisDetections(diagnosisId)
+      .then((detections) => mounted.current && setBoxes({ status: 'ok', detections }))
+      .catch(() => mounted.current && setBoxes({ status: 'error' }));
+  }
+
+  function choose(next: BoxView) {
+    setView(next);
+    // Se piden una sola vez, la primera vez que hacen falta (o de nuevo si fallaron).
+    if (next !== 'original' && (boxes.status === 'idle' || boxes.status === 'error')) loadBoxes();
+  }
+
+  const showBoxes = offersBoxes && view !== 'original';
 
   return (
     <div
@@ -62,18 +129,43 @@ export function CapturaModal({ thumb, imagenUrl, estado, ago, sectorId, onClose 
         </button>
       </div>
 
-      {/* Frena la propagación: un clic sobre la imagen no debe cerrar */}
+      {offersBoxes && (
+        <div className={styles.tools} onClick={keepOpen}>
+          <Segmented label="Cajas sobre la foto" options={VIEWS} value={view} onChange={choose} />
+          <div className={styles.toolsInfo} aria-live="polite">
+            {showBoxes && boxes.status === 'loading' && <p className={styles.note}>Cargando las cajas…</p>}
+            {showBoxes && boxes.status === 'error' && (
+              <p className={styles.note} role="alert">
+                <Icon name="alert" size={15} />
+                No se pudieron cargar las cajas: se muestra la foto original.
+                <button type="button" className={styles.retry} onClick={loadBoxes}>
+                  Reintentar
+                </button>
+              </p>
+            )}
+            {showBoxes && boxes.status === 'ok' && (
+              <DetectionLegend detections={boxes.detections} diagnosedState={estado} view={view} />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className={styles.stage}>
         {conFoto ? (
-          <img
-            className={styles.foto}
-            src={imagenUrl}
-            alt={`Captura cenital del sector ${sectorId}`}
-            onClick={(e) => e.stopPropagation()}
-            onError={() => setImagenRota(true)}
-          />
+          // El marco toma el tamaño exacto de la imagen renderizada: las cajas quedan alineadas.
+          <div className={styles.frame} onClick={keepOpen}>
+            <img
+              className={styles.foto}
+              src={imagenUrl}
+              alt={`Captura cenital del sector ${sectorId}`}
+              onError={() => setImagenRota(true)}
+            />
+            {showBoxes && boxes.status === 'ok' && (
+              <DetectionOverlay detections={boxes.detections} diagnosedState={estado} view={view} />
+            )}
+          </div>
         ) : (
-          <div className={styles.respaldo} style={{ background: thumb }} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.respaldo} style={{ background: thumb }} onClick={keepOpen}>
             <Icon name="leaf-simple" size={220} stroke="rgba(255,255,255,.5)" strokeWidth={1} />
           </div>
         )}

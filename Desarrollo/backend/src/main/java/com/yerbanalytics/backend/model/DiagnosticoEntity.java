@@ -50,14 +50,46 @@ public class DiagnosticoEntity {
     @Column(name = "estado", nullable = false)
     private String estado;
 
-    /** Confianza del modelo, 0-100. */
-    @Column(name = "conf", nullable = false)
+    /**
+     * Score promedio del estado diagnosticado × 100 (0-100). {@code null} en No concluyente.
+     *
+     * <p>{@code ddl-auto=update} no quita el {@code NOT NULL} que tenía la columna: hace falta
+     * {@code migracion-diagnostico-detecciones.sql}.
+     */
+    @Column(name = "conf")
     private Double conf;
 
-    /** Severidad asignada (Alta, Media, Baja o em dash). */
+    /** Severidad asignada (Alta, Media, Baja o em dash cuando no aplica). */
     @Column(name = "sev", nullable = false)
     private String sev;
 
+    /**
+     * Nivel de confianza del diagnóstico (Baja, Media, Alta). {@code null} en No concluyente y en
+     * los diagnósticos anteriores a este campo, que la vista muestra "sin nivel".
+     */
+    @Column(name = "confidence")
+    private String confidence;
+
+    /**
+     * Detecciones que intervinieron, como JSON ({@code [{"label", "score", "box"}]}). Se leen
+     * siempre juntas para dibujarlas, nunca por campo: por eso no son una tabla (design D8).
+     */
+    @Column(name = "detections", columnDefinition = "text")
+    private String detections;
+
+    /**
+     * Cantidad de detecciones, para que el snapshot no tenga que parsear el JSON. Nullable a
+     * propósito: {@code ddl-auto} la agrega a una tabla con filas, y las anteriores quedan en
+     * {@code null}, que se lee como 0 ({@link #getDetectionCount()}).
+     */
+    @Column(name = "detection_count")
+    private Integer detectionCount;
+
     @Column(name = "creado_en", nullable = false)
     private Long creadoEn;
+
+    /** Cantidad de detecciones; las filas anteriores a la columna cuentan 0. */
+    public int getDetectionCount() {
+        return detectionCount != null ? detectionCount : 0;
+    }
 }

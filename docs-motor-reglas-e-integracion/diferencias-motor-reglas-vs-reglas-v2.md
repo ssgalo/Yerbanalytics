@@ -289,6 +289,19 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 
 La sección F del documento está marcada **Sin revisar**; todas las diferencias de esta sección caen ahí.
 
+> **Cambio de semántica de `conf` (`add-diagnostico-por-detecciones`, 16/10/2026).** El diagnóstico ya no
+> sale de la caja de mayor score: el módulo de diagnóstico del servicio de inferencia agrega todas las
+> detecciones y emite estado, nivel de severidad (`Baja`/`Media`/`Alta`, por cantidad de hojas contra el
+> criterio del agrónomo, `GET/PUT /api/configuracion/diagnostico`) y nivel de confianza (por bandas de
+> score propias de cada clase). El campo numérico `conf` se conservó para no tocar el motor y ahora es el
+> **score promedio × 100** del estado diagnosticado; en No concluyente llega nulo. `SupplyRule` no cambió:
+> sigue comparando ese número contra `diagnostico.confianza-minima` (85 %), así que hoy dosifica cuando el
+> score promedio de las detecciones del estado elegido supera 0,85, que **no** equivale a "confianza
+> suficiente" (los scores no son comparables entre clases y el nivel de confianza ya lo resuelve el
+> módulo). Con `conf` nulo cae en "sin dato" → `NOOP_INFO`. **La regla queda por rediseñar** sobre los
+> niveles de severidad y confianza en un cambio posterior. Además, `concluyente` dejó de usar
+> `diagnostico.confianza-minima`: ahora es "estado distinto de No concluyente".
+
 - **Qué hace el código.** `SupplyRule` (prioridad 11, rama INSUMO): si el estado del sector no es `critical` → `NOOP_INFO`; si la confianza es nula → `NOOP_INFO`; si `conf ≥ diagnostico.confianza-minima` (85 %; rango 50-100) → `ACTIVAR_BOMBA`; si no → `NOOP_INFO` (`rules/SupplyRule.java:65-95`). No lee la clase del diagnóstico (sólo la cita en el texto), ni la severidad, ni la antigüedad.
 - **El "estado crítico" viene de sensores, no de la IA.** `finalStatus` es `critical` si cualquier métrica con `afectaEstado` está `critical` (`service/NurseryService.java:517-530`). Por las bandas actuales esto incluye humedad de sustrato, humedad ambiental, temperatura, **luminosidad** (`uv` crítica si < 20 % o > 85 %) y CE (`constant/NurseryConstants.java:58-64`). Una lectura de luminosidad baja pasa el sector a `critical` y, con el diagnóstico sintético, puede activar la bomba. Es una consecuencia de las bandas y la lógica leídas; no se ejecutó.
 - **Diagnóstico sintético** (`service/NurseryService.java:548-566`): `ok` → "Sano" 98 %; `warning` → "Clorosis"/Media; `critical` → "Daño fúngico"/Alta con confianza 92 % (`constant/NurseryConstants.java:80-90`). Si el sector ya estaba en `warning`/`critical` con un diagnóstico real (cargado por `POST /api/diagnosticos`), se conserva (555-556). Si el estado vuelve a `ok`, se pisa con "Sano".
@@ -309,7 +322,7 @@ La sección F del documento está marcada **Sin revisar**; todas las diferencias
 - **Dosis y bomba.** Doc: un insumo por tanque; dosis 100 mL por sector; `t = dosis / caudal`; la orden lleva duración y el ESP32 corta solo; stock descontado y alertas al 20 % / tanque vacío (§8.1-8.2, §11).
 - Código: una sola acción `ACTIVAR_BOMBA` sin tipo de insumo ni dosis; el comando es `pump ON` con `parametros` vacíos (`engine/ActionExecutor.java:130`). Desde el 10/10/2026 el firmware acepta `pump ON` sin `ml`: bombea `INSUMO_SEG_POR_DEFECTO` (10 s) por la válvula del sector (`Desarrollo/embebido/actuacion/act_riego.cpp`); antes la rechazaba. No hay stock/tanques, ni reingreso restringido de 24 h, ni marca de "aplicado" más allá del evento de historial "Insumo" (y su enganche, ver R-06).
 - La dosis máxima por 24 h (`insumoDosisMax24hMl`, default 15) **ya no la lee el motor**: la regla cuenta eventos contra `insumo.max-dosis-24h` (1) y su texto muestra ese valor (`rules/DailyDoseLimitRule.java:90-96`).
-- **P-D1** vigente: parcial. Sólo confianza ≥ `diagnostico.confianza-minima` (85 %; el doc: 70 % configurable 50-95, última captura, ≤ 48 h) (`rules/SupplyRule.java:76-77`). El mismo parámetro lo usa `DiagnosticoService.esConcluyente` (`service/DiagnosticoService.java:134`), que sólo alimenta la presentación (`service/NurseryService.java:772`), no el motor.
+- **P-D1** vigente: parcial. Sólo confianza ≥ `diagnostico.confianza-minima` (85 %; el doc: 70 % configurable 50-95, última captura, ≤ 48 h) (`rules/SupplyRule.java:76-77`). Desde `add-diagnostico-por-detecciones` el parámetro ya no decide la marca de concluyente (`DiagnosticoService.esConcluyente` mira sólo el estado) y `conf` es el score promedio × 100 del estado diagnosticado (ver la nota de 4.5).
 - **P-D2** intervalo mínimo: `DailyDoseLimitRule` bloquea con `ABORT_INSUMO` si hay ≥ `insumo.max-dosis-24h` (1) eventos "Insumo" en 24 h para el sector (`rules/DailyDoseLimitRule.java:86-98`). Cubre "no más de una aplicación por día" pero no el intervalo de 5 días (fertilizante) / 7 días (fitosanitario) ni el orden fitosanitario → fertilizante.
 - **P-D3** ventana y temperatura ≤ 30 °C: no existe.
 - **P-D4** lluvia ≥ 5 mm en 6 h: no existe (`SupplyRule` no usa el pronóstico).

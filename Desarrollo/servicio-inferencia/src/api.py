@@ -2,8 +2,10 @@
 api.py — Cliente HTTP para la comunicación con el backend de Yerbanalytics.
 
 Responsabilidades:
-  - GET /api/capturas/pendientes-inactivas  → lista de capturas sin diagnóstico si el ciclo terminó.
-  - POST /api/diagnosticos                    → registro del resultado de inferencia.
+  - GET  /api/capturas/pendientes-inactivas  → lista de capturas sin diagnóstico si el ciclo terminó.
+  - GET  /api/configuracion/diagnostico      → criterio del agrónomo (bandas de severidad y orden
+                                               de criticidad), leído una vez por ciclo.
+  - POST /api/diagnosticos                   → alta del diagnóstico con sus detecciones.
 
 Autenticación: el backend exige sesión de usuario en toda /api/**, y este servicio entra como
 cualquier otro cliente, con una cuenta de rol Servicio que da de alta el Administrador desde el
@@ -23,6 +25,8 @@ import threading
 from dataclasses import dataclass
 
 import requests
+
+from diagnosis import Criteria, Diagnosis, SeverityBands
 
 logger = logging.getLogger(__name__)
 
@@ -149,56 +153,74 @@ def obtener_pendientes() -> list[CapturaPendiente]:
     return pendientes
 
 
-def registrar_diagnostico(
-    captura_id: str,
-    estado: str,
-    confianza: float,
-    severidad: str,
-) -> None:
+def fetch_criteria() -> Criteria:
     """
-    Registra el resultado de la inferencia en el backend.
+    Lee el criterio de diagnóstico vigente (`GET /api/configuracion/diagnostico`, design D12).
 
-    El backend toma el sectorId y zonaId directamente de la captura referenciada,
-    así que el servicio de inferencia solo necesita proveer el capturaId y el
-    resultado del modelo.
+    Formato: `{"severityBands": [{"state", "minimum", "mediumFrom", "highFrom"}, …],
+    "criticality": [estado más crítico, …]}`.
 
-    Args:
-        captura_id:  ID de la captura analizada.
-        estado:      Estado de salud según la taxonomía del backend.
-        confianza:   Confidence score como porcentaje (0.0–100.0).
-        severidad:   "Alta", "Media" o "Baja".
+    Raises:
+        requests.RequestException: ante cualquier fallo de red o HTTP ≥ 400.
+        ValueError: si la respuesta no tiene el formato esperado.
+    """
+    response = _request("GET", "/api/configuracion/diagnostico")
+    response.raise_for_status()
+    data = response.json()
+    try:
+        bands = {
+            item["state"]: SeverityBands(
+                minimum=int(item["minimum"]),
+                medium_from=int(item["mediumFrom"]),
+                high_from=int(item["highFrom"]),
+            )
+            for item in data["severityBands"]
+        }
+        criticality = tuple(str(state) for state in data["criticality"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"El criterio de diagnóstico del backend no tiene el formato esperado: {exc!r}") from exc
+    logger.debug("Criterio de diagnóstico: bandas=%s criticidad=%s", bands, criticality)
+    return Criteria(severity_bands=bands, criticality=criticality)
+
+
+def build_payload(captura_id: str, diagnosis: Diagnosis) -> dict:
+    """
+    Arma el cuerpo del alta (design D7/D12).
+
+    `sev` sólo en estados anómalos; `confidence` y `conf` (score promedio × 100) salvo en
+    No concluyente. `detections` lleva todas las válidas que sobrevivieron a los solapes.
+    """
+    payload: dict = {"capturaId": captura_id, "estado": diagnosis.state}
+    if diagnosis.severity is not None:
+        payload["sev"] = diagnosis.severity
+    if diagnosis.confidence is not None:
+        payload["confidence"] = diagnosis.confidence
+    if diagnosis.mean_score is not None:
+        payload["conf"] = round(diagnosis.mean_score * 100, 2)
+    payload["detections"] = [
+        {"label": d.label, "score": d.score, "box": list(d.box)} for d in diagnosis.detections
+    ]
+    return payload
+
+
+def registrar_diagnostico(captura_id: str, diagnosis: Diagnosis) -> None:
+    """
+    Registra el diagnóstico en el backend por el camino único de alta (`POST /api/diagnosticos`).
+
+    El backend toma el sector y la zona de la captura referenciada, así que el servicio sólo
+    provee el capturaId y el resultado.
 
     Raises:
         requests.RequestException: ante cualquier fallo de red o HTTP ≥ 400.
     """
-    payload = {
-        "capturaId": captura_id,
-        "estado": estado,
-        "conf": confianza,
-        "sev": severidad,
-    }
+    payload = build_payload(captura_id, diagnosis)
     response = _request("POST", "/api/diagnosticos", json=payload)
+    if response.status_code == 400:
+        # El backend explica en {"error": …} qué campo rechazó: vale la pena dejarlo en el log.
+        logger.error("El backend rechazó el alta de %s: %s", captura_id, response.text)
     response.raise_for_status()
     logger.info(
-        "Diagnóstico registrado — captura=%s estado=%s confianza=%.1f%% severidad=%s",
-        captura_id, estado, confianza, severidad,
+        "Diagnóstico registrado — captura=%s estado=%s severidad=%s confianza=%s conf=%s detecciones=%d",
+        captura_id, diagnosis.state, payload.get("sev", "—"), payload.get("confidence", "—"),
+        payload.get("conf", "—"), len(payload["detections"]),
     )
-
-
-def obtener_configuracion() -> dict:
-    """
-    Consulta la configuración operativa actual del vivero.
-
-    Pide `configuracion.ver`, que el rol Servicio no trae en la matriz por defecto: sin ese
-    permiso el backend responde 403 y esto devuelve {}.
-
-    Returns:
-        Dict con la configuración, o diccionario vacío si falla.
-    """
-    try:
-        response = _request("GET", "/api/configuracion")
-        response.raise_for_status()
-        return response.json()
-    except Exception as exc:
-        logger.warning("No se pudo obtener la configuración del backend: %s", exc)
-        return {}

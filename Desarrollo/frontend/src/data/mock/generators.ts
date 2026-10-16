@@ -23,6 +23,7 @@ import type {
   Zona,
 } from '@/types/domain';
 import { capturaDemo } from './capturasDemo';
+import { mockConfidenceLevel, mockDetections } from './detections';
 import catalogo from './catalogoReglas.fixture.json';
 import { ACT, C, LAB, actTpl, pathos, resMap, sevMap, specs, tints, zonaDefs } from './specs';
 import {
@@ -224,18 +225,25 @@ function makeSector(
   const finalStatus: Status = peor(piso, plantin);
 
   // diagnóstico
+  // `conf` es el score promedio × 100 del estado diagnosticado, y el nivel de confianza sale de
+  // ubicarlo en las bandas de su clase. No concluyente no tiene ninguno de los dos.
   let diagnosis: Sector['diagnosis'];
   if (finalStatus === 'offline') {
-    diagnosis = { estado: 'Sin diagnóstico', conf: null, sev: '—' };
+    diagnosis = { estado: 'Sin diagnóstico', conf: null, confidence: null, sev: '—' };
   } else if (finalStatus === 'ok') {
-    diagnosis = { estado: 'Sano', conf: Math.round(rr(r, 95, 99)), sev: '—' };
+    const conf = Math.round(rr(r, 95, 99));
+    diagnosis = { estado: 'Sano', conf, confidence: mockConfidenceLevel('Sano', conf), sev: '—' };
   } else {
     const isNC = r() > 0.86;
     if (isNC) {
-      diagnosis = { estado: 'No concluyente', conf: Math.round(rr(r, 64, 83)), sev: '—' };
+      // Se consume igual el número que antes era su confianza: no correr la secuencia del vivero.
+      rr(r, 64, 83);
+      diagnosis = { estado: 'No concluyente', conf: null, confidence: null, sev: '—' };
     } else {
       const p = pick(r, pathos[finalStatus]);
-      diagnosis = { estado: p[0], conf: Math.round(rr(r, 86, 98)), sev: p[1] };
+      // Rango amplio: la demo muestra los tres niveles de confianza (con las bandas provisorias).
+      const conf = Math.round(rr(r, 48, 97));
+      diagnosis = { estado: p[0], conf, confidence: mockConfidenceLevel(p[0], conf), sev: p[1] };
     }
   }
 
@@ -416,19 +424,26 @@ export function buildNursery(
       pulse: s.status === 'critical' ? 'ybPulse 2s infinite' : 'none',
     }));
 
-  // diagnósticos
+  // diagnósticos — todos los de la demo nacen de una captura (tienen foto), así que llevan id
+  // `DX-` como los persistidos del backend, y sus detecciones.
   let dn = 0;
+  const diagnosisId = (n: number) => 'DX-' + String(n).padStart(5, '0');
+  const detectionCount = (id: string, estado: string, sev: Severity, conf: number | null) =>
+    mockDetections(id, estado, sev, conf).length;
   const diagnoses: DiagnosisCard[] = sectors
     .filter((s) => s.diagnosis.estado !== 'Sano' && s.diagnosis.estado !== 'Sin diagnóstico')
     .map((s) => {
       dn++;
       const d = s.diagnosis;
+      const id = diagnosisId(dn);
       return {
-        id: 'DG-' + String(dn).padStart(3, '0'),
+        id,
         sectorId: s.id,
         zonaName: s.zonaName,
         estado: d.estado,
-        conf: d.conf as number,
+        conf: d.conf,
+        confidence: d.confidence,
+        detectionCount: detectionCount(id, d.estado, d.sev, d.conf),
         sev: d.sev,
         sevSoft: sevMap[d.sev].soft,
         sevInk: sevMap[d.sev].ink,
@@ -436,19 +451,24 @@ export function buildNursery(
         imagenUrl: capturaDemo(d.estado, dn),
         time: agoPorZona[s.zona] ?? 'hace —',
         creadoEn: lecturaPorZona[s.zona] ?? null,
-        concluyente: (d.conf as number) >= 85,
+        concluyente: d.estado !== 'No concluyente',
       };
     });
   // entradas "No concluyente" adicionales
   const ncSectors = sectors.filter((s) => s.status === 'warning').slice(0, 3);
   ncSectors.forEach((s) => {
     dn++;
+    // Se consume el número que antes era su confianza: no correr la secuencia del vivero.
+    rr(r, 62, 83);
+    const id = diagnosisId(dn);
     diagnoses.push({
-      id: 'DG-' + String(dn).padStart(3, '0'),
+      id,
       sectorId: s.id,
       zonaName: s.zonaName,
       estado: 'No concluyente',
-      conf: Math.round(rr(r, 62, 83)),
+      conf: null,
+      confidence: null,
+      detectionCount: detectionCount(id, 'No concluyente', '—', null),
       sev: '—',
       sevSoft: sevMap['—'].soft,
       sevInk: sevMap['—'].ink,

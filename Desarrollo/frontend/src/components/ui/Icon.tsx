@@ -30,6 +30,8 @@ export type IconName =
   | 'camera'
   | 'calendar'
   | 'chevron-down'
+  | 'chevron-up'
+  | 'detections'
   | 'sort'
   | 'sort-asc'
   | 'sort-desc'
@@ -221,6 +223,14 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
+  'chevron-up': <path d="M6 15l6-6 6 6" />,
+  // Criterio de diagnóstico: cajas de detección sobre hojas, una resaltada.
+  detections: (
+    <>
+      <rect x="3" y="3" width="11" height="11" rx="1.5" />
+      <path d="M10 17v3a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-3" strokeDasharray="2.5 2" />
+    </>
+  ),
   sort: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />,
   'sort-asc': <path d="M7 20V4M3 8l4-4 4 4M14 6h7M14 12h5M14 18h3" />,
   'sort-desc': <path d="M7 4v16M3 16l4 4 4-4M14 6h3M14 12h5M14 18h7" />,

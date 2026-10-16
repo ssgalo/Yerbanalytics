@@ -41,4 +41,19 @@ class HistorialServiceConfiguracionTest {
         assertThat(e.getSectorId()).isEqualTo("—");
         assertThat(e.isEvoShow()).isFalse();
     }
+
+    @Test
+    void laRecalibracionDelCriterioDeDiagnosticoQuedaConSuUsuario() {
+        HistorialService service = new HistorialService(historialRepository, sectorRepository,
+                configuracionService, 120000, "2 min", 5, java.time.Clock.systemUTC());
+
+        service.registrarCriterioDiagnostico("Ana", "Criterio de diagnóstico actualizado.");
+
+        ArgumentCaptor<HistorialEventoEntity> captor = ArgumentCaptor.forClass(HistorialEventoEntity.class);
+        verify(historialRepository).save(captor.capture());
+        HistorialEventoEntity e = captor.getValue();
+        assertThat(e.getTipo()).isEqualTo("Configuración");
+        assertThat(e.getLectura()).contains("criterio de diagnóstico").contains("Ana");
+        assertThat(e.getAccion()).isEqualTo("Criterio de diagnóstico actualizado.");
+    }
 }

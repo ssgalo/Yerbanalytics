@@ -251,6 +251,7 @@ public class TopologiaService {
         s.setReason(LABEL_OFFLINE);
         s.setDiagnosisEstado(DIAG_OFFLINE);
         s.setDiagnosisConf(null);
+        s.setDiagnosisConfidence(null);
         s.setDiagnosisSev(SEV_OFFLINE);
         s.setActuadorValve(VALVE_OFFLINE);
         s.setActuadorPump(PUMP_OFFLINE);

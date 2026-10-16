@@ -41,7 +41,7 @@ class PasadaRielControllerTest {
                 null, null, null, null, null, 1759514400010L, 1759514421800L);
         PasoPasada foto = new PasoPasada(2, "CAPTURAR", 1, "MZ-1-001", "OK", null, null, null,
                 "orden-1", "RECIBIDA", "CAP-000042", "/api/capturas/CAP-000042/imagen",
-                new DiagnosticoPaso("Clorosis", 87.0, "Media", 1759514530000L), 1759514422000L, 1759514431000L);
+                new DiagnosticoPaso("Clorosis", 87.0, "Media", "Media", 1759514530000L), 1759514422000L, 1759514431000L);
         return new Pasada("p-1", "EN_CURSO", 1759514400000L, null, false, null, List.of(mover, foto));
     }
 
@@ -74,7 +74,7 @@ class PasadaRielControllerTest {
     }
 
     @Test
-    void elDiagnosticoSeSerializaConSusCuatroClaves() throws Exception {
+    void elDiagnosticoSeSerializaConSusClaves() throws Exception {
         when(service.estado()).thenReturn(Optional.of(pasada()));
 
         mockMvc.perform(get("/api/pasadas/actual"))
@@ -83,6 +83,7 @@ class PasadaRielControllerTest {
                 .andExpect(jsonPath("$.pasos[1].diagnostico.estado").value("Clorosis"))
                 .andExpect(jsonPath("$.pasos[1].diagnostico.conf").value(87.0))
                 .andExpect(jsonPath("$.pasos[1].diagnostico.sev").value("Media"))
+                .andExpect(jsonPath("$.pasos[1].diagnostico.confidence").value("Media"))
                 .andExpect(jsonPath("$.pasos[1].diagnostico.creadoEn").value(1759514530000L))
                 .andExpect(jsonPath("$.pasos[0].diagnostico").value((Object) null));
     }

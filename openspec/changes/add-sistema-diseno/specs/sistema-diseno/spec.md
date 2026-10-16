@@ -48,7 +48,7 @@ que lo diga.
 ### Requirement: Componentes del sistema
 `src/components/ui/` SHALL ofrecer: `Button`, `Chip`, `StateGlyph`, `Callout`, `Field`, `Input`,
 `Select`, `InputUnit`, `Segmented`, `FilterChip`, `Switch`, `SaveBar`, `Skeleton`, `EmptyState`,
-`OfflineBanner`, `CompositionBar`, `RangeBar`, `ConfidenceBar` y `SectorCell`. Una vista nueva o
+`OfflineBanner`, `CompositionBar`, `RangeBar` y `SectorCell`. Una vista nueva o
 rediseñada SHALL usarlos en lugar de reimplementar el control.
 
 #### Scenario: Selección accesible

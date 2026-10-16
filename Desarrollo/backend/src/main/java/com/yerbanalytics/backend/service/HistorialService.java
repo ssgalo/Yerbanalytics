@@ -241,6 +241,18 @@ public class HistorialService {
                 detalle);
     }
 
+    /**
+     * Recalibración del criterio de diagnóstico (bandas de severidad y orden de criticidad). Va con
+     * su propio texto: no es la configuración agronómica ni el catálogo de parámetros del motor.
+     */
+    @Transactional
+    public void registrarCriterioDiagnostico(String usuario, String detalle) {
+        registrarConfiguracion(
+                "Recalibración del criterio de diagnóstico por " + usuario + ".",
+                "Se validaron las bandas de severidad (enteros, mínimo < media < alta) y el orden de criticidad.",
+                detalle);
+    }
+
     private void registrarConfiguracion(String lectura, String decision, String accion) {
         HistorialEventoEntity e = new HistorialEventoEntity();
         e.setId(UUID.randomUUID().toString());

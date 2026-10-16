@@ -30,6 +30,9 @@ export const VISTAS = {
   configuracion: { ruta: '/configuracion', permisos: ['configuracion.ver'] },
   // Preferencias es parte de la misma configuración agronómica: mismo permiso.
   preferencias: { ruta: '/preferencias', permisos: ['configuracion.ver'] },
+  // El criterio de diagnóstico se lee con `diagnosticos.ver` (`GET /api/configuracion/diagnostico`)
+  // y es una vista de Configuración: hacen falta los dos. Editarlo, `configuracion.editar`.
+  criterioDiagnostico: { ruta: '/criterio-diagnostico', permisos: ['configuracion.ver', 'diagnosticos.ver'] },
   reglas: { ruta: '/reglas', permisos: ['reglas.ver', 'vivero.ver'] },
   hardware: { ruta: '/hardware', permisos: ['hardware.ver'] },
   topologia: { ruta: '/topologia', permisos: ['topologia.ver'] },
@@ -44,6 +47,7 @@ const ORDEN: readonly ClaveVista[] = [
   'diagnosticos',
   'historial',
   'configuracion',
+  'criterioDiagnostico',
   'reglas',
   'hardware',
   'topologia',

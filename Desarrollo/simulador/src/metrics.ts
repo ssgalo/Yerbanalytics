@@ -52,4 +52,12 @@ export const DIAGNOSIS_STATES = [
   'No concluyente',
 ];
 
-export const SEVERITIES = ['—', 'Baja', 'Media', 'Alta'];
+/** Levels shared by severity and confidence. Mirrors `ConfidenceLevel` in the backend contract. */
+export const LEVELS = ['Baja', 'Media', 'Alta'];
+
+/** States without severity: healthy or inconclusive. Every other state is an anomaly. */
+const NON_ANOMALOUS = ['Sano', 'No concluyente'];
+
+export function isAnomalous(state: string): boolean {
+  return !NON_ANOMALOUS.includes(state);
+}

@@ -11,7 +11,7 @@ import { LimitesActuadoresForm } from './components/LimitesActuadoresForm';
 import { SeguimientoForm } from './components/SeguimientoForm';
 import { ShadeScheduleForm } from './components/ShadeScheduleForm';
 import { ConfigFieldset, ConfigLayout, ConfigRow, ConfigSection } from './components/ConfigLayout';
-import { pendingFixes, useConfigDraft } from './useConfigDraft';
+import { configAudit, pendingFixes, useConfigDraft } from './useConfigDraft';
 
 export function ConfiguracionPage() {
   const state = useConfigDraft();
@@ -55,6 +55,7 @@ export function ConfiguracionPage() {
   return (
     <ConfigLayout
       state={state}
+      audit={configAudit}
       editable={editable}
       onReset={onReset}
       blockedReason={pendingFixes(errors)}

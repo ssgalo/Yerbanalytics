@@ -34,9 +34,16 @@ const GESTION: NavItem[] = [{ to: '/historial', vista: VISTAS.historial, icon: '
 
 /* Grupo desplegable "Configuración": todo lo que ajusta cómo opera el sistema. Umbrales y
    Preferencias editan partes de la misma configuración agronómica (Umbrales sigue en
-   /configuracion). Los planes de rustificación no están acá: son de cada macro-zona. */
+   /configuracion); el criterio de diagnóstico es otro recurso, con su propia ruta. Los planes de
+   rustificación no están acá: son de cada macro-zona. */
 const CONFIGURACION: NavItem[] = [
   { to: '/configuracion', vista: VISTAS.configuracion, icon: 'gauge', label: 'Umbrales' },
+  {
+    to: '/criterio-diagnostico',
+    vista: VISTAS.criterioDiagnostico,
+    icon: 'detections',
+    label: 'Criterio de diagnóstico',
+  },
   { to: '/reglas', vista: VISTAS.reglas, icon: 'rules', label: 'Motor de reglas' },
   { to: '/hardware', vista: VISTAS.hardware, icon: 'hardware', label: 'Hardware' },
   { to: '/topologia', vista: VISTAS.topologia, icon: 'cube', label: 'Topología' },

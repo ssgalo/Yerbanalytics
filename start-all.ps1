@@ -152,18 +152,26 @@ if ($haySimulador) {
 $inferenciaDir = Join-Path $ScriptRoot "Desarrollo\servicio-inferencia"
 $hayInferencia = Test-Path $inferenciaDir
 
-# Si el servicio de inferencia existe pero no tiene .env, copiar el ejemplo.
-# Sin .env, el contenedor crashea en el primer arranque porque MODEL_PATH es obligatoria.
-# El script no fuerza el arranque del servicio: Docker Compose lo levanta junto con los otros.
+# El servicio de inferencia corre en Docker y toma su configuracion de docker-compose.yml, no
+# de su .env (ese es para correrlo a mano con Python). Igual se crea, para que quede listo.
 if ($hayInferencia) {
     $infEnv = Join-Path $inferenciaDir ".env"
     if (-not (Test-Path $infEnv)) {
         Copy-Item (Join-Path $inferenciaDir ".env.example") $infEnv
         Write-Host "[setup] .env del servicio de inferencia creado desde .env.example." -ForegroundColor Yellow
-        Write-Host "        IMPORTANTE: editá MODEL_PATH y MODEL_CLASSES en:" -ForegroundColor Yellow
-        Write-Host "        $infEnv" -ForegroundColor Yellow
         Write-Host ""
     }
+}
+
+# El modelo no se versiona (*.pt en .gitignore). Sin el archivo, el contenedor no tiene que
+# levantarse: Docker montaria una CARPETA vacia en su lugar y el servicio se reiniciaria sin fin.
+$modeloInferencia = Join-Path $inferenciaDir "modelo_final.pt"
+$levantarInferencia = $hayInferencia -and (Test-Path $modeloInferencia -PathType Leaf)
+if ($hayInferencia -and -not $levantarInferencia) {
+    Write-Host "[AVISO] Falta el modelo de IA: $modeloInferencia" -ForegroundColor Yellow
+    Write-Host "        El servicio de inferencia no se levanta; el resto arranca igual." -ForegroundColor Yellow
+    Write-Host "        Copia modelo_final.pt a esa carpeta y volve a correr este script." -ForegroundColor Yellow
+    Write-Host ""
 }
 
 Write-Host "===========================================" -ForegroundColor Green
@@ -172,9 +180,18 @@ Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""
 
 # 1. Docker
-Write-Host "[1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto + Inferencia)..." -ForegroundColor Cyan
 Push-Location $ScriptRoot
-docker-compose up -d
+if ($levantarInferencia) {
+    # --build: la imagen copia el codigo del servicio, asi que sin reconstruirla seguiria
+    # corriendo la version vieja. Con la cache, si el codigo no cambio tarda segundos; la
+    # primera vez instala PyTorch y demora varios minutos. Arranca antes que el backend a
+    # proposito: mientras no responde, el servicio lo registra y reintenta solo cada 10 s.
+    Write-Host "[1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto + Inferencia)..." -ForegroundColor Cyan
+    docker-compose up -d --build
+} else {
+    Write-Host "[1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto)..." -ForegroundColor Cyan
+    docker-compose up -d yerbanalytics-db mosquitto
+}
 $dcExit = $LASTEXITCODE
 Pop-Location
 if ($dcExit -ne 0) {
@@ -235,7 +252,7 @@ Write-Host "  - Frontend:   http://localhost:5173      " -ForegroundColor Green
 if ($haySimulador) {
     Write-Host "  - Simulador:  http://localhost:5180      " -ForegroundColor Green
 }
-if ($hayInferencia) {
+if ($levantarInferencia) {
     Write-Host "  - Inferencia: (daemon Docker, ver logs con:)" -ForegroundColor Green
     Write-Host "                docker logs -f servicio-inferencia" -ForegroundColor DarkGray
 }

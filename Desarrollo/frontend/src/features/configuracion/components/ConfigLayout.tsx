@@ -41,9 +41,13 @@ export function ConfigFieldset({ disabled, children }: { disabled: boolean; chil
   );
 }
 
-interface ConfigLayoutProps {
-  state: ConfigDraft;
+interface ConfigLayoutProps<T> {
+  state: ConfigDraft<T>;
   intro: ReactNode;
+  /** Quién y cuándo editó por última vez; sin él (o en null), no se muestra. */
+  audit?: (draft: T) => { by: string | null; ts: number | null } | null;
+  /** Qué se carga, para el mensaje de error ("la configuración", "el criterio de diagnóstico"). */
+  resourceName?: string;
   /** Sin `configuracion.editar`: sin restablecer ni barra de guardado, con aviso. */
   editable: boolean;
   /** Restablece a fábrica sólo lo que edita esta vista. */
@@ -54,13 +58,22 @@ interface ConfigLayoutProps {
   children: ReactNode;
 }
 
-export function ConfigLayout({ state, intro, editable, onReset, blockedReason, children }: ConfigLayoutProps) {
+export function ConfigLayout<T>({
+  state,
+  intro,
+  audit,
+  resourceName = 'la configuración',
+  editable,
+  onReset,
+  blockedReason,
+  children,
+}: ConfigLayoutProps<T>) {
   const { draft, error, loading, saving, changes, feedback, save, discard } = state;
 
   if (error) {
     return (
       <Callout tone="crit" role="alert">
-        No se pudo cargar la configuración: {error.message}
+        No se pudo cargar {resourceName}: {error.message}
       </Callout>
     );
   }
@@ -68,22 +81,24 @@ export function ConfigLayout({ state, intro, editable, onReset, blockedReason, c
   if (loading || !draft) {
     return (
       <div className={styles.page} aria-busy="true">
-        <span className="sr">Cargando configuración…</span>
+        <span className="sr">Cargando {resourceName}…</span>
         <Skeleton height={260} />
         <Skeleton height={180} />
       </div>
     );
   }
 
+  const lastEdit = audit?.(draft) ?? null;
+
   return (
     <div className={styles.page}>
       <div className={styles.head}>
         <p className={styles.intro}>{intro}</p>
         <div className={styles.headSide}>
-          {draft.operativa.updatedBy && (
+          {lastEdit?.by && (
             <span className={styles.audit}>
-              Última edición: <b>{draft.operativa.updatedBy}</b>
-              {draft.operativa.updatedTs ? ` · ${formatTs(draft.operativa.updatedTs)}` : ''}
+              Última edición: <b>{lastEdit.by}</b>
+              {lastEdit.ts ? ` · ${formatTs(lastEdit.ts)}` : ''}
             </span>
           )}
           {editable && onReset && (
@@ -95,7 +110,7 @@ export function ConfigLayout({ state, intro, editable, onReset, blockedReason, c
       </div>
 
       {!editable && (
-        <Callout icon="lock">Sólo lectura: tu rol puede ver la configuración pero no modificarla.</Callout>
+        <Callout icon="lock">Sólo lectura: tu rol puede consultar {resourceName}, pero no cambiar sus valores.</Callout>
       )}
 
       {children}

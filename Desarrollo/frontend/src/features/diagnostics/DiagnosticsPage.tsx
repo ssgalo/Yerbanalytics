@@ -105,6 +105,8 @@ export function DiagnosticsPage() {
           estado={expanded.estado}
           ago={expanded.time}
           sectorId={expanded.sectorId}
+          diagnosisId={expanded.id}
+          detectionCount={expanded.detectionCount}
           onClose={() => setExpandedId(null)}
         />
       )}

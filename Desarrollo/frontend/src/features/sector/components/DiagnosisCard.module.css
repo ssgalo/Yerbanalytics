@@ -97,40 +97,13 @@
   font-weight: 700;
 }
 
-/* Barra de confianza */
+/* Nivel de confianza y score */
 .confSection {
-  margin-top: 16px;
-}
-
-.confRow {
   display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-.confValue {
-  font-weight: 700;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
-}
-
-/* Caja concluyente */
-.conclusionBox {
-  display: flex;
-  gap: 9px;
-  margin-top: 15px;
-  padding: 11px 13px;
-  background: var(--ok-soft);
-  border-radius: 11px;
-}
-
-.conclusionText {
-  font-size: 12.5px;
-  color: var(--ok-ink);
-  line-height: 1.45;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 14px;
 }
 
 /* Caja de advertencia para diagnósticos retenidos en modo offline */

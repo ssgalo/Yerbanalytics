@@ -5,7 +5,8 @@
    Cubre el dominio del dashboard y nada más. Las pasadas del riel (Demo Expo) SÍ son
    superficie del dashboard. Las demás piezas de captura —órdenes, dispositivos de cámara, alta
    de diagnósticos— NO se declaran acá: son superficie pública de la plataforma, para el
-   planificador de pasadas y el servicio de inferencia, y ninguna vista las consume.
+   planificador de pasadas y el servicio de inferencia, y ninguna vista las consume. La CONSULTA
+   de las detecciones de un diagnóstico y el criterio de diagnóstico sí son del dashboard.
    ============================================================ */
 import type {
   ActionRecord,
@@ -13,6 +14,8 @@ import type {
   CatalogoReglas,
   Configuracion,
   DagSchema,
+  Detection,
+  DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
   NurseryData,
@@ -57,6 +60,18 @@ export interface DataRepository {
   getConfig(): Promise<Configuracion>;
   /** Persiste la configuración validada y devuelve la versión guardada (HU-15). */
   saveConfig(config: Configuracion): Promise<Configuracion>;
+  /** Criterio agronómico del diagnóstico: bandas de severidad y orden de criticidad. */
+  getDiagnosisCriteria(): Promise<DiagnosisCriteria>;
+  /**
+   * Reemplaza el criterio completo y devuelve el guardado. Si es inválido rechaza con un `Error`
+   * cuyo mensaje es apto para mostrar (el `{ error }` del 400).
+   */
+  saveDiagnosisCriteria(criteria: DiagnosisCriteria): Promise<DiagnosisCriteria>;
+  /**
+   * Cajas guardadas con un diagnóstico (`DX-`). Rechaza si el id no existe (incluye los `DG-`
+   * derivados del sector, que no tienen detecciones).
+   */
+  getDiagnosisDetections(diagnosisId: string): Promise<Detection[]>;
   /** Devuelve el estado técnico de la flota de hardware (HU-18 / HU-21). */
   getHardware(): Promise<HardwareData>;
   /** Da de alta un dispositivo (valida unicidad) y devuelve la flota actualizada (HU-18). */

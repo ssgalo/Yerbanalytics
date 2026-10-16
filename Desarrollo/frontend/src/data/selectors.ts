@@ -2,7 +2,7 @@
    Selectores: derivaciones puras sobre el dataset del vivero.
    La UI consume estas funciones sin conocer su implementación.
    ============================================================ */
-import type { MetricHistory, NurseryData, Range, SectorDetail, Zona } from '@/types/domain';
+import type { DiagnosisCard, MetricHistory, NurseryData, Range, SectorDetail, Zona } from '@/types/domain';
 import { series } from './mock/generators';
 import { buildSectorDetail } from './mock/sectorDetail';
 
@@ -12,9 +12,26 @@ export function selectSectorDetail(data: NurseryData, sectorId: string): SectorD
   if (!sector) return null;
   const zona = data.zonas.find((z) => z.id === sector.zona);
   if (!zona) return null;
-  // Find the latest diagnosis for this sector that has an image
-  const latestDiag = data.diagnoses.find(d => d.sectorId === sectorId && d.imagenUrl);
-  return buildSectorDetail(sector, zona.lectura, latestDiag?.imagenUrl ?? undefined);
+  // El último diagnóstico que nació de una captura (`DX-`): de ahí salen la foto y las cajas.
+  const latestCapture = latestCaptureDiagnosis(data, sectorId);
+  const latestPhoto = latestCapture?.imagenUrl
+    ? latestCapture
+    : data.diagnoses.find((d) => d.sectorId === sectorId && d.imagenUrl);
+  return buildSectorDetail(sector, zona.lectura, latestPhoto?.imagenUrl ?? undefined, latestCapture);
+}
+
+/**
+ * Diagnóstico `DX-` (persistido, nacido de una captura) más reciente de un sector; `null` si no
+ * tiene. Los `DG-` se derivan del estado del sector y nunca tienen detecciones.
+ */
+export function latestCaptureDiagnosis(data: NurseryData, sectorId: string): DiagnosisCard | null {
+  let best: DiagnosisCard | null = null;
+  for (const d of data.diagnoses) {
+    if (d.sectorId !== sectorId || !d.id.startsWith('DX-')) continue;
+    // La lista llega de más reciente a más antiguo; ante fechas iguales gana la primera.
+    if (!best || (d.creadoEn ?? -Infinity) > (best.creadoEn ?? -Infinity)) best = d;
+  }
+  return best;
 }
 
 /**
