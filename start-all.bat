@@ -102,15 +102,26 @@ if exist "Desarrollo\simulador" if not exist "Desarrollo\simulador\.env" (
     echo.
 )
 
-:: Si el servicio de inferencia existe pero no tiene .env, copiar el ejemplo.
-:: Sin .env el contenedor crashea porque MODEL_PATH es obligatoria.
+:: El servicio de inferencia corre en Docker y toma su configuracion de docker-compose.yml, no
+:: de su .env (ese es para correrlo a mano con Python). Igual se crea, para que quede listo.
 set "HAY_INFERENCIA=0"
 if exist "Desarrollo\servicio-inferencia" set "HAY_INFERENCIA=1"
 if "%HAY_INFERENCIA%"=="1" if not exist "Desarrollo\servicio-inferencia\.env" (
     copy /y "Desarrollo\servicio-inferencia\.env.example" "Desarrollo\servicio-inferencia\.env" >nul
     echo [setup] .env del servicio de inferencia creado desde .env.example.
-    echo         IMPORTANTE: edita MODEL_PATH y MODEL_CLASSES en:
-    echo         %~dp0Desarrollo\servicio-inferencia\.env
+    echo.
+)
+
+:: El modelo no se versiona (*.pt en .gitignore). Sin el archivo, el contenedor no tiene que
+:: levantarse: Docker montaria una CARPETA vacia en su lugar y el servicio se reiniciaria sin fin.
+:: `if not exist "x\"` descarta que sea una carpeta (justamente lo que deja Docker).
+set "MODELO_INFERENCIA=Desarrollo\servicio-inferencia\modelo_final.pt"
+set "LEVANTAR_INFERENCIA=0"
+if "%HAY_INFERENCIA%"=="1" if exist "%MODELO_INFERENCIA%" if not exist "%MODELO_INFERENCIA%\" set "LEVANTAR_INFERENCIA=1"
+if "%HAY_INFERENCIA%"=="1" if "%LEVANTAR_INFERENCIA%"=="0" (
+    echo [AVISO] Falta el modelo de IA: %~dp0%MODELO_INFERENCIA%
+    echo         El servicio de inferencia no se levanta; el resto arranca igual.
+    echo         Copia modelo_final.pt a esa carpeta y volve a correr este script.
     echo.
 )
 
@@ -120,9 +131,17 @@ echo ===========================================
 echo.
 
 :: 1. Docker
-echo [1/5] Iniciando contenedores Docker (PostgreSQL + Mosquitto + Inferencia)...
-docker-compose up -d
-if %ERRORLEVEL% neq 0 (
+:: --build: la imagen copia el codigo del servicio, asi que sin reconstruirla seguiria corriendo
+:: la version vieja. Con la cache tarda segundos; la primera vez instala PyTorch y demora varios
+:: minutos. Arranca antes que el backend a proposito: mientras no responde, reintenta cada 10 s.
+if "%LEVANTAR_INFERENCIA%"=="1" (
+    echo [1/5] Iniciando contenedores Docker ^(PostgreSQL + Mosquitto + Inferencia^)...
+    docker-compose up -d --build
+) else (
+    echo [1/5] Iniciando contenedores Docker ^(PostgreSQL + Mosquitto^)...
+    docker-compose up -d yerbanalytics-db mosquitto
+)
+if errorlevel 1 (
     echo [ERROR] Fallo al iniciar Docker. Asegurate de que Docker Desktop este corriendo.
     popd & pause & exit /b 1
 )
@@ -173,7 +192,7 @@ echo   Servicios iniciando en segundo plano.
 echo   - Backend:    http://localhost:8000
 echo   - Frontend:   http://localhost:5173
 if "%HAY_SIMULADOR%"=="1" echo   - Simulador:  http://localhost:5180
-if "%HAY_INFERENCIA%"=="1" (
+if "%LEVANTAR_INFERENCIA%"=="1" (
     echo   - Inferencia: daemon Docker. Ver logs con:
     echo                 docker logs -f servicio-inferencia
 )
