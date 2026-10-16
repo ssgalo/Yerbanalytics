@@ -103,15 +103,8 @@ describe('simularPasada', () => {
   });
 });
 
-describe('MockRepository · pasada y Demo Expo', () => {
+describe('MockRepository · pasada', () => {
   const nuevo = () => new MockRepository(20260613);
-
-  it('Demo Expo arranca oculto y se guarda en memoria', async () => {
-    const repo = nuevo();
-    expect(await repo.getDemoExpo()).toBe(false);
-    expect(await repo.setDemoExpo(true)).toBe(true);
-    expect(await repo.getDemoExpo()).toBe(true);
-  });
 
   it('sin pasadas getPasadaActual devuelve null', async () => {
     expect(await nuevo().getPasadaActual()).toBeNull();

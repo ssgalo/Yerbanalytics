@@ -107,10 +107,6 @@ export interface DataRepository {
    * `null` si todavía no se evaluó desde el arranque.
    */
   getTrazaEvaluacion(sectorId: string, origen?: OrigenEvaluacion): Promise<TrazaEvaluacion | null>;
-  /** ¿Se muestra la pestaña "Demo Expo" en el menú? Sólo oculta la pestaña, no las pasadas. */
-  getDemoExpo(): Promise<boolean>;
-  /** Guarda la visibilidad de la pestaña y devuelve el valor guardado. */
-  setDemoExpo(visible: boolean): Promise<boolean>;
   /** Rechaza con `PasadaRechazadaError` (mensaje del 409) si no se puede iniciar. */
   iniciarPasada(): Promise<Pasada>;
   /** La pasada en curso o la última; `null` si no hubo ninguna desde que arrancó el backend (204). */

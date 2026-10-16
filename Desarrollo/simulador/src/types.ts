@@ -155,3 +155,122 @@ export interface SimulatedWeather {
   precipMm: number;
   uvIndex: number;
 }
+
+/* ----------------------------------------------------------------
+   Pasada del riel (Demo Expo)
+   ---------------------------------------------------------------- */
+
+export type EstadoPasada = 'EN_CURSO' | 'COMPLETADA' | 'FALLIDA' | 'CANCELADA';
+export type TipoPaso = 'MOVER' | 'CAPTURAR' | 'HOME';
+export type EstadoPaso = 'PENDIENTE' | 'EN_CURSO' | 'OK' | 'ERROR' | 'OMITIDO';
+
+export interface DiagnosticoPaso {
+  estado: string;
+  conf: number;
+  sev: string;
+  creadoEn: number;
+}
+
+export interface PasoPasada {
+  n: number;
+  tipo: TipoPaso;
+  posicion: number;
+  sectorId: string | null;
+  estado: EstadoPaso;
+  codigoError: string | null;
+  detalle: string | null;
+  commandId: string | null;
+  ordenId: string | null;
+  estadoOrden: string | null;
+  capturaId: string | null;
+  imagenUrl: string | null;
+  diagnostico: DiagnosticoPaso | null;
+  iniciadoEn: number | null;
+  terminadoEn: number | null;
+}
+
+export interface Pasada {
+  id: string;
+  estado: EstadoPasada;
+  iniciadaEn: number;
+  finalizadaEn: number | null;
+  cancelacionSolicitada: boolean;
+  error: string | null;
+  pasos: PasoPasada[];
+}
+
+/* ----------------------------------------------------------------
+   Secuencias de actuadores (Demo Expo)
+   ---------------------------------------------------------------- */
+
+export type TipoSecuencia = 'RIEGO' | 'MEDIASOMBRA' | 'LECTURA';
+export type TipoPasoSecuencia =
+  | 'ABRIR'
+  | 'ESPERAR'
+  | 'CERRAR'
+  | 'DESPLEGAR'
+  | 'ENROLLAR'
+  | 'PEDIR'
+  | 'ESPERAR_TELEMETRIA'
+  | 'MOSTRAR';
+
+export interface ParametrosSecuencia {
+  duracionSeg?: number | null;
+  esperaSeg?: number | null;
+  ejecutarMotor?: boolean | null;
+}
+
+export interface PasoSecuencia {
+  n: number;
+  tipo: TipoPasoSecuencia;
+  estado: EstadoPaso;
+  codigoError: string | null;
+  detalle: string | null;
+  commandId: string | null;
+  esperaHasta: number | null;
+  iniciadoEn: number | null;
+  terminadoEn: number | null;
+}
+
+export interface LecturaSecuencia {
+  recibidaEn: number;
+  metricas: Record<string, number | null>;
+}
+
+export interface Secuencia {
+  id: string;
+  tipo: TipoSecuencia;
+  estado: EstadoPasada;
+  zonaId: string;
+  sectorId: string | null;
+  parametros: ParametrosSecuencia;
+  iniciadaEn: number;
+  finalizadaEn: number | null;
+  cancelacionSolicitada: boolean;
+  error: string | null;
+  lectura: LecturaSecuencia | null;
+  pasos: PasoSecuencia[];
+}
+
+/* ----------------------------------------------------------------
+   Rule parameters catalog
+   ---------------------------------------------------------------- */
+
+export interface ParametroRegla {
+  clave: string;
+  etiqueta: string;
+  valor: string;
+  fabrica: string;
+  unidad: string;
+}
+
+/* ----------------------------------------------------------------
+   Hardware registration
+   ---------------------------------------------------------------- */
+
+export interface NuevoHardware {
+  serial: string;
+  tipo: string;
+  zonaId: string | null;
+  sectorId: string | null;
+}

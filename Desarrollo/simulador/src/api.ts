@@ -22,14 +22,21 @@ import type {
   DemoRule,
   DemoRuleUpdate,
   NewDiagnosis,
+  NuevoHardware,
   NurseryTopology,
   PairingCode,
+  Pasada,
+  PasoPasada,
+  ParametroRegla,
+  ParametrosSecuencia,
   RegisteredDiagnosis,
+  Secuencia,
   SectorRef,
   SimulatedSensor,
   SimulatedWeather,
   SimulatorStatus,
   TelemetryInput,
+  TipoSecuencia,
 } from './types';
 
 /** Proxy prefix. The UI never learns the backend's real address. */
@@ -248,6 +255,89 @@ export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void>
     body: JSON.stringify({ ejecutarMotor }),
   });
   await check(res, 'disparar el pulso de sensado');
+}
+
+/* ----------------------------------------------------------------
+   Pasadas del riel (Demo Expo)
+   ---------------------------------------------------------------- */
+
+function absolutizePasada(pasada: Pasada): Pasada {
+  return {
+    ...pasada,
+    pasos: pasada.pasos.map((paso) => absolutizePaso(paso)),
+  };
+}
+
+function absolutizePaso(paso: PasoPasada): PasoPasada {
+  return absolutizeImage(paso) as PasoPasada;
+}
+
+export async function getPasadaActual(): Promise<Pasada | null> {
+  const res = await fetch(`${BACKEND}/api/pasadas/actual`);
+  if (res.status === 204) return null;
+  return absolutizePasada(await json<Pasada>(res, 'consultar la pasada actual'));
+}
+
+export async function iniciarPasada(): Promise<Pasada> {
+  const res = await fetch(`${BACKEND}/api/pasadas`, { method: 'POST' });
+  return absolutizePasada(await json<Pasada>(res, 'iniciar la pasada'));
+}
+
+export async function cancelarPasada(): Promise<Pasada> {
+  const res = await fetch(`${BACKEND}/api/pasadas/actual/cancelar`, { method: 'POST' });
+  return absolutizePasada(await json<Pasada>(res, 'cancelar la pasada'));
+}
+
+/* ----------------------------------------------------------------
+   Secuencias de actuadores (Demo Expo)
+   ---------------------------------------------------------------- */
+
+export async function getSecuenciaActual(): Promise<Secuencia | null> {
+  const res = await fetch(`${BACKEND}/api/secuencias/actual`);
+  if (res.status === 204) return null;
+  return json<Secuencia>(res, 'consultar la secuencia actual');
+}
+
+export async function iniciarSecuencia(
+  tipo: TipoSecuencia,
+  parametros?: ParametrosSecuencia,
+): Promise<Secuencia> {
+  const res = await fetch(`${BACKEND}/api/secuencias`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo, parametros: parametros ?? {} }),
+  });
+  return json<Secuencia>(res, 'iniciar la secuencia');
+}
+
+export async function cancelarSecuencia(): Promise<Secuencia> {
+  const res = await fetch(`${BACKEND}/api/secuencias/actual/cancelar`, { method: 'POST' });
+  return json<Secuencia>(res, 'cancelar la secuencia');
+}
+
+/* ----------------------------------------------------------------
+   Rule parameters catalog
+   ---------------------------------------------------------------- */
+
+export async function getParametrosCatalogo(): Promise<ParametroRegla[]> {
+  const data = await json<{ parametros?: ParametroRegla[] } | ParametroRegla[]>(
+    await fetch(`${BACKEND}/api/rules/parametros`),
+    'consultar los parámetros del motor',
+  );
+  return Array.isArray(data) ? data : ((data as { parametros?: ParametroRegla[] }).parametros ?? []);
+}
+
+/* ----------------------------------------------------------------
+   Hardware registration
+   ---------------------------------------------------------------- */
+
+export async function registrarHardware(device: NuevoHardware): Promise<void> {
+  const res = await fetch(`${BACKEND}/api/hardware`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(device),
+  });
+  await check(res, 'registrar el hardware en el backend');
 }
 
 export async function uploadImage(ordenId: string, file: File, token: string): Promise<void> {

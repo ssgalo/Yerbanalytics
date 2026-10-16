@@ -1,7 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, NavLink, matchPath, useLocation } from 'react-router-dom';
 import { useNurseryDataOpcional } from '@/hooks/NurseryContext';
-import { useDemoExpo } from '@/hooks/DemoExpoContext';
 import { useAuth } from '@/hooks/AuthContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { puedeVer, VISTAS, type Vista } from '@/lib/vistas';
@@ -26,9 +25,6 @@ const PRINCIPAL: NavItem[] = [
   { to: '/', vista: VISTAS.panel, icon: 'dashboard', label: 'Panel general', end: true },
   { to: '/diagnosticos', vista: VISTAS.diagnosticos, icon: 'diagnostics', label: 'Diagnósticos de IA', showCount: true },
 ];
-
-/* Sólo se agrega si el interruptor de Configuración la enciende; va pegada a Diagnósticos de IA. */
-const DEMO_EXPO: NavItem = { to: '/demo-expo', vista: VISTAS.demoExpo, icon: 'camera', label: 'Demo Expo' };
 
 const GESTION: NavItem[] = [{ to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' }];
 
@@ -113,11 +109,10 @@ function NavGroup({ icon, label, items, count }: { icon: IconName; label: string
 export function Sidebar() {
   const vivero = useNurseryDataOpcional();
   const diagCount = vivero?.stats.diagCount ?? 0;
-  const { visible: demoExpoVisible } = useDemoExpo();
   const { puede } = useAuth();
   // Cada ítem sólo si el rol puede ver la vista; un grupo sin ítems no se muestra.
   const habilitados = (items: NavItem[]) => items.filter((i) => puedeVer(i.vista, puede));
-  const principal = habilitados(demoExpoVisible ? [...PRINCIPAL, DEMO_EXPO] : PRINCIPAL);
+  const principal = habilitados(PRINCIPAL);
   const gestion = habilitados(GESTION);
   const configuracion = habilitados(CONFIGURACION);
   const hayGestion = gestion.length > 0 || configuracion.length > 0;

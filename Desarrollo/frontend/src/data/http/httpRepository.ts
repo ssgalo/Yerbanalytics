@@ -377,27 +377,6 @@ export class HttpRepository implements DataRepository {
   async cancelarSecuencia(): Promise<Secuencia> {
     return this.postSecuencia(`${this.baseUrl}/secuencias/actual/cancelar`, 'cancelar');
   }
-
-  async getDemoExpo(): Promise<boolean> {
-    const res = await apiFetch(`${this.baseUrl}/configuracion/demo-expo?t=${Date.now()}`);
-    if (!res.ok) {
-      throw new Error(`Error ${res.status} al obtener la preferencia de Demo Expo`);
-    }
-    return ((await res.json()) as { visible: boolean }).visible === true;
-  }
-
-  async setDemoExpo(visible: boolean): Promise<boolean> {
-    const res = await apiFetch(`${this.baseUrl}/configuracion/demo-expo`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ visible }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Error ${res.status} al guardar la preferencia de Demo Expo`);
-    }
-    return ((await res.json()) as { visible: boolean }).visible === true;
-  }
 }
 
 /**

@@ -56,7 +56,7 @@ describe('matriz · borrador', () => {
       'Topología',
       'Captura',
       'Pasadas del riel',
-      'Demo Expo',
+      'Simulación',
       'Seguridad',
     ]);
   });

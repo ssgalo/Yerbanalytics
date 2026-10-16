@@ -82,9 +82,6 @@ export class MockRepository implements DataRepository {
 
   /** Criterio de diagnóstico guardado en la sesión; arranca con el de fábrica, como el backend. */
   private diagnosisCriteria: DiagnosisCriteria = defaultDiagnosisCriteria();
-
-  /** Visibilidad de la pestaña "Demo Expo"; apagada por defecto, igual que el backend. */
-  private demoExpo = false;
   /** Inicio de la última pasada simulada y, si se canceló, cuándo; null = no hubo ninguna. */
   private pasadaInicioMs: number | null = null;
   private pasadaCanceladaMs: number | null = null;
@@ -431,15 +428,6 @@ export class MockRepository implements DataRepository {
       ultimaAplicacionMs: ultimo(delSector('Insumo')),
       riegoEnCursoHastaMs: regando ? ref + 300_000 : null,
     });
-  }
-
-  async getDemoExpo(): Promise<boolean> {
-    return this.demoExpo;
-  }
-
-  async setDemoExpo(visible: boolean): Promise<boolean> {
-    this.demoExpo = visible;
-    return this.demoExpo;
   }
 
   /** La pasada simulada tal como estaría ahora; null si nunca se inició. */

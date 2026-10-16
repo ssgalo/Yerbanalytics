@@ -6,7 +6,6 @@ import type { ComponentType } from 'react';
 import { ConfiguracionPage } from './ConfiguracionPage';
 import { PreferencesPage } from './PreferencesPage';
 import { PageMetaProvider } from '@/hooks/PageMeta';
-import { DemoExpoProvider } from '@/hooks/DemoExpoContext';
 import { getRepository, PermisoDenegadoError } from '@/data';
 import { ConPermisos } from '@/test/sesion';
 import type { Rol } from '@/types/seguridad';
@@ -23,9 +22,7 @@ const montar = (Pagina: ComponentType, rol: Rol = 'INGENIERO_AGRONOMO') =>
     <MemoryRouter>
       <ConPermisos rol={rol}>
         <PageMetaProvider>
-          <DemoExpoProvider>
-            <Pagina />
-          </DemoExpoProvider>
+          <Pagina />
         </PageMetaProvider>
       </ConPermisos>
     </MemoryRouter>,
@@ -142,12 +139,12 @@ describe('Preferencias (PreferencesPage)', () => {
     (await screen.findByLabelText('Intervalo de sensado y evaluación')) as HTMLInputElement;
   const hourField = async () => (await screen.findByLabelText('Hora de la pasada')) as HTMLInputElement;
 
-  it('trae la frecuencia operativa, la pasada diaria y el interruptor de Demo Expo', async () => {
+  it('trae la frecuencia operativa y la pasada diaria', async () => {
     montar(PreferencesPage);
 
     expect(await screen.findByText('Frecuencia operativa')).toBeTruthy();
     expect(screen.getByText('Pasada diaria del riel')).toBeTruthy();
-    expect(screen.getByRole('switch', { name: /Mostrar Demo Expo/ })).toBeTruthy();
+    expect(screen.queryByRole('switch', { name: /Mostrar Demo Expo/ })).toBeNull();
     expect(screen.queryByText('Umbrales de métricas')).toBeNull();
   });
 
@@ -157,25 +154,6 @@ describe('Preferencias (PreferencesPage)', () => {
 
     expect(screen.queryByLabelText(/Intervalo de Evaluación/i)).toBeNull();
     expect(screen.queryByLabelText(/frecuencia de pedido de lectura/i)).toBeNull();
-  });
-
-  it('usar el interruptor de Demo Expo no ensucia el borrador', async () => {
-    montar(PreferencesPage, 'ADMINISTRADOR');
-    const sw = (await screen.findByRole('switch', { name: /Mostrar Demo Expo/ })) as HTMLButtonElement;
-    await waitFor(() => expect(sw.disabled).toBe(false));
-
-    fireEvent.click(sw);
-
-    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'));
-    expect(barra()).toBeNull();
-  });
-
-  it('sin demo-expo.configurar el interruptor queda deshabilitado con el motivo (7.5)', async () => {
-    montar(PreferencesPage, 'INGENIERO_AGRONOMO');
-
-    const sw = (await screen.findByRole('switch', { name: /Mostrar Demo Expo/ })) as HTMLButtonElement;
-    expect(screen.getByText('Tu rol no puede cambiar esta preferencia')).toBeTruthy();
-    expect(sw.disabled).toBe(true);
   });
 
   it.each([

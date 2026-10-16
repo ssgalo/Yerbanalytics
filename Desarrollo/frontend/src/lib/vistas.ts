@@ -4,10 +4,9 @@
    ítem del menú llevaría a una pantalla de "sin permiso", o al revés.
 
    El primer permiso de cada vista es su permiso de lectura (el que nombra la spec). Los demás
-   son de los datos que la vista consume de otra superficie: el Panel, Diagnósticos, el
-   Inspector del motor y Demo Expo leen el snapshot o la preferencia del vivero
-   (`GET /api/nursery`, `GET /api/configuracion/demo-expo`, ambos `vivero.ver`). Sin ellos la
-   vista no podría cargar, así que tampoco se ofrece.
+   son de los datos que la vista consume de otra superficie: el Panel, Diagnósticos y el
+   Inspector del motor leen el snapshot del vivero (`GET /api/nursery`, `vivero.ver`). Sin él
+   la vista no podría cargar, así que tampoco se ofrece.
 
    El dashboard es sólo presentación: la autoridad es el backend.
    ============================================================ */
@@ -25,7 +24,6 @@ export const VISTAS = {
   mapa: { ruta: '/mapa', permisos: ['vivero.ver'] },
   sector: { ruta: '/sector', permisos: ['vivero.ver'] },
   diagnosticos: { ruta: '/diagnosticos', permisos: ['diagnosticos.ver', 'vivero.ver'] },
-  demoExpo: { ruta: '/demo-expo', permisos: ['pasadas.ver', 'vivero.ver'] },
   historial: { ruta: '/historial', permisos: ['historial.ver'] },
   configuracion: { ruta: '/configuracion', permisos: ['configuracion.ver'] },
   // Preferencias es parte de la misma configuración agronómica: mismo permiso.
