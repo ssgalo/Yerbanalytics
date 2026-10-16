@@ -64,34 +64,34 @@ function estiloEspecial(estado: EstadoNodo): CSSProperties {
   if (estado === 'accion') {
     return {
       ...BASE_ESPECIAL,
-      background: 'color-mix(in srgb, var(--info) 18%, var(--tray))',
+      background: 'color-mix(in srgb, var(--info) 18%, var(--art))',
       border: '2px solid var(--info)',
-      color: 'var(--on-tray)',
+      color: 'var(--on-art)',
     };
   }
   if (estado === 'noAccion') {
     return {
       ...BASE_ESPECIAL,
-      background: 'var(--tray)',
+      background: 'var(--art)',
       border: '1.5px dashed var(--off)',
-      color: 'var(--on-tray-muted)',
+      color: 'var(--on-art-muted)',
     };
   }
   if (estado === 'omitida' || estado === 'noAlcanzada') {
     return {
       ...BASE_ESPECIAL,
-      background: 'var(--tray)',
+      background: 'var(--art)',
       border: '1.5px dashed var(--off)',
-      color: 'var(--on-tray-muted)',
+      color: 'var(--on-art-muted)',
       opacity: 0.6,
     };
   }
   // inicio
   return {
     ...BASE_ESPECIAL,
-    background: 'var(--tray-2)',
+    background: 'var(--art-2)',
     border: '1.5px solid var(--brand)',
-    color: 'var(--on-tray)',
+    color: 'var(--on-art)',
     borderRadius: 22,
   };
 }
@@ -262,7 +262,7 @@ export function TrazaGraph({ schema, traza, seleccionada, onSeleccionar }: Traza
           style={{ width: '100%', height: '100%' }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background color="var(--tray-2)" gap={22} size={1} />
+          <Background color="var(--art-2)" gap={22} size={1} />
           <Controls showInteractive={false} position="top-right" />
         </ReactFlow>
       )}

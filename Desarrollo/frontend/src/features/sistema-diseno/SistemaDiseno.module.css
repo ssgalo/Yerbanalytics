@@ -86,7 +86,7 @@
 .boxDark {
   composes: box;
   background: var(--tray);
-  border-color: var(--tray);
+  border-color: var(--tray-line);
 }
 .boxDark .meta {
   color: var(--on-tray-muted);

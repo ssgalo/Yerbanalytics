@@ -2,7 +2,8 @@
    Se ajusta desde afuera con:
    --scroll-max-h   alto máximo visible (por defecto, sin tope)
    --scroll-fade    largo del fundido
-   --scroll-fade-bg color hacia el que se funde (el fondo de la superficie: la bandeja) */
+   --scroll-fade-bg color hacia el que se funde (el fondo de la superficie: la bandeja)
+   --scroll-fade-solid tramo del fundido que tapa del todo (más chico = más gradual) */
 
 .frame {
   position: relative;
@@ -48,28 +49,28 @@
 .left {
   left: 0;
   justify-content: flex-start;
-  background: linear-gradient(to right, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+  background: linear-gradient(to right, var(--scroll-fade-bg, var(--tray)) var(--scroll-fade-solid, 45%), transparent);
 }
 
 .right {
   right: 0;
   justify-content: flex-end;
-  background: linear-gradient(to left, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+  background: linear-gradient(to left, var(--scroll-fade-bg, var(--tray)) var(--scroll-fade-solid, 45%), transparent);
 }
 
 .top {
   top: 0;
   align-items: flex-start;
-  background: linear-gradient(to bottom, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+  background: linear-gradient(to bottom, var(--scroll-fade-bg, var(--tray)) var(--scroll-fade-solid, 45%), transparent);
 }
 
 .bottom {
   bottom: 0;
   align-items: flex-end;
-  background: linear-gradient(to top, var(--scroll-fade-bg, var(--tray)) 20%, transparent);
+  background: linear-gradient(to top, var(--scroll-fade-bg, var(--tray)) var(--scroll-fade-solid, 45%), transparent);
 }
 
-/* Flecha chica sobre el fundido: clara, para que se distinga sobre la bandeja oscura */
+/* Flecha chica sobre el fundido */
 .arrow {
   display: grid;
   place-items: center;
@@ -81,7 +82,7 @@
   border-radius: 50%;
   background: var(--card);
   color: var(--ink);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent);
   cursor: pointer;
   pointer-events: auto;
   transition:

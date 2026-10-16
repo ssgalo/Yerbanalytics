@@ -35,7 +35,8 @@
 /* Tope de alto y largo del fundido del área desplazable */
 .scroll {
   --scroll-max-h: var(--viewport-max-h);
-  --scroll-fade: 64px;
+  --scroll-fade: 96px;
+  --scroll-fade-solid: 15%;
 }
 
 /* Zona alta: celdas de lado fijo, la tarjeta mide lo que su grilla */

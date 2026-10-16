@@ -183,7 +183,7 @@ Toda pantalla nueva o rediseñada lo respeta; **si cambia algo del sistema, se a
 que lo usa** (`src/styles/tokens.test.ts` falla si vuelve un token retirado o un hex viejo).
 - **Todo color sale de un token** de `src/styles/tokens.css` (espejo JS: `theme.ts`). Nada de hex
   sueltos en los módulos. Los únicos saturados son los de estado (`--ok/--warn/--crit/--off`) y
-  `--info` ("el sistema actuó"). El único oscuro es `--tray`, sólo para plano, grillas y arte.
+  `--info` ("el sistema actuó"). El único oscuro es `--art` (fotos, login, grafos del motor); la bandeja (`--tray`) va del tono del fondo.
 - **Texto de estado con su tinta** (`--x-ink`), nunca con el relleno; `--faint` no es para texto;
   bordes de campo con `--line-field`.
 - **El estado tiene forma además de color** (`StateGlyph`, `SectorCell`): círculo, medio círculo,

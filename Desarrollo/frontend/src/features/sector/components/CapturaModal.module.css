@@ -6,7 +6,7 @@
   z-index: 60;
   display: flex;
   flex-direction: column;
-  background: var(--tray);
+  background: var(--art);
   animation: fadeIn 0.16s ease-out;
 }
 
@@ -30,12 +30,12 @@
   font-stretch: var(--w-exp);
   font-size: 19px;
   font-weight: 700;
-  color: var(--on-tray);
+  color: var(--on-art);
 }
 
 .sub {
   font-size: 12.5px;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
 }
 
 .close {
@@ -46,16 +46,16 @@
   height: 40px;
   margin-left: auto;
   flex-shrink: 0;
-  border: 1px solid var(--tray-line);
+  border: 1px solid var(--art-line);
   border-radius: var(--r-m);
   background: transparent;
-  color: var(--on-tray);
+  color: var(--on-art);
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .close:hover {
-  background: var(--tray-2);
+  background: var(--art-2);
 }
 
 /* Ocupa el resto de la pantalla; la imagen entra entera sin deformarse */
@@ -112,14 +112,14 @@
   gap: 6px;
   margin: 0;
   font-size: var(--t-13);
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
 }
 
 .retry {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--on-tray);
+  color: var(--on-art);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;

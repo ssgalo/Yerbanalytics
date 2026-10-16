@@ -31,9 +31,9 @@ import styles from './RuleGraph.module.css';
 // -----------------------------------------------------------------------
 
 const STYLE_IDLE: React.CSSProperties = {
-  background: 'var(--tray-2)',
-  border: '1.5px solid var(--tray-line)',
-  color: 'var(--on-tray-muted)',
+  background: 'var(--art-2)',
+  border: '1.5px solid var(--art-line)',
+  color: 'var(--on-art-muted)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 500,
@@ -41,9 +41,9 @@ const STYLE_IDLE: React.CSSProperties = {
 };
 
 const STYLE_PASSED: React.CSSProperties = {
-background: 'color-mix(in srgb, var(--ok) 18%, var(--tray))',
+background: 'color-mix(in srgb, var(--ok) 18%, var(--art))',
   border: '2px solid var(--ok)',
-  color: 'var(--on-tray)',
+  color: 'var(--on-art)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 600,
@@ -51,9 +51,9 @@ background: 'color-mix(in srgb, var(--ok) 18%, var(--tray))',
 };
 
 const STYLE_BLOCKED: React.CSSProperties = {
-background: 'color-mix(in srgb, var(--crit) 18%, var(--tray))',
+background: 'color-mix(in srgb, var(--crit) 18%, var(--art))',
   border: '2px solid var(--crit)',
-  color: 'var(--on-tray)',
+  color: 'var(--on-art)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 700,
@@ -62,9 +62,9 @@ background: 'color-mix(in srgb, var(--crit) 18%, var(--tray))',
 };
 
 const STYLE_POSTPONED: React.CSSProperties = {
-background: 'color-mix(in srgb, var(--warn) 18%, var(--tray))',
+background: 'color-mix(in srgb, var(--warn) 18%, var(--art))',
   border: '2px solid var(--warn)',
-  color: 'var(--on-tray)',
+  color: 'var(--on-art)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 700,
@@ -73,9 +73,9 @@ background: 'color-mix(in srgb, var(--warn) 18%, var(--tray))',
 };
 
 const STYLE_ACTION: React.CSSProperties = {
-background: 'color-mix(in srgb, var(--info) 22%, var(--tray))',
+background: 'color-mix(in srgb, var(--info) 22%, var(--art))',
   border: '2px solid var(--info)',
-  color: 'var(--on-tray)',
+  color: 'var(--on-art)',
   borderRadius: 10,
   fontSize: 12,
   fontWeight: 700,
@@ -84,9 +84,9 @@ background: 'color-mix(in srgb, var(--info) 22%, var(--tray))',
 };
 
 const STYLE_SKIPPED: React.CSSProperties = {
-  background: 'var(--tray)',
-  border: '1.5px dashed var(--tray-line)',
-  color: 'var(--on-tray-muted)',
+  background: 'var(--art)',
+  border: '1.5px dashed var(--art-line)',
+  color: 'var(--on-art-muted)',
   opacity: 0.6,
   borderRadius: 10,
   fontSize: 12,
@@ -94,9 +94,9 @@ const STYLE_SKIPPED: React.CSSProperties = {
 };
 
 const STYLE_START: React.CSSProperties = {
-  background: 'var(--tray-2)',
+  background: 'var(--art-2)',
   border: '1.5px solid var(--brand)',
-  color: 'var(--on-tray)',
+  color: 'var(--on-art)',
   borderRadius: 20,
   fontSize: 11,
   fontWeight: 600,
@@ -104,18 +104,18 @@ const STYLE_START: React.CSSProperties = {
 };
 
 const STYLE_ABORT_TERMINAL: React.CSSProperties = {
-  background: 'color-mix(in srgb, var(--crit) 10%, var(--tray))',
-  border: '1.5px solid color-mix(in srgb, var(--crit) 55%, var(--tray))',
-  color: 'var(--on-tray)',
+  background: 'color-mix(in srgb, var(--crit) 10%, var(--art))',
+  border: '1.5px solid color-mix(in srgb, var(--crit) 55%, var(--art))',
+  color: 'var(--on-art)',
   borderRadius: 10,
   fontSize: 11,
   width: 160,
 };
 
 const STYLE_SUCCESS_TERMINAL: React.CSSProperties = {
-  background: 'color-mix(in srgb, var(--ok) 10%, var(--tray))',
-  border: '1.5px solid color-mix(in srgb, var(--ok) 55%, var(--tray))',
-  color: 'var(--on-tray)',
+  background: 'color-mix(in srgb, var(--ok) 10%, var(--art))',
+  border: '1.5px solid color-mix(in srgb, var(--ok) 55%, var(--art))',
+  color: 'var(--on-art)',
   borderRadius: 10,
   fontSize: 11,
   width: 160,
@@ -266,7 +266,7 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
   const buildEdges = useCallback((): Edge[] => {
     return filteredSchema.edges.map((e) => {
       let animated = false;
-      let strokeColor = 'var(--tray-line)';
+      let strokeColor = 'var(--art-line)';
 
       if (activeEvents && activeEvents.length > 0) {
         const sourceNode = filteredSchema.nodes.find((n) => n.id === e.source);
@@ -316,8 +316,8 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
         animated,
         style: { stroke: strokeColor, strokeWidth: animated ? 2 : 1 },
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
-        labelStyle: { fontSize: 10, fill: 'var(--on-tray-muted)' },
-        labelBgStyle: { fill: 'var(--tray)', fillOpacity: 0.9 },
+        labelStyle: { fontSize: 10, fill: 'var(--on-art-muted)' },
+        labelBgStyle: { fill: 'var(--art)', fillOpacity: 0.9 },
       };
     });
   }, [filteredSchema, activeEvents]);
@@ -358,9 +358,9 @@ function RuleGraphInner({ schema, activeEvents }: RuleGraphInnerProps) {
         style={{ width: '100%', height: '100%' }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="var(--tray-2)" gap={20} size={1} />
+        <Background color="var(--art-2)" gap={20} size={1} />
         <Controls showInteractive={false} />
-        <MiniMap nodeColor={(n) => (n.style as React.CSSProperties)?.borderColor ?? theme.trayLine} />
+        <MiniMap nodeColor={(n) => (n.style as React.CSSProperties)?.borderColor ?? theme.artLine} />
       </ReactFlow>
 
       {/* Leyenda */}

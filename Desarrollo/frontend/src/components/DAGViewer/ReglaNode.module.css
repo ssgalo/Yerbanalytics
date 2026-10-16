@@ -7,8 +7,8 @@
   padding: 9px 11px 10px;
   border: 2px solid var(--c);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--c) 13%, var(--tray));
-  color: var(--on-tray);
+  background: color-mix(in srgb, var(--c) 13%, var(--art));
+  color: var(--on-art);
   font-family: var(--font-body);
   cursor: pointer;
 }
@@ -38,8 +38,8 @@
 .nodo[data-estado='noAlcanzada'],
 .nodo[data-estado='sinTraza'] {
   border-style: dashed;
-  background: var(--tray);
-  color: var(--on-tray-muted);
+  background: var(--art);
+  color: var(--on-art-muted);
 }
 
 .nodo[data-estado='noAlcanzada'] {
@@ -47,7 +47,7 @@
 }
 
 .nodo[data-seleccionado='true'] {
-  outline: 2px solid var(--on-tray);
+  outline: 2px solid var(--on-art);
   outline-offset: 3px;
 }
 
@@ -69,7 +69,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--c);
-  color: var(--tray);
+  color: var(--art);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -80,7 +80,7 @@
   margin-top: 7px;
   padding: 5px 8px 6px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--on-tray) 6%, transparent);
+  background: color-mix(in srgb, var(--on-art) 6%, transparent);
 }
 
 .compEtiqueta {
@@ -88,7 +88,7 @@
   align-items: center;
   gap: 5px;
   font-size: 10.5px;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
 }
 
 .candado {
@@ -103,18 +103,18 @@
   margin-top: 1px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--on-tray);
+  color: var(--on-art);
 }
 
 .operador {
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
   font-weight: 600;
 }
 
 .sinDato {
   font-style: italic;
   font-weight: 600;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
 }
 
 .marca {
@@ -135,7 +135,7 @@
 .nota {
   margin-top: 6px;
   font-size: 11px;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
   line-height: 1.35;
 }
 

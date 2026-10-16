@@ -23,7 +23,8 @@ const BASE: [string, string, string][] = [
   ['--ink', '#15231B', 'Texto, botón primario, foco (16:1)'],
   ['--bg', '#F1F3EE', 'Fondo de la app'],
   ['--card', '#FFFFFF', 'Superficies'],
-  ['--tray', '#1C2420', 'Sólo plano y grillas de sectores'],
+  ['--tray', '#F1F3EE', 'Bandeja: plano y grillas de sectores'],
+  ['--art', '#1C2420', 'Sólo fotos, login y grafos del motor'],
   ['--muted', '#5B6A61', 'Texto secundario (5,7:1)'],
   ['--faint', '#7D8A82', 'Sólo íconos y decoración'],
   ['--line-field', '#8D978F', 'Borde de campos (3:1)'],
@@ -117,7 +118,7 @@ export function SistemaDisenoPage() {
           <Swatches items={CLASES_DIAGNOSTICO} />
           <h3 className={styles.h3}>Cajas de detección (sólo superpuestas a una fotografía)</h3>
           <p className={styles.meta}>
-            Saturadas y claras para leerse sobre follaje, siempre con un halo de --tray debajo. El estado
+            Saturadas y claras para leerse sobre follaje, siempre con un halo de --art debajo. El estado
             diagnosticado va con trazo continuo grueso; las demás clases, discontinuo fino. Fuera de una foto no se
             usan: ni texto, ni estado, ni composición.
           </p>

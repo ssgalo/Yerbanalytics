@@ -73,7 +73,7 @@
 
   /* cajas de detección: SÓLO para superponer a una fotografía (las cajas del diagnóstico sobre
      la captura). Saturadas y claras a propósito, para leerse sobre follaje verde (siempre con un
-     halo de --tray debajo) y distinguirse entre sí; la forma del trazo distingue además el estado
+     halo de --art debajo) y distinguirse entre sí; la forma del trazo distingue además el estado
      diagnosticado. Fuera de una foto no se usan: ni texto, ni estado, ni composición (eso es --dx-*). */
   --det-sano: #5cd6ff;
   --det-clorosis: #ffe45c;
@@ -84,12 +84,19 @@
   /* texto sobre un fondo de marca / acción primaria */
   --on-brand: #ffffff;
 
-  /* bandeja: el único oscuro. Sólo plano, grillas de sectores y superficies de arte. */
-  --tray: #1c2420;
-  --tray-2: #2a332e; /* hueco vacío dentro de la bandeja */
-  --tray-line: #39433d;
-  --on-tray: #ffffff;
-  --on-tray-muted: #a9b5ae;
+  /* bandeja: plano y grillas de sectores. Mismo tono que el fondo, recortada por su borde. */
+  --tray: #f1f3ee;
+  --tray-2: #dfe4dc; /* hueco vacío dentro de la bandeja */
+  --tray-line: #cdd4ca;
+  --on-tray: #15231b;
+  --on-tray-muted: #5b6a61;
+
+  /* arte: el único oscuro. Sólo fotografías, login y grafos del motor. */
+  --art: #1c2420;
+  --art-2: #2a332e;
+  --art-line: #39433d;
+  --on-art: #ffffff;
+  --on-art-muted: #a9b5ae;
 
   /* tipografía: Archivo, una familia variable en tres anchos */
   --font-display: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;

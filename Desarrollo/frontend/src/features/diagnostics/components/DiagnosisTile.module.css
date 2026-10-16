@@ -59,7 +59,7 @@
   border-radius: 999px;
   background: rgba(21, 35, 27, 0.55);
   backdrop-filter: blur(3px);
-  color: var(--on-tray);
+  color: var(--on-art);
   font-size: var(--t-12);
   font-weight: 600;
   font-stretch: var(--w-cond);

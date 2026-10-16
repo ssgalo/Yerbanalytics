@@ -121,7 +121,7 @@ describe('RuleGraph en el Historial: a qué regla se atribuye cada evento (13.4)
     evo: null,
     ...e,
   });
-  const ACCION = 'color-mix(in srgb, var(--info) 22%, var(--tray))'; // fondo de un nodo que accionó
+  const ACCION = 'color-mix(in srgb, var(--info) 22%, var(--art))'; // fondo de un nodo que accionó
   const fondo = (id: string) => nodo(id).style.background;
 
   it('un riego ordenado por R-02 marca a DeficitCriticoRule (campo `regla`)', () => {

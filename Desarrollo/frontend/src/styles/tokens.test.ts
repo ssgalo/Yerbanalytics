@@ -50,6 +50,7 @@ describe('sistema de diseño', () => {
       ['--off', theme.off],
       ['--info', theme.info],
       ['--tray', theme.tray],
+      ['--art', theme.art],
       ['--det-sano', theme.detSano],
       ['--det-clorosis', theme.detClorosis],
       ['--det-estres-solar', theme.detEstresSolar],

@@ -32,7 +32,7 @@
 /* Halo oscuro debajo de cada trazo, para que se lea sobre hojas claras y oscuras */
 .halo,
 .haloMain {
-  stroke: var(--tray);
+  stroke: var(--art);
   stroke-opacity: 0.55;
 }
 .haloMain {
@@ -54,7 +54,7 @@
   padding: 0;
   list-style: none;
   font-size: var(--t-13);
-  color: var(--on-tray);
+  color: var(--on-art);
 }
 
 .legend li {
@@ -75,12 +75,12 @@
 }
 
 .count {
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
   font-stretch: var(--w-cond);
 }
 
 .empty {
   margin: 0;
   font-size: var(--t-13);
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
 }
