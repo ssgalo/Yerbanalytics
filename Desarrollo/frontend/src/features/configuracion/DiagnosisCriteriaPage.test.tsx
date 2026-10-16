@@ -41,13 +41,12 @@ const orden = () =>
     .map((li) => li.textContent?.replace(/^\d/, '').replace(/(más|menos) crítico$/, '').trim());
 
 describe('Criterio de diagnóstico', () => {
-  it('muestra el criterio por defecto del mock y aclara que la confianza la calibra el equipo', async () => {
+  it('muestra el criterio por defecto del mock', async () => {
     montar();
 
     expect((await campo('Daño fúngico · Media desde')).value).toBe('4');
     expect((await campo('Clorosis · Alta desde')).value).toBe('20');
     expect(orden()).toEqual(['Daño fúngico', 'Plaga foliar', 'Clorosis', 'Estrés solar']);
-    expect(screen.getByText(/los calibra el equipo en el servicio de inferencia/)).toBeTruthy();
     expect(screen.getByText('Baja 2–3 · Media 4–7 · Alta 8 o más')).toBeTruthy();
     expect(barra()).toBeNull();
   });

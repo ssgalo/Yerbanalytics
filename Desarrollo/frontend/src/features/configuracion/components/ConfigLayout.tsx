@@ -43,7 +43,7 @@ export function ConfigFieldset({ disabled, children }: { disabled: boolean; chil
 
 interface ConfigLayoutProps<T> {
   state: ConfigDraft<T>;
-  intro: ReactNode;
+  intro?: ReactNode;
   /** Quién y cuándo editó por última vez; sin él (o en null), no se muestra. */
   audit?: (draft: T) => { by: string | null; ts: number | null } | null;
   /** Qué se carga, para el mensaje de error ("la configuración", "el criterio de diagnóstico"). */
@@ -90,30 +90,37 @@ export function ConfigLayout<T>({
 
   const lastEdit = audit?.(draft) ?? null;
 
+  // Sin intro, el encabezado (auditoría y restablecer) va al pie: arriba dejaría una franja vacía.
+  const head = (
+    <div className={styles.head}>
+      {intro && <p className={styles.intro}>{intro}</p>}
+      <div className={styles.headSide}>
+        {lastEdit?.by && (
+          <span className={styles.audit}>
+            Última edición: <b>{lastEdit.by}</b>
+            {lastEdit.ts ? ` · ${formatTs(lastEdit.ts)}` : ''}
+          </span>
+        )}
+        {editable && onReset && (
+          <Button size="sm" onClick={onReset}>
+            Restablecer valores de fábrica
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.page}>
-      <div className={styles.head}>
-        <p className={styles.intro}>{intro}</p>
-        <div className={styles.headSide}>
-          {lastEdit?.by && (
-            <span className={styles.audit}>
-              Última edición: <b>{lastEdit.by}</b>
-              {lastEdit.ts ? ` · ${formatTs(lastEdit.ts)}` : ''}
-            </span>
-          )}
-          {editable && onReset && (
-            <Button size="sm" onClick={onReset}>
-              Restablecer valores de fábrica
-            </Button>
-          )}
-        </div>
-      </div>
+      {intro && head}
 
       {!editable && (
         <Callout icon="lock">Sólo lectura: tu rol puede consultar {resourceName}, pero no cambiar sus valores.</Callout>
       )}
 
       {children}
+
+      {!intro && head}
 
       {feedback && (
         <Callout tone={feedback.kind === 'ok' ? 'ok' : 'crit'} role={feedback.kind === 'ok' ? 'status' : 'alert'}>
