@@ -16,6 +16,10 @@
   color: var(--ink);
 }
 
+.bell:hover {
+  background: var(--line2);
+}
+
 .count {
   position: absolute;
   top: -5px;
