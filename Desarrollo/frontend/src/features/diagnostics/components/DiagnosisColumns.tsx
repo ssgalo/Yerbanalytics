@@ -16,8 +16,8 @@ import {
   type SortState,
   type ValueColumn,
 } from '../diagnosisQuery';
-import { ColumnMenu } from './ColumnMenu';
-import { RangeFilter, ValuesFilter } from './ColumnFilters';
+import { ColumnMenu } from '@/components/ui/ColumnMenu';
+import { RangeFilter, ValuesFilter } from '@/components/ui/ColumnFilters';
 import styles from './DiagnosisColumns.module.css';
 
 type Column = { label: string; sortLabels: Record<SortDir, string> } & (

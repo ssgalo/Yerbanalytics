@@ -1,0 +1,15 @@
+/* Panel flotante anclado: la posición y el alto máximo los calcula Popover.tsx. */
+.popover {
+  position: fixed;
+  z-index: 40;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-overlay);
+  animation: ybFade 0.12s both;
+}
+
+.padded {
+  padding: 16px 18px 18px;
+}

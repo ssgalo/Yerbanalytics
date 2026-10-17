@@ -5,6 +5,9 @@
    rango. La fecha es `creadoEn`, que manda el backend. La confianza es el NIVEL: el score
    promedio no se muestra en el dashboard. */
 import type { DiagnosisCard } from '@/types/domain';
+import type { Range, SortDir } from '@/lib/columnQuery';
+
+export type { Range, SortDir };
 
 /** Clases del dashboard, en el orden en que se muestran los KPI. */
 export const DIAGNOSIS_CLASSES = [
@@ -21,16 +24,9 @@ export type ColumnKey = 'zone' | 'sector' | 'date' | 'confidence' | 'severity';
 export type ValueColumn = 'zone' | 'sector' | 'confidence' | 'severity';
 /** Columnas que se filtran por rango. */
 export type RangeColumn = 'date';
-export type SortDir = 'asc' | 'desc';
 export interface SortState {
   column: ColumnKey;
   dir: SortDir;
-}
-
-/** Rango cerrado; un extremo ausente no limita. Fecha en ms epoch. */
-export interface Range {
-  min?: number;
-  max?: number;
 }
 
 /** Filtro de cada columna; `null` = sin filtro (todos). */

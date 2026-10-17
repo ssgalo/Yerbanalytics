@@ -18,8 +18,8 @@ interface CalloutProps {
   tone?: CalloutTone;
   icon?: IconName;
   children: ReactNode;
-  /** `alert` para un error que aparece después de una acción; si no, se lee en orden. */
-  role?: 'alert' | 'status';
+  /** `alert` para un error que aparece después de una acción; `note` para una advertencia que acompaña un formulario; si no, se lee en orden. */
+  role?: 'alert' | 'status' | 'note';
 }
 
 /** Aviso en línea, dentro del contenido. */
