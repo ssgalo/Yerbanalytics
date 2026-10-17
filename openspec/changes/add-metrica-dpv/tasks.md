@@ -9,8 +9,8 @@
 ## 2. Persistencia
 - [x] 2.1 Verificado: no hay historial de lecturas; este cambio **requiere** `add-historial-lecturas` integrado.
 - [ ] 2.2 Test: la ingesta de una lectura con T y HR guarda `dpv`; sin una de las dos conserva el viejo.
-- [ ] 2.3 Columnas `dpv`, `dpv_ts` en la zona (se agregan solas con `ddl-auto=update`) y `dpv` en `lectura_zona`.
-- [ ] 2.4 Test de integración: `HistorialLecturas.maximo(zona, "dpv", desde)` devuelve el DPV calculado.
+- [ ] 2.3 Columnas `dpv`, `dpv_ts` en la zona (se agregan solas con `ddl-auto=update`) y `dpv` en `zone_reading`.
+- [ ] 2.4 Test de integración: `ReadingHistory.max(zone, ReadingMetric.DPV, window)` devuelve el DPV calculado.
 
 ## 3. API y frontend
 - [ ] 3.1 `Zona.lectura.dpv` en el DTO y en `src/types/domain.ts`.

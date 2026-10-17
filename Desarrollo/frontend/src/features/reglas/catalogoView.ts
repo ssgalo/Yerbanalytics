@@ -35,7 +35,7 @@ export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string;
     descripcion: 'Cómo se reparten los riegos ordenados entre los sectores de una macro-zona',
     rama: 'RIEGO',
   },
-  PurgaLecturas: {
+  ReadingPurge: {
     titulo: 'Historial de lecturas',
     descripcion: 'Cuánto tiempo se conservan las lecturas de cada macro-zona que consultan las reglas',
     rama: 'GLOBAL',

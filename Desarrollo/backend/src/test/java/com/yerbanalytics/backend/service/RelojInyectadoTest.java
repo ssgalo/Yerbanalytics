@@ -92,7 +92,7 @@ class RelojInyectadoTest {
                 mock(HistorialService.class), mock(ConfiguracionService.class), mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, mock(WeatherService.class),
                 mock(ManualLockRepository.class), mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
-                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.lecturas.RegistroLecturas.class), RELOJ, 20);
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class), RELOJ, 20);
 
         // timestamp del nodo = 10 segundos antes del "ahora" del reloj fijo, en segundos epoch.
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, AHORA.getEpochSecond() - 10,

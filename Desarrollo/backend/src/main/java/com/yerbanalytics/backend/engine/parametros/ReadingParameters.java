@@ -11,9 +11,9 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @AllArgsConstructor
-public enum ParametrosLecturas implements DefinicionParametro {
+public enum ReadingParameters implements DefinicionParametro {
 
-    RETENCION_DIAS("lecturas.retencion-dias",
+    RETENTION_DAYS("readings.retention-days",
             "Retención del historial de lecturas",
             "Días que se conservan las lecturas de cada macro-zona. Las reglas miran hasta 72 h hacia atrás; el resto es margen para auditar. Lo más viejo se borra todos los días a las 03:30.",
             TipoParametro.ENTERO, "días", "14", 3.0, 90.0, 0, "add-historial-lecturas D-4");
@@ -31,6 +31,6 @@ public enum ParametrosLecturas implements DefinicionParametro {
 
     @Override
     public FamiliaParametro familia() {
-        return FamiliaParametro.LECTURAS;
+        return FamiliaParametro.READINGS;
     }
 }

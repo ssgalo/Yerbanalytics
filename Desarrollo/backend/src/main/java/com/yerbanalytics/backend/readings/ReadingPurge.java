@@ -1,11 +1,11 @@
-package com.yerbanalytics.backend.lecturas;
+package com.yerbanalytics.backend.readings;
 
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
-import com.yerbanalytics.backend.engine.parametros.ParametrosLecturas;
-import com.yerbanalytics.backend.repository.LecturaZonaRepository;
+import com.yerbanalytics.backend.engine.parametros.ReadingParameters;
+import com.yerbanalytics.backend.repository.ZoneReadingRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -17,7 +17,7 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Retención del historial: una vez por día borra las lecturas más viejas que {@code lecturas.retencion-dias}
+ * Retención del historial: una vez por día borra las lecturas más viejas que {@code readings.retention-days}
  * (fábrica 14 días: cubre las 72 h que miran las reglas con margen para auditar). Lee el parámetro del catálogo, así
  * que declararlo en {@link #parametros()} es lo que lo hace figurar "usado" en la vista de reglas.
  *
@@ -28,46 +28,46 @@ import java.util.List;
  * de la base no escapa de la tarea; se reintenta al día siguiente y el historial sólo crece un día de más.
  */
 @Component
-public class PurgaLecturas implements ConsumidorParametros {
+public class ReadingPurge implements ConsumidorParametros {
 
-    private static final Logger log = LoggerFactory.getLogger(PurgaLecturas.class);
+    private static final Logger log = LoggerFactory.getLogger(ReadingPurge.class);
 
-    private final LecturaZonaRepository repository;
-    private final CatalogoParametrosService parametros;
-    private final Clock reloj;
+    private final ZoneReadingRepository repository;
+    private final CatalogoParametrosService parameters;
+    private final Clock clock;
 
-    public PurgaLecturas(LecturaZonaRepository repository, @Lazy CatalogoParametrosService parametros,
-                         Clock relojVivero) {
+    public ReadingPurge(ZoneReadingRepository repository, @Lazy CatalogoParametrosService parameters,
+                        Clock relojVivero) {
         this.repository = repository;
-        this.parametros = parametros;
-        this.reloj = relojVivero;
+        this.parameters = parameters;
+        this.clock = relojVivero;
     }
 
     @Override
     public String name() {
-        return "PurgaLecturas";
+        return "ReadingPurge";
     }
 
     @Override
     public List<DefinicionParametro> parametros() {
-        return List.of(ParametrosLecturas.RETENCION_DIAS);
+        return List.of(ReadingParameters.RETENTION_DAYS);
     }
 
     /** Todos los días a las 03:30, hora del vivero. */
     @Scheduled(cron = "0 30 3 * * *", zone = ZonaHorariaVivero.ID)
-    public void purgarProgramada() {
+    public void scheduledPurge() {
         try {
-            int borradas = purgar();
-            log.info("Historial de lecturas: se borraron {} lectura(s) fuera de la retención.", borradas);
+            int deleted = purge();
+            log.info("Historial de lecturas: se borraron {} lectura(s) fuera de la retención.", deleted);
         } catch (RuntimeException e) {
             log.error("Historial de lecturas: falló la purga, se reintenta mañana.", e);
         }
     }
 
     /** Borra lo anterior a la retención vigente y devuelve cuántas lecturas eran. */
-    public int purgar() {
-        long dias = (long) parametros.vigentes().numero(ParametrosLecturas.RETENCION_DIAS);
-        long corte = reloj.instant().minus(Duration.ofDays(dias)).toEpochMilli();
-        return repository.deleteByTsLessThan(corte);
+    public int purge() {
+        long days = (long) parameters.vigentes().numero(ReadingParameters.RETENTION_DAYS);
+        long cutoff = clock.instant().minus(Duration.ofDays(days)).toEpochMilli();
+        return repository.deleteByTsLessThan(cutoff);
     }
 }

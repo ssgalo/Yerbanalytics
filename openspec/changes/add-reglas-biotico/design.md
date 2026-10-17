@@ -11,7 +11,7 @@
 | Historial de diagnósticos | `DiagnosticoEntity` (`sectorId`, `estado`, `sev`, `conf`, `creadoEn`) permite consultar los últimos N por sector |
 | Severidad | Baja / Media / Alta (CLAUDE.md §2); la v2 dice leve / moderada / alta |
 | Vecindad | Verificado: cada sector tiene `n` (1…N dentro de su MZ, id `MZ-z-NNN`, `TopologiaService.nuevoSectorOffline`) y `TopologiaLayoutEntity.sectoresPorFila` (default 10) es la "**disposición visual** de la fila única" del mapa (`NurseryService.buildLayout`). **No hay un mapa físico de adyacencia**; la grilla (fila = (n−1)/w, columna = (n−1)%w) es una convención de presentación |
-| Historial de lecturas | No existe: DPV de 24 h / 72 h y "2 lecturas seguidas" salen de `HistorialLecturas` (`add-historial-lecturas`) |
+| Historial de lecturas | No existe: DPV de 24 h / 72 h y "2 lecturas seguidas" salen de `ReadingHistory` (`add-historial-lecturas`) |
 | Capturas seguidas | `DiagnosticoRepository.findBySectorIdOrderByCreadoEnDesc(sectorId)` permite traer los últimos N diagnósticos del sector |
 | "Diagnóstico nuevo" | Las reglas con `usaDiagnostico()` actúan una vez por diagnóstico (CLAUDE.md §2) |
 

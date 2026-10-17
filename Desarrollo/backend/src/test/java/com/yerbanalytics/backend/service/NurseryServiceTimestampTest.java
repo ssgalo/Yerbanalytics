@@ -84,7 +84,7 @@ class NurseryServiceTimestampTest {
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor,
                 mock(WeatherService.class), mock(ManualLockRepository.class),
                 mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
-                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.lecturas.RegistroLecturas.class),
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class),
                 java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
     }
 

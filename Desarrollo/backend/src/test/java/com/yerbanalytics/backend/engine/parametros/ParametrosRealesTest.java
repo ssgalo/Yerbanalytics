@@ -32,7 +32,7 @@ class ParametrosRealesTest {
             Map.entry("mediasombra.uv-umbral", 7.0),                 // uv-threshold
             Map.entry("mediasombra.apertura-proteccion-uv", 30.0),   // ShadingRule:90
             Map.entry("mediasombra.apertura-maxima", 100.0),         // configuracion_operativa
-            Map.entry("lecturas.retencion-dias", 14.0),              // add-historial-lecturas D-4
+            Map.entry("readings.retention-days", 14.0),              // add-historial-lecturas D-4
             Map.entry("diagnostico.confianza-minima", 85.0));        // SupplyRule:34 / capturas.confianza-minima
 
     /** Las claves nuevas de riego v2 (tabla D8): tipo, unidad, fábrica, mínimo, máximo y decimales. */

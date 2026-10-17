@@ -573,10 +573,10 @@
       "updatedTs": null
     },
     {
-      "clave": "lecturas.retencion-dias",
+      "clave": "readings.retention-days",
       "etiqueta": "Retención del historial de lecturas",
       "descripcion": "Días que se conservan las lecturas de cada macro-zona. Las reglas miran hasta 72 h hacia atrás; el resto es margen para auditar. Lo más viejo se borra todos los días a las 03:30.",
-      "familia": "LECTURAS",
+      "familia": "READINGS",
       "tipo": "ENTERO",
       "unidad": "días",
       "valor": "14",
@@ -587,7 +587,7 @@
       "refSpec": "add-historial-lecturas D-4",
       "modificado": false,
       "usadoPor": [
-        "PurgaLecturas"
+        "ReadingPurge"
       ],
       "updatedBy": null,
       "updatedTs": null

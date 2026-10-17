@@ -16,14 +16,14 @@ final class PulsosDePrueba {
     /** Toda telemetría responde a un pulso con motor: la ingesta evalúa las reglas. */
     static PulsoSensadoService conMotor() {
         PulsoSensadoService pulsos = mock(PulsoSensadoService.class);
-        when(pulsos.registrarRespuesta(anyString(), anyLong())).thenReturn(new PulsoSensadoService.RespuestaPulso(true, true));
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(new PulsoSensadoService.PulseResponse(true, true));
         return pulsos;
     }
 
     /** Ninguna telemetría responde a un pulso con motor: la ingesta sólo actualiza la lectura. */
     static PulsoSensadoService sinMotor() {
         PulsoSensadoService pulsos = mock(PulsoSensadoService.class);
-        when(pulsos.registrarRespuesta(anyString(), anyLong())).thenReturn(PulsoSensadoService.RespuestaPulso.NINGUNA);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(PulsoSensadoService.PulseResponse.NONE);
         return pulsos;
     }
 }

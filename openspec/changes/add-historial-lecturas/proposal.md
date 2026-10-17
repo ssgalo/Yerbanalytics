@@ -24,8 +24,8 @@ Sin este cambio, cada regla que lo necesita inventaría su propia tabla o quedar
 
 ## What Changes
 
-- Tabla `lectura_zona` con una fila por lectura aceptada de una macro-zona (las 10 métricas + DPV cuando exista) y su origen.
-- Servicio `HistorialLecturas` único para todas las reglas: últimas N lecturas, máximo/mínimo/media en una ventana, con filtro
+- Tabla `zone_reading` con una fila por lectura aceptada de una macro-zona (las 10 métricas + DPV cuando exista) y su origen.
+- Servicio `ReadingHistory` único para todas las reglas: últimas N lecturas, máximo/mínimo/media en una ventana, con filtro
   opcional por franja horaria (p. ej. 10–16 h).
 - Escritura en `updateTelemetry`, en la misma transacción que la lectura de la zona.
 - Purga programada (retención configurable).

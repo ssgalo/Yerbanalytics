@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.repository;
 
-import com.yerbanalytics.backend.lecturas.OrigenLectura;
-import com.yerbanalytics.backend.model.LecturaZonaEntity;
+import com.yerbanalytics.backend.model.ZoneReadingEntity;
+import com.yerbanalytics.backend.readings.ReadingOrigin;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,19 +17,19 @@ import java.util.List;
  * (con {@link Pageable}); nunca se trae la tabla entera.
  */
 @Repository
-public interface LecturaZonaRepository extends JpaRepository<LecturaZonaEntity, Long> {
+public interface ZoneReadingRepository extends JpaRepository<ZoneReadingEntity, Long> {
 
     /** Las más nuevas primero; el tamaño de página es el N pedido. */
-    List<LecturaZonaEntity> findByZonaIdOrderByTsDesc(String zonaId, Pageable pagina);
+    List<ZoneReadingEntity> findByZoneIdOrderByTsDesc(String zoneId, Pageable page);
 
-    List<LecturaZonaEntity> findByZonaIdAndOrigenOrderByTsDesc(String zonaId, OrigenLectura origen, Pageable pagina);
+    List<ZoneReadingEntity> findByZoneIdAndOriginOrderByTsDesc(String zoneId, ReadingOrigin origin, Pageable page);
 
-    /** Lecturas con {@code desde <= ts <= hasta}, de la más vieja a la más nueva. */
-    List<LecturaZonaEntity> findByZonaIdAndTsBetweenOrderByTsAsc(String zonaId, long desde, long hasta);
+    /** Lecturas con {@code from <= ts <= to}, de la más vieja a la más nueva. */
+    List<ZoneReadingEntity> findByZoneIdAndTsBetweenOrderByTsAsc(String zoneId, long from, long to);
 
     /** Borra las anteriores al corte (epoch ms) y devuelve cuántas. */
     @Transactional
     @Modifying
-    @Query("delete from LecturaZonaEntity l where l.ts < :corte")
-    int deleteByTsLessThan(@Param("corte") long corte);
+    @Query("delete from ZoneReadingEntity r where r.ts < :cutoff")
+    int deleteByTsLessThan(@Param("cutoff") long cutoff);
 }

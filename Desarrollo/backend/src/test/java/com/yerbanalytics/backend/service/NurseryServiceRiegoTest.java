@@ -114,7 +114,7 @@ class NurseryServiceRiegoTest {
                 mock(HistorialService.class), configuracion, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
                 mock(ManualLockRepository.class), mock(DiagnosticoService.class), store,
-                historialRepository, despacho, PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.lecturas.RegistroLecturas.class), RELOJ, 20);
+                historialRepository, despacho, PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class), RELOJ, 20);
     }
 
     private static HistorialRepository.UltimoEvento fila(String sector, String tipo, String regla, long ts) {

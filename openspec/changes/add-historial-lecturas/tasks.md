@@ -4,21 +4,21 @@
 biótico y clorosis/estrés.
 
 ## 1. Modelo
-- [x] 1.1 Test (JPA): se guarda y se lee una `LecturaZonaEntity` con las 10 métricas, `dpv` nulo, origen.
-- [x] 1.2 Entidad `lectura_zona` + `LecturaZonaRepository` con índice (`zona_id`, `ts`).
+- [x] 1.1 Test (JPA): se guarda y se lee una `ZoneReadingEntity` con las 10 métricas, `dpv` nulo, origen.
+- [x] 1.2 Entidad `zone_reading` + `ZoneReadingRepository` con índice (`zone_id`, `ts`).
 
 ## 2. Escritura
 - [x] 2.1 Test: `updateTelemetry` guarda una fila con los valores vigentes (también los que no vinieron).
 - [x] 2.2 Test: lectura anterior a `lastReadingTime` no se guarda; CE queda en dS/m.
-- [x] 2.3 `PulsoSensadoService.registrarRespuesta` (con o sin motor, en una sola operación) y origen `PULSO`/`OTRA`.
+- [x] 2.3 `PulsoSensadoService.recordResponse` (con o sin motor, en una sola operación) y origen `PULSE`/`OTHER`.
 - [x] 2.4 Test: si falla el guardado, la zona no cambia (misma transacción).
 
 ## 3. Consultas
-- [x] 3.1 Test (tabla): `ultimas`, `maximo/minimo/media` con ventana, franja horaria local, `soloPulso`, sin dato.
-- [x] 3.2 Implementar `HistorialLecturas` (consultas JPQL/derivadas; sin cargar todo en memoria).
+- [x] 3.1 Test (tabla): `latest`, `max/min/average` con ventana, franja horaria local, `onlyPulse`, sin dato.
+- [x] 3.2 Implementar `ReadingHistory` (consultas JPQL/derivadas; sin cargar todo en memoria).
 
 ## 4. Retención
-- [x] 4.1 Parámetro `lecturas.retencion-dias` (3–90, fábrica 14) en el catálogo de parámetros (familia `LECTURAS`); test de rango. El frontend (fixture del modo estático y tests anti-drift) lo conoce.
+- [x] 4.1 Parámetro `readings.retention-days` (3–90, fábrica 14) en el catálogo de parámetros (familia `READINGS`); test de rango. El frontend (fixture del modo estático y tests anti-drift) lo conoce.
 - [x] 4.2 Test: la purga borra lo viejo y respeta lo nuevo (reloj inyectado). Tarea a las 03:30.
 
 ## 5. Cierre

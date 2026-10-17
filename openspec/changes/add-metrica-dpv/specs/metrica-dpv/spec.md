@@ -31,7 +31,7 @@ su historial para las reglas que piden lecturas seguidas o un máximo en una ven
 
 #### Scenario: Máximo de 72 h
 - **WHEN** en las últimas 72 h el mayor DPV fue 2,3 kPa
-- **THEN** `maximoDesde` devuelve 2,3
+- **THEN** `ReadingHistory.max` devuelve 2,3
 
 ### Requirement: Presentación del DPV
 El dashboard SHALL mostrar el DPV junto a las demás métricas de la macro-zona, con su tramo

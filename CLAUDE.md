@@ -302,7 +302,7 @@ cd Desarrollo/backend
   si el nodo informa una falla o no contesta a tiempo; no cambia decisiones del motor) y las secuencias de
   Demo Expo (`SecuenciaService`, que espera el ACK de cada paso). Los comandos de las secuencias salen por
   el mismo `ComandoActuadorPublisher`, así que el seguimiento también los vigila, a propósito.
-- **El pasado de las lecturas vive en `lectura_zona`** (una fila por lectura aceptada, con las diez métricas vigentes y su origen `PULSO`/`OTRA`). Las reglas lo consultan sólo por `lecturas/HistorialLecturas`; nunca arman su propia tabla. Sin lecturas es `SIN_DATO`, no cero. Detalle en el README del backend.
+- **El pasado de las lecturas vive en `zone_reading`** (una fila por lectura aceptada, con las diez métricas vigentes y su origen `PULSE`/`OTHER`). Las reglas lo consultan sólo por `readings/ReadingHistory`; nunca arman su propia tabla. Sin lecturas es `SIN_DATO`, no cero. Detalle en el README del backend.
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.

@@ -12,7 +12,7 @@
 ## Decisiones
 
 ### D-1 — Ventanas de 48 h sobre el historial
-Se usa `HistorialLecturas.maximo/media(zona, metrica, desde, hasta?, franja?)` de `add-historial-lecturas`, el mismo servicio de
+Se usa `ReadingHistory.max/average(zone, metric, window)` de `add-historial-lecturas`, el mismo servicio de
 DPV y CE.
 
 ### D-2 — F-C1 decide, F-C2 ejecuta

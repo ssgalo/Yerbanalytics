@@ -90,8 +90,9 @@ function leerEnumsDelBackend(): EntradaEnum[] {
   const re =
     /(\w+)\(\s*"([^"]+)",\s*"(?:[^"\\]|\\.)*",\s*"(?:[^"\\]|\\.)*",\s*TipoParametro\.(\w+),\s*"([^"]*)",\s*"([^"]*)",\s*(null|[\d.]+),\s*(null|[\d.]+),\s*(\d+),\s*"(?:[^"\\]|\\.)*"\)/g;
   const out: EntradaEnum[] = [];
-  for (const f of readdirSync(DIR_PARAMETROS).filter((n) => /^Parametros\w+\.java$/.test(n))) {
+  for (const f of readdirSync(DIR_PARAMETROS).filter((n) => n.endsWith('.java'))) {
     const src = readFileSync(resolve(DIR_PARAMETROS, f), 'utf8');
+    if (!/enum \w+ implements DefinicionParametro/.test(src)) continue;
     for (const m of src.matchAll(re)) {
       out.push({
         constante: `${f.replace('.java', '')}.${m[1]}`,
@@ -147,7 +148,7 @@ export function parametrosPorRegla(
   const out: Record<string, string[]> = {};
   for (const [ruleId, src] of Object.entries(fuentes)) {
     const m = /List<DefinicionParametro>\s+parametros\(\)\s*\{\s*return\s+List\.of\(([^;]*)\);/.exec(src);
-    const refs = m ? [...m[1].matchAll(/(Parametros\w+\.\w+)/g)].map((r) => r[1]) : [];
+    const refs = m ? [...m[1].matchAll(/([A-Z]\w*\.[A-Z][A-Z0-9_]*)/g)].map((r) => r[1]) : [];
     out[ruleId] = refs.map((r) => constantes.get(r) ?? `<constante desconocida ${r}>`);
   }
   return out;
@@ -167,7 +168,7 @@ function leerReglasDelBackend(): Record<string, string> {
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   DespachoRiego: resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java'),
-  PurgaLecturas: resolve(DIR_ENGINE, '..', 'lecturas', 'PurgaLecturas.java'),
+  ReadingPurge: resolve(DIR_ENGINE, '..', 'readings', 'ReadingPurge.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
