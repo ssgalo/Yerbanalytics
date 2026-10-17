@@ -5,7 +5,7 @@
 
 ## 0. Previo
 - [x] 0.1 Verificado: nadie escribe `dispositivo.falla` (sólo se limpia al recambiar) y el firmware lee un final de carrera por sentido (ver `design.md`). Este cambio crea el primer camino que lo escribe.
-- [ ] 0.2 Responder las preguntas abiertas del diseño.
+- [x] 0.2 Responder las preguntas abiertas del diseño (ver «Preguntas resueltas» en `design.md`).
 
 ## 1. Contrato
 - [x] 1.1 `contrato.h`: tópico, payload, tipos y constantes; helper `contratoTopicErrores()`.
@@ -24,12 +24,12 @@
 - [x] 3.2 Tests y lint.
 
 ## 4. Firmware y simulador
-- [ ] 4.1 Firmware: publicar `MEDIASOMBRA_FIN_DE_CARRERA` y exponer ambos finales de carrera; compila con `arduino-cli`.
-- [ ] 4.2 Firmware: publicar caudal sólo detrás de un flag de compilación (sin hardware instalado).
+- [x] 4.1 Firmware: publicar `MEDIASOMBRA_FIN_DE_CARRERA` y exponer ambos finales de carrera. **Sin compilar**: esta máquina no tiene `arduino-cli` ni PlatformIO; compilar antes de flashear (`nodo_actuador`, `nodo_combinado`, `nodo_sensor`).
+- [x] 4.2 Firmware: publicar caudal sólo detrás de un flag de compilación (`ENVIAR_ERRORES_CAUDAL`, de fábrica 0; deja `informarErrorCaudal()` como punto de integración, sin hardware instalado).
 - [x] 4.3 Simulador: botón por tipo de error (`Desarrollo/simulador/`); el backend no se toca.
 
 ## 5. Cierre
-- [ ] 5.1 README del backend, README del sketch, índice, suites verdes.
+- [x] 5.1 README del backend, README del embebido y del simulador, `CLAUDE.md`, índice (`ESTADO.md`), suites verdes (backend: las que no necesitan PostgreSQL; frontend y simulador completas).
 
 ## 6. Control desde el simulador (requiere `add-control-demo-reglas`)
 - [x] 6.1 Las dos reglas y el receptor como `DemoControllable` (apagado + bypass `fault`); tests.

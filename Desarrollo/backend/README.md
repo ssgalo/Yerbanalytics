@@ -65,6 +65,14 @@ El simulador (cuenta de rol Servicio) consulta qué sectores ya no tienen electr
 Corré `src/main/resources/migracion-permisos-hardware-servicio.sql` (idempotente, antes o después de arrancar). Se aplica
 al reiniciar el backend (la matriz vive en memoria). Las tablas nuevas de este cambio (`invalid_reading`) las crea Hibernate.
 
+### Migración manual pendiente · permiso para registrar reparaciones de hardware
+
+`hardware.reparar` (S-05) es un permiso nuevo. Lo reciben el Ingeniero Agrónomo, el **Operario** (que además pasa a ver el panel
+de Hardware: `hardware.ver`, porque la reparación se registra desde ahí) y el rol Servicio (el simulador registra la reparación de
+su escenario); `hardware.gestionar` (alta y recambio) sigue siendo de quien administra. Una base sembrada no lo tiene: corré
+`src/main/resources/migracion-permisos-hardware-reparar.sql` (idempotente, antes o después de arrancar). La columna nueva
+`dispositivo.falla_desde` la agrega Hibernate. Se aplica al reiniciar el backend (la matriz vive en memoria).
+
 ### Migración manual pendiente · confianza mínima 70 %
 
 `diagnostico.confianza-minima` pasó de 85 a **70 %** de fábrica y su rango de 50–100 a **50–95 %**
@@ -275,6 +283,7 @@ ninguna rama para ellos: son usuarios como cualquier otro.
 | `GET /api/historial` | `historial.ver` |
 | `GET /api/rules/**` / `PUT /api/rules/parametros` | `reglas.ver` / `reglas.editar` |
 | `GET` / `POST`,`PUT /api/hardware/**` | `hardware.ver` / `hardware.gestionar` |
+| `POST /api/hardware/{id}/reparacion` | `hardware.reparar` |
 | `GET` / `POST`,`PUT /api/topologia/**` | `topologia.ver` / `topologia.gestionar` |
 | `GET /api/capturas/**` / `POST /api/capturas/ordenes` | `capturas.ver` / `capturas.ordenar` |
 | `/api/camara/vinculacion`, `/api/camara/dispositivos/**` | `camara.gestionar` |
@@ -843,11 +852,47 @@ frescura) corta sólo lo que falta, sin alertas:
 
 Nunca `ABORT_ALL`: un sector sin bomba sí se riega. «Mapeado» no es «sano»: un dispositivo con falla cuenta (eso es de S-05).
 Una regla de la cadena no puede tener prioridad fraccionaria, así que las demás subieron una (`ReglasArquitecturaTest` exige
-prioridades únicas).
+prioridades únicas). S-05 volvió a correrlas para sumar `HydraulicFaultRule` (ver «Fallas del nodo»).
 
 > **Efecto operativo.** Un sector sin su electroválvula registrada **deja de regarse de forma autónoma** (HU-18 CA-04). El
 > `data.sql` de desarrollo sólo equipa unos pocos sectores y regenerar la topología borra todos los dispositivos: para ver
 > actuar al motor, registrá el hardware o usá el bypass `hardware` del simulador (Telemetría → Control de reglas).
+
+## Fallas del nodo (S-05) y registro de reparaciones
+
+La v2 reparte la detección: **el ESP32 detecta la falla, corta el actuador y la publica; el motor reacciona** sacando al sector (o a
+la malla) de lo autónomo hasta que alguien registre la reparación. Contrato: `nursery/zone/{zona}/errores`, payload
+`{nodo, sector, tipo, valor, timestamp}` (fuente de verdad `contrato.h`; espejos `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType`
+y `simulador/server/contract.ts`).
+
+| Pieza | Qué hace |
+|---|---|
+| `NodeErrorReceiver` (`mqtt/`) | Parsea el payload, saca la zona del tópico y entrega a `HardwareFaultService`. Un `tipo` que el contrato no define, un JSON roto o un tópico inesperado se loguean y se descartan |
+| `HardwareFaultService` (`service/`) | **Único lugar que escribe `dispositivo.falla`** (+ `falla_desde`). `SIN_CAUDAL`/`CAUDAL_EXCESIVO` marcan la electroválvula del sector; `MEDIASOMBRA_FIN_DE_CARRERA` marca la mediasombra de **todos** los sectores de la zona (la v2 la trata por zona, el hardware la registra por sector). Deja UNA alerta `CRITICAL` con los textos de la v2 |
+| `HydraulicFaultRule` (prioridad **2**, `GLOBAL`) | Sector con la válvula averiada: `ABORT_RIEGO` (con `CancelaRiego.TODAS`: retira también el riego ya encolado) y `ABORT_INSUMO`. **R-02 no se exceptúa**: la v2 no lo dice, por eso la alerta pide riego manual. Nunca `ABORT_ALL` |
+| `ShadeFaultRule` (prioridad **13**, `MEDIASOMBRA`) | Malla averiada: `ABORT_MEDIASOMBRA`; `ShadingRule` no mueve la malla |
+
+- **Una sola fuente:** no hay tabla de fallas. `HardwareService.faultsOf(sectores)` (una consulta por zona) arma `HardwareFaults` y
+  `NurseryService` lo pone en `RuleContext.faults`, como `coverageOf` hace con S-04. `HardwareService` ya derivaba el estado
+  operativo de `falla`, así que el panel de Hardware lo ve sin cambios.
+- **Textos de la alerta (D-4):** falla hidráulica con la humedad de la macro-zona bajo el umbral de riego (`riego.umbral-humedad`,
+  45 %, del catálogo) pide **riego manual** del sector; con el sustrato húmedo, no. Falla de la malla con el final de «cerrada»
+  sin activar (quedó abierta) pide **cubrir a mano**.
+- **Un mismo hecho por dos caminos (D-6):** la falla de la malla llega por el tópico y por el ack `falla_mecanica`
+  (`SeguimientoComandosService` la entrega al mismo servicio). Mientras la marca siga con el mismo tipo, el segundo aviso es
+  `DUPLICATE` y no alerta. Con el receptor apagado desde el simulador, el ack alerta como antes.
+- **Reparación (D-5):** `POST /api/hardware/{id}/reparacion {detalle}` (permiso `hardware.reparar`; el detalle es obligatorio; `400`
+  sin detalle o dispositivo inexistente, `409` si no tiene falla) limpia la marca (la de la malla, en toda la zona), deja el evento
+  **«Reparación»** en el historial con usuario y detalle y una alerta `INFO`. En el siguiente pulso el sector vuelve a evaluarse.
+  S-06 reutilizará este camino.
+- **Prioridades:** `HydraulicFaultRule` entra en la 2 y las reglas de riego subieron una (`ShadeFaultRule` en la 13 y
+  `ShadingRule` en la 14), como en S-04. `ReglasArquitecturaTest` exige que la falla hidráulica corra antes que R-02.
+- **Para probarlo sin hardware:** simulador → Automatización de reglas → «Sin caudal», «Caudal excesivo», «Falla de mediasombra»
+  y «Reparación». Controles (apagar `HardwareFaultService`, bypass `fault` de las dos reglas): Telemetría → Control de reglas.
+
+> **Efecto operativo.** Un sector con falla hidráulica **no se riega solo ni se dosifica** hasta que se registre la reparación, y con
+> la mediasombra averiada la malla no recibe comandos de la regla de mediasombra. El estado seguro del nodo caído (S-02) no pasa por
+> las reglas: sigue ordenando cerrar la malla.
 
 ## Historial de lecturas
 
