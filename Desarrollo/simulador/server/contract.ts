@@ -61,7 +61,7 @@ export function telemetryTopic(zonaId: string): string {
 /* ============================================================
    Actuator commands and acks (the "Ack" section of contrato.h).
 
-   The backend publishes `valve ON {durationSec}`, `pump ON {}` and `shade SET {targetPct}` to
+   The backend publishes `valve ON {durationSec}`, `pump ON {ml}` and `shade SET {targetPct}` to
    nursery/zone/{zona}/sector/{sector}/command. The node answers on .../ack WHEN THE ACTION ENDS,
    and the backend raises an alert if no ack arrives in time (SeguimientoComandosService). The
    simulator answers the same way, so a demo without hardware does not fill the history with
