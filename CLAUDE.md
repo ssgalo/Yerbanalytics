@@ -333,6 +333,10 @@ cd Desarrollo/backend
     - **Cada regla puede tener más de una flag de cooldown o variable a bypasear**: Por ejemplo, una regla puede tener un cooldown de ciclo de lectura Y una guarda de riego en curso, o una pausa tras aplicación Y un límite de dosis.
     - En producción (`yerbanalytics.mode=REAL`), cada regla aplica estrictamente los valores y cooldowns establecidos por el usuario en la configuración agronómica.
     - En modo demo (`yerbanalytics.mode=SIMULATED` / `yerbanalytics.demo.enabled=true`), los cooldowns y variables de bypass se pueden setear en 0 o conmutar independientemente vía `/api/demo/rules/{ruleName}`, permitiendo re-regar o re-actuar de inmediato sin esperar las 4 horas ni depender de la hora del día.
+- **Fuente de telemetría en modo demo**: el simulador escribe en `nursery/demo/zone/{z}/telemetry` (tópico aparte del
+  ESP32) y `GET/PUT /api/demo/telemetry-source` (`REAL_NODE` | `SIMULATOR`, en memoria) elige cuál procesa el backend
+  (motor, pulso y lectura de Demo Expo). Los comandos siguen yendo a los actuadores del ESP32. Todo en el paquete
+  `demo/`; con demo apagado no existe suscripción, endpoint ni bean (el código productivo sólo ve `TelemetryAdmission`).
 - **Modos de operación y Feature Flags**:
   - Controlado por `yerbanalytics.mode` (`REAL` | `SIMULATED`) y `yerbanalytics.demo.enabled` (`false` | `true`), sobreescribible en Docker por `YERBANALYTICS_MODE` y `YERBANALYTICS_DEMO_ENABLED`.
   - En modo `REAL` (producción), el backend no expone ningún rastro de simulación: los endpoints `/api/demo/**` no se registran (retornan 404), no existen tablas demo en base de datos y todas las reglas respetan sus cooldowns productivos.
@@ -419,6 +423,8 @@ Invariantes a respetar al tocar esta área:
   su `.env` —una lista de configuración genérica—; el backend no tiene usuario, rol ni permiso
   programado para él. Su servidor inicia sesión y adjunta la cookie en el proxy. Sin credenciales, la
   telemetría MQTT sigue saliendo y su UI avisa que el backend rechaza el resto.
+- **Con el backend en modo demo publica en `nursery/demo/zone/{z}/telemetry`** (no en el tópico del ESP32) y trae el
+  interruptor de la fuente de telemetría; sin modo demo publica en el tópico regular, como hardware simulado.
 - **Su estado vive en `simulador/data/`**, nunca en la base del vivero.
 - **No tiene superficie de API propia en el sistema**: topología, órdenes de captura,
   dispositivos y diagnósticos son endpoints públicos, los mismos que usan el planificador de
