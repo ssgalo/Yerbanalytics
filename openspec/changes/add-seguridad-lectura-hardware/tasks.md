@@ -8,7 +8,7 @@
 
 ## 1. Rangos en el catálogo
 - [x] 1.1 Test: claves, fábrica, restricción min < max.
-- [x] 1.2 `ParametrosSeguridad` (rangos y `relecturas-invalidas`); frontend los muestra en Parámetros. *(Backend hecho; el frontend se sincroniza en el bloque 4.)*
+- [x] 1.2 `ParametrosSeguridad` (rangos y `relecturas-invalidas`); frontend los muestra en Parámetros. *Hecho: el fixture del catálogo trae los 11 parámetros (los consume `ReadingValidationGuard`, grupo «Lectura inválida» de la pestaña Parámetros).*
 
 ## 2. S-03
 - [x] 2.1 Test (tabla): `LecturaValidator` por métrica, bordes incluidos, CE ya convertida.
@@ -23,7 +23,7 @@
 - [x] 3.1 Test: `IncompleteHardwareRule` por rama (RIEGO, INSUMO, MEDIASOMBRA) con y sin actuador.
 - [x] 3.2 Cargar el hardware en el `RuleContext` sin consultar la base por regla. *`HardwareService.coverageOf` (2 consultas por zona) → `RuleContext.hardware`.*
 - [x] 3.3 Implementar la regla (`@Component`, prioridad 0.5 ⇒ renumerar si `priority()` es entero), flag de activación. *`priority()` es entero: la regla es la 1 y las demás subieron una. Sumó `ABORT_MEDIASOMBRA` (ver design).*
-- [x] 3.4 Inspector (`/reglas`): la regla aparece en el grafo (`GET /api/rules/schema`). *(Backend hecho; el frontend se sincroniza en el bloque 4.)*
+- [x] 3.4 Inspector (`/reglas`): la regla aparece en el grafo (`GET /api/rules/schema`). *Hecho: la regla está en el fixture del catálogo, el modo demo la evalúa y `ABORT_MEDIASOMBRA` se pinta como bloqueo.*
 
 ## 4. Cierre
 - [ ] 4.1 README del backend, índice, `./mvnw test`, `npm test && npm run lint`.

@@ -1,14 +1,15 @@
 /* ============================================================
    Evaluación simulada del motor de reglas para la demo (modo `mock`).
 
-   Espeja a las 13 reglas del backend y a `RuleOrchestrator.evaluate`: mismo orden de
+   Espeja a las reglas del backend y a `RuleOrchestrator.evaluate`: mismo orden de
    prioridad, mismas comparaciones, mismas reglas de corte por rama (ABORT_RIEGO y
-   POSTPONE_RIEGO cortan RIEGO, ABORT_INSUMO corta INSUMO, ABORT_ALL corta todo). Los
+   POSTPONE_RIEGO cortan RIEGO, ABORT_INSUMO corta INSUMO, ABORT_MEDIASOMBRA corta MEDIASOMBRA,
+   ABORT_ALL corta todo). Los
    umbrales se leen del catálogo vigente, así que editar un parámetro en la demo cambia
    la traza como lo haría el sistema real.
 
-   Riego (reglas_v2): R-04 saturado (2) → ciclo de lectura (3) → R-02 déficit crítico (4) →
-   R-05 ventana (6) → R-06 pausa (7) → R-03 lluvia (8) → R-01 déficit (10). R-02 gana: corre
+   Riego (reglas_v2): R-04 saturado (3) → ciclo de lectura (4) → R-02 déficit crítico (5) →
+   R-05 ventana (7) → R-06 pausa (8) → R-03 lluvia (9) → R-01 déficit (11). R-02 gana: corre
    antes y el orquestador conserva sus acciones aunque después se corte la rama; R-05/R-06/R-03
    sólo actúan cuando aplica R-01 (`crítico ≤ humedad < umbral`). R-04 va ANTES de la guarda de ciclo:
    recién regado el sector queda "ya regado en este ciclo" y la humedad sube; si el ciclo cortara primero,
@@ -257,6 +258,9 @@ const EVALUADORES: Record<string, Evaluador> = {
       ? [accion('ABORT_ALL', 'Bloqueo manual activo en el sector: se detiene toda actuación autónoma.')]
       : noop('Sin bloqueo manual.'),
 
+  // La demo siempre tiene el hardware completo mapeado: la regla confirma que la cadena sigue (S-04).
+  IncompleteHardwareRule: () => noop('Hardware completo: el sector tiene mapeados los actuadores que requiere.'),
+
   StaleSensorRule: (ev, e) => {
     const vieja = ev.comparar('Antigüedad de la última lectura', e.antiguedadSeg, 'GT', 'seguridad.antiguedad-max-lectura');
     // La humedad de sustrato se mide aparte: si la sonda falla, el resto de la lectura sigue fresco.
@@ -465,6 +469,7 @@ export function evaluarMotor(catalogo: CatalogoReglas, entrada: EntradaMotor): T
   let abortAll: string | null = null;
   let abortRiego: string | null = null;
   let abortInsumo: string | null = null;
+  let abortMediasombra: string | null = null;
 
   for (const regla of [...catalogo.reglas].sort((a, b) => a.prioridad - b.prioridad)) {
     if (abortAll) {
@@ -477,6 +482,10 @@ export function evaluarMotor(catalogo: CatalogoReglas, entrada: EntradaMotor): T
     }
     if (regla.rama === 'INSUMO' && abortInsumo) {
       reglas.push(omitida(regla, 'OMITIDA_RAMA_BLOQUEADA', abortInsumo));
+      continue;
+    }
+    if (regla.rama === 'MEDIASOMBRA' && abortMediasombra) {
+      reglas.push(omitida(regla, 'OMITIDA_RAMA_BLOQUEADA', abortMediasombra));
       continue;
     }
     if (USAN_DIAGNOSTICO.has(regla.id) && entrada.diagnosticoNuevo === false) {
@@ -501,6 +510,7 @@ export function evaluarMotor(catalogo: CatalogoReglas, entrada: EntradaMotor): T
       if (a.tipo === 'ABORT_ALL') abortAll ??= regla.id;
       else if (a.tipo === 'ABORT_RIEGO' || a.tipo === 'POSTPONE_RIEGO') abortRiego ??= regla.id;
       else if (a.tipo === 'ABORT_INSUMO') abortInsumo ??= regla.id;
+      else if (a.tipo === 'ABORT_MEDIASOMBRA') abortMediasombra ??= regla.id;
     }
   }
 

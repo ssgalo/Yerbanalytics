@@ -95,7 +95,7 @@ interface EntradaEnum {
 
 function leerEnumsDelBackend(): EntradaEnum[] {
   const re =
-    /(\w+)\(\s*"([^"]+)",\s*"(?:[^"\\]|\\.)*",\s*"(?:[^"\\]|\\.)*",\s*TipoParametro\.(\w+),\s*"([^"]*)",\s*"([^"]*)",\s*(null|[\d.]+),\s*(null|[\d.]+),\s*(\d+),\s*"(?:[^"\\]|\\.)*"\)/g;
+    /(\w+)\(\s*"([^"]+)",\s*"(?:[^"\\]|\\.)*",\s*"(?:[^"\\]|\\.)*",\s*TipoParametro\.(\w+),\s*"([^"]*)",\s*"([^"]*)",\s*(null|-?[\d.]+),\s*(null|-?[\d.]+),\s*(\d+),\s*"(?:[^"\\]|\\.)*"\)/g;
   const out: EntradaEnum[] = [];
   for (const f of readdirSync(DIR_PARAMETROS).filter((n) => n.endsWith('.java'))) {
     const src = readFileSync(resolve(DIR_PARAMETROS, f), 'utf8');
@@ -170,8 +170,8 @@ function leerReglasDelBackend(): Record<string, string> {
 }
 
 /**
- * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado y el
- * escalamiento del nodo): también
+ * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
+ * escalamiento del nodo y el guard de lectura inválida): también
  * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
@@ -179,6 +179,7 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   ReadingPurge: resolve(DIR_ENGINE, '..', 'readings', 'ReadingPurge.java'),
   PulsoSensado: resolve(DIR_ENGINE, '..', 'sensing', 'PulsoSensadoService.java'),
   EscalamientoNodo: resolve(DIR_ENGINE, '..', 'service', 'EscalamientoNodoService.java'),
+  ReadingValidationGuard: resolve(DIR_ENGINE, '..', 'readings', 'ReadingValidationGuard.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {

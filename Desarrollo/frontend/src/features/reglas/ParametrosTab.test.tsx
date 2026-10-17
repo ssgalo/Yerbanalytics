@@ -6,6 +6,7 @@ import { ParametrosTab } from './ParametrosTab';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import type { CambioParametro, CatalogoReglas } from '@/types/domain';
 import type { Borrador } from './borrador';
+import { agruparPorConsumidor } from './catalogoView';
 import { catalogoDeFabrica, conValor } from './__fixtures__/catalogos';
 
 afterEach(cleanup);
@@ -63,15 +64,22 @@ describe('ParametrosTab · agrupación (7.2)', () => {
 
     const grupos = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(grupos).toEqual([
-      expect.stringMatching(/Global/),
+      expect.stringMatching(/Global · 3 reglas/),
+      // Lo que lee parámetros sin ser una regla va justo después de la rama a la que pertenece.
+      expect.stringMatching(/Lectura inválida/),
+      expect.stringMatching(/Historial de lecturas/),
+      expect.stringMatching(/Lectura de los nodos/),
+      expect.stringMatching(/Nodo sin respuesta/),
       expect.stringMatching(/Riego · 7 reglas/),
       expect.stringMatching(/Ejecución del riego/),
       expect.stringMatching(/Insumos/),
       expect.stringMatching(/Mediasombra/),
       expect.stringMatching(/Seguimiento/),
     ]);
-    // Colapsadas: ningún campo de regla a la vista (el grupo de ejecución del riego no se colapsa)
-    expect(screen.queryAllByRole('spinbutton')).toHaveLength(1);
+    // Colapsadas: ningún campo de regla a la vista. Los grupos de lo que lee parámetros sin ser una regla (ejecución
+    // del riego, lectura inválida…) no se colapsan: sus campos son los únicos que se ven.
+    const deConsumidores = agruparPorConsumidor(catalogoDeFabrica()).flatMap((g) => g.parametros);
+    expect(screen.queryAllByRole('spinbutton')).toHaveLength(deConsumidores.length);
     // Orden por prioridad dentro de RIEGO: R-04 → ciclo → R-02 → R-05 → R-06 → R-03 → R-01
     const botones = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent ?? '');
     const orden = ['Sustrato saturado', 'Un riego por ciclo', 'Déficit hídrico crítico', 'fuera de ventana', 'Pausa tras', 'Posponer por lluvia', 'Riego por déficit'];
@@ -82,8 +90,8 @@ describe('ParametrosTab · agrupación (7.2)', () => {
 
   it('muestra "Sin parámetros configurables" para las reglas sin umbrales', () => {
     montar(catalogoDeFabrica());
-    // Bloqueo manual y seguimiento (la regla de ciclo lee el umbral crítico para dejar pasar a R-02).
-    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(2);
+    // Bloqueo manual, hardware incompleto y seguimiento (la regla de ciclo lee el umbral crítico para dejar pasar a R-02).
+    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(3);
   });
 });
 
@@ -246,8 +254,8 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
     expect(within(fila).getByText(/Usado por: .*fuera de ventana.*Pausa tras.*Posponer por lluvia.*Riego por déficit/)).toBeTruthy();
     // El consumidor que no es una regla se rotula por su nombre, no por el id de la clase.
     expect(screen.getByText(/Usado por: Ejecución del riego/)).toBeTruthy();
-    // 21 parámetros del catálogo = 21 filas
-    expect(document.querySelectorAll('[data-clave]')).toHaveLength(21);
+    // Una fila por parámetro del catálogo.
+    expect(document.querySelectorAll('[data-clave]')).toHaveLength(catalogoDeFabrica().parametros.length);
   });
 });
 

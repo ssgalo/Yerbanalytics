@@ -27,7 +27,7 @@ export type EstadoNodo =
   | 'noAccion'
   | 'sinTraza';
 
-const BLOQUEANTES = new Set(['ABORT_RIEGO', 'ABORT_INSUMO', 'ABORT_ALL']);
+const BLOQUEANTES = new Set(['ABORT_RIEGO', 'ABORT_INSUMO', 'ABORT_MEDIASOMBRA', 'ABORT_ALL']);
 const EJECUTORAS = new Set(['ACTIVAR_VALVULA', 'ACTIVAR_BOMBA', 'MOVER_MEDIASOMBRA']);
 
 /** Estado visual de una regla según su traza. Si emite varias acciones manda la más fuerte. */
