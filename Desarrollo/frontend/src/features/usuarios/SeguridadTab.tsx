@@ -3,8 +3,12 @@
    desde que se guarda y queda auditado. El rango (5–480 min) lo valida la UI y lo vuelve a
    validar el backend.
    ============================================================ */
-import { useEffect, useState, type FormEvent } from 'react';
-import { Card } from '@/components/ui/Card';
+import { useEffect, useState } from 'react';
+import { Callout } from '@/components/ui/Callout';
+import { SaveBar, Skeleton } from '@/components/ui/EstadosPantalla';
+import { Toast } from '@/components/ui/Toast';
+import { Field, InputUnit } from '@/components/ui/Field';
+import { ayudaDe } from '@/components/ui/clases';
 import { getSeguridadRepository } from '@/data';
 import { useAuth } from '@/hooks/AuthContext';
 import type { PoliticaSesion } from '@/types/seguridad';
@@ -36,18 +40,24 @@ export function SeguridadTab() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
+      <Callout tone="crit" role="alert">
         No se pudo cargar la política de sesión: {error}
+      </Callout>
+    );
+  }
+  if (!politica) {
+    return (
+      <div className={styles.page} aria-busy="true">
+        <span className="sr">Cargando la política de sesión…</span>
+        <Skeleton height={180} />
       </div>
     );
   }
-  if (!politica) return <div className={styles.state}>Cargando la política de sesión…</div>;
 
   const invalido = errorInactividad(valor, politica.minimo, politica.maximo);
   const sinCambios = Number(valor) === politica.inactividadMin;
 
-  const guardar = async (e: FormEvent) => {
-    e.preventDefault();
+  const guardar = async () => {
     if (invalido) return;
     setFeedback(null);
     setGuardando(true);
@@ -66,54 +76,73 @@ export function SeguridadTab() {
   };
 
   return (
-    <Card className={styles.section}>
-      <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>Cierre de sesión por inactividad</h2>
-        <span className={styles.sectionHint}>
-          Rige para todas las sesiones desde que se guarda · queda en la auditoría
-        </span>
-      </div>
-      <form onSubmit={guardar}>
-        <div className={styles.formGrid}>
-          <label className={styles.group}>
-            <span className={styles.label}>Tiempo máximo de inactividad (min)</span>
-            <input
-              className={`${styles.input} ${styles.inputCorto}`}
-              type="number"
-              min={politica.minimo}
-              max={politica.maximo}
-              step={1}
-              value={valor}
-              aria-invalid={invalido !== null}
-              onChange={(e) => {
-                setValor(e.target.value);
-                setFeedback(null);
-              }}
-            />
-          </label>
-          <button type="submit" className={styles.btnPrimary} disabled={guardando || invalido !== null || sinCambios}>
-            {guardando ? 'Guardando…' : 'Guardar'}
-          </button>
-          {feedback && (
-            <span
-              role={feedback.tipo === 'err' ? 'alert' : 'status'}
-              className={feedback.tipo === 'ok' ? styles.feedbackOk : styles.feedbackErr}
+    <div className={styles.page}>
+      <section className={styles.section}>
+        <header className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>Cierre de sesión por inactividad</h2>
+          <p className={styles.sectionHint}>Rige para todas las sesiones desde que se guarda · queda en la auditoría</p>
+        </header>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void guardar();
+          }}
+          noValidate
+        >
+          <div className={styles.narrow}>
+            <Field
+              label="Tiempo máximo de inactividad"
+              htmlFor="politica-inactividad"
+              hint={`Entre ${politica.minimo} y ${politica.maximo} minutos`}
+              error={invalido}
             >
-              {feedback.msg}
-            </span>
-          )}
-        </div>
-        {invalido && (
-          <div role="alert" className={styles.errorBox}>
-            {invalido}
+              <InputUnit
+                id="politica-inactividad"
+                unit="min"
+                type="number"
+                inputMode="numeric"
+                min={politica.minimo}
+                max={politica.maximo}
+                step={1}
+                value={valor}
+                invalid={invalido !== null}
+                modified={!sinCambios && invalido === null}
+                aria-describedby={ayudaDe('politica-inactividad')}
+                onChange={(e) => {
+                  setValor(e.target.value);
+                  setFeedback(null);
+                }}
+              />
+            </Field>
           </div>
-        )}
-        <div className={styles.info}>
-          Sólo cuenta la interacción real (teclado, puntero, toque, scroll) y las acciones que modifican datos: las
-          consultas automáticas del dashboard no mantienen viva la sesión. Un minuto antes del cierre se avisa en
-          pantalla.
+        </form>
+        <div className={styles.formNotes}>
+          <Callout>
+            Sólo cuenta la interacción real (teclado, puntero, toque, scroll) y las acciones que modifican datos: las
+            consultas automáticas del dashboard no mantienen viva la sesión. Un minuto antes del cierre se avisa en
+            pantalla.
+          </Callout>
         </div>
-      </form>
-    </Card>
+      </section>
+
+      {feedback && (
+        <Toast tone={feedback.tipo === 'ok' ? 'ok' : 'crit'} onClose={() => setFeedback(null)}>
+          {feedback.msg}
+        </Toast>
+      )}
+
+      <SaveBar
+        count={sinCambios ? 0 : 1}
+        detalle={invalido ? 'Corregí el valor para poder guardar.' : `Inactividad: ${politica.inactividadMin} → ${valor} min.`}
+        onDiscard={() => {
+          setValor(String(politica.inactividadMin));
+          setFeedback(null);
+        }}
+        onSave={() => void guardar()}
+        saveLabel="Guardar cambios"
+        saving={guardando}
+        saveDisabled={invalido !== null}
+      />
+    </div>
   );
 }

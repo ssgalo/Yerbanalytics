@@ -3,23 +3,33 @@
    pedido, alta, edición y cambio de rol, suspensión/reactivación, baja con confirmación y
    restablecimiento de contraseña. Cada operación que corresponde cierra las sesiones del usuario: eso
    lo hace el backend; la UI sólo lo avisa.
+
+   Nada aparece en línea corriendo las tablas: los formularios y la confirmación de baja se abren
+   en un popover anclado al botón que se tocó, y el resultado de cada operación es un toast.
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Callout } from '@/components/ui/Callout';
+import { Popover } from '@/components/ui/Popover';
+import { Toast } from '@/components/ui/Toast';
+import { Skeleton } from '@/components/ui/EstadosPantalla';
+import { Switch } from '@/components/ui/Seleccion';
 import { getSeguridadRepository } from '@/data';
 import { useAuth } from '@/hooks/AuthContext';
 import { nombreRol } from '@/lib/catalogoSeguridad';
 import type { Usuario } from '@/types/seguridad';
 import { BlanqueoForm, UsuarioForm } from './components/UsuarioForm';
-import { ESTADO_USUARIO, fechaHora } from './presentacion';
+import { UsersTable } from './components/UsersTable';
 import styles from './Usuarios.module.css';
 
+/** Popover abierto y el botón al que se ancla. */
 type Panel =
-  | { modo: 'alta' }
-  | { modo: 'edicion'; usuario: Usuario }
-  | { modo: 'clave'; usuario: Usuario }
-  | { modo: 'baja'; usuario: Usuario }
+  | ({ anchor: HTMLElement } & (
+      | { modo: 'alta' }
+      | { modo: 'edicion'; usuario: Usuario }
+      | { modo: 'clave'; usuario: Usuario }
+      | { modo: 'baja'; usuario: Usuario }
+    ))
   | null;
 
 type Feedback = { tipo: 'ok' | 'err'; msg: string } | null;
@@ -63,235 +73,163 @@ export function UsuariosTab() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
+      <Callout tone="crit" role="alert">
         No se pudieron cargar los usuarios: {error}
+      </Callout>
+    );
+  }
+  if (!usuarios) {
+    return (
+      <div className={styles.page} aria-busy="true">
+        <span className="sr">Cargando usuarios…</span>
+        <Skeleton height={220} />
+        <Skeleton height={140} />
       </div>
     );
   }
-  if (!usuarios) return <div className={styles.state}>Cargando usuarios…</div>;
 
   const personas = usuarios.filter((u) => u.rol !== 'SERVICIO');
   const servicio = usuarios.filter((u) => u.rol === 'SERVICIO');
   const repo = getSeguridadRepository();
 
   const tabla = (lista: Usuario[], titulo: string, hint: string) => (
-    <Card className={styles.tableCard}>
-      <div className={styles.tableHead}>
-        <h2 className={styles.sectionTitle}>{titulo}</h2>
-        <span className={styles.sectionHint}>{hint}</span>
-      </div>
-      <div className={styles.tableScroll}>
-        <table className={styles.table} aria-label={titulo}>
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Rol</th>
-              <th>Estado</th>
-              <th>Último ingreso</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {lista.length === 0 && (
-              <tr>
-                <td colSpan={5} className={styles.empty}>
-                  No hay {titulo.toLowerCase()}.
-                </td>
-              </tr>
-            )}
-            {lista.map((u) => {
-              const yo = u.id === perfil?.id;
-              const estado = ESTADO_USUARIO[u.estado];
-              const baja = u.estado === 'BAJA';
-              const deshabilitado = ocupado !== null;
-              return (
-                <tr key={u.id} data-username={u.username}>
-                  <td>
-                    <div className={styles.username}>
-                      {u.username}
-                      {yo && <span className={styles.yo}>vos</span>}
-                    </div>
-                    <div className={styles.sub}>{u.nombre}</div>
-                  </td>
-                  <td>{nombreRol(u.rol)}</td>
-                  <td>
-                    <Badge soft={estado.soft} ink={estado.ink}>
-                      {estado.label}
-                    </Badge>
-                    {u.debeCambiarClave && !baja && <div className={styles.sub}>Clave temporal</div>}
-                  </td>
-                  <td className={u.ultimoIngreso ? styles.mono : styles.muted}>{fechaHora(u.ultimoIngreso)}</td>
-                  <td>
-                    {!baja && (
-                      <div className={styles.acciones}>
-                        <button
-                          type="button"
-                          className={styles.btnLink}
-                          disabled={deshabilitado}
-                          onClick={() => setPanel({ modo: 'edicion', usuario: u })}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.btnLink}
-                          disabled={deshabilitado}
-                          onClick={() => setPanel({ modo: 'clave', usuario: u })}
-                        >
-                          Restablecer contraseña
-                        </button>
-                        {u.estado === 'ACTIVO' ? (
-                          <button
-                            type="button"
-                            className={styles.btnLink}
-                            disabled={deshabilitado || yo}
-                            title={yo ? 'No podés suspenderte a vos mismo' : undefined}
-                            onClick={() =>
-                              void operar(u, () => repo.suspenderUsuario(u.id), `«${u.username}» quedó suspendido; sus sesiones se cerraron.`)
-                            }
-                          >
-                            Suspender
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className={styles.btnLink}
-                            disabled={deshabilitado}
-                            onClick={() =>
-                              void operar(u, () => repo.reactivarUsuario(u.id), `«${u.username}» puede volver a ingresar.`)
-                            }
-                          >
-                            Reactivar
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className={styles.btnLinkDanger}
-                          disabled={deshabilitado || yo}
-                          title={yo ? 'No podés darte de baja a vos mismo' : undefined}
-                          onClick={() => setPanel({ modo: 'baja', usuario: u })}
-                        >
-                          Dar de baja
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+    <UsersTable
+      title={titulo}
+      hint={hint}
+      users={lista}
+      selfId={perfil?.id}
+      busy={ocupado !== null}
+      onEdit={(u, anchor) => setPanel({ modo: 'edicion', usuario: u, anchor })}
+      onResetPassword={(u, anchor) => setPanel({ modo: 'clave', usuario: u, anchor })}
+      onSuspend={(u) =>
+        void operar(u, () => repo.suspenderUsuario(u.id), `«${u.username}» quedó suspendido; sus sesiones se cerraron.`)
+      }
+      onReactivate={(u) => void operar(u, () => repo.reactivarUsuario(u.id), `«${u.username}» puede volver a ingresar.`)}
+      onRemove={(u, anchor) => setPanel({ modo: 'baja', usuario: u, anchor })}
+    />
   );
+
+  const cerrar = () => setPanel(null);
 
   return (
     <div className={styles.page}>
       <div className={styles.toolbar}>
-        <label className={styles.check}>
-          <input type="checkbox" checked={incluirBajas} onChange={(e) => setIncluirBajas(e.target.checked)} />
-          Mostrar bajas
-        </label>
+        <span className={styles.toggle}>
+          <Switch checked={incluirBajas} onChange={setIncluirBajas} labelledBy="usuarios-mostrar-bajas" />
+          <span id="usuarios-mostrar-bajas">Mostrar bajas</span>
+        </span>
         <span className={styles.spacer} />
-        {feedback && (
-          <span role={feedback.tipo === 'err' ? 'alert' : 'status'} className={feedback.tipo === 'ok' ? styles.feedbackOk : styles.feedbackErr}>
-            {feedback.msg}
-          </span>
-        )}
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => {
+        <Button
+          variant="primary"
+          aria-expanded={panel?.modo === 'alta'}
+          onClick={(e) => {
             setFeedback(null);
-            setPanel({ modo: 'alta' });
+            setPanel({ modo: 'alta', anchor: e.currentTarget });
           }}
         >
           Nuevo usuario
-        </button>
+        </Button>
       </div>
-
-      {panel?.modo === 'alta' && (
-        <UsuarioForm
-          modo="alta"
-          onCancel={() => setPanel(null)}
-          onSubmit={async (nuevo) => {
-            await repo.crearUsuario(nuevo);
-            setPanel(null);
-            setFeedback({ tipo: 'ok', msg: `«${nuevo.username}» quedó dado de alta. Tiene que cambiar la contraseña al ingresar.` });
-            await cargar();
-          }}
-        />
-      )}
-
-      {panel?.modo === 'edicion' && (
-        <UsuarioForm
-          key={panel.usuario.id}
-          modo="edicion"
-          usuario={panel.usuario}
-          onCancel={() => setPanel(null)}
-          onSubmit={async (edicion) => {
-            const u = panel.usuario;
-            await repo.editarUsuario(u.id, edicion);
-            setPanel(null);
-            setFeedback({
-              tipo: 'ok',
-              msg:
-                edicion.rol !== u.rol
-                  ? `«${u.username}» ahora es ${nombreRol(edicion.rol)}; sus sesiones se cerraron.`
-                  : `«${u.username}» quedó actualizado.`,
-            });
-            await cargar();
-            // El nombre propio se ve en la topbar.
-            if (u.id === perfil?.id) await recargarPerfil();
-          }}
-        />
-      )}
-
-      {panel?.modo === 'clave' && (
-        <BlanqueoForm
-          key={panel.usuario.id}
-          usuario={panel.usuario}
-          onCancel={() => setPanel(null)}
-          onSubmit={async (clave) => {
-            await repo.blanquearClave(panel.usuario.id, clave);
-            setPanel(null);
-            setFeedback({ tipo: 'ok', msg: `Se asignó una contraseña temporal a «${panel.usuario.username}».` });
-            await cargar();
-          }}
-        />
-      )}
-
-      {panel?.modo === 'baja' && (
-        <Card className={styles.section}>
-          <div role="alertdialog" aria-label="Confirmar baja">
-            <h2 className={styles.sectionTitle}>¿Dar de baja a «{panel.usuario.username}»?</h2>
-            <div className={styles.advertencia}>
-              La baja es definitiva: se cierran sus sesiones, no puede volver a ingresar ni reactivarse, y su nombre de
-              usuario no se reutiliza. El registro se conserva para la auditoría.
-            </div>
-            <div className={styles.formActions}>
-              <button
-                type="button"
-                className={styles.btnDanger}
-                disabled={ocupado !== null}
-                onClick={() => {
-                  const u = panel.usuario;
-                  setPanel(null);
-                  void operar(u, () => repo.darDeBajaUsuario(u.id), `«${u.username}» quedó dado de baja.`);
-                }}
-              >
-                Confirmar baja
-              </button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setPanel(null)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {tabla(personas, 'Personas', 'Quienes operan el dashboard')}
       {tabla(servicio, 'Cuentas de servicio', 'Integraciones: simulador, servicio de inferencia')}
+
+      {panel?.modo === 'alta' && (
+        <Popover anchor={panel.anchor} onClose={cerrar} label="Nuevo usuario" width={460} alignEnd>
+          <UsuarioForm
+            modo="alta"
+            onCancel={cerrar}
+            onSubmit={async (nuevo) => {
+              await repo.crearUsuario(nuevo);
+              setPanel(null);
+              setFeedback({ tipo: 'ok', msg: `«${nuevo.username}» quedó dado de alta. Tiene que cambiar la contraseña al ingresar.` });
+              await cargar();
+            }}
+          />
+        </Popover>
+      )}
+
+      {panel?.modo === 'edicion' && (
+        <Popover anchor={panel.anchor} onClose={cerrar} label={`Editar «${panel.usuario.username}»`} width={460} alignEnd>
+          <UsuarioForm
+            key={panel.usuario.id}
+            modo="edicion"
+            usuario={panel.usuario}
+            onCancel={cerrar}
+            onSubmit={async (edicion) => {
+              const u = panel.usuario;
+              await repo.editarUsuario(u.id, edicion);
+              setPanel(null);
+              setFeedback({
+                tipo: 'ok',
+                msg:
+                  edicion.rol !== u.rol
+                    ? `«${u.username}» ahora es ${nombreRol(edicion.rol)}; sus sesiones se cerraron.`
+                    : `«${u.username}» quedó actualizado.`,
+              });
+              await cargar();
+              // El nombre propio se ve en la topbar.
+              if (u.id === perfil?.id) await recargarPerfil();
+            }}
+          />
+        </Popover>
+      )}
+
+      {panel?.modo === 'clave' && (
+        <Popover
+          anchor={panel.anchor}
+          onClose={cerrar}
+          label={`Restablecer la contraseña de «${panel.usuario.username}»`}
+          width={340}
+          alignEnd
+        >
+          <BlanqueoForm
+            key={panel.usuario.id}
+            usuario={panel.usuario}
+            onCancel={cerrar}
+            onSubmit={async (clave) => {
+              await repo.blanquearClave(panel.usuario.id, clave);
+              setPanel(null);
+              setFeedback({ tipo: 'ok', msg: `Se asignó una contraseña temporal a «${panel.usuario.username}».` });
+              await cargar();
+            }}
+          />
+        </Popover>
+      )}
+
+      {panel?.modo === 'baja' && (
+        <Popover anchor={panel.anchor} onClose={cerrar} label="Confirmar baja" role="alertdialog" width={340} alignEnd>
+          <header className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>¿Dar de baja a «{panel.usuario.username}»?</h2>
+          </header>
+          <p className={styles.popText}>
+            La baja es definitiva: se cierran sus sesiones, no puede volver a ingresar ni reactivarse, y su nombre de
+            usuario no se reutiliza. El registro se conserva para la auditoría.
+          </p>
+          <div className={styles.formActions}>
+            <Button
+              variant="danger"
+              disabled={ocupado !== null}
+              onClick={() => {
+                const u = panel.usuario;
+                setPanel(null);
+                void operar(u, () => repo.darDeBajaUsuario(u.id), `«${u.username}» quedó dado de baja.`);
+              }}
+            >
+              Confirmar baja
+            </Button>
+            <Button variant="ghost" onClick={cerrar}>
+              Cancelar
+            </Button>
+          </div>
+        </Popover>
+      )}
+
+      {feedback && (
+        <Toast tone={feedback.tipo === 'ok' ? 'ok' : 'crit'} onClose={() => setFeedback(null)}>
+          {feedback.msg}
+        </Toast>
+      )}
     </div>
   );
 }
