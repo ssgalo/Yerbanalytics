@@ -149,6 +149,52 @@ class PulsoSensadoServiceTest {
         assertThat(service.respondePulso("MZ-1", ms(0))).isFalse();
     }
 
+    // --- registrarRespuesta (la respuesta completa: si respondió y si ejecuta el motor) ---
+
+    @Test
+    @DisplayName("un pulso con motor: la primera respuesta responde y ejecuta el motor")
+    void registrarRespuesta_conMotor() {
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+
+        var r = service.registrarRespuesta("MZ-1", ms(2));
+
+        assertThat(r.respondio()).isTrue();
+        assertThat(r.ejecutaMotor()).isTrue();
+    }
+
+    @Test
+    @DisplayName("un pulso sin motor: la primera respuesta responde pero NO ejecuta el motor")
+    void registrarRespuesta_sinMotorIgualRespondeAlPulso() {
+        service.iniciar(OrigenPulso.MANUAL, false);
+
+        var r = service.registrarRespuesta("MZ-1", ms(2));
+
+        assertThat(r.respondio()).isTrue();
+        assertThat(r.ejecutaMotor()).isFalse();
+    }
+
+    @Test
+    @DisplayName("fuera de un pulso, la segunda respuesta de la zona o una anterior al pedido no responden")
+    void registrarRespuesta_nadaQueResponder() {
+        assertThat(service.registrarRespuesta("MZ-1", ms(0)).respondio()).isFalse();
+
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+        assertThat(service.registrarRespuesta("MZ-1", ms(-5)).respondio()).isFalse();
+        assertThat(service.registrarRespuesta("MZ-1", ms(1)).respondio()).isTrue();
+        var segunda = service.registrarRespuesta("MZ-1", ms(5));
+        assertThat(segunda.respondio()).isFalse();
+        assertThat(segunda.ejecutaMotor()).isFalse();
+    }
+
+    @Test
+    @DisplayName("registrarRespuesta y respondePulso comparten la marca: la zona responde una sola vez")
+    void registrarRespuesta_yRespondePulsoNoSeDuplican() {
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+
+        assertThat(service.respondePulso("MZ-1", ms(1))).isTrue();
+        assertThat(service.registrarRespuesta("MZ-1", ms(2)).respondio()).isFalse();
+    }
+
     @Test
     void elPulsoTerminaCuandoRespondenTodasLasZonas() {
         service.iniciar(OrigenPulso.PROGRAMADO, true);

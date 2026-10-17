@@ -14,6 +14,8 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
+import com.yerbanalytics.backend.lecturas.OrigenLectura;
+import com.yerbanalytics.backend.lecturas.RegistroLecturas;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService;
@@ -74,6 +76,7 @@ public class NurseryService {
     private final DespachoRiego despacho;
     private final PulsoSensadoService pulsos;
     private final EscalamientoNodoService escalamiento;
+    private final RegistroLecturas lecturas;
     private final Clock reloj;
     private final int bateriaMinPct;
 
@@ -94,6 +97,7 @@ public class NurseryService {
                           DespachoRiego despacho,
                           PulsoSensadoService pulsos,
                           EscalamientoNodoService escalamiento,
+                          RegistroLecturas lecturas,
                           Clock reloj,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -112,6 +116,7 @@ public class NurseryService {
         this.despacho = despacho;
         this.pulsos = pulsos;
         this.escalamiento = escalamiento;
+        this.lecturas = lecturas;
         this.reloj = reloj;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -559,7 +564,8 @@ public class NurseryService {
         // El motor decide sólo con la primera respuesta de la zona a un pulso con motor. Cualquier otra
         // telemetría (pulso sin motor, segunda respuesta, arranque del nodo, secuencia LECTURA) sólo actualiza
         // la lectura y el estado de los sectores.
-        boolean ejecutaMotor = pulsos.respondePulso(zoneId, recepcionMs);
+        PulsoSensadoService.RespuestaPulso respuesta = pulsos.registrarRespuesta(zoneId, recepcionMs);
+        boolean ejecutaMotor = respuesta.ejecutaMotor();
         List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
 
         // La lectura se persiste UNA vez, en la zona. Sólo se actualizan las métricas
@@ -589,6 +595,8 @@ public class NurseryService {
         if (payload.battery() != null) zona.setNodoBattery(payload.battery());
         if (payload.signal() != null) zona.setNodoSignal(payload.signal());
         zona.setLastReadingTime(tsMs);
+        // Misma transacción que la lectura: si falla el historial, la zona tampoco se actualiza.
+        lecturas.registrar(zona, tsMs, recepcionMs, respuesta.respondio() ? OrigenLectura.PULSO : OrigenLectura.OTRA);
         zonaRepository.save(zona);
 
         // El estado de cada sector se deriva de esa única lectura. Sólo las métricas no
