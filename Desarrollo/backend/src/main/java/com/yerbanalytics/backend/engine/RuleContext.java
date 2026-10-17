@@ -11,6 +11,7 @@ import com.yerbanalytics.backend.model.ZonaEntity;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Snapshot inmutable de todo lo que las reglas del motor necesitan para decidir.
@@ -54,11 +55,60 @@ public record RuleContext(
          * Overrides en vigor (cooldowns y guardas). {@link RuleOverrides#NONE} en producción: cada regla usa su
          * configuración. Nunca {@code null}.
          */
-        RuleOverrides overrides
+        RuleOverrides overrides,
+
+        /**
+         * Métricas descartadas en este ciclo por lectura inválida (S-03): agotaron sus relecturas fuera del rango
+         * físico. Las reglas que las usan no actúan (las leen como "sin dato"); las demás métricas siguen vigentes.
+         * Nunca {@code null}; vacío en la gran mayoría de las evaluaciones.
+         */
+        Set<String> invalidMetrics,
+
+        /**
+         * Qué hardware tiene mapeado el sector y su macro-zona (S-04), armado UNA vez por zona para que las reglas no
+         * consulten la base. {@link HardwareCoverage#COMPLETE} si el llamador no lo arma. Nunca {@code null}.
+         */
+        HardwareCoverage hardware,
+
+        /**
+         * Qué actuadores del sector y su macro-zona están marcados como averiados (S-05), armado UNA vez por zona.
+         * {@link HardwareFaults#NONE} si el llamador no lo arma. Nunca {@code null}.
+         */
+        HardwareFaults faults
 
 ) {
     public RuleContext {
         overrides = overrides == null ? RuleOverrides.NONE : overrides;
+        invalidMetrics = invalidMetrics == null ? Set.of() : Set.copyOf(invalidMetrics);
+        hardware = hardware == null ? HardwareCoverage.COMPLETE : hardware;
+        faults = faults == null ? HardwareFaults.NONE : faults;
+    }
+
+    /** Constructor sin fallas: mantiene la firma de antes de S-05. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
+                       RuleOverrides overrides, Set<String> invalidMetrics, HardwareCoverage hardware) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
+                overrides, invalidMetrics, hardware, HardwareFaults.NONE);
+    }
+
+    /** Constructor sin hardware: mantiene la firma de antes de S-04. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
+                       RuleOverrides overrides, Set<String> invalidMetrics) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
+                overrides, invalidMetrics, HardwareCoverage.COMPLETE, HardwareFaults.NONE);
+    }
+
+    /** Constructor sin métricas descartadas: mantiene la firma de antes de S-03. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
+                       RuleOverrides overrides) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
+                overrides, Set.of(), HardwareCoverage.COMPLETE, HardwareFaults.NONE);
     }
 
     /** Constructor sin overrides: mantiene la firma de antes de los overrides de reglas. */
@@ -66,7 +116,7 @@ public record RuleContext(
                        ConfiguracionOperativaEntity config, String finalStatus, Instant now,
                        WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego) {
         this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
-                RuleOverrides.NONE);
+                RuleOverrides.NONE, Set.of(), HardwareCoverage.COMPLETE, HardwareFaults.NONE);
     }
 
     /** Constructor sin contexto de riego: mantiene la firma de antes de las reglas de riego v2. */
@@ -80,7 +130,20 @@ public record RuleContext(
     /** Copia de este contexto con otros overrides. Lo usa el orquestador: el llamador no los conoce. */
     public RuleContext withOverrides(RuleOverrides nuevos) {
         return new RuleContext(sector, zona, specs, metrics, config, finalStatus, now, forecast,
-                bloqueoManualActivo, riego, nuevos);
+                bloqueoManualActivo, riego, nuevos, invalidMetrics, hardware, faults);
+    }
+
+    /**
+     * {@code false} si la métrica se descartó en este ciclo por lectura inválida (S-03). Una regla que decide con
+     * ella debe leerla con {@link #validMetricRaw} (o preguntar esto) y no actuar si es {@code false}.
+     */
+    public boolean isMetricValid(String key) {
+        return !invalidMetrics.contains(key);
+    }
+
+    /** Como {@link #metricRaw}, pero {@code null} (sin dato) si la métrica se descartó por lectura inválida. */
+    public Double validMetricRaw(String key) {
+        return isMetricValid(key) ? metricRaw(key) : null;
     }
 
     /**

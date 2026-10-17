@@ -4,6 +4,8 @@ import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.mqtt.AckActuador;
+import com.yerbanalytics.backend.mqtt.NodeError;
+import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +39,7 @@ class SeguimientoComandosServiceTest {
     private final ZonaRepository zonas = mock(ZonaRepository.class);
     private final Clock reloj = mock(Clock.class);
     private final ApplicationEventPublisher eventos = mock(ApplicationEventPublisher.class);
+    private final HardwareFaultService fallas = mock(HardwareFaultService.class);
     private SeguimientoComandosService seguimiento;
 
     @BeforeEach
@@ -46,7 +49,9 @@ class SeguimientoComandosServiceTest {
         zona.setId("MZ-1");
         zona.setName("Macro-zona 1");
         when(zonas.findById("MZ-1")).thenReturn(Optional.of(zona));
-        seguimiento = new SeguimientoComandosService(historial, zonas, reloj, MARGEN_MS, eventos);
+        // Por defecto el receptor de errores no se hace cargo (apagado): el ack alerta por su cuenta, como antes de S-05.
+        when(fallas.report(any())).thenReturn(HardwareFaultService.Outcome.IGNORED);
+        seguimiento = new SeguimientoComandosService(historial, zonas, fallas, reloj, MARGEN_MS, eventos);
     }
 
     private static AckActuador ack(String zonaId, String sectorId, String commandId, String status, String tipo) {
@@ -86,6 +91,40 @@ class SeguimientoComandosServiceTest {
         assertThat(d.nivel()).isEqualTo(NivelAlerta.CRITICAL);
         assertThat(d.texto()).contains("MZ-1-002").contains("mediasombra");
         assertThat(seguimiento.pendientes()).isZero();
+    }
+
+    @Test
+    void laFallaMecanicaDelAckMarcaLaMallaYDejaQueLaAlertaSeaDelServicioDeFallas() {
+        when(fallas.report(any())).thenReturn(HardwareFaultService.Outcome.REGISTERED);
+        seguimiento.registrarEnvio("c-2b", "MZ-1", "MZ-1-002", "shade", Map.of("targetPct", 100));
+
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-002", "c-2b", "ERROR", "falla_mecanica"));
+
+        ArgumentCaptor<NodeError> error = ArgumentCaptor.forClass(NodeError.class);
+        verify(fallas).report(error.capture());
+        assertThat(error.getValue().zoneId()).isEqualTo("MZ-1");
+        assertThat(error.getValue().type()).isEqualTo(NodeErrorType.SHADE_LIMIT_SWITCH);
+        assertThat(error.getValue().value()).as("el ack no dice qué final de carrera falló").isNull();
+        sinAlertas();   // una sola alerta: la que deja el servicio de fallas
+        assertThat(seguimiento.pendientes()).isZero();
+    }
+
+    @Test
+    void laFallaMecanicaYaMarcadaPorElTopicoNoAlertaOtraVez() {
+        when(fallas.report(any())).thenReturn(HardwareFaultService.Outcome.DUPLICATE);
+
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-002", "c-2c", "ERROR", "falla_mecanica"));
+
+        sinAlertas();
+    }
+
+    @Test
+    void unComandoRechazadoNoMarcaNingunaFalla() {
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-001", "c-3b", "ERROR", "comando_invalido"));
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-001", "c-3c", "SUCCESS", "ok"));
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-001", "c-3d", "ERROR", "cancelado"));
+
+        verify(fallas, never()).report(any());
     }
 
     @Test

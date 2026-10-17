@@ -97,6 +97,8 @@ public final class MapaPermisos {
         permiso(r, put, "/api/rules/parametros", Permiso.REGLAS_EDITAR);
 
         permiso(r, get, "/api/hardware/**", Permiso.HARDWARE_VER);
+        // La reparación va antes que el POST general: la registra quien arregla, no quien administra la flota.
+        permiso(r, post, "/api/hardware/*/reparacion", Permiso.HARDWARE_REPARAR);
         permiso(r, post, "/api/hardware/**", Permiso.HARDWARE_GESTIONAR);
         permiso(r, put, "/api/hardware/**", Permiso.HARDWARE_GESTIONAR);
 
@@ -118,6 +120,10 @@ public final class MapaPermisos {
         permiso(r, post, "/api/secuencias/**", Permiso.PASADAS_OPERAR);
         // Pulso de sensado manual ("Leer ahora" / "Leer y ejecutar motor"): se opera desde Demo Expo.
         permiso(r, post, "/api/pulsos", Permiso.PASADAS_OPERAR);
+
+        permiso(r, get, "/api/bloqueos", Permiso.BLOQUEOS_VER);
+        permiso(r, post, "/api/bloqueos", Permiso.BLOQUEOS_GESTIONAR);
+        permiso(r, HttpMethod.DELETE, "/api/bloqueos/**", Permiso.BLOQUEOS_GESTIONAR);
 
         // Demo (solo existe cuando yerbanalytics.demo.enabled=true; en producción los controllers no se registran)
         permiso(r, null, "/api/demo/**", Permiso.SIMULACION_GESTIONAR);

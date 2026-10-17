@@ -1,8 +1,8 @@
 /* ============================================================
    Simulator MQTT publisher + command subscriber.
 
-   Uplink: the simulator publishes directly to the broker on the same topic and with the same
-   payload as the ESP32 firmware. The backend ingests it through its normal pipeline and has
+   Uplink: the simulator publishes directly to the broker with the same payload as the ESP32
+   firmware, on the same topic (or, with the backend in demo mode, on the separate demo topic). The backend ingests it through its normal pipeline and has
    no way of knowing there was a simulator on the other end.
 
    Downlink: the simulator subscribes to the command wildcard topic so that orders sent by the
@@ -18,15 +18,18 @@ import mqtt, { type MqttClient } from 'mqtt';
 import { config } from './config.ts';
 import {
   ackTopic,
+  errorsTopic,
   isReadNow,
   parseCommandTopic,
   parseZoneCommandTopic,
   simulatedAck,
-  telemetryTopic,
+  telemetryTopicFor,
   valveDurationWarning,
   type ActuatorCommand,
+  type NodeErrorPayload,
   type TelemetryPayload,
 } from './contract.ts';
+import { demoMode } from './demo-mode.ts';
 import { answerReadNow } from './emission.ts';
 import { listSensors } from './store.ts';
 
@@ -189,12 +192,24 @@ export function isConnected(): boolean {
  * out at once.
  */
 export async function publish(zonaId: string, payload: TelemetryPayload): Promise<void> {
+  // With the backend in demo mode the telemetry goes on the separate demo topic (no race with the real ESP32).
+  await publishJson(telemetryTopicFor(zonaId, await demoMode.isAvailable()), payload);
+}
+
+/**
+ * Publishes an error as the zone's node would (S-05): same topic and payload as the firmware, QoS 1, no retain. The
+ * backend marks the device as faulty without being able to tell there was a simulator on the other end.
+ */
+export async function publishNodeError(zonaId: string, payload: NodeErrorPayload): Promise<void> {
+  await publishJson(errorsTopic(zonaId), payload);
+}
+
+async function publishJson(topic: string, payload: TelemetryPayload | NodeErrorPayload): Promise<void> {
   if (!client || !client.connected) {
     throw new PublishFailed(
       `No hay conexión con el broker MQTT (${config.mqttUrl}). Verificá que Mosquitto esté levantado.`,
     );
   }
-  const topic = telemetryTopic(zonaId);
   const message = JSON.stringify(payload);
 
   await new Promise<void>((resolve, reject) => {

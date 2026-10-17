@@ -13,6 +13,7 @@ import { backendSession } from './backend-session.ts';
 import { config } from './config.ts';
 import {
   METRIC_KEYS,
+  buildNodeError,
   toContractUnits,
   type MetricKey,
   type TelemetryPayload,
@@ -20,7 +21,8 @@ import {
 import * as store from './store.ts';
 import { InvalidInput } from './store.ts';
 import * as emission from './emission.ts';
-import { isConnected, publish } from './mqtt.ts';
+import { isConnected, publish, publishNodeError } from './mqtt.ts';
+import { parseNodeErrorRequest } from './node-errors.ts';
 
 export const api = Router();
 
@@ -168,6 +170,21 @@ api.post(
 );
 
 // ------------------------------------------------------------------
+// Node errors (S-05): a failure the node would detect and publish once on its zone's `errores` topic
+// ------------------------------------------------------------------
+
+api.post(
+  '/node-errors',
+  asyncRoute(async (req, res) => {
+    const { zonaId, input } = parseNodeErrorRequest(req.body);
+    const payload = buildNodeError(input, Date.now());
+
+    await publishNodeError(zonaId, payload);
+    res.status(202).json({ zonaId, ...payload });
+  }),
+);
+
+// ------------------------------------------------------------------
 // Automatic emission
 // ------------------------------------------------------------------
 
@@ -186,6 +203,29 @@ api.put('/emission', (req, res) => {
 
 api.get('/silenced-zones', (_req, res) => {
   res.json(emission.silencedZones());
+});
+
+// ------------------------------------------------------------------
+// Pinned readings: metrics every reading of a zone carries (scenarios "Lectura inválida" and "Hardware incompleto")
+// ------------------------------------------------------------------
+
+api.get('/pinned-readings', (_req, res) => {
+  res.json(emission.pinnedMetrics());
+});
+
+/**
+ * Pins the given metrics (UI units) on the zone's readings, or releases the zone when none come. Values are NOT
+ * range-checked: that is the point, the backend is the one that has to reject an impossible reading.
+ */
+api.put('/pinned-readings/:zonaId', (req, res) => {
+  const { metrics } = (req.body ?? {}) as { metrics?: Record<string, unknown> | null };
+  const pinned: emission.PinnedMetrics = {};
+  for (const key of METRIC_KEYS) {
+    const value = optionalNumber(metrics?.[key], key);
+    if (value !== undefined) pinned[key] = value;
+  }
+  emission.setPinnedMetrics(req.params.zonaId, pinned);
+  res.json(emission.pinnedMetrics());
 });
 
 api.put('/silenced-zones/:zonaId', (req, res) => {

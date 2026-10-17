@@ -26,6 +26,17 @@ class ParametrosRealesTest {
      */
     private static final Map<String, Double> VALORES_DE_HOY = Map.ofEntries(
             Map.entry("seguridad.antiguedad-max-lectura", 90.0),     // 3 intervalos de publicación del nodo (30 s)
+            Map.entry("seguridad.rango-hum-min", 0.0),               // reglas_v2 S-03: rango físico de la humedad
+            Map.entry("seguridad.rango-hum-max", 100.0),
+            Map.entry("seguridad.rango-temp-min", -10.0),
+            Map.entry("seguridad.rango-temp-max", 60.0),
+            Map.entry("seguridad.rango-ph-min", 3.0),
+            Map.entry("seguridad.rango-ph-max", 9.0),
+            Map.entry("seguridad.rango-ce-min", 0.0),
+            Map.entry("seguridad.rango-ce-max", 10.0),
+            Map.entry("seguridad.rango-luz-min", 0.0),
+            Map.entry("seguridad.rango-luz-max", 100.0),
+            Map.entry("seguridad.relecturas-invalidas", 2.0),
             Map.entry("riego.umbral-humedad", 45.0),                 // reglas_v2 §11 (era 42, idealMin de humSus)
             Map.entry("riego.lluvia-probabilidad", 70.0),            // reglas_v2 §11 (era 60)
             Map.entry("insumo.max-dosis-24h", 1.0),                  // DailyDoseLimitRule:80
@@ -83,6 +94,33 @@ class ParametrosRealesTest {
             assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
             assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
             assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2");
+        }
+    }
+
+    @Test
+    void losRangosFisicosDeS03SonDeSeguridadYSoloSeEditanHaciaAdentro() {
+        record Esperado(String clave, String unidad, String fabrica, double min, double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("seguridad.rango-hum-min", "%", "0", 0, 50),
+                new Esperado("seguridad.rango-hum-max", "%", "100", 50, 100),
+                new Esperado("seguridad.rango-temp-min", "°C", "-10", -40, 25),
+                new Esperado("seguridad.rango-temp-max", "°C", "60", 25, 85),
+                new Esperado("seguridad.rango-ph-min", "", "3", 0, 7),
+                new Esperado("seguridad.rango-ph-max", "", "9", 7, 14),
+                new Esperado("seguridad.rango-ce-min", "dS/m", "0", 0, 5),
+                new Esperado("seguridad.rango-ce-max", "dS/m", "10", 5, 20),
+                new Esperado("seguridad.rango-luz-min", "%", "0", 0, 50),
+                new Esperado("seguridad.rango-luz-max", "%", "100", 50, 100),
+                new Esperado("seguridad.relecturas-invalidas", "relecturas", "2", 1, 5));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(FamiliaParametro.SEGURIDAD);
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("S-03");
         }
     }
 
@@ -164,7 +202,7 @@ class ParametrosRealesTest {
 
     @Test
     void losValoresDeFabricaCumplenLasRestriccionesCruzadas() {
-        assertThat(catalogo.restricciones()).hasSize(4);
+        assertThat(catalogo.restricciones()).hasSize(9);
         assertThat(catalogo.violaciones(catalogo.fabricas())).isEmpty();
     }
 }

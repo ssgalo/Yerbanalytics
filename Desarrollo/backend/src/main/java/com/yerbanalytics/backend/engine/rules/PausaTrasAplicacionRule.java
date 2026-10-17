@@ -28,7 +28,7 @@ import java.util.List;
 @Component
 public class PausaTrasAplicacionRule implements Rule {
 
-    private static final int PRIORITY = 7;
+    private static final int PRIORITY = 9;
     public static final String NAME = "PausaTrasAplicacionRule";
     /** Clave de cooldown: minutos de pausa tras una aplicación de insumo (0 la desactiva). */
     public static final String COOLDOWN_PAUSE = "pause";

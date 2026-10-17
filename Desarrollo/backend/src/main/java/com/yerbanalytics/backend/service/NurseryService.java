@@ -4,9 +4,12 @@ import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ContextoRiego;
+import com.yerbanalytics.backend.engine.HardwareCoverage;
+import com.yerbanalytics.backend.engine.HardwareFaults;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.riego.CicloLectura;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
@@ -14,8 +17,11 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
+import com.yerbanalytics.backend.readings.ReadingCheck;
+import com.yerbanalytics.backend.readings.ReadingMetrics;
 import com.yerbanalytics.backend.readings.ReadingOrigin;
 import com.yerbanalytics.backend.readings.ReadingRecorder;
+import com.yerbanalytics.backend.readings.ReadingValidationGuard;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService;
@@ -77,6 +83,7 @@ public class NurseryService {
     private final PulsoSensadoService pulsos;
     private final EscalamientoNodoService escalamiento;
     private final ReadingRecorder readings;
+    private final ReadingValidationGuard readingGuard;
     private final Clock reloj;
     private final int bateriaMinPct;
 
@@ -98,6 +105,7 @@ public class NurseryService {
                           PulsoSensadoService pulsos,
                           EscalamientoNodoService escalamiento,
                           ReadingRecorder readings,
+                          ReadingValidationGuard readingGuard,
                           Clock reloj,
                           @Value("${yerbanalytics.hardware.bateria-min-pct:20}") int bateriaMinPct) {
         this.zonaRepository = zonaRepository;
@@ -117,6 +125,7 @@ public class NurseryService {
         this.pulsos = pulsos;
         this.escalamiento = escalamiento;
         this.readings = readings;
+        this.readingGuard = readingGuard;
         this.reloj = reloj;
         this.bateriaMinPct = bateriaMinPct;
     }
@@ -561,35 +570,29 @@ public class NurseryService {
             }
             return;
         }
+        // S-03: sólo entra a la zona lo que está dentro del rango físico. Un valor fuera de rango pide la lectura
+        // de nuevo y, si las relecturas también fallan, esa métrica se descarta en el ciclo (el resto sigue).
+        // La unidad cambia una sola vez, acá: el contrato manda µS/cm de CE y la plataforma persiste dS/m.
+        ReadingCheck check = readingGuard.check(zona, ReadingMetrics.from(payload.metrics()));
+
         // El motor decide sólo con la primera respuesta de la zona a un pulso con motor. Cualquier otra
         // telemetría (pulso sin motor, segunda respuesta, arranque del nodo, secuencia LECTURA) sólo actualiza
-        // la lectura y el estado de los sectores.
-        PulsoSensadoService.PulseResponse pulseResponse = pulsos.recordResponse(zoneId, recepcionMs);
+        // la lectura y el estado de los sectores. Una lectura que todavía espera su relectura no es la respuesta
+        // definitiva: el pulso queda pendiente y el motor decide cuando llegue la que corrige (o la descartada).
+        PulsoSensadoService.PulseResponse pulseResponse = check.awaitsReread()
+                ? PulsoSensadoService.PulseResponse.NONE
+                : pulsos.recordResponse(zoneId, recepcionMs);
         boolean ejecutaMotor = pulseResponse.runsEngine();
         List<SectorEntity> sectors = sectorRepository.findByZonaId(zoneId);
 
-        // La lectura se persiste UNA vez, en la zona. Sólo se actualizan las métricas
-        // presentes en el payload: una lectura parcial (un sensor en falla, o un envío
-        // manual de una sola métrica) conserva el último valor de las demás.
-        MqttTelemetryPayload.MetricsPayload pm = payload.metrics();
-        if (pm != null) {
-            if (pm.humSus() != null) {
-                zona.setHumSusRaw(pm.humSus());
-                // Marca propia: si la sonda cae, el resto de la lectura sigue refrescando la zona
-                // y sólo esta marca delata que la humedad está congelada (StaleSensorRule).
-                zona.setHumSusTs(tsMs);
-            }
-            if (pm.humAmb() != null) zona.setHumAmbRaw(pm.humAmb());
-            if (pm.temp() != null) zona.setTempRaw(pm.temp());
-            if (pm.tempSuelo() != null) zona.setTempSueloRaw(pm.tempSuelo());
-            if (pm.uv() != null) zona.setUvRaw(pm.uv());
-            // Única conversión de unidad del sistema: el contrato manda µS/cm, la
-            // plataforma persiste dS/m (ver ContratoNodo).
-            if (pm.ce() != null) zona.setCeRaw(ContratoNodo.ceADsPorM(pm.ce()));
-            if (pm.phSuelo() != null) zona.setPhSueloRaw(pm.phSuelo());
-            if (pm.n() != null) zona.setNRaw(pm.n());
-            if (pm.p() != null) zona.setPRaw(pm.p());
-            if (pm.k() != null) zona.setKRaw(pm.k());
+        // La lectura se persiste UNA vez, en la zona. Sólo se actualizan las métricas aceptadas: una lectura
+        // parcial (un sensor en falla, un valor descartado o un envío manual de una sola métrica) conserva el
+        // último valor de las demás.
+        check.accepted().asMap().forEach(zona::setRaw);
+        if (check.accepted().has("humSus")) {
+            // Marca propia: si la sonda cae, el resto de la lectura sigue refrescando la zona
+            // y sólo esta marca delata que la humedad está congelada (StaleSensorRule).
+            zona.setHumSusTs(tsMs);
         }
         if (payload.mac() != null && !payload.mac().isBlank()) zona.setNodoMac(payload.mac().trim());
         if (payload.battery() != null) zona.setNodoBattery(payload.battery());
@@ -621,8 +624,15 @@ public class NurseryService {
         // por regla): último riego, último riego crítico y última aplicación de cada sector.
         Instant ahora = reloj.instant();
         Map<String, ContextoRiego> riegoPorSector = Map.of();
+        Map<String, HardwareCoverage> hardwarePorSector = Map.of();
+        Map<String, HardwareFaults> fallasPorSector = Map.of();
         WeatherForecast forecast = null;
         if (ejecutaMotor) {
+            // S-04: qué actuadores tiene mapeado cada sector, también UNA vez por zona (dos consultas, no una por regla).
+            List<String> sectorIds = sectors.stream().map(SectorEntity::getId).toList();
+            hardwarePorSector = hardwareService.coverageOf(zoneId, sectorIds);
+            // S-05: cuáles de esos actuadores están averiados, también UNA vez por zona.
+            fallasPorSector = hardwareService.faultsOf(sectorIds);
             Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
             riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
             // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker
@@ -658,7 +668,9 @@ public class NurseryService {
             }
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
-            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()));
+            RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()),
+                    check.invalid(), hardwarePorSector.getOrDefault(s.getId(), HardwareCoverage.NONE),
+                    fallasPorSector.getOrDefault(s.getId(), HardwareFaults.NONE));
             // La traza queda en memoria (última por sector y origen); no toca la base.
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
@@ -683,10 +695,15 @@ public class NurseryService {
      * <ul>
          *   <li>{@code forecast} — el de la zona, pedido UNA vez a {@link WeatherService} (null en modo degradado).</li>
      *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
+     *   <li>{@code invalidMetrics} — las métricas descartadas en esta lectura por estar fuera de rango (S-03).</li>
+     *   <li>{@code hardware} — los actuadores mapeados del sector y su zona; un sector que no figura no tiene ninguno (S-04).</li>
+     *   <li>{@code faults} — los actuadores del sector y su zona marcados como averiados; un sector que no figura no tiene ninguno (S-05).</li>
      * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus,
-                                         Instant ahora, WeatherForecast forecast, ContextoRiego riego) {
+                                         Instant ahora, WeatherForecast forecast, ContextoRiego riego,
+                                         Set<String> invalidMetrics, HardwareCoverage hardware,
+                                         HardwareFaults faults) {
         ZonaEntity zona = s.getZona();
 
         boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
@@ -702,7 +719,11 @@ public class NurseryService {
                 ahora,
                 forecast,
                 bloqueoActivo,
-                riego != null ? riego : ContextoRiego.vacio()
+                riego != null ? riego : ContextoRiego.vacio(),
+                RuleOverrides.NONE,
+                invalidMetrics,
+                hardware,
+                faults
         );
     }
 

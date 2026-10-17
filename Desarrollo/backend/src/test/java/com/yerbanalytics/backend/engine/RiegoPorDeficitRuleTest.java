@@ -127,10 +127,10 @@ class RiegoPorDeficitRuleTest {
     }
 
     @Test
-    @DisplayName("metadatos: RIEGO, prioridad 10 y los seis parámetros que lee")
+    @DisplayName("metadatos: RIEGO, prioridad 11 y los seis parámetros que lee")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(10);
+        assertThat(rule.priority()).isEqualTo(11);
         assertThat(rule.parametros()).containsExactlyInAnyOrder(ParametrosRiego.UMBRAL_HUMEDAD,
                 ParametrosRiego.UMBRAL_CRITICO, ParametrosRiego.HUMEDAD_OBJETIVO, ParametrosRiego.LITROS_POR_PUNTO,
                 ParametrosRiego.VOLUMEN_MAX_EVENTO, ParametrosRiego.CAUDAL_EMISOR);

@@ -17,8 +17,8 @@ import java.lang.annotation.Target;
 @WithMockUser(username = "test", authorities = {
         "vivero.ver", "diagnosticos.ver", "diagnosticos.registrar", "historial.ver",
         "configuracion.ver", "configuracion.editar", "reglas.ver", "reglas.editar",
-        "hardware.ver", "hardware.gestionar", "topologia.ver", "topologia.gestionar",
+        "hardware.ver", "hardware.gestionar", "hardware.reparar", "topologia.ver", "topologia.gestionar",
         "capturas.ver", "capturas.ordenar", "camara.gestionar", "pasadas.ver", "pasadas.operar",
-        "demo-expo.configurar", "simulacion.gestionar", "usuarios.gestionar", "auditoria.ver"})
+        "bloqueos.ver", "bloqueos.gestionar", "demo-expo.configurar", "simulacion.gestionar", "usuarios.gestionar", "auditoria.ver"})
 public @interface ConTodosLosPermisos {
 }

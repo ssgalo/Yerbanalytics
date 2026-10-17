@@ -21,7 +21,9 @@ import type {
   CaptureOrder,
   DemoRule,
   DemoRuleUpdate,
+  ManualLock,
   NewDiagnosis,
+  NodeErrorPlan,
   NuevoHardware,
   NurseryTopology,
   PairingCode,
@@ -38,6 +40,7 @@ import type {
   TelemetryInput,
   TipoSecuencia,
 } from './types';
+import type { HardwareDevice } from './hardwareCoverage';
 
 /** Proxy prefix. The UI never learns the backend's real address. */
 const BACKEND = '/backend';
@@ -102,6 +105,19 @@ export async function sendTelemetry(input: TelemetryInput): Promise<void> {
   await check(res, 'publicar la lectura');
 }
 
+/**
+ * Publishes an error as the node of the zone would (S-05). For the shade error the sector is ignored: the mesh belongs
+ * to the macro-zone.
+ */
+export async function sendNodeError(error: NodeErrorPlan & { zonaId: string; sector: string }): Promise<void> {
+  const res = await fetch('/api/node-errors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(error),
+  });
+  await check(res, 'publicar el error del nodo');
+}
+
 export async function setAutoEmission(active: boolean): Promise<void> {
   const res = await fetch('/api/emission', {
     method: 'PUT',
@@ -125,9 +141,54 @@ export async function setZoneSilenced(zonaId: string, silenced: boolean): Promis
   return json(res, 'cambiar si la zona responde la lectura');
 }
 
+/** Pinned readings by macro-zone: the metrics (UI units) every reading of that zone carries. */
+export type PinnedReadings = Record<string, Record<string, number>>;
+
+export async function getPinnedReadings(): Promise<PinnedReadings> {
+  return json(await fetch('/api/pinned-readings'), 'consultar las lecturas fijadas');
+}
+
+/**
+ * Sticks the sensor of a zone on `metrics` (UI units) so every reading it publishes carries them, or repairs it when
+ * `metrics` is empty. The values are not range-checked on purpose: the backend is the one that has to reject them.
+ */
+export async function pinReadings(zonaId: string, metrics: Record<string, number>): Promise<PinnedReadings> {
+  const res = await fetch(`/api/pinned-readings/${encodeURIComponent(zonaId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metrics }),
+  });
+  return json(res, 'cambiar las lecturas fijadas');
+}
+
 /* ----------------------------------------------------------------
    The platform's public API (through the proxy)
    ---------------------------------------------------------------- */
+
+/**
+ * The devices of the hardware registry. READ-ONLY on purpose: the simulator never registers, replaces or removes
+ * hardware. It needs `hardware.ver`, which the backend's default matrix gives the Servicio role.
+ */
+export async function getHardwareDevices(): Promise<HardwareDevice[]> {
+  const data = await json<{ dispositivos: HardwareDevice[] }>(
+    await fetch(`${BACKEND}/api/hardware`),
+    'consultar el registro de hardware',
+  );
+  return data.dispositivos;
+}
+
+/**
+ * Registers the repair of a faulty device (S-05, HU-21 CA-04): the public endpoint the dashboard uses too. Needs
+ * `hardware.reparar` on the Servicio account.
+ */
+export async function registerRepair(deviceId: string, detail: string): Promise<void> {
+  const res = await fetch(`${BACKEND}/api/hardware/${encodeURIComponent(deviceId)}/reparacion`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ detalle: detail }),
+  });
+  await check(res, 'registrar la reparación');
+}
 
 export async function getTopology(): Promise<NurseryTopology> {
   return json(await fetch(`${BACKEND}/api/topologia`), 'consultar la topología');
@@ -278,6 +339,25 @@ export async function setOfflineForecast(on: boolean): Promise<boolean> {
   return body.on;
 }
 
+/** Which telemetry the backend reads in demo mode: the real ESP32 node or this simulator. */
+export type TelemetrySource = 'REAL_NODE' | 'SIMULATOR';
+
+export async function getTelemetrySource(): Promise<TelemetrySource> {
+  const res = await fetch(`${BACKEND}/api/demo/telemetry-source`);
+  const body = await json<{ source: TelemetrySource }>(res, 'consultar la fuente de telemetría');
+  return body.source;
+}
+
+export async function setTelemetrySource(source: TelemetrySource): Promise<TelemetrySource> {
+  const res = await fetch(`${BACKEND}/api/demo/telemetry-source`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source }),
+  });
+  const body = await json<{ source: TelemetrySource }>(res, 'cambiar la fuente de telemetría');
+  return body.source;
+}
+
 /** Triggers a manual sensing pulse with the rule engine. 409 if one is already in progress. */
 export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void> {
   const res = await fetch(`${BACKEND}/api/pulsos`, {
@@ -286,6 +366,32 @@ export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void>
     body: JSON.stringify({ ejecutarMotor }),
   });
   await check(res, 'disparar el pulso de sensado');
+}
+
+/* ----------------------------------------------------------------
+   Manual locks (public platform API: the same one the dashboard uses)
+   ---------------------------------------------------------------- */
+
+export async function getManualLocks(): Promise<ManualLock[]> {
+  return json(await fetch(`${BACKEND}/api/bloqueos`), 'consultar los bloqueos manuales');
+}
+
+/** Locks the whole zone, or only `sectorId` when given. The backend answers 409 if it is already locked. */
+export async function createManualLock(lock: {
+  zonaId: string;
+  sectorId?: string;
+  motivo: string;
+}): Promise<ManualLock> {
+  const res = await fetch(`${BACKEND}/api/bloqueos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(lock),
+  });
+  return json(res, 'crear el bloqueo manual');
+}
+
+export async function releaseManualLock(id: number): Promise<void> {
+  await check(await fetch(`${BACKEND}/api/bloqueos/${id}`, { method: 'DELETE' }), 'levantar el bloqueo manual');
 }
 
 /* ----------------------------------------------------------------

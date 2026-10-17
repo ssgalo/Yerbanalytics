@@ -72,7 +72,7 @@ describe('MockRepository · catálogo de reglas', () => {
 });
 
 describe('MockRepository · esquema del DAG', () => {
-  it('trae start, las 13 reglas con sus parámetros y los terminales por rama', async () => {
+  it('trae start, las 16 reglas con sus parámetros y los terminales por rama', async () => {
     const schema = await nuevo().getRuleSchema();
     const ids = schema.nodes.map((n) => n.id);
 
@@ -94,7 +94,9 @@ describe('MockRepository · esquema del DAG', () => {
     const par = (s: string, t: string) => edges.some((e) => e.source === s && e.target === t);
 
     expect(par('start', 'ManualLockRule')).toBe(true);
-    expect(par('ManualLockRule', 'StaleSensorRule')).toBe(true);
+    expect(par('ManualLockRule', 'IncompleteHardwareRule')).toBe(true);
+    expect(par('IncompleteHardwareRule', 'HydraulicFaultRule')).toBe(true);
+    expect(par('HydraulicFaultRule', 'StaleSensorRule')).toBe(true);
     // La rama de riego, en el orden en que corre el motor.
     expect(par('StaleSensorRule', 'SustratoSaturadoRule')).toBe(true);
     expect(par('SustratoSaturadoRule', 'CicloLecturaRiegoRule')).toBe(true);

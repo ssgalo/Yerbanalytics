@@ -60,7 +60,7 @@ class ZoneSafeStateTest {
         when(publisher.publicar(anyString(), anyString(), anyString(), anyString(), any()))
                 .thenReturn(new Resultado(true, "c", null));
         when(sectors.findByZonaId("MZ-2")).thenReturn(List.of(sector("MZ-2-001"), sector("MZ-2-002")));
-        safeState = new ZoneSafeState(sectors, devices, publisher);
+        safeState = new ZoneSafeState(sectors, new ActuatorShutdown(devices, publisher));
     }
 
     private void registered(DispositivoEntity... registered) {
@@ -74,12 +74,12 @@ class ZoneSafeStateTest {
                 device(HardwareService.BOMBA, "MZ-2-001"),
                 device(HardwareService.MEDIASOMBRA, "MZ-2-002"));
 
-        ZoneSafeState.Result result = safeState.order("MZ-2");
+        ActuatorShutdown.Result result = safeState.order("MZ-2");
 
         verify(publisher).publicar("MZ-2", "MZ-2-001", "valve", "OFF", Map.of());
         verify(publisher).publicar("MZ-2", "MZ-2-001", "pump", "OFF", Map.of());
         verify(publisher).publicar("MZ-2", "MZ-2-002", "shade", "SET", Map.of("targetPct", 0));
-        assertThat(result).isEqualTo(new ZoneSafeState.Result(3, 0));
+        assertThat(result).isEqualTo(new ActuatorShutdown.Result(3, 0));
     }
 
     @Test
@@ -104,10 +104,10 @@ class ZoneSafeStateTest {
     void nothingRegisteredNothingPublished() {
         registered();
 
-        ZoneSafeState.Result result = safeState.order("MZ-2");
+        ActuatorShutdown.Result result = safeState.order("MZ-2");
 
         verify(publisher, never()).publicar(anyString(), anyString(), anyString(), anyString(), any());
-        assertThat(result).isEqualTo(new ZoneSafeState.Result(0, 0));
+        assertThat(result).isEqualTo(new ActuatorShutdown.Result(0, 0));
     }
 
     @Test
@@ -116,7 +116,7 @@ class ZoneSafeStateTest {
         registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
                 device(HardwareService.ELECTROVALVULA, "MZ-2-001"));
 
-        ZoneSafeState.Result result = safeState.order("MZ-2");
+        ActuatorShutdown.Result result = safeState.order("MZ-2");
 
         assertThat(result.commands()).isEqualTo(1);
     }
@@ -131,20 +131,20 @@ class ZoneSafeStateTest {
         when(publisher.publicar(eq("MZ-2"), eq("MZ-2-002"), eq("shade"), anyString(), any()))
                 .thenThrow(new RuntimeException("explotó"));
 
-        ZoneSafeState.Result result = safeState.order("MZ-2");
+        ActuatorShutdown.Result result = safeState.order("MZ-2");
 
-        assertThat(result).isEqualTo(new ZoneSafeState.Result(0, 2));
+        assertThat(result).isEqualTo(new ActuatorShutdown.Result(0, 2));
     }
 
     @Test
     @DisplayName("sale por el publicador de actuadores: el seguimiento vigila cada orden hasta su ack")
     void ordersAreWatchedByTheFollowUp() {
         SeguimientoComandosService followUp = new SeguimientoComandosService(
-                mock(HistorialService.class), mock(ZonaRepository.class), Clock.systemUTC(), 90_000L,
-                mock(org.springframework.context.ApplicationEventPublisher.class));
+                mock(HistorialService.class), mock(ZonaRepository.class), mock(HardwareFaultService.class),
+                Clock.systemUTC(), 90_000L, mock(org.springframework.context.ApplicationEventPublisher.class));
         ComandoActuadorPublisher real = new ComandoActuadorPublisher(
                 mock(MqttCommandGateway.class), new ObjectMapper(), followUp);
-        ZoneSafeState withFollowUp = new ZoneSafeState(sectors, devices, real);
+        ZoneSafeState withFollowUp = new ZoneSafeState(sectors, new ActuatorShutdown(devices, real));
         registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
                 device(HardwareService.MEDIASOMBRA, "MZ-2-002"));
 

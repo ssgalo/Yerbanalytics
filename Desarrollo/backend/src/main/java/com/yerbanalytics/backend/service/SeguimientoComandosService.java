@@ -5,6 +5,8 @@ import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.mqtt.AckActuador;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
+import com.yerbanalytics.backend.mqtt.NodeError;
+import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +33,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>Ack SUCCESS:</b> se cierra el seguimiento.</li>
  *   <li><b>Ack ERROR:</b> si es una falla (p. ej. {@code falla_mecanica}, comando rechazado) queda una
  *       alerta en el historial de la macro-zona; {@code reemplazado} y {@code cancelado} son esperables
- *       y sólo se loguean.</li>
+ *       y sólo se loguean. La {@code falla_mecanica} de la mediasombra es además una falla de la malla (S-05): se
+ *       entrega a {@link HardwareFaultService}, que la marca y deja <b>la</b> alerta (el mismo hecho puede llegar
+ *       también por el tópico de errores). Sólo si el receptor de errores está apagado alerta este servicio.</li>
  *   <li><b>Cierre de estado:</b> un {@code cancelado} de la válvula, y el ack final de la bomba (ok, cancelado
  *       o error), publican un {@link ActuatorStopped}: el "regando" y el "dosificando" se derivan por tiempo y
  *       esto los cierra al instante. Un {@code reemplazado} no cierra nada.</li>
@@ -39,8 +43,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *       WiFi o no recibió el comando). Es el equivalente de {@code RIEL_SIN_RESPUESTA}.</li>
  * </ul>
  *
- * <p>No cambia ninguna decisión del motor: el despacho de riego no depende del ack (ver
- * {@code DespachoRiego}). Esto sólo hace visible en la web lo que pasó en el nodo.
+ * <p>No cambia ninguna decisión del motor por sí mismo: el despacho de riego no depende del ack (ver
+ * {@code DespachoRiego}). Esto hace visible en la web lo que pasó en el nodo; lo único que además tiene consecuencias
+ * es la falla de la malla, y la decide {@link HardwareFaultService}.
  *
  * <p><b>En memoria:</b> tras un reinicio se pierde lo pendiente (sus acks llegan como desconocidos:
  * un ERROR que sea falla igual alerta). Un commandId ya resuelto no se procesa dos veces: el nodo
@@ -77,17 +82,20 @@ public class SeguimientoComandosService {
 
     private final HistorialService historialService;
     private final ZonaRepository zonaRepository;
+    private final HardwareFaultService hardwareFaultService;
     private final Clock reloj;
     private final long margenMs;
     private final ApplicationEventPublisher eventos;
 
     public SeguimientoComandosService(HistorialService historialService,
                                       ZonaRepository zonaRepository,
+                                      HardwareFaultService hardwareFaultService,
                                       Clock reloj,
                                       @Value("${yerbanalytics.actuadores.ack-margen-ms:90000}") long margenMs,
                                       ApplicationEventPublisher eventos) {
         this.historialService = historialService;
         this.zonaRepository = zonaRepository;
+        this.hardwareFaultService = hardwareFaultService;
         this.reloj = reloj;
         this.margenMs = margenMs;
         this.eventos = eventos;
@@ -153,9 +161,13 @@ public class SeguimientoComandosService {
         log.warn("Sector {}: el nodo informó un error en {} ({}).", sectorId, nombre(actuador), tipo);
         avisarSiTerminoLaBomba(zonaId, sectorId, actuador, commandId, tipo);
         if (ContratoNodo.ACK_TIPO_FALLA_MECANICA.equals(tipo)) {
-            alertar(zonaId, NivelAlerta.CRITICAL, REGLA_FALLA, "Sector " + sectorId + ": "
-                    + "la mediasombra no llegó al final de carrera a tiempo (" + tipo + "). "
-                    + "Revisar el motor y los finales de carrera.");
+            // Es la falla de la malla de la macro-zona (S-05): la marca y la alerta son del servicio de fallas.
+            NodeError falla = new NodeError(zonaId, null, "", NodeErrorType.SHADE_LIMIT_SWITCH, null);
+            if (hardwareFaultService.report(falla) == HardwareFaultService.Outcome.IGNORED) {
+                alertar(zonaId, NivelAlerta.CRITICAL, REGLA_FALLA, "Sector " + sectorId + ": "
+                        + "la mediasombra no llegó al final de carrera a tiempo (" + tipo + "). "
+                        + "Revisar el motor y los finales de carrera.");
+            }
         } else {
             alertar(zonaId, NivelAlerta.WARNING, REGLA_FALLA, "Sector " + sectorId + ": "
                     + "el nodo no pudo ejecutar " + nombre(actuador) + " (" + (tipo != null ? tipo : "sin detalle") + ").");

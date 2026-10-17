@@ -141,7 +141,7 @@ public class ActionExecutor {
                 case NOOP_INFO -> log.debug("Sector {}: NOOP_INFO — {}", ctx.sector().getId(), action.motivo());
 
                 // El corte ya fue aplicado por el RuleOrchestrator.
-                case ABORT_RIEGO, ABORT_INSUMO, ABORT_ALL, POSTPONE_RIEGO ->
+                case ABORT_RIEGO, ABORT_INSUMO, ABORT_MEDIASOMBRA, ABORT_ALL, POSTPONE_RIEGO ->
                     log.debug("Sector {}: {} — {}", ctx.sector().getId(), action.type(), action.motivo());
 
                 case ALERTA -> persistirAlerta(action, ctx);

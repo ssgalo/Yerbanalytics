@@ -6,16 +6,24 @@
    no sabe armarle las condiciones, y el panel la muestra en gris ("sin escenario").
    ============================================================ */
 import type { DemoRule } from '../types';
+import { faultNoFlow, faultOverflow, faultShadeLimit } from './faults';
+import { incompleteHardware } from './incompleteHardware';
+import { invalidReading } from './invalidReading';
+import { lock } from './lock';
 import { nodeOffline } from './nodeOffline';
 import { r01 } from './r01';
 import { r02 } from './r02';
 import { r03 } from './r03';
 import { r04 } from './r04';
+import { repair } from './repair';
 import { shading } from './shading';
 import { supply } from './supply';
 import type { RuleScenario } from './types';
 
-export const SCENARIOS: RuleScenario[] = [r01, r02, r04, r03, shading, supply, nodeOffline];
+export const SCENARIOS: RuleScenario[] = [
+  r01, r02, r04, r03, shading, supply, nodeOffline, lock, invalidReading, incompleteHardware,
+  faultNoFlow, faultOverflow, faultShadeLimit, repair,
+];
 
 /** Backend pieces (`GET /api/demo/rules`) that no scenario exercises. */
 export function rulesWithoutScenario(rules: DemoRule[]): DemoRule[] {

@@ -8,6 +8,8 @@ import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.engine.rules.IncompleteHardwareRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,22 @@ class RuleEngineSchemaControllerTest {
             @Override public List<DefinicionParametro> parametros() { return List.of(params); }
             @Override public List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) { return List.of(); }
         };
+    }
+
+    @Test
+    void laReglaDeHardwareIncompletoEstaEnLaCadenaGlobalEntreElBloqueoYLaFrescura() throws Exception {
+        when(orchestrator.getRules()).thenReturn(List.of(
+                regla("ManualLockRule", 0, RuleBranch.GLOBAL),
+                new IncompleteHardwareRule(),
+                regla("StaleSensorRule", 2, RuleBranch.GLOBAL, ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)));
+
+        mockMvc.perform(get("/api/rules/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].branch", contains("GLOBAL")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].label", contains("🧰 Hardware incompleto (S-04)")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].parametros[*]", empty()))
+                .andExpect(jsonPath("$.edges[?(@.source=='ManualLockRule' && @.target=='IncompleteHardwareRule')]", hasSize(1)))
+                .andExpect(jsonPath("$.edges[?(@.source=='IncompleteHardwareRule' && @.target=='StaleSensorRule')]", hasSize(1)));
     }
 
     @Test

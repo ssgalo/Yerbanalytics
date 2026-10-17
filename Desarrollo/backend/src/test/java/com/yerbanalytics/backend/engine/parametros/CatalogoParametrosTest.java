@@ -185,4 +185,26 @@ class CatalogoParametrosTest {
         assertThat(cat.violaciones(conCambios(cat, Map.of("riego.saturacion-bloqueo", "80"))))
                 .isEmpty();
     }
+
+    @Test
+    void restriccionCruzada_cadaRangoFisicoTieneMinimoMenorQueMaximo() {
+        CatalogoParametros cat = catalogoRiegoV2();
+
+        // El mínimo de cada magnitud llega hasta un pivote y el máximo parte de él: ambos en el pivote chocan.
+        record Caso(String magnitud, String claveMin, String claveMax, String pivote) {}
+        List<Caso> casos = List.of(
+                new Caso("humedad", "seguridad.rango-hum-min", "seguridad.rango-hum-max", "50"),
+                new Caso("temperatura", "seguridad.rango-temp-min", "seguridad.rango-temp-max", "25"),
+                new Caso("pH", "seguridad.rango-ph-min", "seguridad.rango-ph-max", "7"),
+                new Caso("conductividad", "seguridad.rango-ce-min", "seguridad.rango-ce-max", "5"),
+                new Caso("luz", "seguridad.rango-luz-min", "seguridad.rango-luz-max", "50"));
+        for (Caso c : casos) {
+            assertThat(cat.violaciones(conCambios(cat, Map.of(c.claveMin(), c.pivote(), c.claveMax(), c.pivote()))))
+                    .as(c.magnitud())
+                    .extracting(RestriccionCruzada::mensaje)
+                    .containsExactly("El mínimo de " + c.magnitud() + " debe ser menor que el máximo.");
+        }
+        assertThat(cat.violaciones(conCambios(cat, Map.of("seguridad.rango-hum-min", "10", "seguridad.rango-hum-max", "90"))))
+                .isEmpty();
+    }
 }

@@ -28,7 +28,7 @@ import java.util.List;
 @Component
 public class RiegoPorDeficitRule implements Rule {
 
-    private static final int PRIORITY = 10;
+    private static final int PRIORITY = 11;
     private static final String NAME = SolicitudRiego.REGLA_DEFICIT_COMUN;
 
     @Override

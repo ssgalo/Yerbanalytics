@@ -5,7 +5,7 @@
    qué telemetría, clima y diagnóstico previo hacen que la regla dispare en el siguiente pulso.
    Cada regla nueva agrega su archivo en este directorio y lo registra en `index.ts`.
    ============================================================ */
-import type { NewDiagnosis, SimulatedWeather } from '../types';
+import type { NewDiagnosis, NodeErrorPlan, SimulatedWeather } from '../types';
 
 /** Umbrales del catálogo del backend ya resueltos (con los valores de la v2 si el backend no responde). */
 export interface ThresholdMap {
@@ -18,6 +18,10 @@ export interface ThresholdMap {
   uvUmbral: number;
   /** Minimum diagnosis confidence (%) for the diagnosis-driven rules to act. */
   confianzaMinima: number;
+  /** Physical upper limit of a humidity reading (%): above it the backend discards the reading (S-03). */
+  humedadMaxima: number;
+  /** Rereads the backend asks for after an out-of-range value, before discarding the metric (S-03). */
+  relecturasInvalidas: number;
 }
 
 /** What the AI diagnosis must say for the rule to act; the sector and capture are resolved at dispatch. */
@@ -50,6 +54,33 @@ export interface ScenarioPatch {
   silenceZone?: boolean;
   /** Sensing pulses to request, one after the other. Defaults to one. */
   pulses?: number;
+  /** A manual lock to create BEFORE the pulse, over the target zone (or the sector the operator picks). */
+  manualLock?: { reason: string };
+  /**
+   * Metrics pinned on the target zone's readings: every reading it publishes (the answer to the pulse and to each
+   * reread) carries them, until the operator releases the zone. They are NOT published as a reading of their own: the
+   * answer to the pulse is what the engine decides on, so that is where they have to be.
+   */
+  pinnedReadings?: Record<string, TelemetryClaim>;
+  /**
+   * The target zone must have at least one sector with no electrovalve registered, because that is what the scenario
+   * shows. The simulator never changes the hardware registry: it looks for sectors that already lack theirs.
+   */
+  needsSectorWithoutValve?: boolean;
+  /**
+   * An error the target zone's node publishes BEFORE the pulse (S-05). The simulator publishes it on the broker like a
+   * real node would; the backend does not know it was the simulator.
+   */
+  nodeError?: NodeErrorPlan;
+  /**
+   * The error is about a sector's valve, so the operator has to pick a sector of the target zone that HAS its valve
+   * registered (the simulator reads the registry, never edits it). The shade error is the macro-zone's: no sector.
+   */
+  needsSectorWithValve?: boolean;
+  /** Register the repair of the faulty devices of the target zone BEFORE the pulse (S-05), with this detail. */
+  repair?: { detail: string };
+  /** The target zone must have at least one device marked as faulty, because that is what the scenario repairs. */
+  needsFaultyDevice?: boolean;
 }
 
 export interface ScenarioConflict {

@@ -40,7 +40,7 @@ entorno tome solo sus carpetas.
 | ------------ | :-------: | ---------------------------------------------------------------------------------------- |
 | `actuacion`  | 4         | Recibe comandos, deduplica y despacha. Riego y mediasombra no bloquean: los atiende cada 50 ms |
 | `sensado`    | 3         | Lee una vez al arrancar y después solo ante un `LEER_AHORA` (el backend lo publica cada X s; sin timer propio) y arma la telemetría |
-| `red`        | 2         | WiFi/MQTT: publica telemetría, acks y eventos del riel, y drena el buffer offline         |
+| `red`        | 2         | WiFi/MQTT: publica telemetría, acks, eventos del riel y errores del nodo, y drena el buffer offline |
 | `riel`       | 1         | Mueve el carro de la cámara. Genera los pasos con espera activa: va última y las demás la interrumpen. Fija al núcleo 1 |
 
 El callback MQTT **solo encola o avisa**: nunca acciona, lee ni publica (PubSubClient reusa su buffer al
@@ -152,6 +152,7 @@ La bomba de riego, la bomba de insumo, la mediasombra y el riel son **compartido
 | `INSUMO_SEG_POR_DEFECTO` | Cuánto bombea el insumo cuando el backend manda `pump ON` sin parámetros (es lo que manda hoy) |
 | `MEDIASOMBRA_UMBRAL_APERTURA_PCT` | `targetPct` (% de apertura) desde el que se enrolla |
 | `LIMITE_VALVULA_SEG_MAX` | 1200 s, igual al máximo del contrato (`CONTRATO_VALVULA_DURACION_MAX_SEG`). Si es menor, no compila (`static_assert` en `actuacion/act_riego.cpp`) |
+| `ENVIAR_ERRORES_CAUDAL` | `0` (de fábrica) → no se compila `task_actuacion::informarErrorCaudal()`, el punto de integración del caudalímetro (S-05). El hardware no está instalado en el vivero; los errores de caudal los inyecta el simulador |
 | `RIEL_POSICION_SECTOR_1/2`, `RIEL_DIR_HACIA_HOME` | Calibración del riel en pasos y sentido del motor |
 | `TANQUE_*_DIST_LLENO_CM` / `_VACIO_CM` | Calibración de los HC-SR04 para pasar distancia a % de nivel |
 
@@ -209,6 +210,7 @@ Fuente de verdad: `comun/contrato.h`. Los espejos del backend son `ContratoNodo.
 | Ack (×2 sectores) | `nursery/zone/{zona}/sector/{sector}/ack` | ESP32 | Backend (`AckActuadorReceiver`) | 1 |
 | Comando del riel | `nursery/rail/command` | Backend | ESP32 | 1 |
 | Evento del riel | `nursery/rail/event` | ESP32 | Backend | 0 (PubSubClient) |
+| Errores del nodo (S-05) | `nursery/zone/{zona}/errores` | ESP32 | Backend (`NodeErrorReceiver`) | 1 |
 
 ### Payload de telemetría
 
@@ -277,6 +279,31 @@ Un `commandId` repetido no se vuelve a ejecutar:
 > un `ERROR` que es una falla deja una alerta en el historial (`falla_mecanica` es crítica; `reemplazado`
 > y `cancelado` no son fallas); y si no llega ningún ack en `durationSec` + 90 s, alerta
 > `ActuadorSinRespuesta`. No cambia ninguna decisión del motor.
+
+### Errores del nodo (S-05)
+
+El nodo detecta una falla, **corta el actuador por su cuenta** y la publica **una sola vez** por evento en
+`nursery/zone/{zona}/errores` (QoS 1, sin retain):
+
+```json
+{ "nodo": "A4:CF:12:9A:00:01", "sector": "", "tipo": "MEDIASOMBRA_FIN_DE_CARRERA", "valor": "CERRADA", "timestamp": 1782414800 }
+{ "nodo": "A4:CF:12:9A:00:01", "sector": "MZ-1-012", "tipo": "SIN_CAUDAL", "valor": 0, "timestamp": 1782414800 }
+```
+
+| `tipo` | `sector` | `valor` |
+|---|---|---|
+| `SIN_CAUDAL`, `CAUDAL_EXCESIVO` | el del sector de la electroválvula | caudal medido en L/h (número) |
+| `MEDIASOMBRA_FIN_DE_CARRERA` | vacío: la malla es de la macro-zona | `CERRADA` (no llegó a cerrar: quedó abierta) o `ABIERTA` (no llegó a abrir) |
+
+- **Mediasombra (hoy):** cuando `act_mediasombra` se rinde (`TIMEOUT_MEDIASOMBRA_MS` sin tocar el final de carrera, que es también el
+  ack `falla_mecanica`) deja la falla pendiente y `task_actuacion` la encola por `sys.error`; `task_red` la publica. No se repite
+  mientras el problema siga: se rearma cuando un movimiento termina bien. El log serie muestra el estado real de los dos finales
+  de carrera (`estadoFines()`). El backend deduplica este error con el ack: queda una sola alerta.
+- **Caudal (todavía no):** el caudalímetro no está instalado (solo hay un sketch de prototipo, `prototipo_hardware/test_caudalimetro`).
+  Detrás de `ENVIAR_ERRORES_CAUDAL` queda `informarErrorCaudal()` como punto de integración; sin el flag no se compila.
+- El `timestamp` del nodo actuador son los segundos desde el arranque (no tiene NTP); el backend no lo usa: fecha la falla con la hora
+  de recepción.
+- **Sin compilar:** este cambio se escribió sin toolchain a mano (`arduino-cli`/PlatformIO). Compilarlo antes de flashear.
 
 ### Riel
 

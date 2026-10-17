@@ -40,7 +40,7 @@ import java.util.List;
 @Component
 public class DeficitCriticoRule implements Rule {
 
-    private static final int PRIORITY = 4;
+    private static final int PRIORITY = 6;
     /** Nombre de la regla: también es la {@code regla} que queda en los eventos "Riego" que ordenó R-02. */
     public static final String NAME = SolicitudRiego.REGLA_DEFICIT_CRITICO;
     static final String TEXTO_ALERTA = "Déficit hídrico crítico";

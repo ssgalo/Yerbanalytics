@@ -1,5 +1,6 @@
 #include "act_mediasombra.h"
 #include "config.h"
+#include "contrato.h"
 
 namespace act_mediasombra {
 
@@ -12,6 +13,12 @@ static bool     haciaEnrollada = false;
 static uint32_t inicioMs = 0;
 static char     commandId[40] = "";
 static int      sectorComando = 1;
+
+// Falla del final de carrera (S-05): cuál se esperaba y no se tocó. 'fallaInformada' evita repetir el error mientras el
+// problema siga: se limpia cuando un movimiento termina bien.
+static bool        fallaPendiente = false;
+static bool        fallaInformada = false;
+static const char* finFallido = VALOR_FIN_ABIERTA;
 
 // Acks pendientes (el reemplazado y el que termina pueden salir en la misma vuelta).
 static const int MAX_PENDIENTES = 2;
@@ -66,6 +73,17 @@ static void terminar(EstadoAck status, const char* detalle) {
   }
   detenerMotor();
   moviendo = false;
+
+  if (status == EstadoAck::ERROR && strcmp(detalle, "falla_mecanica") == 0) {
+    // Enrollar = abrir (deja pasar el sol): si no llegó, falló el final de "abierta"; si no desenrolló, el de "cerrada".
+    if (!fallaInformada) {
+      fallaPendiente = true;
+      fallaInformada = true;
+      finFallido = haciaEnrollada ? VALOR_FIN_ABIERTA : VALOR_FIN_CERRADA;
+    }
+  } else if (status == EstadoAck::SUCCESS && strcmp(detalle, "ok") == 0) {
+    fallaInformada = false;   // se resolvió: la próxima falla es un evento nuevo
+  }
 
   Ack a;
   ackBase(a, commandId, sectorComando);
@@ -137,6 +155,19 @@ bool atender(Ack& out) {
     pendientes[i - 1] = pendientes[i];
   }
   cantPendientes--;
+  return true;
+}
+
+EstadoFinesDeCarrera estadoFines() {
+  return { finActivado(pinFin(false)), finActivado(pinFin(true)) };
+}
+
+bool tomarFallaPendiente(char* valor, size_t n) {
+  if (!fallaPendiente) {
+    return false;
+  }
+  fallaPendiente = false;
+  strlcpy(valor, finFallido, n);
   return true;
 }
 

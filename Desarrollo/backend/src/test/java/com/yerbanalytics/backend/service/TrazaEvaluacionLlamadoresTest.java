@@ -100,6 +100,7 @@ class TrazaEvaluacionLlamadoresTest {
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
                 manualLockRepository, mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
                 PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class),
+                ReadingGuardsDePrueba.aceptaTodo(),
                 java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
 
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, System.currentTimeMillis(),
@@ -141,6 +142,7 @@ class TrazaEvaluacionLlamadoresTest {
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, weatherService,
                 manualLockRepository, mock(DiagnosticoService.class), store, mock(com.yerbanalytics.backend.repository.HistorialRepository.class), mock(com.yerbanalytics.backend.engine.riego.DespachoRiego.class),
                 PulsosDePrueba.sinMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class),
+                ReadingGuardsDePrueba.aceptaTodo(),
                 java.time.Clock.system(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA), 20);
 
         service.updateTelemetry("MZ-1", new MqttTelemetryPayload("aa:bb", 90, -60, System.currentTimeMillis(),

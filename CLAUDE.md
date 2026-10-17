@@ -243,7 +243,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay siete scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay diez scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -257,6 +257,12 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   (un No concluyente no tiene score).
 > - `resources/migracion-confianza-70.sql` — borra las confianzas mínimas guardadas por encima de 95 %,
 >   que el rango nuevo (50–95 %, fábrica 70 %) no admite.
+> - `resources/migracion-permisos-bloqueo.sql` — agrega `bloqueos.ver`/`bloqueos.gestionar` a la matriz de una
+>   base ya sembrada (la matriz sólo se siembra si está vacía).
+> - `resources/migracion-permisos-hardware-servicio.sql` — agrega `hardware.ver` al rol Servicio (el simulador lo lee
+>   para su escenario de hardware incompleto); sólo lectura.
+> - `resources/migracion-permisos-hardware-reparar.sql` — agrega `hardware.reparar` (Ingeniero, Operario y Servicio) y
+>   `hardware.ver` al Operario a una matriz ya sembrada (S-05, registro de reparaciones).
 >
 > Detalle en el README del backend.
 
@@ -277,6 +283,9 @@ cd Desarrollo/backend
 - `POST /api/pulsos {ejecutarMotor}` → pulso de sensado manual de todas las zonas, sólo por API; `409` si hay
   uno en curso. En Demo Expo, la lectura con motor es la secuencia `LECTURA` con `ejecutarMotor` (sólo la zona
   de la secuencia). Ver "Pulso de sensado" en el README del backend.
+- `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{id}` → bloqueo manual de la actuación autónoma por sector o
+  macro-zona (S-01): al activar cierra válvulas y bombas y cancela el riego encolado; reanudar no repone nada.
+  Un bloqueo es de un sector o de una zona, nunca de los dos. Ver "Bloqueo manual" en el README del backend.
 - `POST /api/auth/login`, `GET /api/auth/perfil`, `POST /api/auth/actividad|logout`,
   `PUT /api/auth/clave` → sesión. `/api/usuarios/**`, `/api/roles/**`, `/api/seguridad/politica`,
   `GET /api/auditoria` → gestión de seguridad (HU-01 / HU-20). Ver "Autenticación y permisos" en
@@ -302,14 +311,26 @@ cd Desarrollo/backend
 - **El backend consume la telemetría por MQTT y publica comandos a los actuadores y al riel.** No
   publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
   (§6.2). Escucha además los eventos del riel (`nursery/rail/event`) y el ACK de los actuadores
-  (`nursery/zone/+/sector/+/ack`). Lo consumen dos: `SeguimientoComandosService` (alerta en el historial
-  si el nodo informa una falla o no contesta a tiempo; no cambia decisiones del motor) y las secuencias de
+  (`nursery/zone/+/sector/+/ack`), más los errores del nodo (`nursery/zone/+/errores`, S-05). El ACK lo consumen dos: `SeguimientoComandosService` (alerta en el historial
+  si el nodo informa una falla o no contesta a tiempo; no cambia decisiones del motor, salvo la `falla_mecanica` de la malla, que se entrega a `HardwareFaultService`) y las secuencias de
   Demo Expo (`SecuenciaService`, que espera el ACK de cada paso). Los comandos de las secuencias salen por
   el mismo `ComandoActuadorPublisher`, así que el seguimiento también los vigila, a propósito.
 - **El pasado de las lecturas vive en `zone_reading`** (una fila por lectura aceptada, con las diez métricas vigentes y su origen `PULSE`/`OTHER`). Las reglas lo consultan sólo por `readings/ReadingHistory`; nunca arman su propia tabla. Sin lecturas es `SIN_DATO`, no cero. Detalle en el README del backend.
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
+- **La ingesta valida antes de escribir y el motor sabe qué hardware hay.** `ReadingValidationGuard` (S-03) descarta por
+  métrica lo que cae fuera del rango físico del catálogo, con relecturas inmediatas, y `IncompleteHardwareRule` (S-04,
+  prioridad 1) aborta la rama a la que le falta un actuador mapeado (`HardwareCoverage`, armada una vez por zona). Efecto a
+  conocer: **un sector sin su electroválvula registrada no se riega solo**. Prioridades de las reglas: únicas (no hay
+  fraccionarias); ver `ReglasArquitecturaTest`. Detalle en el README del backend ("Lectura inválida (S-03) y hardware incompleto
+  (S-04)").
+- **Las fallas del nodo marcan el dispositivo, y marcar es de un solo servicio.** El ESP32 detecta la falla, corta el actuador y la
+  publica en `nursery/zone/{zona}/errores`; `HardwareFaultService` es el **único** que escribe `dispositivo.falla` (y la levanta al
+  registrar la reparación, `POST /api/hardware/{id}/reparacion`, permiso `hardware.reparar`). `HydraulicFaultRule` (prioridad 2) y
+  `ShadeFaultRule` leen la marca por `RuleContext.faults` y sacan al sector (o a la malla) de lo autónomo; R-02 no se exceptúa.
+  Efecto a conocer: **un sector con falla hidráulica no se riega ni se dosifica solo hasta que alguien registre la reparación**.
+  Detalle en el README del backend ("Fallas del nodo (S-05)").
 - **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y
@@ -333,6 +354,10 @@ cd Desarrollo/backend
     - **Cada regla puede tener más de una flag de cooldown o variable a bypasear**: Por ejemplo, una regla puede tener un cooldown de ciclo de lectura Y una guarda de riego en curso, o una pausa tras aplicación Y un límite de dosis.
     - En producción (`yerbanalytics.mode=REAL`), cada regla aplica estrictamente los valores y cooldowns establecidos por el usuario en la configuración agronómica.
     - En modo demo (`yerbanalytics.mode=SIMULATED` / `yerbanalytics.demo.enabled=true`), los cooldowns y variables de bypass se pueden setear en 0 o conmutar independientemente vía `/api/demo/rules/{ruleName}`, permitiendo re-regar o re-actuar de inmediato sin esperar las 4 horas ni depender de la hora del día.
+- **Fuente de telemetría en modo demo**: el simulador escribe en `nursery/demo/zone/{z}/telemetry` (tópico aparte del
+  ESP32) y `GET/PUT /api/demo/telemetry-source` (`REAL_NODE` | `SIMULATOR`, en memoria) elige cuál procesa el backend
+  (motor, pulso y lectura de Demo Expo). Los comandos siguen yendo a los actuadores del ESP32. Todo en el paquete
+  `demo/`; con demo apagado no existe suscripción, endpoint ni bean (el código productivo sólo ve `TelemetryAdmission`).
 - **Modos de operación y Feature Flags**:
   - Controlado por `yerbanalytics.mode` (`REAL` | `SIMULATED`) y `yerbanalytics.demo.enabled` (`false` | `true`), sobreescribible en Docker por `YERBANALYTICS_MODE` y `YERBANALYTICS_DEMO_ENABLED`.
   - En modo `REAL` (producción), el backend no expone ningún rastro de simulación: los endpoints `/api/demo/**` no se registran (retornan 404), no existen tablas demo en base de datos y todas las reglas respetan sus cooldowns productivos.
@@ -419,6 +444,8 @@ Invariantes a respetar al tocar esta área:
   su `.env` —una lista de configuración genérica—; el backend no tiene usuario, rol ni permiso
   programado para él. Su servidor inicia sesión y adjunta la cookie en el proxy. Sin credenciales, la
   telemetría MQTT sigue saliendo y su UI avisa que el backend rechaza el resto.
+- **Con el backend en modo demo publica en `nursery/demo/zone/{z}/telemetry`** (no en el tópico del ESP32) y trae el
+  interruptor de la fuente de telemetría; sin modo demo publica en el tópico regular, como hardware simulado.
 - **Su estado vive en `simulador/data/`**, nunca en la base del vivero.
 - **No tiene superficie de API propia en el sistema**: topología, órdenes de captura,
   dispositivos y diagnósticos son endpoints públicos, los mismos que usan el planificador de
@@ -430,7 +457,8 @@ Invariantes a respetar al tocar esta área:
   no contiene ninguna implementación, vista ni control de demo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
-  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. El comando de
+  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. Los errores del nodo
+  (`nursery/zone/{zona}/errores`, S-05) también: `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType` y `buildNodeError` del simulador. El comando de
   zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.

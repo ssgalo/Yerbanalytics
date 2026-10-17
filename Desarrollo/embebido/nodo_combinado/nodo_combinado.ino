@@ -40,6 +40,7 @@ static char topicTelemetria[96];
 static char topicComandoZona[96];
 static char topicComando[CANT_SECTORES + 1][96];   // índice 1 y 2
 static char topicAck[CANT_SECTORES + 1][96];
+static char topicErrores[96];
 
 // ----------------------------------------------------------------------------
 //  Callback MQTT: parsea y encola (no ejecuta ni publica acá).
@@ -153,6 +154,28 @@ static void publicarEventosRiel(bool mqttOk)
   }
 }
 
+// Publica los errores del nodo (S-05) en orden. Uno que no se pudo publicar queda primero en la cola y se reintenta en la
+// próxima vuelta (p.ej. al reconectar): la falla se informa una sola vez, no puede perderse.
+static void publicarErrores(bool mqttOk)
+{
+  ErrorNodo e;
+  while (mqttOk && xQueuePeek(sys.error, &e, 0) == pdTRUE)
+  {
+    char mac[18];
+    net_wifi::obtenerMac(mac, sizeof(mac));
+    const char *sectorId = (e.sector >= 1 && e.sector <= CANT_SECTORES) ? contratoSectorId(e.sector) : "";
+    char buf[192];
+    size_t escritos = util_json::serializarError(e, mac, sectorId, reloj::ahoraEpoch(), buf, sizeof(buf));
+    buf[escritos] = '\0';
+    if (!net_mqtt::publicar(topicErrores, buf, QOS_ERROR))
+    {
+      break;
+    }
+    xQueueReceive(sys.error, &e, 0);
+    Serial.printf("[main] Error del nodo publicado: %s\n", buf);
+  }
+}
+
 // Drena el buffer offline en orden cronológico, borrando cada registro tras
 // publicarlo con éxito (sin duplicados).
 static void drenarBufferOffline()
@@ -210,6 +233,9 @@ static void taskRed(void *pv)
     // Eventos del riel.
     publicarEventosRiel(mqttOk);
 
+    // Errores del nodo (S-05).
+    publicarErrores(mqttOk);
+
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -229,6 +255,7 @@ void setup()
   // Topics: telemetría (zona/sector según config); comando de zona; comando y ack de cada sector.
   contratoTopicTelemetria(topicTelemetria, sizeof(topicTelemetria));
   contratoTopicComandoZona(topicComandoZona, sizeof(topicComandoZona));
+  contratoTopicErrores(topicErrores, sizeof(topicErrores));
   for (int s = 1; s <= CANT_SECTORES; s++)
   {
     contratoTopicComando(topicComando[s], sizeof(topicComando[s]), s);
@@ -241,6 +268,7 @@ void setup()
   sys.ack = xQueueCreate(10, sizeof(Ack));
   sys.comandoRiel = xQueueCreate(1, sizeof(ComandoRiel));
   sys.eventoRiel = xQueueCreate(8, sizeof(EventoRiel));
+  sys.error = xQueueCreate(4, sizeof(ErrorNodo));
 
   // Infraestructura común + suscripciones.
   net_wifi::iniciar();

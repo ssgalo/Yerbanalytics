@@ -148,6 +148,7 @@ void setup()
   sys.ack = nullptr;
   sys.comandoRiel = nullptr;
   sys.eventoRiel = nullptr;
+  sys.error = nullptr;
 
   // Infraestructura común + única suscripción: el comando de zona (LEER_AHORA).
   net_wifi::iniciar();
