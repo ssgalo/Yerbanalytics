@@ -56,6 +56,10 @@ simulador (punto ámbar, con el motivo).
   for that zone (only simulated macro-zones, only while on).
 - **Topología** — regenera la grilla (N macro-zonas × M sectores) para que coincida con el
   hardware a simular.
+- **Control de reglas y automatización** — con el backend en modo demo, apaga reglas y acorta sus
+  cooldowns (*Telemetría → Control de reglas*), inyecta clima (con marcas horarias, UV máximo del día y
+  un modo "sin pronóstico") y arma las condiciones para que una regla dispare en el siguiente pulso
+  (*Automatización*). Ver "Cómo agregar el escenario de una regla".
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a
   mano el diagnóstico que devolvería el modelo.
 
@@ -155,6 +159,29 @@ automática tampoco puede leer el intervalo de sensado (`configuracion.ver`) y u
 
 ---
 
+## Cómo agregar el escenario de una regla
+
+Una regla del backend se **apaga** desde el panel con sólo existir (`GET /api/demo/rules` lista toda
+pieza de decisión, también las que corren por macro-zona o como servicio). Para poder **accionarla** el
+simulador necesita su *escenario*: qué telemetría, clima y diagnóstico previo hacen que dispare en el
+siguiente pulso. Mientras no lo tenga, el panel la muestra en gris ("sin escenario").
+
+1. Crear `src/scenarios/<regla>.ts` con un `RuleScenario` (contrato en `src/scenarios/types.ts`):
+   - `key`, `label`, `description`, `branch`.
+   - `backendRules`: los nombres con que el backend la lista en `/api/demo/rules`.
+   - `needsCooldownReset` / `needsDiagnosis`.
+   - `apply({ thresholds })`: función **pura** que devuelve un `ScenarioPatch` con la telemetría
+     (cada métrica con la línea que ve el operador), el clima y el diagnóstico que necesita. Los
+     umbrales salen siempre de `thresholds` (el catálogo del backend), nunca de números sueltos.
+   - `conflicts`, si es incompatible con otra (se declara de un solo lado; la detección es simétrica).
+   - `applyOrder`: si dos escenarios piden la misma métrica gana el de mayor orden.
+2. Sumarlo a `SCENARIOS` en `src/scenarios/index.ts`.
+3. Escribir su test (`tsx --test`) y agregarlo al script `test` de `package.json`.
+
+`ruleConditions.ts` no se toca: no conoce ninguna regla en particular.
+
+---
+
 ## Qué endpoints del sistema usa
 
 Ninguno es del simulador. Todos son superficie **pública** de la plataforma:
@@ -167,6 +194,7 @@ Ninguno es del simulador. Todos son superficie **pública** de la plataforma:
 | `GET /api/capturas/ordenes/{id}` | idem |
 | `GET /api/camara/dispositivos`, `POST /api/camara/vinculacion` | el backoffice |
 | `POST /api/diagnosticos` | el servicio de inferencia |
+| `GET/PUT /api/demo/rules`, `POST/DELETE /api/demo/weather`, `GET/PUT /api/demo/weather/offline` | sólo existen con el backend en modo demo (en producción dan 404) |
 
 Por eso el recorrido que se ensaya acá es literalmente el que va a correr solo cuando exista el
 modelo. **El simulador no toca `/api/camara/v1/**`**: ese es el contrato del dispositivo de
@@ -192,6 +220,8 @@ simulador/
 │   ├── proxy.ts       proxy al backend (/backend/**)
 │   └── backend-session.ts  sesión de la cuenta de servicio ante el backend
 ├── src/             UI React, con estilos propios
+│   ├── scenarios/     un escenario por regla (cómo se la acciona) y su registro
+│   └── ruleConditions.ts  umbrales, conflictos y combinación de los escenarios elegidos
 └── data/            estado local (no se versiona)
 ```
 

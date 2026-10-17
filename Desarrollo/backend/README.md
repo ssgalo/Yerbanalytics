@@ -734,6 +734,28 @@ sin cámara conectada) deja una alerta `WARNING` de la macro-zona del recorrido 
 el dashboard muestra la pestaña. Se guarda en `preferencia_dashboard` (fila única), que crea
 Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de pasada no dependen de él.
 
+## Control de reglas desde el simulador (`/api/demo/**`)
+
+Sólo existen con `yerbanalytics.demo.enabled=true`; en producción dan `404` y no hay ningún rastro de
+simulación. Los usa el simulador (`Desarrollo/simulador/`), nunca el dashboard.
+
+- **`DemoControllable`** (`engine/overrides/`) es todo lo que `GET /api/demo/rules` necesita saber de una pieza
+  de decisión: `name`, `label`, `branch`, `priority`, `cooldownKeys()` y `bypassKeys()`. `Rule` lo extiende, y
+  también lo implementan las reglas por macro-zona y los servicios que deciden fuera de la cadena por sector.
+  `DemoControllableRegistry` las reúne a todas; nombres duplicados hacen fallar el arranque.
+- `PUT /api/demo/rules/{nombre}` apaga o enciende una pieza y fija sus cooldowns (minutos; `0` los elimina) y
+  bypass. `404` si el nombre no existe; `400` si una clave de cooldown o bypass no la declara la pieza.
+  `PUT /api/demo/rules/cooldowns/zero` alcanza a todas, no sólo a las de la cadena por sector. Los overrides
+  viven en memoria: un reinicio los borra.
+- Quien decide consulta `RuleOverrides` **antes de actuar**: apagada no actúa ni corta nada y lo deja en su
+  traza (`OMITIDA_DESHABILITADA` en las reglas por sector). Toda espera o intervalo se declara como
+  `cooldownKey` y toda guarda de estado o franja horaria como `bypassKey`.
+- **Clima simulado**: `POST /api/demo/weather` arma 24 marcas horarias (probabilidad, mm por hora y
+  temperatura) más el UV máximo del día. Con sólo los cinco campos básicos las marcas salen planas con esos
+  valores (así R-03 se puede accionar); `uvMaxDia` y `horas` (`{hora, probLluviaPct?, precipMm?, tempC?}`, hora
+  0–23 del vivero) afinan una marca. `PUT /api/demo/weather/offline {"on": true}` hace que el servicio
+  responda "sin pronóstico" como si Open-Meteo estuviera caída; `DELETE /api/demo/weather` limpia ambos.
+
 ## Secuencias de la Demo Expo
 
 Una **secuencia** es un guion corto contra el actuador de un sector, con cada paso visible: **riego**
