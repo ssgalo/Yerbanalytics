@@ -14,8 +14,8 @@
 ## 2. Backend
 - [ ] 2.1 Test: el receptor registra la falla (`falla`, `falla_desde`) y descarta tipos desconocidos.
 - [ ] 2.2 `ErrorNodoReceiver` (MQTT) + servicio; deduplicación con el ack `falla_mecanica` (D-6).
-- [ ] 2.3 Test: `FallaHidraulicaRule` aborta RIEGO e INSUMO del sector, incluso R-02; otros sectores siguen.
-- [ ] 2.4 Test: `FallaMediasombraRule` impide comandos de malla de la MZ (rama MEDIASOMBRA).
+- [x] 2.3 Test: `FallaHidraulicaRule` aborta RIEGO e INSUMO del sector, incluso R-02; otros sectores siguen.
+- [x] 2.4 Test: `FallaMediasombraRule` impide comandos de malla de la MZ (rama MEDIASOMBRA).
 - [ ] 2.5 Alertas con los textos de la v2 (riego manual si humedad MZ < 45 %; cubrir a mano).
 - [ ] 2.6 Reparación: endpoint, permiso `hardware.reparar` en `MapaPermisos`, evento de historial.
 

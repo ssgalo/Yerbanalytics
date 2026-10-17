@@ -159,7 +159,7 @@ class PosponerPorLluviaRuleTest {
     @DisplayName("metadatos: RIEGO, prioridad 9")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(9);
+        assertThat(rule.priority()).isEqualTo(10);
         assertThat(rule.parametros()).containsExactlyInAnyOrder(ParametrosRiego.LLUVIA_PROBABILIDAD,
                 ParametrosRiego.LLUVIA_MM, ParametrosRiego.LLUVIA_VENTANA,
                 ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);

@@ -75,6 +75,26 @@ class ReglasArquitecturaTest {
     }
 
     @Test
+    void lasReglasDeFallaVanAntesDeLasQueActuan() throws Exception {
+        Map<String, Integer> prioridades = new HashMap<>();
+        for (Class<?> c : reglas()) {
+            Field f = c.getDeclaredField("PRIORITY");
+            f.setAccessible(true);
+            prioridades.put(c.getSimpleName(), f.getInt(null));
+        }
+
+        // R-02 y las demás reglas de riego no pueden ordenar agua antes de saber que la válvula está averiada.
+        assertThat(prioridades.get("IncompleteHardwareRule")).isLessThan(prioridades.get("HydraulicFaultRule"));
+        assertThat(prioridades.get("HydraulicFaultRule"))
+                .isLessThan(prioridades.get("StaleSensorRule"))
+                .isLessThan(prioridades.get("DeficitCriticoRule"))
+                .isLessThan(prioridades.get("RiegoPorDeficitRule"))
+                .isLessThan(prioridades.get("SupplyRule"));
+        // La malla no se mueve sin antes saber que está averiada.
+        assertThat(prioridades.get("ShadeFaultRule")).isLessThan(prioridades.get("ShadingRule"));
+    }
+
+    @Test
     void todaReglaImplementaLaFirmaConEvaluacionYNingunaConservaLaVieja() throws Exception {
         for (Class<?> c : reglas()) {
             List<Method> evaluate = java.util.Arrays.stream(c.getDeclaredMethods())

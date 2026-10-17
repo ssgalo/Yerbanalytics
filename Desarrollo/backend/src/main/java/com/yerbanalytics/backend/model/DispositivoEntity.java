@@ -55,7 +55,14 @@ public class DispositivoEntity {
     @Column(name = "ultimo_update")
     private Long ultimoUpdate;
 
-    /** Falla física registrada (p. ej. "Falla Hidráulica"); null si está sano. */
+    /**
+     * Falla registrada: el {@code tipo} del error que informó el nodo (p. ej. {@code SIN_CAUDAL}, S-05); null si está
+     * sano. Una sola fuente: no hay una tabla paralela de fallas. Se limpia al registrar la reparación o al recambiar la pieza.
+     */
     @Column(name = "falla")
     private String falla;
+
+    /** Epoch ms en que se marcó la falla; null si está sano. */
+    @Column(name = "falla_desde")
+    private Long fallaDesde;
 }
