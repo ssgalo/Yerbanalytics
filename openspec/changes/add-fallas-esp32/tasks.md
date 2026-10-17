@@ -8,8 +8,8 @@
 - [ ] 0.2 Responder las preguntas abiertas del diseño.
 
 ## 1. Contrato
-- [ ] 1.1 `contrato.h`: tópico, payload, tipos y constantes; helper `contratoTopicErrores()`.
-- [ ] 1.2 Espejos: `ContratoNodo.java` y `simulador/server/contract.ts`. Test de paridad de constantes si existe el patrón.
+- [x] 1.1 `contrato.h`: tópico, payload, tipos y constantes; helper `contratoTopicErrores()`.
+- [x] 1.2 Espejos: `ContratoNodo.java` y `simulador/server/contract.ts`. Test de paridad de constantes si existe el patrón.
 
 ## 2. Backend
 - [ ] 2.1 Test: el receptor registra la falla (`falla`, `falla_desde`) y descarta tipos desconocidos.

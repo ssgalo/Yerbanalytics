@@ -68,6 +68,16 @@ public final class ContratoNodo {
      */
     public static final String TOPIC_ACK_SUSCRIPCION = "nursery/zone/+/sector/+/ack";
 
+    /**
+     * Errores del nodo (S-05): el nodo detecta una falla, corta el actuador y la publica UNA vez en el tópico de su
+     * zona. Con el id de la zona. Espeja {@code contratoTopicErrores} de {@code contrato.h}. QoS 1, sin retain.
+     * Los tipos están en {@link NodeErrorType}.
+     */
+    public static final String TOPIC_ERRORS = "nursery/zone/%s/errores";
+
+    /** Suscripción a los errores de todas las zonas. */
+    public static final String TOPIC_ERRORS_SUBSCRIPTION = "nursery/zone/+/errores";
+
     /** {@code status} de un ack: la acción terminó bien. */
     public static final String ACK_SUCCESS = "SUCCESS";
     /** {@code status} de un ack: la acción no se pudo hacer o no terminó; {@code detalle.tipo} dice por qué. */
