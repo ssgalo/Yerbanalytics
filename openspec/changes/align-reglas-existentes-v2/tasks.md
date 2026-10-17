@@ -29,8 +29,8 @@ Rama: `feat/reglas-v2-align`.
 - [x] 3.4 Test: `SeguimientoComandosService` vigila esos comandos.
 
 ## 4. Reintento con nodo caído
-- [ ] 4.1 Test en `SensingScheduler`: zona con cuenta ≥ 3 recibe `LEER_AHORA` cada 15 min; zona sana, no.
-- [ ] 4.2 Implementar con el reloj inyectado.
+- [x] 4.1 Test en `SensingScheduler`: zona con cuenta ≥ 3 recibe `LEER_AHORA` cada 15 min; zona sana, no.
+- [x] 4.2 Implementar con el reloj inyectado.
 
 ## 5. Guardas
 - [ ] 5.1 Test: con lectura vencida, `StaleSensorRule` aborta el riego y la mediasombra se evalúa.

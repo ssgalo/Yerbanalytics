@@ -402,6 +402,14 @@ backend caído no se recupera.
   Hardware: 0 operativo, 1-2 señal intermitente, ≥ 3 fuera de servicio). Desde el cuarto, sin alertas.
   Cualquier telemetría vuelve la cuenta a 0 (alerta `INFO` si estaba fuera de servicio). La cuenta está
   en la base: sobrevive a un reinicio.
+- **Estado seguro** (S-02): al cruzar el tercero se ordena **una sola vez** `valve OFF`, `pump OFF` y
+  `shade SET {targetPct: 0}` a los equipos **registrados** en los sectores de la zona (`ZoneSafeState`, por el
+  mismo `ComandoActuadorPublisher`, así que `SeguimientoComandosService` vigila cada ack). La alerta
+  `CRITICAL` dice cuántas órdenes salieron. No se revierte cuando el nodo vuelve: decide el motor con la
+  lectura nueva (que llega en el siguiente pulso). Una zona sin equipos registrados no recibe órdenes.
+- **Reintento con el nodo caído**: mientras `pulsos_sin_respuesta ≥ 3`, cada tick del planificador pide
+  `LEER_AHORA` a la zona si pasaron `sensado.reintento-fuera-servicio` minutos (15) del último pedido
+  (`EscalamientoNodoService.retryOfflineNodes`). Si responde, la telemetría limpia la cuenta y deja el `INFO`.
 - **Umbral de lectura vieja**: `max(piso, intervalo × 60 + espera-respuesta + reintentos × espera-reintento × 60)`
   (14 580 s con los valores de fábrica). Sólo protege al riego (`StaleSensorRule`, revalidación del despacho); ya no decide
   si un nodo está fuera de servicio.

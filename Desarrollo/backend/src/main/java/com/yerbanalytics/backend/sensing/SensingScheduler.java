@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.engine.riego.CicloLectura;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService.OrigenPulso;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService.PulsoEnCursoException;
 import com.yerbanalytics.backend.service.ConfiguracionService;
+import com.yerbanalytics.backend.service.EscalamientoNodoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,6 +37,7 @@ public class SensingScheduler {
     private static final Logger log = LoggerFactory.getLogger(SensingScheduler.class);
 
     private final PulsoSensadoService pulsos;
+    private final EscalamientoNodoService escalamiento;
     private final ConfiguracionService configuracionService;
     private final TaskScheduler scheduler;
     private final PulsoProperties properties;
@@ -45,11 +47,13 @@ public class SensingScheduler {
     private Instant ultimaFranja;
 
     public SensingScheduler(PulsoSensadoService pulsos,
+                            EscalamientoNodoService escalamiento,
                             ConfiguracionService configuracionService,
                             @Qualifier("sensingScheduler") TaskScheduler scheduler,
                             PulsoProperties properties,
                             Clock clock) {
         this.pulsos = pulsos;
+        this.escalamiento = escalamiento;
         this.configuracionService = configuracionService;
         this.scheduler = scheduler;
         this.properties = properties;
@@ -64,7 +68,7 @@ public class SensingScheduler {
         log.info("Pulso de sensado: planificador iniciado (franja vigente desde {}).", ultimaFranja);
     }
 
-    /** Un tick: dispara el pulso de una franja nueva y avanza los reintentos. Nada escapa. */
+    /** Un tick: dispara el pulso de una franja nueva, avanza los reintentos y reintenta los nodos caídos. Nada escapa. */
     void tick() {
         try {
             revisarFranja();
@@ -75,6 +79,11 @@ public class SensingScheduler {
             pulsos.revisarReintentos();
         } catch (RuntimeException e) {
             log.error("Pulso de sensado: fallaron los reintentos del pulso en curso.", e);
+        }
+        try {
+            escalamiento.retryOfflineNodes();
+        } catch (RuntimeException e) {
+            log.error("Pulso de sensado: falló el reintento de los nodos fuera de servicio.", e);
         }
     }
 

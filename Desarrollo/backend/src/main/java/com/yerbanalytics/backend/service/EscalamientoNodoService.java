@@ -2,18 +2,26 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.SensingParameters;
 import com.yerbanalytics.backend.model.ZonaEntity;
+import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Escalamiento por pulsos consecutivos sin respuesta del nodo testigo (design D4). La cuenta se persiste en la
@@ -28,6 +36,12 @@ public class EscalamientoNodoService implements ConsumidorParametros {
 
     private static final Logger log = LoggerFactory.getLogger(EscalamientoNodoService.class);
 
+    /** Nombre técnico del escalamiento: el de su consumo de parámetros y el de sus overrides. */
+    public static final String NAME = "EscalamientoNodo";
+
+    /** Clave de cooldown: minutos entre dos pedidos de lectura a un nodo fuera de servicio (0 pide en cada tick). */
+    public static final String COOLDOWN_RETRY_OFFLINE = "retry-offline";
+
     /** Nombre de "regla" con que las alertas del pulso quedan en el historial. */
     public static final String REGLA = "PulsoSensado";
 
@@ -37,19 +51,31 @@ public class EscalamientoNodoService implements ConsumidorParametros {
     private final ZonaRepository zonaRepository;
     private final HistorialService historialService;
     private final ZoneSafeState safeState;
+    private final ComandoZonaPublisher zonePublisher;
+    private final CatalogoParametrosService parametros;
+    private final RuleOverrides overrides;
     private final Clock reloj;
 
+    /** Último pedido de lectura a cada zona fuera de servicio (epoch ms). En memoria: tras un reinicio se pide de inmediato. */
+    private final Map<String, Long> lastOfflineRequest = new ConcurrentHashMap<>();
+
     public EscalamientoNodoService(ZonaRepository zonaRepository, HistorialService historialService,
-                                   ZoneSafeState safeState, Clock relojVivero) {
+                                   ZoneSafeState safeState, ComandoZonaPublisher zonePublisher,
+                                   // Perezoso: el catálogo se arma con la lista de consumidores, y esta clase es uno.
+                                   @Lazy CatalogoParametrosService parametros,
+                                   RuleOverrides overrides, Clock relojVivero) {
         this.zonaRepository = zonaRepository;
         this.historialService = historialService;
         this.safeState = safeState;
+        this.zonePublisher = zonePublisher;
+        this.parametros = parametros;
+        this.overrides = overrides;
         this.reloj = relojVivero;
     }
 
     @Override
     public String name() {
-        return "EscalamientoNodo";
+        return NAME;
     }
 
     @Override
@@ -91,6 +117,55 @@ public class EscalamientoNodoService implements ConsumidorParametros {
                 : "El nodo testigo de " + zonaId + " no respondió al pulso de sensado ("
                         + n + (n == 1 ? " pulso" : " pulsos seguidos") + " sin respuesta).";
         historialService.registrarAlerta(zonaId, zona.getName(), REGLA, new DetalleAlerta(nivel, texto), reloj.millis());
+        if (nivel == NivelAlerta.CRITICAL) {
+            // El pulso que lo declaró caído acaba de pedir lectura: el siguiente pedido es recién en el plazo.
+            lastOfflineRequest.put(zonaId, reloj.millis());
+        }
+    }
+
+    /**
+     * S-02: mientras una zona esté fuera de servicio se le vuelve a pedir lectura cada
+     * {@code sensado.reintento-fuera-servicio} minutos, fuera de los pulsos. Si responde, la telemetría vuelve su
+     * cuenta a 0 ({@link #reiniciar}). Lo llama el tick del planificador; ante una zona que vuelve a caer el plazo
+     * arranca de cero.
+     */
+    public void retryOfflineNodes() {
+        if (!overrides.isEnabled(NAME)) {
+            return;
+        }
+        List<ZonaEntity> offline = zonaRepository.findByPulsosSinRespuestaGreaterThanEqual(FUERA_DE_SERVICIO);
+        Set<String> ids = offline.stream().map(ZonaEntity::getId).collect(Collectors.toSet());
+        lastOfflineRequest.keySet().retainAll(ids);   // las que volvieron se olvidan
+        if (offline.isEmpty()) {
+            return;
+        }
+        long now = reloj.millis();
+        long intervalMs = (long) (retryIntervalMinutes() * 60_000.0);
+        for (ZonaEntity zona : offline) {
+            Long last = lastOfflineRequest.get(zona.getId());
+            if (last != null && now - last < intervalMs) {
+                continue;
+            }
+            lastOfflineRequest.put(zona.getId(), now);   // también si falla: no se insiste en cada tick
+            requestReading(zona.getId());
+        }
+    }
+
+    /** El override del simulador reemplaza al parámetro del catálogo; 0 elimina la espera. */
+    private double retryIntervalMinutes() {
+        return overrides.cooldownMinutes(NAME, COOLDOWN_RETRY_OFFLINE)
+                .orElseGet(() -> parametros.vigentes().numero(SensingParameters.OFFLINE_RETRY));
+    }
+
+    private void requestReading(String zonaId) {
+        try {
+            ComandoZonaPublisher.Resultado r = zonePublisher.leerAhora(zonaId);
+            if (!r.publicado()) {
+                log.warn("Zona {}: no se pudo pedir lectura al nodo fuera de servicio ({}).", zonaId, r.error());
+            }
+        } catch (RuntimeException e) {
+            log.warn("Zona {}: falló el pedido de lectura al nodo fuera de servicio. {}", zonaId, e.getMessage());
+        }
     }
 
     /**

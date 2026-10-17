@@ -2,7 +2,10 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.SensingParameters;
+import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,12 +46,16 @@ class EscalamientoNodoServiceTest {
         historial = mock(HistorialService.class);
         safeState = mock(ZoneSafeState.class);
         when(safeState.order(anyString())).thenReturn(new ZoneSafeState.Result(3, 0));
-        service = new EscalamientoNodoService(zonas, historial, safeState,
-                Clock.fixed(Instant.parse("2026-10-14T13:00:00Z"), ZoneOffset.UTC));
+        service = nuevoServicio(Clock.fixed(Instant.parse("2026-10-14T13:00:00Z"), ZoneOffset.UTC));
         mz3 = new ZonaEntity();
         mz3.setId("MZ-3");
         mz3.setName("Macro-zona 3");
         when(zonas.findById("MZ-3")).thenReturn(Optional.of(mz3));
+    }
+
+    private EscalamientoNodoService nuevoServicio(Clock reloj) {
+        return new EscalamientoNodoService(zonas, historial, safeState, mock(ComandoZonaPublisher.class),
+                mock(CatalogoParametrosService.class), new RuleOverridesStore(), reloj);
     }
 
     private List<NivelAlerta> nivelesRegistrados(int veces) {
@@ -153,7 +160,7 @@ class EscalamientoNodoServiceTest {
     void laCuentaPersistidaSobreviveAUnReinicio() {
         // Lo que dejó la racha antes del reinicio vive en la fila de la zona: un servicio nuevo la retoma.
         mz3.setPulsosSinRespuesta(2);
-        EscalamientoNodoService trasReinicio = new EscalamientoNodoService(zonas, historial, safeState, Clock.systemUTC());
+        EscalamientoNodoService trasReinicio = nuevoServicio(Clock.systemUTC());
 
         trasReinicio.registrarSinRespuesta("MZ-3");
 
