@@ -1,8 +1,8 @@
 /* ============================================================
    Simulator MQTT publisher + command subscriber.
 
-   Uplink: the simulator publishes directly to the broker on the same topic and with the same
-   payload as the ESP32 firmware. The backend ingests it through its normal pipeline and has
+   Uplink: the simulator publishes directly to the broker with the same payload as the ESP32
+   firmware, on the same topic (or, with the backend in demo mode, on the separate demo topic). The backend ingests it through its normal pipeline and has
    no way of knowing there was a simulator on the other end.
 
    Downlink: the simulator subscribes to the command wildcard topic so that orders sent by the
@@ -22,11 +22,12 @@ import {
   parseCommandTopic,
   parseZoneCommandTopic,
   simulatedAck,
-  telemetryTopic,
+  telemetryTopicFor,
   valveDurationWarning,
   type ActuatorCommand,
   type TelemetryPayload,
 } from './contract.ts';
+import { demoMode } from './demo-mode.ts';
 import { answerReadNow } from './emission.ts';
 import { listSensors } from './store.ts';
 
@@ -194,7 +195,8 @@ export async function publish(zonaId: string, payload: TelemetryPayload): Promis
       `No hay conexión con el broker MQTT (${config.mqttUrl}). Verificá que Mosquitto esté levantado.`,
     );
   }
-  const topic = telemetryTopic(zonaId);
+  // With the backend in demo mode the telemetry goes on the separate demo topic (no race with the real ESP32).
+  const topic = telemetryTopicFor(zonaId, await demoMode.isAvailable());
   const message = JSON.stringify(payload);
 
   await new Promise<void>((resolve, reject) => {

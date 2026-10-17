@@ -58,6 +58,20 @@ export function telemetryTopic(zonaId: string): string {
   return `nursery/zone/${zonaId}/telemetry`;
 }
 
+/**
+ * Demo telemetry topic of a macro-zone. Separate tree from the real one, so the ESP32's readings and the
+ * simulator's never race: with the backend in demo mode, the operator chooses which of the two it reads.
+ * Mirrors `DemoTelemetryTopics` in the backend (it is NOT part of contrato.h).
+ */
+export function demoTelemetryTopic(zonaId: string): string {
+  return `nursery/demo/zone/${zonaId}/telemetry`;
+}
+
+/** The topic to publish a zone's telemetry on: the demo one if the backend is in demo mode, else the regular one. */
+export function telemetryTopicFor(zonaId: string, demoMode: boolean): string {
+  return demoMode ? demoTelemetryTopic(zonaId) : telemetryTopic(zonaId);
+}
+
 /* ============================================================
    Actuator commands and acks (the "Ack" section of contrato.h).
 

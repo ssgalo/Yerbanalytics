@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { VALVE_MAX_DURATION_SEC, valveDurationWarning } from './contract.ts';
+import * as c from './contract.ts';
 
 test('the valve maximum mirrors the contract (1200 s)', () => {
   assert.equal(VALVE_MAX_DURATION_SEC, 1200);
@@ -120,4 +121,17 @@ test('a macro-zone id maps to its index; anything else is not a macro-zone', asy
   assert.equal(macroZoneIndex('MZ-'), null);
   assert.equal(macroZoneIndex('MZ-1x'), null);
   assert.equal(macroZoneIndex('Z-1'), null);
+});
+
+test('telemetry topic: regular by default, separate demo tree when the backend is in demo mode', () => {
+  assert.equal(c.telemetryTopic('MZ-1'), 'nursery/zone/MZ-1/telemetry');
+  assert.equal(c.demoTelemetryTopic('MZ-1'), 'nursery/demo/zone/MZ-1/telemetry');
+  assert.equal(c.telemetryTopicFor('MZ-2', false), 'nursery/zone/MZ-2/telemetry');
+  assert.equal(c.telemetryTopicFor('MZ-2', true), 'nursery/demo/zone/MZ-2/telemetry');
+});
+
+test('the demo telemetry topic is never matched by the productive wildcard', () => {
+  const productive = /^nursery\/zone\/[^/]+\/telemetry$/;
+  assert.ok(productive.test(c.telemetryTopic('MZ-1')));
+  assert.ok(!productive.test(c.demoTelemetryTopic('MZ-1')));
 });
