@@ -389,9 +389,12 @@ backend caído no se recupera.
   Pide a todas las zonas y sólo se usa por API: Demo Expo usa la secuencia `LECTURA` con `ejecutarMotor`,
   que emite un pulso con motor sólo de su zona (ver "Secuencias"). No corre las franjas. Un programado
   que encuentra uno en curso se omite (queda en el log).
-- **Reintentos** (`yerbanalytics.pulso.*`): a una zona pendiente se le reenvía el pedido cada
-  `reintento-seg` (60) hasta `intentos` (3); vencido el último plazo queda sin respuesta en ese pulso y
-  no se evalúa. El pulso no toma `GuardiaHardware`: si el ESP32 está moviendo el riel, lo cubren los
+- **Reintentos** (parámetros `sensado.*` del catálogo, editables en Motor de reglas → Parámetros): a una
+  zona pendiente se le reenvía el pedido tras `sensado.espera-respuesta` (60 s) y después cada
+  `sensado.espera-reintento` (1 min), hasta `sensado.reintentos` (2) reintentos; vencido el último plazo
+  queda sin respuesta en ese pulso y no se evalúa. Un cambio guardado rige en el tick siguiente. Se
+  quitaron `yerbanalytics.pulso.reintento-seg` e `intentos` de `application.properties` (queda sólo
+  `tick-ms`): si alguien los fijaba por variable de entorno, ahora se ignoran. El pulso no toma `GuardiaHardware`: si el ESP32 está moviendo el riel, lo cubren los
   reintentos.
 - **Escalamiento** (`EscalamientoNodoService`): cada pulso sin respuesta suma uno a
   `zona.pulsos_sin_respuesta` y deja una alerta de la zona (regla `PulsoSensado`): `WARNING`, `WARNING`
@@ -399,8 +402,8 @@ backend caído no se recupera.
   Hardware: 0 operativo, 1-2 señal intermitente, ≥ 3 fuera de servicio). Desde el cuarto, sin alertas.
   Cualquier telemetría vuelve la cuenta a 0 (alerta `INFO` si estaba fuera de servicio). La cuenta está
   en la base: sobrevive a un reinicio.
-- **Umbral de lectura vieja**: `max(piso, intervalo × 60 + reintento-seg × intentos)` (14 580 s con los
-  valores de fábrica). Sólo protege al riego (`StaleSensorRule`, revalidación del despacho); ya no decide
+- **Umbral de lectura vieja**: `max(piso, intervalo × 60 + espera-respuesta + reintentos × espera-reintento × 60)`
+  (14 580 s con los valores de fábrica). Sólo protege al riego (`StaleSensorRule`, revalidación del despacho); ya no decide
   si un nodo está fuera de servicio.
 - **Diagnóstico nuevo.** Una regla que declara `usaDiagnostico()` (hoy `SupplyRule`) sólo corre si el
   sector tiene un diagnóstico que no usó: `sector.diagnosis_ts` (lo escribe el alta con el `creadoEn`)

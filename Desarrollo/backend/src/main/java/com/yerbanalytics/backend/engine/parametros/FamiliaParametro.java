@@ -7,5 +7,6 @@ public enum FamiliaParametro {
     INSUMO,
     MEDIASOMBRA,
     DIAGNOSTICO,
-    READINGS
+    READINGS,
+    SENSADO
 }

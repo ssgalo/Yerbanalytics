@@ -1,12 +1,17 @@
 package com.yerbanalytics.backend.sensing;
 
-import com.yerbanalytics.backend.config.PulsoProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
+import com.yerbanalytics.backend.engine.parametros.SensingParameters;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import com.yerbanalytics.backend.service.EscalamientoNodoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -25,15 +30,19 @@ import java.util.UUID;
  * decide el motor: si el pulso lo ejecuta, esa primera respuesta de la zona dispara la evaluación de sus sectores.
  *
  * <p>La telemetría del contrato no trae {@code commandId}, así que la correlación es por ventana de tiempo, igual
- * que la secuencia {@code LECTURA}. A una zona pendiente se le reenvía el pedido cada
- * {@code yerbanalytics.pulso.reintento-seg} hasta {@code intentos} pedidos; vencido el último plazo queda sin
- * respuesta en ese pulso y cuenta para el escalamiento ({@link EscalamientoNodoService}).
+ * que la secuencia {@code LECTURA}. A una zona pendiente se le reenvía el pedido: el primer plazo es
+ * {@code sensado.espera-respuesta} y los siguientes {@code sensado.espera-reintento}, hasta
+ * {@code sensado.reintentos} reintentos (1 + reintentos pedidos en total); vencido el último plazo queda sin
+ * respuesta en ese pulso y cuenta para el escalamiento ({@link EscalamientoNodoService}). Los plazos se leen del
+ * catálogo en cada tick, así que un cambio guardado rige en el siguiente.
  *
  * <p>El estado vive en memoria y no se expone: hay a lo sumo un pulso en curso. Las publicaciones salen fuera del
  * lock, porque {@link #respondePulso} corre en el hilo del broker y no puede esperar detrás de un envío MQTT.
+ *
+ * <p>El catálogo se pide {@code @Lazy}: él mismo se arma con la lista de quienes leen parámetros, y esta clase es una.
  */
 @Service
-public class PulsoSensadoService {
+public class PulsoSensadoService implements ConsumidorParametros {
 
     private static final Logger log = LoggerFactory.getLogger(PulsoSensadoService.class);
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
@@ -75,7 +84,7 @@ public class PulsoSensadoService {
     private final ZonaRepository zonaRepository;
     private final ComandoZonaPublisher publisher;
     private final EscalamientoNodoService escalamiento;
-    private final PulsoProperties properties;
+    private final CatalogoParametrosService parametros;
     private final Clock reloj;
 
     /** Guardado por {@code this}. {@code null} si no hay pulso en curso. */
@@ -84,13 +93,23 @@ public class PulsoSensadoService {
     public PulsoSensadoService(ZonaRepository zonaRepository,
                                ComandoZonaPublisher publisher,
                                EscalamientoNodoService escalamiento,
-                               PulsoProperties properties,
+                               @Lazy CatalogoParametrosService parametros,
                                Clock relojVivero) {
         this.zonaRepository = zonaRepository;
         this.publisher = publisher;
         this.escalamiento = escalamiento;
-        this.properties = properties;
+        this.parametros = parametros;
         this.reloj = relojVivero;
+    }
+
+    @Override
+    public String name() {
+        return "PulsoSensado";
+    }
+
+    @Override
+    public List<DefinicionParametro> parametros() {
+        return List.of(SensingParameters.RESPONSE_WAIT, SensingParameters.RETRIES, SensingParameters.RETRY_WAIT);
     }
 
     /**
@@ -189,21 +208,27 @@ public class PulsoSensadoService {
         List<String> reenviar = new ArrayList<>();
         List<String> sinRespuesta = new ArrayList<>();
         String pulsoId;
+        int intentos;
         synchronized (this) {
             if (enCurso == null) {
                 return;
             }
             pulsoId = enCurso.pulso.id();
             long ahora = reloj.millis();
-            long plazoMs = properties.getReintentoSeg() * 1000L;
+            ParametrosVigentes vigentes = parametros.vigentes();   // una sola vez: todas las zonas ven los mismos plazos
+            long primerPlazoMs = (long) (vigentes.numero(SensingParameters.RESPONSE_WAIT) * 1000L);
+            long plazoReintentoMs = (long) (vigentes.numero(SensingParameters.RETRY_WAIT) * 60_000L);
+            intentos = 1 + (int) vigentes.numero(SensingParameters.RETRIES);
             var it = enCurso.pendientes.entrySet().iterator();
             while (it.hasNext()) {
                 var e = it.next();
                 ZonaPendiente zp = e.getValue();
+                // El primer pedido espera la respuesta; cada reintento, el plazo entre reintentos.
+                long plazoMs = zp.pedidos == 1 ? primerPlazoMs : plazoReintentoMs;
                 if (ahora - zp.ultimoPedidoMs < plazoMs) {
                     continue;
                 }
-                if (zp.pedidos < properties.getIntentos()) {
+                if (zp.pedidos < intentos) {
                     zp.pedidos++;
                     zp.ultimoPedidoMs = ahora;
                     reenviar.add(e.getKey());
@@ -221,8 +246,7 @@ public class PulsoSensadoService {
             pedir(zona);
         }
         for (String zona : sinRespuesta) {
-            log.warn("Pulso {}: la zona {} no respondió a ninguno de los {} pedidos.",
-                    pulsoId, zona, properties.getIntentos());
+            log.warn("Pulso {}: la zona {} no respondió a ninguno de los {} pedidos.", pulsoId, zona, intentos);
             try {
                 escalamiento.registrarSinRespuesta(zona);
             } catch (RuntimeException ex) {

@@ -17,10 +17,10 @@ Rama: `feat/reglas-v2-align`.
 - [x] 1.6 Actualizar `servicio-inferencia/README.md` y `env.example` si citan 85 %.
 
 ## 2. Parámetros de sensado en el catálogo
-- [ ] 2.1 Test: cuatro claves nuevas, fábrica y rango de la tabla del diseño.
-- [ ] 2.2 `ParametrosSensado` (familia nueva `SENSADO`); `PulsoProperties` toma el valor inicial del catálogo.
-- [ ] 2.3 Test: cambiar `sensado.reintentos` cambia los pedidos del pulso (`PulsoSensadoService`).
-- [ ] 2.4 Frontend: la familia aparece en Motor de reglas → Parámetros.
+- [x] 2.1 Test: cuatro claves nuevas, fábrica y rango de la tabla del diseño.
+- [x] 2.2 `ParametrosSensado` (familia nueva `SENSADO`); `PulsoProperties` toma el valor inicial del catálogo.
+- [x] 2.3 Test: cambiar `sensado.reintentos` cambia los pedidos del pulso (`PulsoSensadoService`).
+- [x] 2.4 Frontend: la familia aparece en Motor de reglas → Parámetros.
 
 ## 3. Estado seguro (S-02)
 - [ ] 3.1 Test: el 3.er `registrarSinRespuesta` pide el estado seguro una vez; el 4.º no.

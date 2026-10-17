@@ -591,6 +591,86 @@
       ],
       "updatedBy": null,
       "updatedTs": null
+    },
+    {
+      "clave": "sensado.espera-respuesta",
+      "etiqueta": "Espera de la respuesta del nodo",
+      "descripcion": "Segundos que se espera la lectura después de pedirla, antes del primer reintento.",
+      "familia": "SENSADO",
+      "tipo": "ENTERO",
+      "unidad": "s",
+      "valor": "60",
+      "fabrica": "60",
+      "min": 10.0,
+      "max": 300.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §11 Telemetría; S-02",
+      "modificado": false,
+      "usadoPor": [
+        "PulsoSensado"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "sensado.reintentos",
+      "etiqueta": "Reintentos de la lectura",
+      "descripcion": "Veces que se vuelve a pedir la lectura a un nodo que no respondió, dentro del mismo pulso. Agotados, el pulso cuenta como sin respuesta.",
+      "familia": "SENSADO",
+      "tipo": "ENTERO",
+      "unidad": "reintentos",
+      "valor": "2",
+      "fabrica": "2",
+      "min": 1.0,
+      "max": 5.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §11 Telemetría; S-02",
+      "modificado": false,
+      "usadoPor": [
+        "PulsoSensado"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "sensado.espera-reintento",
+      "etiqueta": "Espera entre reintentos",
+      "descripcion": "Minutos que se espera entre un reintento de lectura y el siguiente.",
+      "familia": "SENSADO",
+      "tipo": "ENTERO",
+      "unidad": "min",
+      "valor": "1",
+      "fabrica": "1",
+      "min": 1.0,
+      "max": 10.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §11 Telemetría; S-02",
+      "modificado": false,
+      "usadoPor": [
+        "PulsoSensado"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "sensado.reintento-fuera-servicio",
+      "etiqueta": "Reintento con el nodo fuera de servicio",
+      "descripcion": "Cada cuántos minutos se vuelve a pedir la lectura a un nodo que ya quedó fuera de servicio.",
+      "familia": "SENSADO",
+      "tipo": "ENTERO",
+      "unidad": "min",
+      "valor": "15",
+      "fabrica": "15",
+      "min": 5.0,
+      "max": 60.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §11 Telemetría; S-02",
+      "modificado": false,
+      "usadoPor": [
+        "EscalamientoNodo"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
     }
   ]
 }

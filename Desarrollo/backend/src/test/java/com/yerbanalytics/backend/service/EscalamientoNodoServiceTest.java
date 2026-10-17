@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.parametros.SensingParameters;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,13 @@ class EscalamientoNodoServiceTest {
         verify(historial, times(veces)).registrarAlerta(eq("MZ-3"), eq("Macro-zona 3"),
                 eq(EscalamientoNodoService.REGLA), det.capture(), anyLong());
         return det.getAllValues().stream().map(DetalleAlerta::nivel).toList();
+    }
+
+    @Test
+    @DisplayName("declara el parámetro del reintento con el nodo fuera de servicio, para figurar como su consumidor")
+    void declaraElReintentoConElNodoCaido() {
+        assertThat(service.name()).isEqualTo("EscalamientoNodo");
+        assertThat(service.parametros()).containsExactly(SensingParameters.OFFLINE_RETRY);
     }
 
     @Test

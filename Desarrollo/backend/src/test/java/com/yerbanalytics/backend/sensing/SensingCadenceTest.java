@@ -40,6 +40,14 @@ class SensingCadenceTest {
     }
 
     @Test
+    @DisplayName("la ventana de respuesta: la espera inicial más una espera por cada reintento")
+    void ventanaDeRespuesta() {
+        assertThat(SensingCadence.responseWindowSeconds(60, 2, 1)).isEqualTo(180.0);
+        assertThat(SensingCadence.responseWindowSeconds(10, 1, 1)).isEqualTo(70.0);
+        assertThat(SensingCadence.responseWindowSeconds(300, 5, 10)).isEqualTo(3_300.0);
+    }
+
+    @Test
     void elPisoDominaSiEsMayor() {
         assertThat(SensingCadence.staleThresholdSeconds(20_000, 60, 180)).isEqualTo(20_000.0);
     }

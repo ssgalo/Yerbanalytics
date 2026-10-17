@@ -170,12 +170,15 @@ function leerReglasDelBackend(): Record<string, string> {
 }
 
 /**
- * Consumidores de parámetros que no son reglas (el despacho de riego y la purga del historial de lecturas): también
+ * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado y el
+ * escalamiento del nodo): también
  * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   DespachoRiego: resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java'),
   ReadingPurge: resolve(DIR_ENGINE, '..', 'readings', 'ReadingPurge.java'),
+  PulsoSensado: resolve(DIR_ENGINE, '..', 'sensing', 'PulsoSensadoService.java'),
+  EscalamientoNodo: resolve(DIR_ENGINE, '..', 'service', 'EscalamientoNodoService.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {

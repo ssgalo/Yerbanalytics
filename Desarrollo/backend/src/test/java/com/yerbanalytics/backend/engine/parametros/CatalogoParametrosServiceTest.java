@@ -99,7 +99,7 @@ class CatalogoParametrosServiceTest {
         lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
 
         service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
-                operativaRepository, new com.yerbanalytics.backend.config.PulsoProperties());
+                operativaRepository);
     }
 
     private void override(String clave, String valor) {
@@ -486,6 +486,17 @@ class CatalogoParametrosServiceTest {
         pullInterval(120);
 
         assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
+    }
+
+    @Test
+    void vigentes_laVentanaDeRespuestaSaleDeLosParametrosDeSensado() {
+        pullInterval(240);
+        override("sensado.espera-respuesta", "120");
+        override("sensado.reintentos", "3");
+        override("sensado.espera-reintento", "2");
+
+        // 240 min + 120 s + 3 reintentos × 2 min (120 s cada uno)
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(240 * 60 + 120 + 3 * 120);
     }
 
     @Test

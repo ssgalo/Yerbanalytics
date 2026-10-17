@@ -39,7 +39,8 @@ public class CatalogoParametros {
                 ParametrosInsumo.values(),
                 ParametrosMediasombra.values(),
                 ParametrosDiagnostico.values(),
-                ReadingParameters.values()}) {
+                ReadingParameters.values(),
+                SensingParameters.values()}) {
             todas.addAll(List.of(familia));
         }
         return todas;

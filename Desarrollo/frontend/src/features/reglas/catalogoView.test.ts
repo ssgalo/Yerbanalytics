@@ -173,11 +173,19 @@ describe('agruparPorConsumidor', () => {
   it('agrupa los parámetros que lee algo que no es una regla, cada uno bajo su consumidor', () => {
     const grupos = agruparPorConsumidor(catalogoDeFabrica());
 
-    expect(grupos).toHaveLength(2);
+    expect(grupos).toHaveLength(4);
     expect(grupos[0]).toMatchObject({ id: 'DespachoRiego', titulo: 'Ejecución del riego' });
     expect(grupos[0].parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
     expect(grupos[1]).toMatchObject({ id: 'ReadingPurge', titulo: 'Historial de lecturas' });
     expect(grupos[1].parametros.map((p) => p.clave)).toEqual(['readings.retention-days']);
+    expect(grupos[2]).toMatchObject({ id: 'PulsoSensado', titulo: 'Lectura de los nodos' });
+    expect(grupos[2].parametros.map((p) => p.clave)).toEqual([
+      'sensado.espera-respuesta',
+      'sensado.reintentos',
+      'sensado.espera-reintento',
+    ]);
+    expect(grupos[3]).toMatchObject({ id: 'EscalamientoNodo', titulo: 'Nodo sin respuesta' });
+    expect(grupos[3].parametros.map((p) => p.clave)).toEqual(['sensado.reintento-fuera-servicio']);
   });
 
   it('los que el despacho revalida pero ya son de una regla se editan bajo la regla: no se repiten en el grupo', () => {
@@ -191,7 +199,10 @@ describe('agruparPorConsumidor', () => {
   it('un parámetro que usan sólo reglas no genera grupo', () => {
     const c = catalogoDeFabrica();
     c.parametros = c.parametros.filter(
-      (p) => p.clave !== 'riego.sectores-simultaneos' && p.clave !== 'readings.retention-days',
+      (p) =>
+        p.clave !== 'riego.sectores-simultaneos' &&
+        p.clave !== 'readings.retention-days' &&
+        !p.clave.startsWith('sensado.'),
     );
 
     expect(agruparPorConsumidor(c)).toEqual([]);

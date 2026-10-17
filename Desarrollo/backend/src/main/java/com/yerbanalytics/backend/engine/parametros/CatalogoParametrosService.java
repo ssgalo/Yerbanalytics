@@ -1,6 +1,5 @@
 package com.yerbanalytics.backend.engine.parametros;
 
-import com.yerbanalytics.backend.config.PulsoProperties;
 import com.yerbanalytics.backend.dto.CatalogoReglasDto;
 import com.yerbanalytics.backend.dto.ParametroDto;
 import com.yerbanalytics.backend.dto.ReglaCatalogoDto;
@@ -59,7 +58,6 @@ public class CatalogoParametrosService {
     private final HistorialService historialService;
     private final TransactionTemplate transaccion;
     private final ConfiguracionOperativaRepository operativaRepository;
-    private final PulsoProperties pulso;
 
     /** Serializa los guardados: cada uno valida contra la base, así que no pueden solaparse. */
     private final Object escritura = new Object();
@@ -78,8 +76,7 @@ public class CatalogoParametrosService {
                                      ParametroReglaRepository repository,
                                      HistorialService historialService,
                                      PlatformTransactionManager transactionManager,
-                                     ConfiguracionOperativaRepository operativaRepository,
-                                     PulsoProperties pulso) {
+                                     ConfiguracionOperativaRepository operativaRepository) {
         this.transaccion = new TransactionTemplate(transactionManager);
         // Transacción propia: el lock de guardar tiene que soltarse DESPUÉS del commit.
         this.transaccion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -87,7 +84,6 @@ public class CatalogoParametrosService {
         this.repository = repository;
         this.historialService = historialService;
         this.operativaRepository = operativaRepository;
-        this.pulso = pulso;
     }
 
     // ------------------------------------------------------------------
@@ -174,16 +170,21 @@ public class CatalogoParametrosService {
 
     /**
      * Overlays the effective stale threshold on the raw values: the stored value is only the floor,
-     * the real threshold also depends on the pulse interval and its response window (see {@link SensingCadence}).
+     * the real threshold also depends on the pulse interval and its response window (see {@link SensingCadence}),
+     * which comes from the {@code sensado.*} parameters in force.
      */
     private ParametrosVigentes conUmbralEfectivo(ParametrosVigentes crudos) {
         Integer raw = operativaRepository.findById(OPERATIVA_ID)
                 .map(ConfiguracionOperativaEntity::getIntervaloSensadoMinutos).orElse(null);
         double piso = crudos.numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
+        double ventana = SensingCadence.responseWindowSeconds(
+                crudos.numero(SensingParameters.RESPONSE_WAIT),
+                (int) crudos.numero(SensingParameters.RETRIES),
+                crudos.numero(SensingParameters.RETRY_WAIT));
         Map<String, ValorParametro> efectivos = new HashMap<>(crudos.valores());
         efectivos.put(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(),
                 new ValorParametro.Numero(SensingCadence.staleThresholdSeconds(
-                        piso, SensingCadence.intervalMinutes(raw), pulso.ventanaSeg())));
+                        piso, SensingCadence.intervalMinutes(raw), ventana)));
         return ParametrosVigentes.de(efectivos);
     }
 

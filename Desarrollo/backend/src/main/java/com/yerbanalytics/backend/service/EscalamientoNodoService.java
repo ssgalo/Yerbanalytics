@@ -2,6 +2,9 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.SensingParameters;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
@@ -10,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.List;
 
 /**
  * Escalamiento por pulsos consecutivos sin respuesta del nodo testigo (design D4). La cuenta se persiste en la
@@ -20,7 +24,7 @@ import java.time.Clock;
  * estaba fuera de servicio, deja una alerta {@code INFO}.
  */
 @Service
-public class EscalamientoNodoService {
+public class EscalamientoNodoService implements ConsumidorParametros {
 
     private static final Logger log = LoggerFactory.getLogger(EscalamientoNodoService.class);
 
@@ -39,6 +43,16 @@ public class EscalamientoNodoService {
         this.zonaRepository = zonaRepository;
         this.historialService = historialService;
         this.reloj = relojVivero;
+    }
+
+    @Override
+    public String name() {
+        return "EscalamientoNodo";
+    }
+
+    @Override
+    public List<DefinicionParametro> parametros() {
+        return List.of(SensingParameters.OFFLINE_RETRY);
     }
 
     /** {@code true} si la cuenta de la zona la pone fuera de servicio. */
