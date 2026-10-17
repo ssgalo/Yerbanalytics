@@ -20,15 +20,15 @@
 - [x] 2.7 Migración: entidad nueva ⇒ `ddl-auto=update` alcanza; sin script manual.
 
 ## 3. S-04
-- [ ] 3.1 Test: `HardwareIncompletoRule` por rama (RIEGO, INSUMO, MEDIASOMBRA) con y sin actuador.
-- [ ] 3.2 Cargar el hardware en el `RuleContext` sin consultar la base por regla.
-- [ ] 3.3 Implementar la regla (`@Component`, prioridad 0.5 ⇒ renumerar si `priority()` es entero), flag de activación.
-- [ ] 3.4 Inspector (`/reglas`): la regla aparece en el grafo (`GET /api/rules/schema`).
+- [x] 3.1 Test: `IncompleteHardwareRule` por rama (RIEGO, INSUMO, MEDIASOMBRA) con y sin actuador.
+- [x] 3.2 Cargar el hardware en el `RuleContext` sin consultar la base por regla. *`HardwareService.coverageOf` (2 consultas por zona) → `RuleContext.hardware`.*
+- [x] 3.3 Implementar la regla (`@Component`, prioridad 0.5 ⇒ renumerar si `priority()` es entero), flag de activación. *`priority()` es entero: la regla es la 1 y las demás subieron una. Sumó `ABORT_MEDIASOMBRA` (ver design).*
+- [x] 3.4 Inspector (`/reglas`): la regla aparece en el grafo (`GET /api/rules/schema`). *(Backend hecho; el frontend se sincroniza en el bloque 4.)*
 
 ## 4. Cierre
 - [ ] 4.1 README del backend, índice, `./mvnw test`, `npm test && npm run lint`.
 
 ## 5. Control desde el simulador (requiere `add-control-demo-reglas`)
-- [ ] 5.1 `ReadingValidationGuard` y `HardwareIncompletoRule` como `DemoControllable` (apagado + bypass `retries` / `hardware`); tests.
+- [x] 5.1 `ReadingValidationGuard` y `IncompleteHardwareRule` como `DemoControllable` (apagado + bypass `retries` / `hardware`); tests.
 - [ ] 5.2 Comprobar que la emisión del simulador permite publicar valores fuera de rango (no se verificó si el formulario recorta); ajustar si lo hace.
 - [ ] 5.3 Escenarios `INVALID_READING` y `INCOMPLETE_HARDWARE` con sus tests.

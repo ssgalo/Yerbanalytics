@@ -25,7 +25,7 @@ import java.util.List;
  * {@code WARNING} por macro-zona. Sin lectura de humedad no bloquea (la frescura la cuida
  * {@code StaleSensorRule}).
  *
- * <p><b>Prioridad 2, antes de la guarda de ciclo:</b> recién regado el sector queda "ya regado en este ciclo" y la
+ * <p><b>Prioridad 3, antes de la guarda de ciclo:</b> recién regado el sector queda "ya regado en este ciclo" y la
  * humedad sube; si la guarda cortara primero, la saturación nunca llegaría a evaluarse (ni su alerta ni la
  * cancelación de la cola).
  *
@@ -35,7 +35,7 @@ import java.util.List;
 @Component
 public class SustratoSaturadoRule implements Rule {
 
-    private static final int PRIORITY = 2;
+    private static final int PRIORITY = 3;
     private static final String NAME = "SustratoSaturadoRule";
     static final String TEXTO_ALERTA = "Sustrato saturado, riesgo de asfixia radicular y hongos";
 

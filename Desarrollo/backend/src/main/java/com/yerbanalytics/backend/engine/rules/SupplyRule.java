@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Regla de dosificación de insumo por diagnóstico IA (HU-07).
  *
- * <p><b>Prioridad:</b> 11 (ejecutora, corre justo después de {@link RiegoRule}).
+ * <p><b>Prioridad:</b> 12 (ejecutora, corre justo después de {@link RiegoRule}).
  *
  * <p><b>Condición:</b> el sector está en estado {@code "critical"} Y la confianza del
  * diagnóstico alcanza {@code diagnostico.confianza-minima} (HU-07 CA-01/02).
@@ -33,7 +33,7 @@ import java.util.List;
 @Component
 public class SupplyRule implements Rule {
 
-    private static final int PRIORITY = 11;
+    private static final int PRIORITY = 12;
     private static final String NAME = "SupplyRule";
 
     @Override

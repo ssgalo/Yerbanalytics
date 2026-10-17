@@ -93,3 +93,30 @@ estaban en inglés (`ReadingValidationGuard`, bypass `retries` y `hardware`, esc
   `@Lazy` de `CatalogoParametrosService` **y de `ConfiguracionService`** (éste depende del catálogo). Sin lo segundo el
   contexto no arranca; `ReadingValidationGuardWiringTest` lo cubre con el cableado real.
 - **Migración.** `invalid_reading` es una entidad nueva: `ddl-auto=update` la crea. Sin script manual.
+
+### S-04
+
+- **Cobertura, no consultas.** `HardwareCoverage(valve, pump, zoneNode, zoneShade)` es lo que el sector y su zona tienen
+  *registrado*. `HardwareService.coverageOf(zona, sectores)` la arma con dos consultas por zona (el nodo testigo y los
+  actuadores de todos sus sectores) y `NurseryService` la pasa al `RuleContext` junto al contexto de riego. Un sector que
+  no figura en el resultado no tiene ningún dispositivo: se lee como `HardwareCoverage.NONE`. Un contexto que no la arma
+  (los tests de reglas sueltas) se lee como `COMPLETE`, así ninguna otra regla cambia.
+- **Mapeado, no sano.** Un dispositivo con `falla` sigue contando como mapeado: reportar fallas es de S-05.
+- **El riego exige el nodo testigo.** Además de la electroválvula del sector, la regla pide el nodo testigo de la zona:
+  sin él no hay humedad con que decidir. Es lo que la spec llama "electroválvula del sector + nodo testigo de la MZ".
+- **Una regla, tres ramas.** `IncompleteHardwareRule` es de la rama `GLOBAL` (prioridad 1) pero puede cortar `RIEGO`,
+  `INSUMO` y `MEDIASOMBRA` por separado; nunca emite `ABORT_ALL`. Para poder cortar la tercera se sumó
+  `ActionType.ABORT_MEDIASOMBRA` (bloqueante) y el orquestador omite, con `OMITIDA_RAMA_BLOQUEADA`, las reglas de esa
+  rama. Antes sólo sabía cortar riego, insumo y todo.
+- **Prioridad entera.** `priority()` es `int`, no admite el 0,5 de la spec: la regla es la 1 y las que eran 1…20 pasaron
+  a 2…21 (`ReglasArquitecturaTest` exige prioridades únicas y el orden bloqueo → hardware → frescura). El campo
+  `prioridad` del catálogo y de las trazas sale de ahí; el frontend (fixture del catálogo) se actualizó con el mismo
+  corrimiento.
+- **Sin cancelación del riego encolado.** El `ABORT_RIEGO` de hardware no lleva `CancelaRiego`: una solicitud ya decidida
+  vence sola a los dos ciclos de lectura y el despacho la revalida. Quitar un dispositivo no es una emergencia de minutos
+  (a diferencia de un bloqueo manual).
+- **Consecuencia operativa que hay que conocer.** La regla hace cumplir HU-18 CA-04 al pie de la letra: **un sector sin
+  su electroválvula registrada deja de regarse de forma autónoma**. El `data.sql` de desarrollo sólo equipa unos pocos
+  sectores con dispositivos, y regenerar la topología los borra todos (`TopologiaService` vacía la tabla). En un vivero
+  real eso es lo correcto (primero se mapea el hardware); en desarrollo o demo hay que registrar el hardware o usar el
+  bypass `hardware` del simulador para ver actuar al motor.

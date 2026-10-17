@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ContextoRiego;
+import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
@@ -622,8 +623,11 @@ public class NurseryService {
         // por regla): último riego, último riego crítico y última aplicación de cada sector.
         Instant ahora = reloj.instant();
         Map<String, ContextoRiego> riegoPorSector = Map.of();
+        Map<String, HardwareCoverage> hardwarePorSector = Map.of();
         WeatherForecast forecast = null;
         if (ejecutaMotor) {
+            // S-04: qué actuadores tiene mapeado cada sector, también UNA vez por zona (dos consultas, no una por regla).
+            hardwarePorSector = hardwareService.coverageOf(zoneId, sectors.stream().map(SectorEntity::getId).toList());
             Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
             riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
             // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker
@@ -660,7 +664,7 @@ public class NurseryService {
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
             RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()),
-                    check.invalid());
+                    check.invalid(), hardwarePorSector.getOrDefault(s.getId(), HardwareCoverage.NONE));
             // La traza queda en memoria (última por sector y origen); no toca la base.
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
@@ -686,11 +690,12 @@ public class NurseryService {
          *   <li>{@code forecast} — el de la zona, pedido UNA vez a {@link WeatherService} (null en modo degradado).</li>
      *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
      *   <li>{@code invalidMetrics} — las métricas descartadas en esta lectura por estar fuera de rango (S-03).</li>
+     *   <li>{@code hardware} — los actuadores mapeados del sector y su zona; un sector que no figura no tiene ninguno (S-04).</li>
      * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus,
                                          Instant ahora, WeatherForecast forecast, ContextoRiego riego,
-                                         Set<String> invalidMetrics) {
+                                         Set<String> invalidMetrics, HardwareCoverage hardware) {
         ZonaEntity zona = s.getZona();
 
         boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
@@ -708,7 +713,8 @@ public class NurseryService {
                 bloqueoActivo,
                 riego != null ? riego : ContextoRiego.vacio(),
                 RuleOverrides.NONE,
-                invalidMetrics
+                invalidMetrics,
+                hardware
         );
     }
 

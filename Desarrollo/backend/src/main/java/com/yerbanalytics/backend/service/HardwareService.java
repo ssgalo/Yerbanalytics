@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.dto.Dispositivo;
 import com.yerbanalytics.backend.dto.HardwareData;
 import com.yerbanalytics.backend.dto.SectorIncompleto;
+import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.model.DispositivoEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
@@ -16,11 +17,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -111,6 +116,33 @@ public class HardwareService {
         List<SectorIncompleto> incompletos = sectoresIncompletos(entities, zonaNames);
 
         return new HardwareData(dtos, dtos.size(), operativos, bateriaBaja, fueraDeServicio, averiados, incompletos);
+    }
+
+    /**
+     * Qué tiene mapeado cada sector de la macro-zona (S-04), en DOS consultas: el nodo testigo de la zona y los
+     * actuadores de todos sus sectores. Cada sector de {@code sectorIds} figura en el resultado, también los que no
+     * tienen ningún dispositivo. Lo arma el motor una vez por zona y evaluación; las reglas sólo lo leen.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, HardwareCoverage> coverageOf(String zonaId, Collection<String> sectorIds) {
+        if (sectorIds.isEmpty()) {
+            return Map.of();
+        }
+        boolean zoneNode = !dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO).isEmpty();
+        Map<String, Set<String>> typesBySector = new HashMap<>();
+        boolean zoneShade = false;
+        for (DispositivoEntity d : dispositivoRepository.findBySectorIdInAndTipoIn(
+                sectorIds, List.of(ELECTROVALVULA, BOMBA, MEDIASOMBRA))) {
+            typesBySector.computeIfAbsent(d.getSectorId(), k -> new HashSet<>()).add(d.getTipo());
+            zoneShade |= MEDIASOMBRA.equals(d.getTipo());
+        }
+        Map<String, HardwareCoverage> out = new LinkedHashMap<>();
+        for (String sectorId : sectorIds) {
+            Set<String> types = typesBySector.getOrDefault(sectorId, Set.of());
+            out.put(sectorId, new HardwareCoverage(types.contains(ELECTROVALVULA), types.contains(BOMBA),
+                    zoneNode, zoneShade));
+        }
+        return out;
     }
 
     private Dispositivo toDto(DispositivoEntity e, Map<String, Integer> pulsosSinRespuesta) {
