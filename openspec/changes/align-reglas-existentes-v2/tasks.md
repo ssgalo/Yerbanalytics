@@ -33,9 +33,9 @@ Rama: `feat/reglas-v2-align`.
 - [x] 4.2 Implementar con el reloj inyectado.
 
 ## 5. Guardas
-- [ ] 5.1 Test: con lectura vencida, `StaleSensorRule` aborta el riego y la mediasombra se evalúa.
-- [ ] 5.2 Test de D-3 (dos lecturas seguidas) y resolver según el resultado.
-- [ ] 5.3 Si D-2 = (a): anotar la desviación en la cabecera de `DeficitCriticoRule` y en el README.
+- [x] 5.1 Test: con lectura vencida, `StaleSensorRule` aborta el riego y la mediasombra se evalúa.
+- [x] 5.2 Test de D-3 (dos lecturas seguidas) y resolver según el resultado.
+- [x] 5.3 Si D-2 = (a): anotar la desviación en la cabecera de `DeficitCriticoRule` y en el README.
 
 ## 6. Cierre
 - [ ] 6.1 Textos con "85 %" o reglas v1 en trazas y comentarios.

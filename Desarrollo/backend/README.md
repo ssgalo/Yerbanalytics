@@ -440,7 +440,9 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
 - Un sector recibe a lo sumo **un riego común por ciclo de lectura** (franjas de
   `intervaloSensadoMinutos`, acotado a 60-360 min, ancladas a las 02:00).
 - El déficit crítico (R-02) riega a cualquier hora con el volumen máximo, con un tope de 1 riego cada
-  12 h por sector.
+  12 h por sector. **Desviación deliberada de `reglas_v2`:** la v2 aplica ese tope sólo cuando S-06 bloqueó
+  la macro-zona; como S-06 todavía no existe, se aplica siempre para que un sensor roto no dispare R-02 en
+  cada ciclo. Se reevalúa en `add-efectividad-y-s06`.
 - Una ronda encolada **se completa** aunque la humedad se recupere: sólo la retira una cancelación de
   seguridad (saturación, bloqueo manual; ventana cerrada o pausa por aplicación, para el riego común) o
   la revalidación del despacho (lluvia pronosticada después de decidir, ya regó en el ciclo). El sensor
