@@ -2,6 +2,8 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.overrides.DemoControllable;
+import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.SensingParameters;
@@ -17,7 +19,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +41,7 @@ class EscalamientoNodoServiceTest {
     private ZonaRepository zonas;
     private HistorialService historial;
     private ZoneSafeState safeState;
+    private final RuleOverridesStore overrides = new RuleOverridesStore();
     private EscalamientoNodoService service;
     private ZonaEntity mz3;
 
@@ -55,7 +60,7 @@ class EscalamientoNodoServiceTest {
 
     private EscalamientoNodoService nuevoServicio(Clock reloj) {
         return new EscalamientoNodoService(zonas, historial, safeState, mock(ComandoZonaPublisher.class),
-                mock(CatalogoParametrosService.class), new RuleOverridesStore(), reloj);
+                mock(CatalogoParametrosService.class), overrides, reloj);
     }
 
     private List<NivelAlerta> nivelesRegistrados(int veces) {
@@ -63,6 +68,46 @@ class EscalamientoNodoServiceTest {
         verify(historial, times(veces)).registrarAlerta(eq("MZ-3"), eq("Macro-zona 3"),
                 eq(EscalamientoNodoService.REGLA), det.capture(), anyLong());
         return det.getAllValues().stream().map(DetalleAlerta::nivel).toList();
+    }
+
+    @Test
+    @DisplayName("es controlable desde el simulador: bypass safe-state y cooldown retry-offline")
+    void isDemoControllable() {
+        assertThat(service).isInstanceOf(DemoControllable.class);
+        assertThat(service.label()).isNotBlank().isNotEqualTo(service.name());
+        assertThat(service.bypassKeys()).containsExactly("safe-state");
+        assertThat(service.cooldownKeys()).containsExactly("retry-offline");
+    }
+
+    @Test
+    @DisplayName("apagado no cuenta, no alerta y no ordena nada")
+    void turnedOffDoesNothing() {
+        overrides.put("EscalamientoNodo", new RuleOverride(false, Map.of(), Set.of()));
+
+        service.registrarSinRespuesta("MZ-3");
+        service.registrarSinRespuesta("MZ-3");
+        service.registrarSinRespuesta("MZ-3");
+
+        assertThat(mz3.getPulsosSinRespuesta()).isNull();
+        verify(historial, never()).registrarAlerta(anyString(), any(), anyString(), any(), anyLong());
+        verify(safeState, never()).order(anyString());
+    }
+
+    @Test
+    @DisplayName("bypass safe-state: el nodo cae y alerta, pero no se ordena el estado seguro")
+    void safeStateBypassed() {
+        overrides.put("EscalamientoNodo", new RuleOverride(true, Map.of(), Set.of("safe-state")));
+        mz3.setPulsosSinRespuesta(2);
+
+        service.registrarSinRespuesta("MZ-3");
+
+        assertThat(EscalamientoNodoService.fueraDeServicio(mz3)).isTrue();
+        verify(safeState, never()).order(anyString());
+        ArgumentCaptor<DetalleAlerta> det = ArgumentCaptor.forClass(DetalleAlerta.class);
+        verify(historial).registrarAlerta(eq("MZ-3"), eq("Macro-zona 3"), eq(EscalamientoNodoService.REGLA),
+                det.capture(), anyLong());
+        assertThat(det.getValue().nivel()).isEqualTo(NivelAlerta.CRITICAL);
+        assertThat(det.getValue().texto()).contains("No se ordenó el estado seguro");
     }
 
     @Test

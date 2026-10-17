@@ -111,6 +111,20 @@ export async function setAutoEmission(active: boolean): Promise<void> {
   await check(res, 'cambiar la emisión automática');
 }
 
+export async function getSilencedZones(): Promise<string[]> {
+  return json(await fetch('/api/silenced-zones'), 'consultar las zonas silenciadas');
+}
+
+/** Makes a zone stop (or resume) answering LEER_AHORA, as a node that went silent. */
+export async function setZoneSilenced(zonaId: string, silenced: boolean): Promise<string[]> {
+  const res = await fetch(`/api/silenced-zones/${encodeURIComponent(zonaId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ silenced }),
+  });
+  return json(res, 'cambiar si la zona responde la lectura');
+}
+
 /* ----------------------------------------------------------------
    The platform's public API (through the proxy)
    ---------------------------------------------------------------- */

@@ -8,7 +8,10 @@
      2. Injects simulated weather when needed (R-03 / ShadingRule).
      3. Publishes the calculated MQTT telemetry for the target sensor.
      4. Registers the prior AI diagnosis (SupplyRule only acts on a NEW one).
-     5. Triggers a sensing pulse with the rule engine.
+     5. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
+
+   The "node without answer" scenario is the exception: it silences the target zone instead of
+   publishing telemetry, so the pulses find no answer.
 
    No backend modifications: everything goes through existing public endpoints.
    ============================================================ */
@@ -17,6 +20,7 @@ import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
 import type { DemoRule, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
 import { buildThresholds, calculateConditions } from '../ruleConditions';
+import { runPulses } from '../pulseChain';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
 interface Props {
@@ -36,6 +40,20 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const [execState, setExecState] = useState<ExecutionState>('idle');
   const [execLog, setExecLog] = useState<string[]>([]);
   const [execError, setExecError] = useState<string | null>(null);
+  const [silencedZones, setSilencedZones] = useState<string[]>([]);
+
+  // Zones the simulator keeps mute: they stay that way until released, so they are shown after the run.
+  useEffect(() => {
+    api.getSilencedZones().then(setSilencedZones).catch(() => setSilencedZones([]));
+  }, []);
+
+  const releaseZone = async (zonaId: string) => {
+    try {
+      setSilencedZones(await api.setZoneSilenced(zonaId, false));
+    } catch (e) {
+      setExecError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   // Preselect first sensor.
   useEffect(() => {
@@ -114,13 +132,19 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         setExecLog([...log]);
       }
 
-      // Step 3: publish telemetry to the broker.
-      await api.sendTelemetry({
-        serial: targetSensor.serial,
-        zonaId: targetSensor.zonaId,
-        metrics: conditions.telemetria,
-      });
-      log.push(`✓ Telemetría publicada para ${targetSensor.zonaId} (humSus: ${conditions.telemetria.humSus}%)`);
+      // Step 3: publish telemetry to the broker. A scenario that silences the zone publishes none: the
+      // point is that the node does not answer.
+      if (conditions.silenceZone) {
+        setSilencedZones(await api.setZoneSilenced(targetSensor.zonaId, true));
+        log.push(`✓ ${targetSensor.zonaId} deja de responder LEER_AHORA`);
+      } else {
+        await api.sendTelemetry({
+          serial: targetSensor.serial,
+          zonaId: targetSensor.zonaId,
+          metrics: conditions.telemetria,
+        });
+        log.push(`✓ Telemetría publicada para ${targetSensor.zonaId} (humSus: ${conditions.telemetria.humSus}%)`);
+      }
       setExecLog([...log]);
 
       // Step 4: register the prior diagnosis. It must exist before the pulse: that is the only
@@ -137,10 +161,20 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         setExecLog([...log]);
       }
 
-      // Step 5: trigger sensing pulse with motor.
-      await api.triggerSensingPulse(true);
-      log.push('✓ Pulso de sensado con motor disparado');
-      setExecLog([...log]);
+      // Step 5: trigger the sensing pulse(s) with motor. A chain waits for each pulse to end before asking
+      // for the next, because the backend runs one at a time.
+      await runPulses(conditions.pulses, {
+        trigger: () => api.triggerSensingPulse(true),
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        onPulse: (n) => {
+          log.push(
+            conditions.pulses === 1
+              ? '✓ Pulso de sensado con motor disparado'
+              : `✓ Pulso ${n} de ${conditions.pulses} con motor disparado (esperando que termine para pedir el siguiente)`,
+          );
+          setExecLog([...log]);
+        },
+      });
 
       setExecState('ok');
     } catch (e) {
@@ -232,6 +266,20 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
               ))}
             </div>
           </details>
+        )}
+
+        {silencedZones.length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <p className="sectionTitle" style={{ marginBottom: 6 }}>Zonas sin responder</p>
+            {silencedZones.map((zonaId) => (
+              <div key={zonaId} className="row" style={{ alignItems: 'center', gap: 12 }}>
+                <span>{zonaId} no contesta LEER_AHORA</span>
+                <button type="button" onClick={() => void releaseZone(zonaId)}>
+                  Volver a responder
+                </button>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Conflict warnings */}

@@ -179,3 +179,20 @@ api.put('/emission', (req, res) => {
   emission.setActive(active);
   res.json({ active: emission.isActive() });
 });
+
+// ------------------------------------------------------------------
+// Silenced zones: a node that stops answering LEER_AHORA (scenario "Nodo sin respuesta")
+// ------------------------------------------------------------------
+
+api.get('/silenced-zones', (_req, res) => {
+  res.json(emission.silencedZones());
+});
+
+api.put('/silenced-zones/:zonaId', (req, res) => {
+  const { silenced } = (req.body ?? {}) as { silenced?: unknown };
+  if (typeof silenced !== 'boolean') {
+    throw new InvalidInput('Indicá `silenced` como booleano.');
+  }
+  emission.setSilenced(req.params.zonaId, silenced);
+  res.json(emission.silencedZones());
+});

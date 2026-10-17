@@ -2,6 +2,8 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.RuleBranch;
+import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
@@ -32,7 +34,7 @@ import java.util.stream.Collectors;
  * estaba fuera de servicio, deja una alerta {@code INFO}.
  */
 @Service
-public class EscalamientoNodoService implements ConsumidorParametros {
+public class EscalamientoNodoService implements ConsumidorParametros, DemoControllable {
 
     private static final Logger log = LoggerFactory.getLogger(EscalamientoNodoService.class);
 
@@ -41,6 +43,12 @@ public class EscalamientoNodoService implements ConsumidorParametros {
 
     /** Clave de cooldown: minutos entre dos pedidos de lectura a un nodo fuera de servicio (0 pide en cada tick). */
     public static final String COOLDOWN_RETRY_OFFLINE = "retry-offline";
+
+    /** Clave de bypass: no se ordena el estado seguro al declarar el nodo fuera de servicio. */
+    public static final String BYPASS_SAFE_STATE = "safe-state";
+
+    /** No está en la cadena de reglas por sector: sólo ordena el listado del simulador. */
+    private static final int PRIORITY = 90;
 
     /** Nombre de "regla" con que las alertas del pulso quedan en el historial. */
     public static final String REGLA = "PulsoSensado";
@@ -79,6 +87,31 @@ public class EscalamientoNodoService implements ConsumidorParametros {
     }
 
     @Override
+    public String label() {
+        return "📡 Nodo sin respuesta (S-02)";
+    }
+
+    @Override
+    public RuleBranch branch() {
+        return RuleBranch.GLOBAL;
+    }
+
+    @Override
+    public int priority() {
+        return PRIORITY;
+    }
+
+    @Override
+    public Set<String> cooldownKeys() {
+        return Set.of(COOLDOWN_RETRY_OFFLINE);
+    }
+
+    @Override
+    public Set<String> bypassKeys() {
+        return Set.of(BYPASS_SAFE_STATE);
+    }
+
+    @Override
     public List<DefinicionParametro> parametros() {
         return List.of(SensingParameters.OFFLINE_RETRY);
     }
@@ -97,6 +130,10 @@ public class EscalamientoNodoService implements ConsumidorParametros {
     /** Un pulso cerró sin respuesta de {@code zonaId}: suma uno a la cuenta y registra la alerta que corresponda. */
     @Transactional
     public void registrarSinRespuesta(String zonaId) {
+        if (!overrides.isEnabled(NAME)) {
+            log.debug("Zona {}: el escalamiento del nodo está apagado, el pulso sin respuesta no se cuenta.", zonaId);
+            return;
+        }
         ZonaEntity zona = zonaRepository.findById(zonaId).orElse(null);
         if (zona == null) {
             return;   // la topología cambió en medio del pulso
@@ -175,6 +212,9 @@ public class EscalamientoNodoService implements ConsumidorParametros {
      * @return la frase que la alerta CRITICAL agrega sobre lo que se ordenó
      */
     private String ordenarEstadoSeguro(String zonaId) {
+        if (overrides.isBypassed(NAME, BYPASS_SAFE_STATE)) {
+            return "No se ordenó el estado seguro: la guarda está desactivada.";
+        }
         try {
             ZoneSafeState.Result r = safeState.order(zonaId);
             if (r.commands() == 0 && r.failed() == 0) {

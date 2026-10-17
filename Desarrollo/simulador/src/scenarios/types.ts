@@ -46,6 +46,10 @@ export interface ScenarioPatch {
   diagnosis?: DiagnosisPlan;
   /** Preview lines that are not about a metric. */
   notes?: string[];
+  /** The target zone stops answering LEER_AHORA (and no telemetry is published for it). */
+  silenceZone?: boolean;
+  /** Sensing pulses to request, one after the other. Defaults to one. */
+  pulses?: number;
 }
 
 export interface ScenarioConflict {

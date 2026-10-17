@@ -180,6 +180,17 @@ siguiente pulso. Mientras no lo tenga, el panel la muestra en gris ("sin escenar
 
 `ruleConditions.ts` no se toca: no conoce ninguna regla en particular.
 
+**Escenarios que no son telemetría.** Un escenario también puede pedir `silenceZone: true` (la zona destino
+deja de contestar `LEER_AHORA`, sin publicar lectura) y `pulses: N` (pide N pulsos con motor, uno tras otro,
+esperando que termine cada uno: `src/pulseChain.ts`). Es lo que hace **Nodo sin respuesta (S-02)**
+(`NODE_OFFLINE`, accionable sobre `EscalamientoNodo`): silencia la zona y encadena 3 pulsos, los que
+declaran el nodo fuera de servicio y ordenan el estado seguro. Con los plazos de fábrica cada pulso tarda
+~3 min en darse por perdido; para acortarlo, bajar `sensado.espera-respuesta` y `sensado.reintentos` en el
+dashboard. La zona sigue muda hasta pulsar «Volver a responder» (`PUT /api/silenced-zones/{zona}`), y la
+**emisión automática tiene que estar activa**: con la emisión apagada ninguna zona contesta, silenciada o no.
+Los controles de la pieza `EscalamientoNodo` (apagar, bypass `safe-state`, cooldown `retry-offline`) están en
+Telemetría → Control de reglas.
+
 ---
 
 ## Qué endpoints del sistema usa
@@ -215,12 +226,13 @@ simulador/
 │   ├── contract.ts    espejo de contrato.h (claves y unidades del nodo)
 │   ├── mqtt.ts        publicador al broker
 │   ├── store.ts       sensores simulados, persistidos en data/
-│   ├── emission.ts    emisión automática
+│   ├── emission.ts    emisión automática y zonas silenciadas
 │   ├── api.ts         API interna (/api/**)
 │   ├── proxy.ts       proxy al backend (/backend/**)
 │   └── backend-session.ts  sesión de la cuenta de servicio ante el backend
 ├── src/             UI React, con estilos propios
 │   ├── scenarios/     un escenario por regla (cómo se la acciona) y su registro
+│   ├── pulseChain.ts  encadena N pulsos de sensado esperando que termine cada uno
 │   └── ruleConditions.ts  umbrales, conflictos y combinación de los escenarios elegidos
 └── data/            estado local (no se versiona)
 ```

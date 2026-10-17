@@ -43,7 +43,7 @@ Rama: `feat/reglas-v2-align`.
 - [ ] 6.3 Actualizar CLAUDE.md §6 (migraciones manuales) y marcar el cambio en el índice.
 
 ## 7. Control desde el simulador (requiere `add-control-demo-reglas`)
-- [ ] 7.1 `EscalamientoNodoService` implementa `DemoControllable` (apagado, bypass `safe-state`, cooldown `retry-offline`); test de cada uno.
-- [ ] 7.2 Escenario `NODE_OFFLINE` en el simulador (pausa la emisión de una zona y pide 3 pulsos) con su test.
-- [ ] 7.3 Simulador: `DEFAULT_THRESHOLDS['diagnostico.confianza-minima']` = 70 (hoy 85, cableado en `ruleConditions.ts`); ajustar `ruleConditions.test.ts`.
-- [ ] 7.4 Test: las reglas ya existentes (`ManualLockRule`, `StaleSensorRule`, R-01…R-06, `CicloLecturaRiegoRule`) conservan sus claves de cooldown y bypass.
+- [x] 7.1 `EscalamientoNodoService` implementa `DemoControllable` (apagado, bypass `safe-state`, cooldown `retry-offline`); test de cada uno.
+- [x] 7.2 Escenario `NODE_OFFLINE` en el simulador (pausa la emisión de una zona y pide 3 pulsos) con su test.
+- [x] 7.3 Simulador: `DEFAULT_THRESHOLDS['diagnostico.confianza-minima']` = 70 (hoy 85, cableado en `ruleConditions.ts`); ajustar `ruleConditions.test.ts`.
+- [x] 7.4 Test: las reglas ya existentes (`ManualLockRule`, `StaleSensorRule`, R-01…R-06, `CicloLecturaRiegoRule`) conservan sus claves de cooldown y bypass.
