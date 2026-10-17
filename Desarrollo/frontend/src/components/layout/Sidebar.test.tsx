@@ -61,9 +61,16 @@ describe('Sidebar · permisos (7.3)', () => {
   });
 
   it('sin ninguna vista de Configuración el grupo no se muestra', () => {
-    montar('OPERARIO');
+    montar('OPERARIO', ['vivero.ver', 'historial.ver', 'bloqueos.ver']);
 
     expect(screen.queryByRole('button', { name: 'Configuración' })).toBeNull();
+  });
+
+  it('el Operario ve Hardware (para registrar reparaciones) y ninguna otra vista de Configuración', () => {
+    montar('OPERARIO');
+    fireEvent.click(grupoConfiguracion());
+
+    expect(enlacesDe('Gestión')).toEqual(['Historial', 'Hardware']);
   });
 
   it('un grupo sin ítems visibles no se muestra', () => {

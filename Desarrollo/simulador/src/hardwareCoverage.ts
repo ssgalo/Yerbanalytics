@@ -15,7 +15,10 @@ export interface HardwareDevice {
   tipo: string;
   zonaId: string | null;
   sectorId: string | null;
-  /** A registered device with a fault is still registered: reporting faults belongs to another rule (S-05). */
+  /**
+   * The fault the backend marked (S-05): the `tipo` of the node error, `null` when healthy. A registered device with a
+   * fault is still registered, so it still counts as mapped for S-04.
+   */
   falla?: string | null;
 }
 
@@ -29,4 +32,24 @@ export const VALVE_TYPE = 'electrovalvula';
 export function sectorsWithoutValve(sectors: SectorRef[], devices: HardwareDevice[]): SectorRef[] {
   const withValve = new Set(devices.filter((d) => d.tipo === VALVE_TYPE && d.sectorId !== null).map((d) => d.sectorId));
   return sectors.filter((s) => !withValve.has(s.id));
+}
+
+/** The sectors, of those given, that have their electrovalve registered: where a hydraulic fault can be marked. */
+export function sectorsWithValve(sectors: SectorRef[], devices: HardwareDevice[]): SectorRef[] {
+  const without = new Set(sectorsWithoutValve(sectors, devices).map((s) => s.id));
+  return sectors.filter((s) => !without.has(s.id));
+}
+
+/** `true` if the backend has the device marked as faulty (S-05). */
+export function isMarkedFaulty(device: HardwareDevice): boolean {
+  return typeof device.falla === 'string' && device.falla.trim() !== '';
+}
+
+/**
+ * The devices of the zone's sectors that are marked as faulty (S-05): what the repair scenario registers a repair for.
+ * Only sector actuators: the witness node is not repaired, it recovers by answering again.
+ */
+export function faultyDevicesOf(zonaId: string, sectors: SectorRef[], devices: HardwareDevice[]): HardwareDevice[] {
+  const ofZone = new Set(sectors.filter((s) => s.zonaId === zonaId).map((s) => s.id));
+  return devices.filter((d) => d.sectorId !== null && ofZone.has(d.sectorId) && isMarkedFaulty(d));
 }

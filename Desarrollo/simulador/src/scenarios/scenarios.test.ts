@@ -81,7 +81,10 @@ test('R-01 or R-03 together with R-04 also reset the cooldowns', () => {
 test('the registry keeps the order and keys of the original catalog', () => {
   assert.deepEqual(
     SCENARIOS.map((s) => s.key),
-    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE'],
+    [
+      'R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE',
+      'FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR',
+    ],
   );
 });
 
@@ -298,6 +301,127 @@ test('the incomplete-hardware scenario coexists with the rules that want the sam
   for (const other of ['R01', 'R03', 'SHADING', 'SUPPLY']) {
     assert.equal(calculateConditions([other, 'INCOMPLETE_HARDWARE'], thresholds).conflictos.length, 0, other);
   }
+});
+
+/* ------------------------------------------------------------------ fallas del nodo (S-05) */
+
+test('no-flow: the node reports SIN_CAUDAL on a sector with its valve, over soil that asks for irrigation', () => {
+  const result = calculateConditions(['FAULT_NO_FLOW'], thresholds);
+  assert.deepEqual(result.nodeErrors, [{ tipo: 'SIN_CAUDAL', valor: 0 }]);
+  assert.equal(result.needsSectorWithValve, true);
+  assert.equal(result.needsFaultyDevice, false);
+  // Dry enough for R-01 to irrigate if the fault were not marked: the fault is the only reason it does not.
+  const humSus = result.pinnedMetrics.humSus;
+  assert.ok(humSus < thresholds.umbralHumedad);
+  assert.ok(humSus > thresholds.umbralCritico);
+  assert.equal(result.needsCooldownReset, true);
+  assert.equal(result.repair, null);
+  assert.match(result.resumen.join(' | '), /SIN_CAUDAL/);
+  assert.match(result.resumen.join(' | '), /riego manual/);
+});
+
+test('overflow: CAUDAL_EXCESIVO over wet soil, so the alert has no manual-irrigation request', () => {
+  const result = calculateConditions(['FAULT_OVERFLOW'], thresholds);
+  assert.equal(result.nodeErrors.length, 1);
+  assert.equal(result.nodeErrors[0].tipo, 'CAUDAL_EXCESIVO');
+  assert.equal(typeof result.nodeErrors[0].valor, 'number');
+  assert.ok((result.nodeErrors[0].valor as number) > 0);
+  assert.equal(result.needsSectorWithValve, true);
+  // Above the irrigation threshold and below saturation: nothing is due and nothing blocks it.
+  const humSus = result.pinnedMetrics.humSus;
+  assert.ok(humSus > thresholds.umbralHumedad);
+  assert.ok(humSus < thresholds.saturacionBloqueo);
+  assert.match(result.resumen.join(' | '), /CAUDAL_EXCESIVO/);
+});
+
+test('the soil humidity of the flow faults follows the catalog thresholds', () => {
+  const custom = { ...thresholds, umbralCritico: 30, umbralHumedad: 50, saturacionBloqueo: 70 };
+  assert.equal(calculateConditions(['FAULT_NO_FLOW'], custom).pinnedMetrics.humSus, 40);
+  assert.equal(calculateConditions(['FAULT_OVERFLOW'], custom).pinnedMetrics.humSus, 60);
+});
+
+test('shade limit: the node reports the closed-position limit switch, with no sector and no soil pinned', () => {
+  const result = calculateConditions(['FAULT_SHADE_LIMIT'], thresholds);
+  assert.deepEqual(result.nodeErrors, [{ tipo: 'MEDIASOMBRA_FIN_DE_CARRERA', valor: 'CERRADA' }]);
+  assert.equal(result.needsSectorWithValve, false, 'the mesh belongs to the macro-zone, not to a sector');
+  assert.deepEqual(result.pinnedMetrics, {});
+  assert.match(result.resumen.join(' | '), /MEDIASOMBRA_FIN_DE_CARRERA/);
+});
+
+test('repair: registers the repair of the zone faulty devices and leaves the soil asking for irrigation again', () => {
+  const result = calculateConditions(['REPAIR'], thresholds);
+  assert.deepEqual(result.repair, { detail: 'Reparación de prueba desde el simulador' });
+  assert.equal(result.needsFaultyDevice, true);
+  assert.deepEqual(result.nodeErrors, []);
+  assert.ok(result.pinnedMetrics.humSus < thresholds.umbralHumedad);
+  assert.equal(result.needsCooldownReset, true);
+  assert.match(result.resumen.join(' | '), /vuelve a regar/);
+});
+
+test('without a fault scenario nothing is reported, repaired or looked up in the registry', () => {
+  const result = calculateConditions(['R01'], thresholds);
+  assert.deepEqual(result.nodeErrors, []);
+  assert.equal(result.repair, null);
+  assert.equal(result.needsSectorWithValve, false);
+  assert.equal(result.needsFaultyDevice, false);
+});
+
+test('each fault scenario exercises its rule and the service that marks the fault, and needs no diagnosis', () => {
+  const byKey = (key: string) => SCENARIOS.find((s) => s.key === key)!;
+  assert.deepEqual(byKey('FAULT_NO_FLOW').backendRules, ['HydraulicFaultRule', 'HardwareFaultService']);
+  assert.deepEqual(byKey('FAULT_OVERFLOW').backendRules, ['HydraulicFaultRule', 'HardwareFaultService']);
+  assert.deepEqual(byKey('FAULT_SHADE_LIMIT').backendRules, ['ShadeFaultRule', 'HardwareFaultService']);
+  assert.deepEqual(byKey('REPAIR').backendRules, ['HardwareFaultService']);
+  for (const key of ['FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR']) {
+    assert.equal(byKey(key).needsDiagnosis, false, key);
+  }
+  assert.equal(byKey('FAULT_SHADE_LIMIT').branch, 'MEDIASOMBRA');
+});
+
+test('the cause would be ambiguous next to a lock, a silent node, an impossible humidity or the hardware scenario', () => {
+  for (const fault of ['FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'REPAIR']) {
+    for (const other of ['R02', 'R04', 'LOCK', 'NODE_OFFLINE', 'INVALID_READING', 'INCOMPLETE_HARDWARE']) {
+      for (const selected of [[other, fault], [fault, other]]) {
+        const result = calculateConditions(selected, thresholds);
+        assert.equal(result.conflictos.length, 1, selected.join('+'));
+        assert.deepEqual(result.nodeErrors, [], 'with a conflict nothing is applied');
+        assert.equal(result.repair, null, 'with a conflict nothing is applied');
+      }
+    }
+  }
+});
+
+test('the shade fault is only ambiguous next to a lock, a silent node or the hardware scenario', () => {
+  for (const other of ['LOCK', 'NODE_OFFLINE', 'INCOMPLETE_HARDWARE']) {
+    for (const selected of [[other, 'FAULT_SHADE_LIMIT'], ['FAULT_SHADE_LIMIT', other]]) {
+      assert.equal(calculateConditions(selected, thresholds).conflictos.length, 1, selected.join('+'));
+    }
+  }
+  for (const other of ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'INVALID_READING']) {
+    assert.equal(calculateConditions([other, 'FAULT_SHADE_LIMIT'], thresholds).conflictos.length, 0, other);
+  }
+});
+
+test('two faults on the same valve, or a repair next to a fault, say nothing clear: they conflict', () => {
+  for (const [a, b] of [
+    ['FAULT_NO_FLOW', 'FAULT_OVERFLOW'],
+    ['FAULT_NO_FLOW', 'REPAIR'],
+    ['FAULT_OVERFLOW', 'REPAIR'],
+    ['FAULT_SHADE_LIMIT', 'REPAIR'],
+  ]) {
+    for (const selected of [[a, b], [b, a]]) {
+      assert.equal(calculateConditions(selected, thresholds).conflictos.length, 1, selected.join('+'));
+    }
+  }
+});
+
+test('a hydraulic fault coexists with the rules that want the same dry soil, and with the mesh fault', () => {
+  for (const other of ['R01', 'R03', 'SHADING', 'SUPPLY']) {
+    assert.equal(calculateConditions([other, 'FAULT_NO_FLOW'], thresholds).conflictos.length, 0, other);
+  }
+  const both = calculateConditions(['FAULT_NO_FLOW', 'FAULT_SHADE_LIMIT'], thresholds);
+  assert.equal(both.conflictos.length, 0);
+  assert.deepEqual(both.nodeErrors.map((e) => e.tipo), ['SIN_CAUDAL', 'MEDIASOMBRA_FIN_DE_CARRERA'], 'both errors go out, in applyOrder');
 });
 
 /* ------------------------------------------------------------------ resumen */

@@ -243,7 +243,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay nueve scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay diez scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -261,6 +261,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   base ya sembrada (la matriz sólo se siembra si está vacía).
 > - `resources/migracion-permisos-hardware-servicio.sql` — agrega `hardware.ver` al rol Servicio (el simulador lo lee
 >   para su escenario de hardware incompleto); sólo lectura.
+> - `resources/migracion-permisos-hardware-reparar.sql` — agrega `hardware.reparar` (Ingeniero, Operario y Servicio) y
+>   `hardware.ver` al Operario a una matriz ya sembrada (S-05, registro de reparaciones).
 >
 > Detalle en el README del backend.
 
@@ -309,8 +311,8 @@ cd Desarrollo/backend
 - **El backend consume la telemetría por MQTT y publica comandos a los actuadores y al riel.** No
   publica telemetría ni debería: quien la publica es el hardware, o el simulador que lo reemplaza
   (§6.2). Escucha además los eventos del riel (`nursery/rail/event`) y el ACK de los actuadores
-  (`nursery/zone/+/sector/+/ack`). Lo consumen dos: `SeguimientoComandosService` (alerta en el historial
-  si el nodo informa una falla o no contesta a tiempo; no cambia decisiones del motor) y las secuencias de
+  (`nursery/zone/+/sector/+/ack`), más los errores del nodo (`nursery/zone/+/errores`, S-05). El ACK lo consumen dos: `SeguimientoComandosService` (alerta en el historial
+  si el nodo informa una falla o no contesta a tiempo; no cambia decisiones del motor, salvo la `falla_mecanica` de la malla, que se entrega a `HardwareFaultService`) y las secuencias de
   Demo Expo (`SecuenciaService`, que espera el ACK de cada paso). Los comandos de las secuencias salen por
   el mismo `ComandoActuadorPublisher`, así que el seguimiento también los vigila, a propósito.
 - **El pasado de las lecturas vive en `zone_reading`** (una fila por lectura aceptada, con las diez métricas vigentes y su origen `PULSE`/`OTHER`). Las reglas lo consultan sólo por `readings/ReadingHistory`; nunca arman su propia tabla. Sin lecturas es `SIN_DATO`, no cero. Detalle en el README del backend.
@@ -323,6 +325,12 @@ cd Desarrollo/backend
   conocer: **un sector sin su electroválvula registrada no se riega solo**. Prioridades de las reglas: únicas (no hay
   fraccionarias); ver `ReglasArquitecturaTest`. Detalle en el README del backend ("Lectura inválida (S-03) y hardware incompleto
   (S-04)").
+- **Las fallas del nodo marcan el dispositivo, y marcar es de un solo servicio.** El ESP32 detecta la falla, corta el actuador y la
+  publica en `nursery/zone/{zona}/errores`; `HardwareFaultService` es el **único** que escribe `dispositivo.falla` (y la levanta al
+  registrar la reparación, `POST /api/hardware/{id}/reparacion`, permiso `hardware.reparar`). `HydraulicFaultRule` (prioridad 2) y
+  `ShadeFaultRule` leen la marca por `RuleContext.faults` y sacan al sector (o a la malla) de lo autónomo; R-02 no se exceptúa.
+  Efecto a conocer: **un sector con falla hidráulica no se riega ni se dosifica solo hasta que alguien registre la reparación**.
+  Detalle en el README del backend ("Fallas del nodo (S-05)").
 - **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y
@@ -443,7 +451,8 @@ Invariantes a respetar al tocar esta área:
   no contiene ninguna implementación, vista ni control de demo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
-  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. El comando de
+  El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. Los errores del nodo
+  (`nursery/zone/{zona}/errores`, S-05) también: `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType` y `buildNodeError` del simulador. El comando de
   zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.

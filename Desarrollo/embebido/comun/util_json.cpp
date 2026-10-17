@@ -145,6 +145,21 @@ size_t serializarAck(const Ack& a, char* buf, size_t n) {
   return serializeJson(doc, buf, n);
 }
 
+size_t serializarError(const ErrorNodo& e, const char* nodo, const char* sectorId, uint32_t timestamp, char* buf, size_t n) {
+  JsonDocument doc;
+  doc[KEY_NODO] = nodo;
+  doc[KEY_SECTOR] = sectorId;
+  doc[KEY_TIPO] = e.tipo;
+  if (e.valorNumerico) {
+    doc[KEY_VALOR] = e.caudal;
+  } else {
+    doc[KEY_VALOR] = e.valor;
+  }
+  doc[KEY_TIMESTAMP] = timestamp;
+
+  return serializeJson(doc, buf, n);
+}
+
 void parsearComandoRiel(const char* payload, unsigned int len, ComandoRiel& out) {
   out.commandId[0] = '\0';
   out.valido = false;

@@ -5,7 +5,7 @@
    qué telemetría, clima y diagnóstico previo hacen que la regla dispare en el siguiente pulso.
    Cada regla nueva agrega su archivo en este directorio y lo registra en `index.ts`.
    ============================================================ */
-import type { NewDiagnosis, SimulatedWeather } from '../types';
+import type { NewDiagnosis, NodeErrorPlan, SimulatedWeather } from '../types';
 
 /** Umbrales del catálogo del backend ya resueltos (con los valores de la v2 si el backend no responde). */
 export interface ThresholdMap {
@@ -67,6 +67,20 @@ export interface ScenarioPatch {
    * shows. The simulator never changes the hardware registry: it looks for sectors that already lack theirs.
    */
   needsSectorWithoutValve?: boolean;
+  /**
+   * An error the target zone's node publishes BEFORE the pulse (S-05). The simulator publishes it on the broker like a
+   * real node would; the backend does not know it was the simulator.
+   */
+  nodeError?: NodeErrorPlan;
+  /**
+   * The error is about a sector's valve, so the operator has to pick a sector of the target zone that HAS its valve
+   * registered (the simulator reads the registry, never edits it). The shade error is the macro-zone's: no sector.
+   */
+  needsSectorWithValve?: boolean;
+  /** Register the repair of the faulty devices of the target zone BEFORE the pulse (S-05), with this detail. */
+  repair?: { detail: string };
+  /** The target zone must have at least one device marked as faulty, because that is what the scenario repairs. */
+  needsFaultyDevice?: boolean;
 }
 
 export interface ScenarioConflict {

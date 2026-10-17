@@ -9,13 +9,17 @@
      3. Publishes the calculated MQTT telemetry for the target sensor.
      4. Registers the prior AI diagnosis (SupplyRule only acts on a NEW one).
      5. Creates the manual lock the "Bloqueo manual" scenario asks for (before the pulse).
+     5b. Publishes the node errors / registers the repairs of the S-05 scenarios (before the pulse).
      6. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
 
    The "node without answer" scenario is the exception: it silences the target zone instead of
    publishing telemetry, so the pulses find no answer. The "invalid reading" scenario sticks a metric of the
    target sensor on an impossible value (`pinnedReadings`): the pulse and every reread carry it, so the backend's
    reread-and-discard flow (S-03) happens inside the pulse. The "incomplete hardware" scenario pins dry soil and reads
-   the hardware registry (never edits it) to tell which sectors of the zone have no electrovalve (S-04).
+   the hardware registry (never edits it) to tell which sectors of the zone have no electrovalve (S-04). The "fault"
+   scenarios (S-05) publish the error a node would (`POST /api/node-errors`), wait until the registry shows the mark and
+   then ask for the pulse; the "repair" scenario registers the repair of the zone's faulty devices through the public
+   repair endpoint, the one the dashboard uses.
 
    No backend modifications: everything goes through existing public endpoints.
    ============================================================ */
@@ -24,7 +28,8 @@ import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
 import type { DemoRule, ManualLock, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
 import { buildThresholds, calculateConditions } from '../ruleConditions';
-import { sectorsWithoutValve, type HardwareDevice } from '../hardwareCoverage';
+import { shadeMarked, valveMarked, waitUntil } from '../faultFlow';
+import { faultyDevicesOf, sectorsWithValve, sectorsWithoutValve, type HardwareDevice } from '../hardwareCoverage';
 import { runPulses } from '../pulseChain';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
@@ -53,6 +58,8 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const [manualLocks, setManualLocks] = useState<ManualLock[]>([]);
   // '' = lock the whole zone; otherwise the id of one of its sectors.
   const [lockSectorId, setLockSectorId] = useState('');
+  // Sector whose valve the S-05 hydraulic fault breaks; '' = the first of the zone that has its valve registered.
+  const [faultSectorId, setFaultSectorId] = useState('');
 
   // Zones the simulator keeps mute: they stay that way until released, so they are shown after the run.
   useEffect(() => {
@@ -143,6 +150,10 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     : null;
 
   const needsSectorWithoutValve = conditions?.needsSectorWithoutValve ?? false;
+  const needsSectorWithValve = conditions?.needsSectorWithValve ?? false;
+  const needsFaultyDevice = conditions?.needsFaultyDevice ?? false;
+  // The hardware registry (read-only) is only consulted when a selected scenario needs to know what is in it.
+  const needsRegistry = needsSectorWithoutValve || needsSectorWithValve || needsFaultyDevice;
 
   const loadDevices = useCallback(async () => {
     try {
@@ -155,8 +166,8 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   }, []);
 
   useEffect(() => {
-    if (needsSectorWithoutValve) void loadDevices();
-  }, [needsSectorWithoutValve, loadDevices]);
+    if (needsRegistry) void loadDevices();
+  }, [needsRegistry, loadDevices]);
 
   const targetSensor = sensors.find((s) => s.serial === targetSerial);
   // The diagnosis is per sector, the sensing per zone: the first sector of the target zone stands in.
@@ -167,8 +178,14 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const lockSector = zoneSectors.find((s) => s.id === lockSectorId);
   // Sectors of the target zone that have no electrovalve registered: where the S-04 abort shows up.
   const uncoveredSectors = needsSectorWithoutValve && devices ? sectorsWithoutValve(zoneSectors, devices) : [];
-  const hardwareUnreadable = needsSectorWithoutValve && devices === null && hardwareError !== null;
+  const hardwareUnreadable = needsRegistry && devices === null && hardwareError !== null;
   const noSectorWithoutValve = needsSectorWithoutValve && devices !== null && uncoveredSectors.length === 0;
+  // S-05: sectors of the target zone whose valve a hydraulic fault can be marked on, and the faulty devices to repair.
+  const valveSectors = needsSectorWithValve && devices ? sectorsWithValve(zoneSectors, devices) : [];
+  const faultSector = valveSectors.find((s) => s.id === faultSectorId) ?? valveSectors[0];
+  const noSectorWithValve = needsSectorWithValve && devices !== null && valveSectors.length === 0;
+  const faultyDevices = needsFaultyDevice && devices && targetSensor ? faultyDevicesOf(targetSensor.zonaId, sectors, devices) : [];
+  const noFaultyDevice = needsFaultyDevice && devices !== null && faultyDevices.length === 0;
 
   const execute = async () => {
     if (!targetSensor || !conditions || selectedRules.size === 0) return;
@@ -234,6 +251,56 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
             .join(', ')}${uncovered.length > 5 ? '…' : ''}): el pulso debe abortarles el riego`,
         );
         setExecLog([...log]);
+      }
+
+      // Step 3d: S-05 node errors. The node publishes them on the broker; the backend marks the device when it processes
+      // them, so the pulse waits until the registry shows the mark. If it never does (receiver switched off in the rules
+      // panel, device not registered) the run goes on and says so.
+      if (conditions.nodeErrors.length > 0) {
+        for (const plan of conditions.nodeErrors) {
+          const isShade = plan.tipo === 'MEDIASOMBRA_FIN_DE_CARRERA';
+          if (!isShade && !faultSector) {
+            throw new Error(`Ningún sector de ${targetSensor.zonaId} tiene su electroválvula registrada: no hay dónde marcar la falla.`);
+          }
+          await api.sendNodeError({ ...plan, zonaId: targetSensor.zonaId, sector: isShade ? '' : faultSector!.id });
+          log.push(
+            isShade
+              ? `✓ ${targetSensor.zonaId} informa ${plan.tipo} (final «${String(plan.valor).toLowerCase()}»)`
+              : `✓ ${targetSensor.zonaId} informa ${plan.tipo} (${plan.valor} L/h) en ${faultSector!.id}`,
+          );
+          setExecLog([...log]);
+        }
+        const marked = await waitUntil(
+          async () => {
+            const registry = await api.getHardwareDevices();
+            return conditions.nodeErrors.every((plan) =>
+              plan.tipo === 'MEDIASOMBRA_FIN_DE_CARRERA'
+                ? shadeMarked(registry, targetSensor.zonaId, sectors)
+                : valveMarked(registry, faultSector!.id),
+            );
+          },
+          { sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
+        );
+        log.push(
+          marked
+            ? '✓ El backend marcó la falla en el registro de hardware'
+            : '⚠ El backend no marcó la falla: ¿el receptor de errores está apagado (Telemetría → Control de reglas) o el dispositivo no está registrado? El pulso sigue igual',
+        );
+        setExecLog([...log]);
+      }
+
+      // Step 3e: S-05 repair. The registry is read again (the faults may have changed since it loaded) and every faulty
+      // device of the zone gets its repair registered through the public endpoint.
+      if (conditions.repair) {
+        const faulty = faultyDevicesOf(targetSensor.zonaId, sectors, await api.getHardwareDevices());
+        if (faulty.length === 0) {
+          throw new Error(`${targetSensor.zonaId} no tiene dispositivos marcados como averiados: no hay nada que reparar.`);
+        }
+        for (const d of faulty) {
+          await api.registerRepair(d.id, conditions.repair.detail);
+          log.push(`✓ Reparación registrada en ${d.tipo} ${d.sectorId ?? d.zonaId} (${d.id}, ${d.falla})`);
+          setExecLog([...log]);
+        }
       }
 
       // Step 4: register the prior diagnosis. It must exist before the pulse: that is the only
@@ -308,7 +375,9 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     !missingDiagnosisSector &&
     !hardwareUnreadable &&
     !noSectorWithoutValve &&
-    (!needsSectorWithoutValve || devices !== null) &&
+    !noSectorWithValve &&
+    !noFaultyDevice &&
+    (!needsRegistry || devices !== null) &&
     execState !== 'running';
 
   return (
@@ -448,7 +517,22 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         {hardwareUnreadable && (
           <div className="errorMsg" style={{ marginTop: 12 }}>
             No se pudo leer el registro de hardware ({hardwareError}). El rol Servicio del simulador necesita
-            `hardware.ver`: en una base ya sembrada, corré `migracion-permisos-hardware-servicio.sql` del backend.
+            `hardware.ver` (y `hardware.reparar` para registrar reparaciones): en una base ya sembrada, corré
+            `migracion-permisos-hardware-servicio.sql` y `migracion-permisos-hardware-reparar.sql` del backend.
+          </div>
+        )}
+
+        {noSectorWithValve && (
+          <div className="errorMsg" style={{ marginTop: 12 }}>
+            Ningún sector de {targetSensor?.zonaId} tiene su electroválvula registrada: no hay dónde marcar la falla
+            hidráulica. Elegí otra zona.
+          </div>
+        )}
+
+        {noFaultyDevice && (
+          <div className="errorMsg" style={{ marginTop: 12 }}>
+            {targetSensor?.zonaId} no tiene dispositivos marcados como averiados: no hay nada que reparar. Marcá una falla
+            primero («Sin caudal», «Caudal excesivo» o «Falla de mediasombra»).
           </div>
         )}
 
@@ -471,6 +555,33 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
                 .join(', ')}
               {uncoveredSectors.length > 8 && ` y ${uncoveredSectors.length - 8} más`}. El pulso debe abortarles el riego.
             </p>
+          </div>
+        )}
+
+        {faultyDevices.length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <p className="sectionTitle" style={{ marginBottom: 6 }}>
+              Dispositivos averiados de {targetSensor?.zonaId} ({faultyDevices.length})
+            </p>
+            <p style={{ margin: 0, fontSize: 13 }}>
+              {faultyDevices.map((d) => `${d.id} · ${d.sectorId} · ${d.falla}`).join(' — ')}. Se registra su reparación antes
+              del pulso.
+            </p>
+          </div>
+        )}
+
+        {needsSectorWithValve && valveSectors.length > 0 && (
+          <div className="row" style={{ marginTop: 12 }}>
+            <label className="field">
+              <span className="label">Sector de la electroválvula con falla</span>
+              <select value={faultSector?.id ?? ''} onChange={(e) => setFaultSectorId(e.target.value)}>
+                {valveSectors.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.id}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         )}
 

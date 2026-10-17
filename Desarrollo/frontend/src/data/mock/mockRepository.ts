@@ -55,6 +55,7 @@ import {
   buildFleet,
   buildHardware,
   recambioDispositivo,
+  repararDispositivo,
   setZonasDisponibles,
   type RawDispositivo,
 } from './hardware';
@@ -296,6 +297,11 @@ export class MockRepository implements DataRepository {
 
   async replaceDevice(id: string, device: NuevoDispositivo): Promise<HardwareData> {
     recambioDispositivo(this.fleet(), id, device);
+    return buildHardware(this.fleet());
+  }
+
+  async registerRepair(id: string, detalle: string): Promise<HardwareData> {
+    repararDispositivo(this.fleet(), id, detalle);
     return buildHardware(this.fleet());
   }
 

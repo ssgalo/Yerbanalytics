@@ -357,3 +357,59 @@ export interface ActuatorAck {
   status: AckStatus;
   detalle: { tipo: AckDetailType; durationSec?: number; ml?: number; targetPct?: number } & Record<string, unknown>;
 }
+
+/* ============================================================
+   Node errors (add-fallas-esp32, S-05 of reglas_v2).
+
+   SOURCE OF TRUTH: the "Errores del nodo" section of `Desarrollo/embebido/comun/contrato.h`;
+   also mirrored by `ContratoNodo.java` / `NodeErrorType.java` on the backend.
+
+   The real node detects the failure, cuts the actuator on its own and publishes ONE error per
+   event on the zone's `errores` topic (QoS 1, no retain). The simulator publishes the same
+   payload so the backend reacts exactly as it would to a real node; it does not simulate the
+   hardware behind it.
+   ============================================================ */
+
+/** Errors topic of a macro-zone. Mirrors contrato.h :: contratoTopicErrores. */
+export function errorsTopic(zonaId: string): string {
+  return `nursery/zone/${zonaId}/errores`;
+}
+
+/** The `tipo` values of the contract: two hydraulic (per sector) and one of the shade mesh (per macro-zone). */
+export const NODE_ERROR_TYPES = ['SIN_CAUDAL', 'CAUDAL_EXCESIVO', 'MEDIASOMBRA_FIN_DE_CARRERA'] as const;
+export type NodeErrorType = (typeof NODE_ERROR_TYPES)[number];
+
+/** Which shade limit switch failed (the `valor` of a `MEDIASOMBRA_FIN_DE_CARRERA`). */
+export const SHADE_LIMIT_SWITCHES = ['CERRADA', 'ABIERTA'] as const;
+export type ShadeLimitSwitch = (typeof SHADE_LIMIT_SWITCHES)[number];
+
+/** Error payload, exactly as a node publishes it. */
+export interface NodeErrorPayload {
+  /** Serial/MAC of the node that reports. */
+  nodo: string;
+  /** Sector id; empty on a shade error (the mesh is the macro-zone's). */
+  sector: string;
+  tipo: NodeErrorType;
+  /** Measured flow in L/h for the flow errors; the failed limit switch for the shade one. */
+  valor: number | ShadeLimitSwitch;
+  timestamp: number;
+}
+
+/** What the caller decides; the contract decides the rest (the shade error never names a sector). */
+export interface NodeErrorInput {
+  nodo: string;
+  sector: string;
+  tipo: NodeErrorType;
+  valor: number | ShadeLimitSwitch;
+}
+
+/** The payload for an error, with the shade error's sector emptied as the contract requires. */
+export function buildNodeError(input: NodeErrorInput, nowMs: number): NodeErrorPayload {
+  return {
+    nodo: input.nodo,
+    sector: input.tipo === 'MEDIASOMBRA_FIN_DE_CARRERA' ? '' : input.sector,
+    tipo: input.tipo,
+    valor: input.valor,
+    timestamp: nowMs,
+  };
+}

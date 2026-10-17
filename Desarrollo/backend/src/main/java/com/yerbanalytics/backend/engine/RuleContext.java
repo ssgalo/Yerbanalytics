@@ -68,13 +68,29 @@ public record RuleContext(
          * Qué hardware tiene mapeado el sector y su macro-zona (S-04), armado UNA vez por zona para que las reglas no
          * consulten la base. {@link HardwareCoverage#COMPLETE} si el llamador no lo arma. Nunca {@code null}.
          */
-        HardwareCoverage hardware
+        HardwareCoverage hardware,
+
+        /**
+         * Qué actuadores del sector y su macro-zona están marcados como averiados (S-05), armado UNA vez por zona.
+         * {@link HardwareFaults#NONE} si el llamador no lo arma. Nunca {@code null}.
+         */
+        HardwareFaults faults
 
 ) {
     public RuleContext {
         overrides = overrides == null ? RuleOverrides.NONE : overrides;
         invalidMetrics = invalidMetrics == null ? Set.of() : Set.copyOf(invalidMetrics);
         hardware = hardware == null ? HardwareCoverage.COMPLETE : hardware;
+        faults = faults == null ? HardwareFaults.NONE : faults;
+    }
+
+    /** Constructor sin fallas: mantiene la firma de antes de S-05. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
+                       RuleOverrides overrides, Set<String> invalidMetrics, HardwareCoverage hardware) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
+                overrides, invalidMetrics, hardware, HardwareFaults.NONE);
     }
 
     /** Constructor sin hardware: mantiene la firma de antes de S-04. */
@@ -83,7 +99,7 @@ public record RuleContext(
                        WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
                        RuleOverrides overrides, Set<String> invalidMetrics) {
         this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
-                overrides, invalidMetrics, HardwareCoverage.COMPLETE);
+                overrides, invalidMetrics, HardwareCoverage.COMPLETE, HardwareFaults.NONE);
     }
 
     /** Constructor sin métricas descartadas: mantiene la firma de antes de S-03. */
@@ -92,7 +108,7 @@ public record RuleContext(
                        WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
                        RuleOverrides overrides) {
         this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
-                overrides, Set.of(), HardwareCoverage.COMPLETE);
+                overrides, Set.of(), HardwareCoverage.COMPLETE, HardwareFaults.NONE);
     }
 
     /** Constructor sin overrides: mantiene la firma de antes de los overrides de reglas. */
@@ -100,7 +116,7 @@ public record RuleContext(
                        ConfiguracionOperativaEntity config, String finalStatus, Instant now,
                        WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego) {
         this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
-                RuleOverrides.NONE, Set.of(), HardwareCoverage.COMPLETE);
+                RuleOverrides.NONE, Set.of(), HardwareCoverage.COMPLETE, HardwareFaults.NONE);
     }
 
     /** Constructor sin contexto de riego: mantiene la firma de antes de las reglas de riego v2. */
@@ -114,7 +130,7 @@ public record RuleContext(
     /** Copia de este contexto con otros overrides. Lo usa el orquestador: el llamador no los conoce. */
     public RuleContext withOverrides(RuleOverrides nuevos) {
         return new RuleContext(sector, zona, specs, metrics, config, finalStatus, now, forecast,
-                bloqueoManualActivo, riego, nuevos, invalidMetrics, hardware);
+                bloqueoManualActivo, riego, nuevos, invalidMetrics, hardware, faults);
     }
 
     /**

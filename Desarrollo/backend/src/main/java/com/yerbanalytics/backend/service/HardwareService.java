@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.dto.Dispositivo;
 import com.yerbanalytics.backend.dto.HardwareData;
 import com.yerbanalytics.backend.dto.SectorIncompleto;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
+import com.yerbanalytics.backend.engine.HardwareFaults;
 import com.yerbanalytics.backend.model.DispositivoEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
@@ -145,6 +146,39 @@ public class HardwareService {
         return out;
     }
 
+    /**
+     * Qué actuadores de cada sector de la macro-zona están marcados como averiados (S-05), en UNA consulta. La falla de la
+     * electroválvula es del sector; la de la mediasombra, aunque viva en el dispositivo de un sector, es de la
+     * macro-zona y la ven todos. La bomba averiada no se mira: no hay forma de que el nodo la marque y el hardware
+     * admite una sola por sector. Cada sector de {@code sectorIds} figura en el resultado. Lo arma el motor una vez por
+     * zona y evaluación; las reglas sólo lo leen.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, HardwareFaults> faultsOf(Collection<String> sectorIds) {
+        if (sectorIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> hydraulicBySector = new HashMap<>();
+        String shade = null;
+        for (DispositivoEntity d : dispositivoRepository.findBySectorIdInAndTipoIn(
+                sectorIds, List.of(ELECTROVALVULA, MEDIASOMBRA))) {
+            String falla = blankToNull(d.getFalla());
+            if (falla == null) {
+                continue;
+            }
+            if (MEDIASOMBRA.equals(d.getTipo())) {
+                shade = shade != null ? shade : falla;
+            } else if (ELECTROVALVULA.equals(d.getTipo())) {
+                hydraulicBySector.put(d.getSectorId(), falla);
+            }
+        }
+        Map<String, HardwareFaults> out = new LinkedHashMap<>();
+        for (String sectorId : sectorIds) {
+            out.put(sectorId, new HardwareFaults(hydraulicBySector.get(sectorId), shade));
+        }
+        return out;
+    }
+
     private Dispositivo toDto(DispositivoEntity e, Map<String, Integer> pulsosSinRespuesta) {
         boolean esNodo = NODO_TESTIGO.equals(e.getTipo());
         String estado = deriveEstado(e, esNodo, pulsosSinRespuesta.getOrDefault(e.getZonaId(), 0));
@@ -172,7 +206,8 @@ public class HardwareService {
                 color[0],
                 color[1],
                 bateriaBaja,
-                blankToNull(e.getFalla())
+                blankToNull(e.getFalla()),
+                blankToNull(e.getFalla()) != null ? e.getFallaDesde() : null
         );
     }
 
@@ -289,6 +324,7 @@ public class HardwareService {
         // Reutiliza el registro: pieza nueva, avería limpia, heartbeat reiniciado (HU-21 CA-05).
         e.setSerial(nuevoSerial);
         e.setFalla(null);
+        e.setFallaDesde(null);
         e.setBateria(null);
         e.setSenal(null);
         e.setUltimoUpdate(null);

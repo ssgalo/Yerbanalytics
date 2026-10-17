@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * Enforces the daily supply dose limit for a sector (HU-07 CA-03).
  *
- * <p><b>Priority:</b> 6 — runs before {@link RiegoRule} and {@link InsumoRule} but after
+ * <p><b>Priority:</b> 7 — runs before {@link RiegoRule} and {@link InsumoRule} but after
  * the security and weather rules.
  *
  * <p><b>Condition:</b> the sector has already received a supply dose in the last 24 hours
@@ -38,7 +38,7 @@ import java.util.List;
 @Component
 public class DailyDoseLimitRule implements Rule {
 
-    private static final int PRIORITY = 6;
+    private static final int PRIORITY = 7;
     public static final String NAME = "DailyDoseLimitRule";
     /** Bypass key: ignores the daily dose limit. */
     public static final String BYPASS_DAILY_LIMIT = "daily-limit";

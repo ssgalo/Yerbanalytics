@@ -139,6 +139,17 @@
   font-weight: 600;
 }
 
+.fallaDesde {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .empty {
   padding: 28px 16px;
   text-align: center;
@@ -150,6 +161,11 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.groupGrow {
+  flex: 1;
+  min-width: 260px;
 }
 
 .label {

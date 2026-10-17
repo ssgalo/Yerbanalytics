@@ -129,3 +129,41 @@ test('a macro-zone id maps to its index; anything else is not a macro-zone', asy
   assert.equal(macroZoneIndex('MZ-1x'), null);
   assert.equal(macroZoneIndex('Z-1'), null);
 });
+
+test('the node errors topic and types mirror contrato.h (S-05)', async () => {
+  const c = await import('./contract.ts');
+  assert.equal(c.errorsTopic('MZ-1'), 'nursery/zone/MZ-1/errores');
+  assert.deepEqual([...c.NODE_ERROR_TYPES], ['SIN_CAUDAL', 'CAUDAL_EXCESIVO', 'MEDIASOMBRA_FIN_DE_CARRERA']);
+  assert.deepEqual([...c.SHADE_LIMIT_SWITCHES], ['CERRADA', 'ABIERTA']);
+});
+
+test('a flow error carries the sector and the measured flow', async () => {
+  const { buildNodeError } = await import('./contract.ts');
+  assert.deepEqual(
+    buildNodeError({ nodo: 'SIM-MZ-1', sector: 'MZ-1-012', tipo: 'SIN_CAUDAL', valor: 0 }, 1_760_000_000_000),
+    { nodo: 'SIM-MZ-1', sector: 'MZ-1-012', tipo: 'SIN_CAUDAL', valor: 0, timestamp: 1_760_000_000_000 },
+  );
+});
+
+test('the shade error has no sector: the mesh belongs to the macro-zone', async () => {
+  const { buildNodeError } = await import('./contract.ts');
+  const error = buildNodeError(
+    { nodo: 'SIM-MZ-1', sector: 'MZ-1-012', tipo: 'MEDIASOMBRA_FIN_DE_CARRERA', valor: 'CERRADA' },
+    1_760_000_000_000,
+  );
+  assert.equal(error.sector, '');
+  assert.equal(error.valor, 'CERRADA');
+});
+
+test('the contrato.h firmware declares the same error types and topic', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { NODE_ERROR_TYPES } = await import('./contract.ts');
+  let header: string;
+  try {
+    header = await readFile(new URL('../../embebido/comun/contrato.h', import.meta.url), 'utf8');
+  } catch {
+    return; // the firmware is not in this checkout
+  }
+  for (const type of NODE_ERROR_TYPES) assert.ok(header.includes(`"${type}"`), `contrato.h declares ${type}`);
+  assert.ok(header.includes('nursery/zone/%s/errores'));
+});

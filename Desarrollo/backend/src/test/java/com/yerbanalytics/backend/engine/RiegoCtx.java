@@ -38,6 +38,7 @@ public final class RiegoCtx {
     private boolean contextoVacio = true;
     private boolean humedadDescartada;
     private HardwareCoverage hardware = HardwareCoverage.COMPLETE;
+    private HardwareFaults faults = HardwareFaults.NONE;
 
     private RiegoCtx(Instant ahora) {
         this.ahora = ahora;
@@ -73,6 +74,12 @@ public final class RiegoCtx {
     /** El hardware que tiene mapeado el sector y su zona (S-04). Por defecto, todo. */
     public RiegoCtx hardware(HardwareCoverage h) {
         this.hardware = h;
+        return this;
+    }
+
+    /** Los actuadores marcados como averiados en el sector y su zona (S-05). Por defecto, ninguno. */
+    public RiegoCtx faults(HardwareFaults f) {
+        this.faults = f;
         return this;
     }
 
@@ -133,7 +140,7 @@ public final class RiegoCtx {
                         riegoEnCursoHastaMs, zona.getHumSusTs());
         return new RuleContext(sector, zona, List.of(), metricas, RuleContextTestFactory.defaultConfig(),
                 "ok", ahora, forecast, bloqueo, riego, RuleOverrides.NONE,
-                humedadDescartada ? Set.of("humSus") : Set.of(), hardware);
+                humedadDescartada ? Set.of("humSus") : Set.of(), hardware, faults);
     }
 
     /** Pronóstico con una marca por hora (a partir de la hora siguiente) y los valores dados. */

@@ -55,6 +55,19 @@ export interface NurseryTopology {
 }
 
 /** A sector of the current topology, to choose where to capture. */
+/** The `tipo` of an error a node publishes (contrato.h, "Errores del nodo"; mirrored by `server/contract.ts`). */
+export type NodeErrorType = 'SIN_CAUDAL' | 'CAUDAL_EXCESIVO' | 'MEDIASOMBRA_FIN_DE_CARRERA';
+
+/** Which shade limit switch failed: the `valor` of a `MEDIASOMBRA_FIN_DE_CARRERA`. */
+export type ShadeLimitSwitch = 'CERRADA' | 'ABIERTA';
+
+/** An error a scenario asks the simulator to publish for the target zone (the sector is picked by the operator). */
+export interface NodeErrorPlan {
+  tipo: NodeErrorType;
+  /** Measured flow in L/h for the flow errors; the failed limit switch for the shade one. */
+  valor: number | ShadeLimitSwitch;
+}
+
 export interface SectorRef {
   id: string;
   /** Macro-zone id (`MZ-1`…): the key sensors and telemetry use. */
