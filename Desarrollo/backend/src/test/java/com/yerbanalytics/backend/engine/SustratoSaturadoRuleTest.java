@@ -113,10 +113,10 @@ class SustratoSaturadoRuleTest {
     }
 
     @Test
-    @DisplayName("metadatos: RIEGO, prioridad 2 (antes de la guarda de ciclo), declara bloqueo y alerta")
+    @DisplayName("metadatos: RIEGO, prioridad 3 (antes de la guarda de ciclo), declara bloqueo y alerta")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(2);
+        assertThat(rule.priority()).isEqualTo(3);
         assertThat(rule.parametros()).containsExactly(ParametrosRiego.SATURACION_BLOQUEO, ParametrosRiego.SATURACION_ALERTA);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());
     }

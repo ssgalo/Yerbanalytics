@@ -39,6 +39,7 @@ import type {
   TelemetryInput,
   TipoSecuencia,
 } from './types';
+import type { HardwareDevice } from './hardwareCoverage';
 
 /** Proxy prefix. The UI never learns the backend's real address. */
 const BACKEND = '/backend';
@@ -126,9 +127,41 @@ export async function setZoneSilenced(zonaId: string, silenced: boolean): Promis
   return json(res, 'cambiar si la zona responde la lectura');
 }
 
+/** Pinned readings by macro-zone: the metrics (UI units) every reading of that zone carries. */
+export type PinnedReadings = Record<string, Record<string, number>>;
+
+export async function getPinnedReadings(): Promise<PinnedReadings> {
+  return json(await fetch('/api/pinned-readings'), 'consultar las lecturas fijadas');
+}
+
+/**
+ * Sticks the sensor of a zone on `metrics` (UI units) so every reading it publishes carries them, or repairs it when
+ * `metrics` is empty. The values are not range-checked on purpose: the backend is the one that has to reject them.
+ */
+export async function pinReadings(zonaId: string, metrics: Record<string, number>): Promise<PinnedReadings> {
+  const res = await fetch(`/api/pinned-readings/${encodeURIComponent(zonaId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metrics }),
+  });
+  return json(res, 'cambiar las lecturas fijadas');
+}
+
 /* ----------------------------------------------------------------
    The platform's public API (through the proxy)
    ---------------------------------------------------------------- */
+
+/**
+ * The devices of the hardware registry. READ-ONLY on purpose: the simulator never registers, replaces or removes
+ * hardware. It needs `hardware.ver`, which the backend's default matrix gives the Servicio role.
+ */
+export async function getHardwareDevices(): Promise<HardwareDevice[]> {
+  const data = await json<{ dispositivos: HardwareDevice[] }>(
+    await fetch(`${BACKEND}/api/hardware`),
+    'consultar el registro de hardware',
+  );
+  return data.dispositivos;
+}
 
 export async function getTopology(): Promise<NurseryTopology> {
   return json(await fetch(`${BACKEND}/api/topologia`), 'consultar la topología');

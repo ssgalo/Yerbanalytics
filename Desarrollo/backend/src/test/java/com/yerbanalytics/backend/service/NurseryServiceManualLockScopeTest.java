@@ -104,6 +104,7 @@ class NurseryServiceManualLockScopeTest {
                 locks, mock(DiagnosticoService.class), store,
                 mock(HistorialRepository.class), dispatch, PulsosDePrueba.conMotor(),
                 mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class),
+                ReadingGuardsDePrueba.aceptaTodo(),
                 CLOCK, 20);
     }
 

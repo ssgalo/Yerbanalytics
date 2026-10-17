@@ -114,7 +114,8 @@ class NurseryServicePulsoTest {
                 mock(HistorialService.class), configuracion, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, mock(WeatherService.class),
                 mock(ManualLockRepository.class), mock(DiagnosticoService.class), new TrazaEvaluacionStore(),
-                mock(HistorialRepository.class), despacho, pulsos, escalamiento, mock(com.yerbanalytics.backend.readings.ReadingRecorder.class), RELOJ, 20);
+                mock(HistorialRepository.class), despacho, pulsos, escalamiento, mock(com.yerbanalytics.backend.readings.ReadingRecorder.class),
+                ReadingGuardsDePrueba.aceptaTodo(), RELOJ, 20);
     }
 
     private void telemetria() {

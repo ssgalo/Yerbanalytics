@@ -188,6 +188,29 @@ api.get('/silenced-zones', (_req, res) => {
   res.json(emission.silencedZones());
 });
 
+// ------------------------------------------------------------------
+// Pinned readings: metrics every reading of a zone carries (scenarios "Lectura inválida" and "Hardware incompleto")
+// ------------------------------------------------------------------
+
+api.get('/pinned-readings', (_req, res) => {
+  res.json(emission.pinnedMetrics());
+});
+
+/**
+ * Pins the given metrics (UI units) on the zone's readings, or releases the zone when none come. Values are NOT
+ * range-checked: that is the point, the backend is the one that has to reject an impossible reading.
+ */
+api.put('/pinned-readings/:zonaId', (req, res) => {
+  const { metrics } = (req.body ?? {}) as { metrics?: Record<string, unknown> | null };
+  const pinned: emission.PinnedMetrics = {};
+  for (const key of METRIC_KEYS) {
+    const value = optionalNumber(metrics?.[key], key);
+    if (value !== undefined) pinned[key] = value;
+  }
+  emission.setPinnedMetrics(req.params.zonaId, pinned);
+  res.json(emission.pinnedMetrics());
+});
+
 api.put('/silenced-zones/:zonaId', (req, res) => {
   const { silenced } = (req.body ?? {}) as { silenced?: unknown };
   if (typeof silenced !== 'boolean') {

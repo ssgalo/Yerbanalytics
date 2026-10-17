@@ -31,9 +31,12 @@ final class RiegoRuleSupport {
     private RiegoRuleSupport() {
     }
 
-    /** Humedad de sustrato de la lectura, o {@code null} si no vino (sin lectura nunca se riega). */
+    /**
+     * Humedad de sustrato de la lectura, o {@code null} si no vino o se descartó por lectura inválida (S-03): sin
+     * dato nunca se riega. Es el único punto por donde las reglas de riego leen la humedad.
+     */
     static Double humedad(RuleContext ctx) {
-        return ctx.metricRaw("humSus");
+        return ctx.validMetricRaw("humSus");
     }
 
     /**

@@ -243,7 +243,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay ocho scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay nueve scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -259,6 +259,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   que el rango nuevo (50–95 %, fábrica 70 %) no admite.
 > - `resources/migracion-permisos-bloqueo.sql` — agrega `bloqueos.ver`/`bloqueos.gestionar` a la matriz de una
 >   base ya sembrada (la matriz sólo se siembra si está vacía).
+> - `resources/migracion-permisos-hardware-servicio.sql` — agrega `hardware.ver` al rol Servicio (el simulador lo lee
+>   para su escenario de hardware incompleto); sólo lectura.
 >
 > Detalle en el README del backend.
 
@@ -315,6 +317,12 @@ cd Desarrollo/backend
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
+- **La ingesta valida antes de escribir y el motor sabe qué hardware hay.** `ReadingValidationGuard` (S-03) descarta por
+  métrica lo que cae fuera del rango físico del catálogo, con relecturas inmediatas, y `IncompleteHardwareRule` (S-04,
+  prioridad 1) aborta la rama a la que le falta un actuador mapeado (`HardwareCoverage`, armada una vez por zona). Efecto a
+  conocer: **un sector sin su electroválvula registrada no se riega solo**. Prioridades de las reglas: únicas (no hay
+  fraccionarias); ver `ReglasArquitecturaTest`. Detalle en el README del backend ("Lectura inválida (S-03) y hardware incompleto
+  (S-04)").
 - **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y

@@ -25,7 +25,7 @@ import java.util.List;
 @Component
 public class FueraDeVentanaRiegoRule implements Rule {
 
-    private static final int PRIORITY = 6;
+    private static final int PRIORITY = 7;
     public static final String NAME = "FueraDeVentanaRiegoRule";
     /** Clave de bypass: ignora la ventana horaria de riego. */
     public static final String BYPASS_WINDOW = "window";

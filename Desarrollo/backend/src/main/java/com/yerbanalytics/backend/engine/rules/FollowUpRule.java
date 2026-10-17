@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Post-action follow-up rule (R4/HU-12).
  *
- * <p><b>Priority:</b> 20 — the last rule evaluated. Unlike other rules, it does not decide
+ * <p><b>Priority:</b> 21 — the last rule evaluated. Unlike other rules, it does not decide
  * whether to act: its function is to verify the effectiveness of previous actions on the
  * sector and update the history accordingly.
  *
@@ -37,7 +37,7 @@ import java.util.List;
 public class FollowUpRule implements Rule {
 
     private static final Logger log = LoggerFactory.getLogger(FollowUpRule.class);
-    private static final int PRIORITY = 20;
+    private static final int PRIORITY = 21;
     private static final String NAME = "FollowUpRule";
 
     private final HistorialService historialService;
