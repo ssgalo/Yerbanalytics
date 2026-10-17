@@ -154,7 +154,6 @@ describe('Sidebar · colapsable a íconos', () => {
   afterEach(() => localStorage.clear());
 
   it('Ctrl+B colapsa y expande, y se recuerda', () => {
-    demo.visible = false;
     montarConProvider();
     expect(sidebar().dataset.collapsed).toBe('false');
 
@@ -168,7 +167,6 @@ describe('Sidebar · colapsable a íconos', () => {
   });
 
   it('colapsada, el clic en Configuración la expande con el grupo abierto', () => {
-    demo.visible = false;
     montarConProvider();
     fireEvent.click(screen.getByRole('button', { name: 'Colapsar menú' }));
 
@@ -178,7 +176,6 @@ describe('Sidebar · colapsable a íconos', () => {
   });
 
   it('colapsada, pasar el mouse por un ítem muestra su nombre', () => {
-    demo.visible = false;
     montarConProvider();
     fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
 
