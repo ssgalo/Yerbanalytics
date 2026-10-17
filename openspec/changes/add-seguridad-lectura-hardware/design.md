@@ -58,3 +58,38 @@ Depende de `add-dosificacion-base` (D-2). Por ahora: ambas.
 | `seguridad.relecturas-invalidas` | 2 | 1–5 |
 Restricción cruzada: min < max. Nota: `ce` llega en µS/cm y se persiste en dS/m; la validación va sobre el valor
 **ya convertido**.
+
+## Decisiones de la implementación
+
+Nombres en inglés (CLAUDE.md §7): `LecturaValidator` → `ReadingValidator`, `lectura_invalida` → `invalid_reading`,
+`ctx.metricaValida` → `ctx.isMetricValid`, `HardwareIncompletoRule` → `IncompleteHardwareRule`. Los de la spec que ya
+estaban en inglés (`ReadingValidationGuard`, bypass `retries` y `hardware`, escenarios `INVALID_READING` y
+`INCOMPLETE_HARDWARE`) no cambian.
+
+### S-03
+
+- **Piezas.** `ReadingMetrics` (la lectura en unidades canónicas: es el único lugar donde la CE pasa de µS/cm a dS/m),
+  `ReadingValidator` (puro: qué métricas están fuera de rango), `ReadingValidationGuard` (relectura y descarte; es el
+  `DemoControllable`) e `InvalidReadingEscalation` (la racha persistida y las alertas). Separar la escalación del guard
+  deja a cada una con una sola razón para cambiar.
+- **Métricas con rango.** Humedad (sustrato y ambiente), temperatura (aire y **también la del sustrato**: es una
+  temperatura y el rango físico es el mismo), pH, CE y luz. N, P y K no tienen rango en la v2: nunca se invalidan.
+- **Rangos editables sólo hacia adentro.** Cada mínimo llega hasta un pivote (humedad 50, temperatura 25, pH 7, CE 5,
+  luz 50) y cada máximo parte de él. Así `min < max` es una restricción alcanzable y nadie puede ensanchar un rango
+  más allá de lo físico (humedad y luz quedan acotadas a 0–100).
+- **La lectura inválida no consume el pulso.** El motor decide con la primera respuesta de cada zona a un pulso. Si esa
+  respuesta trae una métrica inválida con relecturas disponibles, el pulso sigue pendiente (no se llama a
+  `recordResponse`) y el motor decide cuando llega la relectura que corrige o la tercera inválida, que ya descarta la
+  métrica. Sin esto, "la relectura corrige" no tendría efecto sobre la decisión de riego del ciclo.
+- **Descartar no borra.** El valor previo queda en la zona (el dashboard lo sigue mostrando) y su marca `humSusTs` no
+  avanza; las reglas de riego leen la humedad por `RiegoRuleSupport.humedad`, que usa `ctx.validMetricRaw` y devuelve
+  "sin dato". Es el único punto de lectura: R-01…R-06 y la regla de ciclo lo heredan.
+- **Contador de relecturas por ciclo.** Vive en memoria, por (zona, métrica, ciclo de lectura): un pedido que nunca se
+  contestó no deja al ciclo siguiente con menos relecturas. Un reinicio lo vuelve a cero (cuesta una relectura de más).
+- **Racha por ciclo.** Un segundo descarte en el mismo ciclo (p. ej. una lectura manual además del pulso) no suma. Del
+  tercer ciclo seguido en adelante la alerta sigue siendo `CRITICAL` (literal de la spec: "vuelve a fallar en el ciclo
+  siguiente"); la racha se limpia con cualquier lectura válida de la métrica.
+- **Cableado.** El guard es consumidor de parámetros y el catálogo se arma con todos los consumidores: depende con
+  `@Lazy` de `CatalogoParametrosService` **y de `ConfiguracionService`** (éste depende del catálogo). Sin lo segundo el
+  contexto no arranca; `ReadingValidationGuardWiringTest` lo cubre con el cableado real.
+- **Migración.** `invalid_reading` es una entidad nueva: `ddl-auto=update` la crea. Sin script manual.

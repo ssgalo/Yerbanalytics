@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.dto.Metric;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Armador de {@link RuleContext} para los tests de las reglas de riego: hora LOCAL del vivero
@@ -34,6 +36,7 @@ public final class RiegoCtx {
     private Long ultimaAplicacionMs;
     private Long riegoEnCursoHastaMs;
     private boolean contextoVacio = true;
+    private boolean humedadDescartada;
 
     private RiegoCtx(Instant ahora) {
         this.ahora = ahora;
@@ -57,6 +60,12 @@ public final class RiegoCtx {
 
     public RiegoCtx humedad(Double h) {
         this.humedad = h;
+        return this;
+    }
+
+    /** La humedad quedó descartada en el ciclo por lectura inválida (S-03): el motor la lee como "sin dato". */
+    public RiegoCtx humedadDescartada() {
+        this.humedadDescartada = true;
         return this;
     }
 
@@ -116,7 +125,8 @@ public final class RiegoCtx {
                 : new ContextoRiego(inicioCiclo, ultimoRiegoMs, ultimoRiegoCriticoMs, ultimaAplicacionMs,
                         riegoEnCursoHastaMs, zona.getHumSusTs());
         return new RuleContext(sector, zona, List.of(), metricas, RuleContextTestFactory.defaultConfig(),
-                "ok", ahora, forecast, bloqueo, riego);
+                "ok", ahora, forecast, bloqueo, riego, RuleOverrides.NONE,
+                humedadDescartada ? Set.of("humSus") : Set.of());
     }
 
     /** Pronóstico con una marca por hora (a partir de la hora siguiente) y los valores dados. */

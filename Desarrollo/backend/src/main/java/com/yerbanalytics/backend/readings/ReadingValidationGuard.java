@@ -79,7 +79,8 @@ public class ReadingValidationGuard implements ConsumidorParametros, DemoControl
                                   ComandoZonaPublisher zonePublisher,
                                   // Perezoso: el catálogo se arma con la lista de consumidores, y esta clase es uno.
                                   @Lazy CatalogoParametrosService parametros,
-                                  ConfiguracionService configuracion,
+                                  // Perezoso por lo mismo: el servicio de configuración depende del catálogo.
+                                  @Lazy ConfiguracionService configuracion,
                                   RuleOverrides overrides,
                                   Clock relojVivero) {
         this.escalation = escalation;
