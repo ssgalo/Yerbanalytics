@@ -29,15 +29,17 @@ let active = false;
  */
 const silenced = new Set<string>();
 
-/** A reading in UI units (`ce` in dS/m): the metrics a faulty sensor is stuck on. */
-export type FaultyMetrics = Partial<Record<MetricKey, number>>;
+/** Metrics in UI units (`ce` in dS/m) that a zone's node answers with, whatever the random reading says. */
+export type PinnedMetrics = Partial<Record<MetricKey, number>>;
 
 /**
- * Sensors stuck on a value (scenario "Lectura inválida"): macro-zone → the metrics every reading of that zone carries
- * over the random ones, however many times the backend asks again. In memory, like `silenced`: it always starts empty.
- * Values are kept in UI units (what the operator typed) and converted to contract units when published.
+ * Pinned readings: macro-zone → the metrics every reading of that zone carries over the random ones, however many times
+ * the backend asks again. A scenario needs them because the answer to a pulse is what the engine decides on, and a
+ * reading published beforehand is overwritten by it ("Lectura inválida" pins an impossible value, "Hardware incompleto"
+ * dry soil). In memory, like `silenced`: it always starts empty. Values are kept in UI units (what the operator typed)
+ * and converted to contract units when published.
  */
-const faulty = new Map<string, FaultyMetrics>();
+const pinned = new Map<string, PinnedMetrics>();
 
 /** Collaborators, replaceable in tests (see setDependencies). Defaults are the real ones. */
 interface Dependencies {
@@ -90,7 +92,7 @@ async function emitZone(i: number): Promise<void> {
     battery: i === LOW_BATTERY_ZONE ? Math.floor(around(12, 8)) : Math.floor(around(70, 30)),
     signal: Math.floor(-55 - Math.random() * 35), // dBm: -55 to -89
     timestamp: Date.now(),
-    metrics: { ...randomMetrics(), ...toContractUnits(faulty.get(`MZ-${i}`) ?? {}) },
+    metrics: { ...randomMetrics(), ...toContractUnits(pinned.get(`MZ-${i}`) ?? {}) },
   };
   await deps.publish(`MZ-${i}`, payload);
 }
@@ -137,17 +139,17 @@ export function setSilenced(zonaId: string, on: boolean): void {
 }
 
 /**
- * Sticks the sensor of a zone on `metrics` (UI units) until it is repaired: every reading it publishes carries them.
- * Replaces the previous fault of the zone; `null` or an empty set repairs it. Idempotent.
+ * Pins `metrics` (UI units) on the readings of a zone until they are released: every reading it publishes carries them.
+ * Replaces what was pinned for the zone; `null` or an empty set releases it. Idempotent.
  */
-export function setFaultyMetrics(zonaId: string, metrics: FaultyMetrics | null): void {
-  if (metrics === null || Object.keys(metrics).length === 0) faulty.delete(zonaId);
-  else faulty.set(zonaId, { ...metrics });
+export function setPinnedMetrics(zonaId: string, metrics: PinnedMetrics | null): void {
+  if (metrics === null || Object.keys(metrics).length === 0) pinned.delete(zonaId);
+  else pinned.set(zonaId, { ...metrics });
 }
 
-/** Faulty sensors by zone, in UI units. */
-export function faultyMetrics(): Record<string, FaultyMetrics> {
-  return Object.fromEntries([...faulty].map(([zone, metrics]) => [zone, { ...metrics }]));
+/** Pinned readings by zone, in UI units. */
+export function pinnedMetrics(): Record<string, PinnedMetrics> {
+  return Object.fromEntries([...pinned].map(([zone, metrics]) => [zone, { ...metrics }]));
 }
 
 export function isSilenced(zonaId: string): boolean {

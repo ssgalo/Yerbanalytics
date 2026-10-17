@@ -189,26 +189,26 @@ api.get('/silenced-zones', (_req, res) => {
 });
 
 // ------------------------------------------------------------------
-// Faulty sensors: a metric stuck on a value in every reading (scenario "Lectura inválida")
+// Pinned readings: metrics every reading of a zone carries (scenarios "Lectura inválida" and "Hardware incompleto")
 // ------------------------------------------------------------------
 
-api.get('/faulty-sensors', (_req, res) => {
-  res.json(emission.faultyMetrics());
+api.get('/pinned-readings', (_req, res) => {
+  res.json(emission.pinnedMetrics());
 });
 
 /**
- * Sticks the zone's sensor on the given metrics (UI units), or repairs it when none come. Values are NOT range-checked:
- * that is the point, the backend is the one that has to reject an impossible reading.
+ * Pins the given metrics (UI units) on the zone's readings, or releases the zone when none come. Values are NOT
+ * range-checked: that is the point, the backend is the one that has to reject an impossible reading.
  */
-api.put('/faulty-sensors/:zonaId', (req, res) => {
+api.put('/pinned-readings/:zonaId', (req, res) => {
   const { metrics } = (req.body ?? {}) as { metrics?: Record<string, unknown> | null };
-  const stuck: emission.FaultyMetrics = {};
+  const pinned: emission.PinnedMetrics = {};
   for (const key of METRIC_KEYS) {
     const value = optionalNumber(metrics?.[key], key);
-    if (value !== undefined) stuck[key] = value;
+    if (value !== undefined) pinned[key] = value;
   }
-  emission.setFaultyMetrics(req.params.zonaId, stuck);
-  res.json(emission.faultyMetrics());
+  emission.setPinnedMetrics(req.params.zonaId, pinned);
+  res.json(emission.pinnedMetrics());
 });
 
 api.put('/silenced-zones/:zonaId', (req, res) => {

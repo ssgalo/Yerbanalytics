@@ -53,3 +53,4 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | Escenarios por regla en el simulador (`src/scenarios/`) | ✅ (6 reglas actuales migradas) |
 | Escenarios de las reglas nuevas | 🚧 (S-01 `LOCK`, S-03 `INVALID_READING` y S-04 `INCOMPLETE_HARDWARE` hechos; cada cambio agrega el suyo) |
 | Retiro de reglas v1 (`ShadingRule`, `SupplyRule`, `DailyDoseLimitRule`, `FollowUpRule`) | ⬜ (ver tabla del índice) |
+| Escenarios previos del simulador (R-01…R-04, `SHADING`, `SUPPLY`, `LOCK`) con lecturas determinísticas | ⚠️ **Pendiente.** Publican la telemetría *antes* del pulso, pero la respuesta al pulso (la que decide el motor) la arma la emisión automática al azar y la pisa: pueden no disparar. Se arregla fijando sus lecturas con `pinnedReadings`, como ya hacen `INVALID_READING` e `INCOMPLETE_HARDWARE` (no se tocó en `add-seguridad-lectura-hardware`) |

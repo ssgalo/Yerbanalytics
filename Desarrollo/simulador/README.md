@@ -200,19 +200,32 @@ bloqueo como causa. El bloqueo queda vigente hasta que se lo levanta en «Bloque
 `bloqueos.ver` y `bloqueos.gestionar` (vienen en la matriz por defecto; en una base ya sembrada, correr
 `migracion-permisos-bloqueo.sql` del backend).
 
-**Lectura inválida (S-03).** El escenario `INVALID_READING` (accionable sobre `ReadingValidationGuard`) deja el sensor de
-humedad de sustrato de la zona destino **trabado** fuera del rango físico: `humSus` = el máximo del catálogo
-(`seguridad.rango-hum-max`) + 12 (112 % con los valores de fábrica). Pide `faultySensor`, no `telemetry`: el valor imposible
-no se publica como una lectura suelta sino que viaja en **cada** respuesta a `LEER_AHORA` de esa zona (`PUT
-/api/faulty-sensors/{zona}`), así el pulso, la relectura y las siguientes son todas inválidas y se ve el flujo entero:
-el backend pide hasta `seguridad.relecturas-invalidas` relecturas, descarta esa métrica en el ciclo (R-01…R-06 quedan «sin dato»)
-y deja un `WARNING` «Lectura inválida en Humedad de sustrato». El `CRITICAL` aparece si la métrica vuelve a fallar en el
-**ciclo de lectura siguiente** (por defecto, 4 h después; dos pulsos del mismo ciclo cuentan como uno). Igual que «Nodo sin
-respuesta», **la emisión automática tiene que estar activa** para que alguien conteste las relecturas, y el sensor queda
-trabado hasta pulsar «Reparar sensor» en «Sensores con falla». No se combina con R-01…R-04, el bloqueo manual ni el nodo mudo.
-El simulador **no recorta** valores (ni el servidor ni los campos de las tarjetas de sensor), así que también se puede cargar a
-mano una lectura imposible en *Envío de lecturas*. Los controles de la pieza `ReadingValidationGuard` (apagar, bypass `retries`)
-están en Telemetría → Control de reglas.
+**Lecturas fijadas.** La respuesta a un `LEER_AHORA` es la lectura con la que decide el motor, y la emisión automática la
+arma al azar: una lectura que el escenario publicó antes del pulso queda pisada por ella. Por eso un escenario puede pedir
+`pinnedReadings`: métricas que viajan en **cada** respuesta de la zona destino (`PUT /api/pinned-readings/{zona}`, en memoria,
+siempre arranca vacío) hasta pulsar «Soltar» en «Lecturas fijadas». No se publican como una lectura suelta: tienen que estar en
+la respuesta al pulso. Los valores **no se recortan** (ni el servidor ni los campos de las tarjetas de sensor), así que también se
+puede cargar a mano una lectura imposible en *Envío de lecturas*. Los dos escenarios siguientes la usan, y **ambos necesitan la
+emisión automática activa** (con la emisión apagada nadie contesta el pulso).
+
+**Lectura inválida (S-03).** El escenario `INVALID_READING` (accionable sobre `ReadingValidationGuard`) fija `humSus` = el
+máximo del catálogo (`seguridad.rango-hum-max`) + 12 (112 % con los valores de fábrica): el pulso, la relectura y las siguientes son
+todas inválidas y se ve el flujo entero. El backend pide hasta `seguridad.relecturas-invalidas` relecturas, descarta esa métrica en
+el ciclo (R-01…R-06 quedan «sin dato») y deja un `WARNING` «Lectura inválida en Humedad de sustrato». El `CRITICAL` aparece si la
+métrica vuelve a fallar en el **ciclo de lectura siguiente** (por defecto, 4 h después; dos pulsos del mismo ciclo cuentan como
+uno). No se combina con R-01…R-04, el bloqueo manual, el nodo mudo ni «Hardware incompleto». Los controles de la pieza
+`ReadingValidationGuard` (apagar, bypass `retries`) están en Telemetría → Control de reglas.
+
+**Hardware incompleto (S-04).** El escenario `INCOMPLETE_HARDWARE` (accionable sobre `IncompleteHardwareRule`) fija el sustrato
+seco de R-01 y le pide a la zona destino **un sector sin electroválvula registrada**: el pulso debe abortarle el riego con
+«hardware incompleto» (sin alerta) mientras los sectores que sí la tienen riegan. **El simulador no da de baja ninguna válvula**:
+el registro de hardware no tiene esa operación y él sólo lo lee (`GET /backend/api/hardware`); busca los sectores que ya no tienen
+la suya (el `data.sql` de desarrollo equipa pocos, así que suelen sobrar) y los lista en la vista previa; su traza se mira en
+Motor de reglas → Inspector. Si la zona no tiene ninguno, o el backend rechaza la lectura, el panel lo dice y no deja ejecutar. Necesita
+que la cuenta de rol Servicio tenga `hardware.ver` (viene en la matriz por defecto; en una base ya sembrada, correr
+`migracion-permisos-hardware-servicio.sql` del backend). No se combina con R-02, R-04, el bloqueo manual, el nodo mudo ni
+«Lectura inválida»: la causa de que no se riegue sería ambigua. Los controles de la regla (apagar, bypass `hardware`) están en
+Telemetría → Control de reglas.
 
 ---
 
@@ -249,13 +262,14 @@ simulador/
 │   ├── contract.ts    espejo de contrato.h (claves y unidades del nodo)
 │   ├── mqtt.ts        publicador al broker
 │   ├── store.ts       sensores simulados, persistidos en data/
-│   ├── emission.ts    emisión automática, zonas silenciadas y sensores con falla
+│   ├── emission.ts    emisión automática, zonas silenciadas y lecturas fijadas
 │   ├── api.ts         API interna (/api/**)
 │   ├── proxy.ts       proxy al backend (/backend/**)
 │   └── backend-session.ts  sesión de la cuenta de servicio ante el backend
 ├── src/             UI React, con estilos propios
 │   ├── scenarios/     un escenario por regla (cómo se la acciona) y su registro
 │   ├── pulseChain.ts  encadena N pulsos de sensado esperando que termine cada uno
+│   ├── hardwareCoverage.ts  qué sectores de una zona no tienen electroválvula registrada (sólo lee el registro)
 │   └── ruleConditions.ts  umbrales, conflictos y combinación de los escenarios elegidos
 └── data/            estado local (no se versiona)
 ```

@@ -81,7 +81,7 @@ test('R-01 or R-03 together with R-04 also reset the cooldowns', () => {
 test('the registry keeps the order and keys of the original catalog', () => {
   assert.deepEqual(
     SCENARIOS.map((s) => s.key),
-    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING'],
+    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE'],
   );
 });
 
@@ -196,9 +196,9 @@ test('the lock scenario coexists with the dry-soil rules', () => {
 test('the invalid-reading scenario sticks the soil humidity above the physical limit, without publishing it', () => {
   const result = calculateConditions(['INVALID_READING'], thresholds);
   // 112 % with the factory limit of 100 %: the value of the v2 example.
-  assert.deepEqual(result.faultyMetrics, { humSus: 112 });
-  assert.ok(result.faultyMetrics.humSus > thresholds.humedadMaxima);
-  // The healthy reading goes out as always; the fault only rides on the answers to LEER_AHORA of the pulse, so the
+  assert.deepEqual(result.pinnedMetrics, { humSus: 112 });
+  assert.ok(result.pinnedMetrics.humSus > thresholds.humedadMaxima);
+  // The healthy reading goes out as always; the impossible value only rides on the answers to LEER_AHORA of the pulse, so the
   // whole reread-and-discard flow happens inside the pulse the engine decides on.
   assert.equal(result.telemetria.humSus, 55);
   assert.equal(result.pulses, 1);
@@ -213,11 +213,11 @@ test('the invalid-reading scenario sticks the soil humidity above the physical l
 
 test('the impossible value follows the catalog limit instead of a loose number', () => {
   const strict = { ...thresholds, humedadMaxima: 90 };
-  assert.equal(calculateConditions(['INVALID_READING'], strict).faultyMetrics.humSus, 102);
+  assert.equal(calculateConditions(['INVALID_READING'], strict).pinnedMetrics.humSus, 102);
 });
 
-test('without it no sensor is stuck', () => {
-  assert.deepEqual(calculateConditions(['R01'], thresholds).faultyMetrics, {});
+test('without it nothing is pinned', () => {
+  assert.deepEqual(calculateConditions(['R01'], thresholds).pinnedMetrics, {});
 });
 
 test('the physical limit and the rereads come from the backend catalog, with the v2 values as fallback', () => {
@@ -234,19 +234,69 @@ test('the invalid-reading scenario exercises ReadingValidationGuard and needs no
   assert.equal(scenario?.branch, 'GLOBAL');
 });
 
-test('a stuck humidity sensor cannot be mixed with anything that needs the soil humidity or an answering node', () => {
+test('a pinned impossible humidity cannot be mixed with anything that needs the soil humidity or an answering node', () => {
   for (const other of ['R01', 'R02', 'R03', 'R04', 'LOCK', 'NODE_OFFLINE']) {
     for (const selected of [[other, 'INVALID_READING'], ['INVALID_READING', other]]) {
       const result = calculateConditions(selected, thresholds);
       assert.equal(result.conflictos.length, 1, selected.join('+'));
-      assert.deepEqual(result.faultyMetrics, {}, 'with a conflict nothing is applied');
+      assert.deepEqual(result.pinnedMetrics, {}, 'with a conflict nothing is applied');
     }
   }
 });
 
-test('a stuck humidity sensor coexists with the shading and the diagnosis-driven rules', () => {
+test('a pinned impossible humidity coexists with the shading and the diagnosis-driven rules', () => {
   for (const other of ['SHADING', 'SUPPLY']) {
     assert.equal(calculateConditions([other, 'INVALID_READING'], thresholds).conflictos.length, 0, other);
+  }
+});
+
+/* ------------------------------------------------------------------ hardware incompleto (S-04) */
+
+test('the incomplete-hardware scenario pins the dry soil of R-01 and asks for a sector without its valve', () => {
+  const result = calculateConditions(['INCOMPLETE_HARDWARE'], thresholds);
+  assert.equal(result.needsSectorWithoutValve, true);
+  // Dry enough for R-01 to irrigate if the hardware were complete: the missing valve is the only reason it does not.
+  const humSus = result.pinnedMetrics.humSus;
+  assert.ok(humSus < thresholds.umbralHumedad);
+  assert.ok(humSus > thresholds.umbralCritico);
+  assert.equal(result.needsCooldownReset, true);
+  assert.equal(result.silenceZone, false);
+  assert.equal(result.manualLock, null);
+  assert.equal(result.pulses, 1);
+  assert.match(result.resumen.join(' | '), /electroválvula/);
+  assert.match(result.resumen.join(' | '), /emisión automática/);
+});
+
+test('the dry humidity follows the catalog thresholds', () => {
+  const result = calculateConditions(['INCOMPLETE_HARDWARE'], { ...thresholds, umbralCritico: 30, umbralHumedad: 50 });
+  assert.equal(result.pinnedMetrics.humSus, 40);
+});
+
+test('without it no sector without a valve is needed', () => {
+  assert.equal(calculateConditions(['R01'], thresholds).needsSectorWithoutValve, false);
+});
+
+test('the incomplete-hardware scenario exercises IncompleteHardwareRule and needs no prior diagnosis', () => {
+  const scenario = SCENARIOS.find((s) => s.key === 'INCOMPLETE_HARDWARE');
+  assert.deepEqual(scenario?.backendRules, ['IncompleteHardwareRule']);
+  assert.equal(scenario?.needsDiagnosis, false);
+  assert.equal(scenario?.branch, 'GLOBAL');
+});
+
+test('the cause of the abort would be ambiguous next to saturated soil, a lock, a silent node or an impossible humidity', () => {
+  for (const other of ['R02', 'R04', 'LOCK', 'NODE_OFFLINE', 'INVALID_READING']) {
+    for (const selected of [[other, 'INCOMPLETE_HARDWARE'], ['INCOMPLETE_HARDWARE', other]]) {
+      const result = calculateConditions(selected, thresholds);
+      assert.equal(result.conflictos.length, 1, selected.join('+'));
+      assert.deepEqual(result.pinnedMetrics, {}, 'with a conflict nothing is applied');
+      assert.equal(result.needsSectorWithoutValve, false, 'with a conflict nothing is applied');
+    }
+  }
+});
+
+test('the incomplete-hardware scenario coexists with the rules that want the same dry soil, the shading and the diagnosis', () => {
+  for (const other of ['R01', 'R03', 'SHADING', 'SUPPLY']) {
+    assert.equal(calculateConditions([other, 'INCOMPLETE_HARDWARE'], thresholds).conflictos.length, 0, other);
   }
 });
 

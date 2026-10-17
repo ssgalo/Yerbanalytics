@@ -26,9 +26,9 @@
 - [x] 3.4 Inspector (`/reglas`): la regla aparece en el grafo (`GET /api/rules/schema`). *Hecho: la regla está en el fixture del catálogo, el modo demo la evalúa y `ABORT_MEDIASOMBRA` se pinta como bloqueo.*
 
 ## 4. Cierre
-- [ ] 4.1 README del backend, índice, `./mvnw test`, `npm test && npm run lint`.
+- [x] 4.1 README del backend, índice, `./mvnw test`, `npm test && npm run lint`. *Backend: 1311+ tests, sin fallas nuevas (los 132 errores son de tests que necesitan PostgreSQL y fallaban igual antes). Frontend: 725 tests, lint y `tsc` limpios. Simulador: 83 tests y `tsc` limpios.*
 
 ## 5. Control desde el simulador (requiere `add-control-demo-reglas`)
 - [x] 5.1 `ReadingValidationGuard` y `IncompleteHardwareRule` como `DemoControllable` (apagado + bypass `retries` / `hardware`); tests.
-- [ ] 5.2 Comprobar que la emisión del simulador permite publicar valores fuera de rango (no se verificó si el formulario recorta); ajustar si lo hace.
-- [ ] 5.3 Escenarios `INVALID_READING` y `INCOMPLETE_HARDWARE` con sus tests.
+- [x] 5.2 Comprobar que la emisión del simulador permite publicar valores fuera de rango (no se verificó si el formulario recorta); ajustar si lo hace. *Verificado: ni el servidor (`/api/telemetry`, `toContractUnits`) ni los inputs recortan; queda fijado por `contract.test.ts`. Hallazgo: la respuesta a `LEER_AHORA` es aleatoria y pisa lo publicado antes del pulso, así que el valor imposible tiene que viajar en esa respuesta: nacieron las «lecturas fijadas» (`emission.pinnedMetrics`).*
+- [x] 5.3 Escenarios `INVALID_READING` y `INCOMPLETE_HARDWARE` con sus tests. *`INCOMPLETE_HARDWARE` no da de baja una válvula (esa API no existe): usa sectores que ya carecen de la suya y pide `hardware.ver` al rol Servicio (migración `migracion-permisos-hardware-servicio.sql`).*

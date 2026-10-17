@@ -57,10 +57,16 @@ export interface ScenarioPatch {
   /** A manual lock to create BEFORE the pulse, over the target zone (or the sector the operator picks). */
   manualLock?: { reason: string };
   /**
-   * Metrics the target zone's sensor gets stuck on: every reading it publishes (the answer to the pulse and to each
-   * reread) carries them, until the operator repairs the sensor. They are NOT published as a reading of their own.
+   * Metrics pinned on the target zone's readings: every reading it publishes (the answer to the pulse and to each
+   * reread) carries them, until the operator releases the zone. They are NOT published as a reading of their own: the
+   * answer to the pulse is what the engine decides on, so that is where they have to be.
    */
-  faultySensor?: Record<string, TelemetryClaim>;
+  pinnedReadings?: Record<string, TelemetryClaim>;
+  /**
+   * The target zone must have at least one sector with no electrovalve registered, because that is what the scenario
+   * shows. The simulator never changes the hardware registry: it looks for sectors that already lack theirs.
+   */
+  needsSectorWithoutValve?: boolean;
 }
 
 export interface ScenarioConflict {
