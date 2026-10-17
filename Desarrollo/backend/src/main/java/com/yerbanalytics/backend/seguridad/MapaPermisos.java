@@ -97,6 +97,8 @@ public final class MapaPermisos {
         permiso(r, put, "/api/rules/parametros", Permiso.REGLAS_EDITAR);
 
         permiso(r, get, "/api/hardware/**", Permiso.HARDWARE_VER);
+        // La reparación va antes que el POST general: la registra quien arregla, no quien administra la flota.
+        permiso(r, post, "/api/hardware/*/reparacion", Permiso.HARDWARE_REPARAR);
         permiso(r, post, "/api/hardware/**", Permiso.HARDWARE_GESTIONAR);
         permiso(r, put, "/api/hardware/**", Permiso.HARDWARE_GESTIONAR);
 

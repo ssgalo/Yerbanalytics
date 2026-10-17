@@ -18,20 +18,32 @@ class PermisoTest {
         assertThat(Permiso.matrizPorDefecto(Rol.ADMINISTRADOR)).containsExactlyInAnyOrder(Permiso.values());
         assertThat(codigos(Rol.OPERARIO)).containsExactlyInAnyOrder(
                 "vivero.ver", "diagnosticos.ver", "historial.ver", "capturas.ver", "pasadas.ver",
-                "bloqueos.ver", "bloqueos.gestionar");
+                "bloqueos.ver", "bloqueos.gestionar", "hardware.ver", "hardware.reparar");
         assertThat(codigos(Rol.SERVICIO)).containsExactlyInAnyOrder("vivero.ver", "topologia.ver", "capturas.ver",
                 "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar",
-                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar", "hardware.ver");
-        assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar", "bloqueos.ver", "bloqueos.gestionar")
+                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar", "hardware.ver", "hardware.reparar");
+        assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar", "bloqueos.ver", "bloqueos.gestionar",
+                        "hardware.reparar")
                 .doesNotContain("auditoria.ver", "pasadas.operar", "usuarios.gestionar");
-        assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver")
-                .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar");
+        assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver", "hardware.ver")
+                .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar", "hardware.reparar");
     }
 
     @Test
     void elRolServicioSoloLeeElHardwareNuncaLoGestiona() {
         // El simulador consulta qué sectores tienen su electroválvula registrada (escenario S-04); no registra ni recambia nada.
         assertThat(codigos(Rol.SERVICIO)).contains("hardware.ver").doesNotContain("hardware.gestionar");
+    }
+
+    @Test
+    void quienRegistraReparacionesPuedeVerElHardwarePeroNoRegistrarloNiRecambiarlo() {
+        // S-05: el Operario es quien está en el vivero cuando algo se rompe. Ve el panel para repararlo, pero el alta
+        // y el recambio de dispositivos (hardware.gestionar) siguen siendo de quien administra.
+        for (Rol rol : new Rol[]{Rol.OPERARIO, Rol.INGENIERO_AGRONOMO, Rol.SERVICIO}) {
+            assertThat(codigos(rol)).as(rol.name()).contains("hardware.ver", "hardware.reparar")
+                    .doesNotContain("hardware.gestionar");
+        }
+        assertThat(Permiso.HARDWARE_REPARAR.getLectura()).isEqualTo(Permiso.HARDWARE_VER);
     }
 
     @Test

@@ -91,6 +91,7 @@ public final class NurseryConstants {
             "Riego", new ActMeta("#E2ECF8", "#1F4F86", "M12 2.7s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11Z"),
             "Insumo", new ActMeta("#ECEBF6", "#4B3F8F", "M9 2h6M10 2v4l-4.5 9A2 2 0 0 0 7.3 18h9.4a2 2 0 0 0 1.8-3L14 6V2"),
             "Mediasombra", new ActMeta("#EFEDE6", "#5F5640", "M4 12h16M12 4v3M6 7l1.5 1.5M18 7l-1.5 1.5M3 16h18a9 9 0 0 0-18 0Z"),
+            "Reparación", new ActMeta("#E3F2E8", "#1E6B41", "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.6-.6-.6-2.6 2.6-2.3Z"),
             "Info", new ActMeta("#ECEEEB", "#545C57", "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-6v-4m0-4h.01")
     );
 

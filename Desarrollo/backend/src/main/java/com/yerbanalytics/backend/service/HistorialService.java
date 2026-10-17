@@ -8,6 +8,7 @@ import com.yerbanalytics.backend.dto.HistorialEvento;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
+import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
@@ -212,6 +213,32 @@ public class HistorialService {
         e.setAccion(type.isBlocking() ? "Evaluación bloqueada." : "Condición normal — sin actuación.");
         e.setRes("Informativo");
         e.setSev(s.getDiagnosisSev());
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra la reparación de un dispositivo averiado (S-05, HU-21 CA-04): quién la hizo, cuándo (el reloj del vivero) y qué
+     * hizo. El evento es del sector del dispositivo, o de la macro-zona ({@code sectorId = "—"}) si es la malla.
+     *
+     * @param falla el tipo de falla que tenía marcada (p. ej. {@code SIN_CAUDAL})
+     */
+    @Transactional
+    public void registrarReparacion(String usuario, String dispositivo, String sectorId, String zonaId, String zonaName,
+                                    String falla, String detalle) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(sectorId);
+        e.setZonaId(zonaId);
+        e.setZonaName(zonaName != null ? zonaName : zonaId);
+        e.setTipo("Reparación");
+        e.setTs(reloj.millis());
+        e.setLectura(dispositivo + " con falla registrada: " + NodeErrorType.describe(falla) + ".");
+        e.setDecision("Reparación registrada por " + usuario + ": " + detalle);
+        e.setAccion("Falla levantada: el dispositivo vuelve a lo autónomo en el siguiente pulso.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
         historialRepository.save(e);
