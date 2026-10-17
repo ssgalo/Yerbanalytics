@@ -233,6 +233,20 @@ export class HttpRepository implements DataRepository {
     return this.mutateDevice('PUT', `${this.baseUrl}/hardware/${encodeURIComponent(id)}`, device);
   }
 
+  async registerRepair(id: string, detalle: string): Promise<HardwareData> {
+    const res = await apiFetch(`${this.baseUrl}/hardware/${encodeURIComponent(id)}/reparacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ detalle }),
+    });
+    if (!res.ok) {
+      // 400 (sin detalle o dispositivo inexistente) y 409 (sin falla registrada) traen { error } con el motivo.
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al registrar la reparación`);
+    }
+    return (await res.json()) as HardwareData;
+  }
+
   /** POST/PUT compartidos: el backend devuelve la flota actualizada o { error } (HU-18 CA-03). */
   private async mutateDevice(
     method: 'POST' | 'PUT',

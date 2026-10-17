@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.*;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ContextoRiego;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
+import com.yerbanalytics.backend.engine.HardwareFaults;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.ResultadoEvaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
@@ -624,10 +625,14 @@ public class NurseryService {
         Instant ahora = reloj.instant();
         Map<String, ContextoRiego> riegoPorSector = Map.of();
         Map<String, HardwareCoverage> hardwarePorSector = Map.of();
+        Map<String, HardwareFaults> fallasPorSector = Map.of();
         WeatherForecast forecast = null;
         if (ejecutaMotor) {
             // S-04: qué actuadores tiene mapeado cada sector, también UNA vez por zona (dos consultas, no una por regla).
-            hardwarePorSector = hardwareService.coverageOf(zoneId, sectors.stream().map(SectorEntity::getId).toList());
+            List<String> sectorIds = sectors.stream().map(SectorEntity::getId).toList();
+            hardwarePorSector = hardwareService.coverageOf(zoneId, sectorIds);
+            // S-05: cuáles de esos actuadores están averiados, también UNA vez por zona.
+            fallasPorSector = hardwareService.faultsOf(sectorIds);
             Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
             riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
             // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker
@@ -664,7 +669,8 @@ public class NurseryService {
             // Motor de Reglas: delega la decisión de actuación al orquestador.
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
             RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()),
-                    check.invalid(), hardwarePorSector.getOrDefault(s.getId(), HardwareCoverage.NONE));
+                    check.invalid(), hardwarePorSector.getOrDefault(s.getId(), HardwareCoverage.NONE),
+                    fallasPorSector.getOrDefault(s.getId(), HardwareFaults.NONE));
             // La traza queda en memoria (última por sector y origen); no toca la base.
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
@@ -691,11 +697,13 @@ public class NurseryService {
      *   <li>{@code bloqueoManualActivo} — consulta {@link ManualLockRepository} por sector y zona.</li>
      *   <li>{@code invalidMetrics} — las métricas descartadas en esta lectura por estar fuera de rango (S-03).</li>
      *   <li>{@code hardware} — los actuadores mapeados del sector y su zona; un sector que no figura no tiene ninguno (S-04).</li>
+     *   <li>{@code faults} — los actuadores del sector y su zona marcados como averiados; un sector que no figura no tiene ninguno (S-05).</li>
      * </ul>
      */
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus,
                                          Instant ahora, WeatherForecast forecast, ContextoRiego riego,
-                                         Set<String> invalidMetrics, HardwareCoverage hardware) {
+                                         Set<String> invalidMetrics, HardwareCoverage hardware,
+                                         HardwareFaults faults) {
         ZonaEntity zona = s.getZona();
 
         boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
@@ -714,7 +722,8 @@ public class NurseryService {
                 riego != null ? riego : ContextoRiego.vacio(),
                 RuleOverrides.NONE,
                 invalidMetrics,
-                hardware
+                hardware,
+                faults
         );
     }
 

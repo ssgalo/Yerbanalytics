@@ -9,6 +9,7 @@
 //    Comando   : nursery/zone/{zona}/sector/{sector}/command     (QoS 1)
 //    Ack       : nursery/zone/{zona}/sector/{sector}/ack
 //    Zona      : nursery/zone/{zona}/command                     (LEER_AHORA, QoS 1)
+//    Errores   : nursery/zone/{zona}/errores                     (nodo → backend, QoS 1)
 //
 //  Ningún otro módulo debe hardcodear nombres de topic o claves JSON.
 // ============================================================================
@@ -148,6 +149,38 @@ static const char* DETALLE_REEMPLAZADO          = "reemplazado";
 static const char* DETALLE_CANCELADO            = "cancelado";
 
 // ----------------------------------------------------------------------------
+//  Errores del nodo (add-fallas-esp32, S-05 de reglas_v2)
+// ----------------------------------------------------------------------------
+//  Topic nursery/zone/{zona}/errores · nodo → backend. El ESP32 detecta la falla, CORTA el
+//  actuador por su cuenta y la publica UNA vez por evento (no repite hasta que se resuelve).
+//  QoS 1, sin retain. El backend marca el dispositivo como averiado y lo saca de lo autónomo
+//  hasta que alguien registre la reparación.
+//    {"nodo":"A4:CF:12:9A:00:01","sector":"MZ-1-012","tipo":"SIN_CAUDAL","valor":0,"timestamp":1760000000}
+//      nodo       serial/MAC del nodo que informa
+//      sector     id del sector; VACÍO ("") en MEDIASOMBRA_FIN_DE_CARRERA (la malla es de la macro-zona)
+//      tipo       uno de los ERROR_* de abajo
+//      valor      caudal medido en L/h (número) para los de caudal; "CERRADA" | "ABIERTA" (texto)
+//                 para el final de carrera que falló en la malla
+//      timestamp  mismo criterio que la telemetría (segundos epoch; el backend lo normaliza)
+//  ERROR_MEDIASOMBRA_FIN_DE_CARRERA es el mismo hecho que el ack "falla_mecanica": el backend
+//  los deduplica y deja una sola alerta.
+//  Caudalímetro: el hardware no está instalado en el vivero; el firmware de producción sólo
+//  publica los de caudal detrás de ENVIAR_ERRORES_CAUDAL (config.h). Espejos:
+//    - backend:   mqtt/ContratoNodo.java (TOPIC_ERRORS*) y mqtt/NodeErrorType.java
+//    - simulador: simulador/server/contract.ts (errorsTopic, NODE_ERROR_TYPES)
+static const char* KEY_NODO   = "nodo";
+static const char* KEY_SECTOR = "sector";
+static const char* KEY_VALOR  = "valor";
+// KEY_TIPO ("tipo") y KEY_TIMESTAMP se comparten con el ack y la telemetría.
+static const char* ERROR_SIN_CAUDAL                 = "SIN_CAUDAL";
+static const char* ERROR_CAUDAL_EXCESIVO            = "CAUDAL_EXCESIVO";
+static const char* ERROR_MEDIASOMBRA_FIN_DE_CARRERA = "MEDIASOMBRA_FIN_DE_CARRERA";
+// Valores de "valor" en ERROR_MEDIASOMBRA_FIN_DE_CARRERA: qué final de carrera falló.
+static const char* VALOR_FIN_CERRADA = "CERRADA";   // la malla no llegó a cerrar: quedó abierta
+static const char* VALOR_FIN_ABIERTA = "ABIERTA";   // la malla no llegó a abrir: quedó cerrada
+static const uint8_t QOS_ERROR = 1;
+
+// ----------------------------------------------------------------------------
 //  Comando de zona "leer ahora" (add-secuencias-demo-expo, design §1.3)
 // ----------------------------------------------------------------------------
 //  Topic nursery/zone/{zona}/command · backend → nodo testigo de la zona (el sensado es por
@@ -254,6 +287,11 @@ inline void contratoTopicComando(char* buf, size_t n, int sector) {
 // Ack del sector 1 o 2: el nodo publica el resultado en el sector del comando.
 inline void contratoTopicAck(char* buf, size_t n, int sector) {
   snprintf(buf, n, "nursery/zone/%s/sector/%s/ack", NODO_ZONA_ID, contratoSectorId(sector));
+}
+
+// Errores del nodo (add-fallas-esp32): el nodo publica en el topic de su zona.
+inline void contratoTopicErrores(char* buf, size_t n) {
+  snprintf(buf, n, "nursery/zone/%s/errores", NODO_ZONA_ID);
 }
 
 // Comando de zona "leer ahora": el nodo testigo de la zona se suscribe a este topic.

@@ -6,6 +6,7 @@ import {
   buildHardware,
   nextDeviceId,
   recambioDispositivo,
+  repararDispositivo,
 } from './hardware';
 import type { NuevoDispositivo } from '@/types/domain';
 
@@ -24,7 +25,9 @@ describe('flota de hardware (HU-18 / HU-21)', () => {
     expect(byId.get('DEV-003')!.estado).toBe('intermitente'); // hace 3 h
     expect(byId.get('DEV-004')!.estado).toBe('fuera_de_servicio'); // hace 26 h
     expect(byId.get('DEV-110')!.estado).toBe('fuera_de_servicio'); // averiado
-    expect(byId.get('DEV-110')!.falla).toBe('Falla Hidráulica');
+    expect(byId.get('DEV-110')!.falla).toBe('SIN_CAUDAL'); // el tipo de error del nodo (S-05)
+    expect(byId.get('DEV-110')!.fallaDesde).toBe(FIXED_NOW - 2 * 3_600_000);
+    expect(byId.get('DEV-101')!.fallaDesde).toBeNull();
   });
 
   it('cuenta los KPIs de la flota', () => {
@@ -113,5 +116,34 @@ describe('recambio (HU-21 CA-05)', () => {
     expect(dev.serial).toBe('EV-5-042-NEW');
     expect(dev.sectorId).toBe('MZ-5-042');
     expect(dev.estado).toBe('operativo');
+  });
+});
+
+describe('reparación (S-05)', () => {
+  it('levanta la falla y deja el dispositivo operativo, con la posición intacta', () => {
+    const fleet = buildFleet(FIXED_NOW);
+
+    repararDispositivo(fleet, 'DEV-110', '  Se destapó el emisor  ');
+
+    const dev = buildHardware(fleet, FIXED_NOW).dispositivos.find((d) => d.id === 'DEV-110')!;
+    expect(dev.falla).toBeNull();
+    expect(dev.fallaDesde).toBeNull();
+    expect(dev.serial).toBe('EV-5-042');
+    expect(dev.estado).toBe('operativo');
+    expect(buildHardware(fleet, FIXED_NOW).averiados).toBe(0);
+  });
+
+  it('exige el detalle, como el backend', () => {
+    const fleet = buildFleet(FIXED_NOW);
+
+    expect(() => repararDispositivo(fleet, 'DEV-110', '   ')).toThrow(/detalle/i);
+    expect(fleet.find((d) => d.id === 'DEV-110')!.falla).toBe('SIN_CAUDAL');
+  });
+
+  it('un dispositivo que no existe, o que no tiene falla, se rechaza', () => {
+    const fleet = buildFleet(FIXED_NOW);
+
+    expect(() => repararDispositivo(fleet, 'DEV-999', 'x')).toThrow(/no existe/);
+    expect(() => repararDispositivo(fleet, 'DEV-101', 'x')).toThrow(/no tiene una falla/);
   });
 });

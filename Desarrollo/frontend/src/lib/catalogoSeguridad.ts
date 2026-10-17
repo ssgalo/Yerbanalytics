@@ -26,7 +26,7 @@ export const NOMBRE_ROL: Record<Rol, string> = {
   SERVICIO: 'Servicio',
 };
 
-/** El catálogo de 22 permisos, en el orden del backend (ya viene agrupado). */
+/** El catálogo de 23 permisos, en el orden del backend (ya viene agrupado). */
 export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'vivero.ver', grupo: 'Vivero', descripcion: 'Panel general, detalle de macro-zona y de sector', lectura: null },
   { codigo: 'diagnosticos.ver', grupo: 'Diagnósticos', descripcion: 'Diagnósticos de IA y su consulta', lectura: null },
@@ -38,6 +38,7 @@ export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'reglas.editar', grupo: 'Motor de reglas', descripcion: 'Editar el catálogo de parámetros', lectura: 'reglas.ver' },
   { codigo: 'hardware.ver', grupo: 'Hardware', descripcion: 'Estado del hardware', lectura: null },
   { codigo: 'hardware.gestionar', grupo: 'Hardware', descripcion: 'Alta y recambio de dispositivos', lectura: 'hardware.ver' },
+  { codigo: 'hardware.reparar', grupo: 'Hardware', descripcion: 'Registrar la reparación de un dispositivo averiado', lectura: 'hardware.ver' },
   { codigo: 'topologia.ver', grupo: 'Topología', descripcion: 'Ver la topología del vivero', lectura: null },
   { codigo: 'topologia.gestionar', grupo: 'Topología', descripcion: 'Generar la topología y cambiar su disposición', lectura: 'topologia.ver' },
   { codigo: 'capturas.ver', grupo: 'Captura', descripcion: 'Órdenes de captura e imágenes', lectura: null },
@@ -69,7 +70,7 @@ const TODOS_LOS_VER: Permiso[] = [
 /** La matriz que siembra el backend en una base vacía. */
 export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
   ADMINISTRADOR: CATALOGO_PERMISOS.map((p) => p.codigo),
-  INGENIERO_AGRONOMO: [...TODOS_LOS_VER, 'configuracion.editar', 'reglas.editar', 'bloqueos.gestionar'],
+  INGENIERO_AGRONOMO: [...TODOS_LOS_VER, 'configuracion.editar', 'reglas.editar', 'bloqueos.gestionar', 'hardware.reparar'],
   PRODUCTOR_VIVERISTA: [...TODOS_LOS_VER, 'pasadas.operar'],
   OPERARIO: [
     'vivero.ver',
@@ -79,6 +80,8 @@ export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
     'pasadas.ver',
     'bloqueos.ver',
     'bloqueos.gestionar',
+    'hardware.ver',
+    'hardware.reparar',
   ],
   SERVICIO: [
     'vivero.ver',
@@ -91,6 +94,8 @@ export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
     'bloqueos.ver',
     'bloqueos.gestionar',
     'simulacion.gestionar',
+    'hardware.ver',
+    'hardware.reparar',
   ],
 };
 

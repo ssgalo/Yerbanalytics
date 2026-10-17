@@ -59,6 +59,12 @@
 //  modela (salinidad, tds), así que es seguro activarlo.
 #define ENVIAR_METRICAS_EXTENDIDAS   1
 
+// Errores de caudal (S-05): SIN_CAUDAL / CAUDAL_EXCESIVO en nursery/zone/{zona}/errores. El caudalímetro NO está instalado en
+// el vivero (se incorpora en la versión final, reglas_v2 §1.2): con 0 el firmware no compila el punto de integración
+// task_actuacion::informarErrorCaudal(). Sin hardware, el backend recibe estos errores sólo del simulador.
+// La falla de la mediasombra (MEDIASOMBRA_FIN_DE_CARRERA) se informa siempre: ya hay un final de carrera por sentido.
+#define ENVIAR_ERRORES_CAUDAL        0
+
 // ============================================================================
 //  PINES — ESP32-S3 DevKitC-1 N16R8
 // ----------------------------------------------------------------------------

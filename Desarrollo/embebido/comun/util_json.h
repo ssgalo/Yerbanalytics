@@ -28,6 +28,10 @@ ResultadoComandoZona parsearComandoZona(const char* payload, unsigned int len, c
 // Serializa un Ack (status SUCCESS/ERROR + detalle). Escribe en buf.
 size_t serializarAck(const Ack& a, char* buf, size_t n);
 
+// Serializa un error del nodo al contrato de errores ({nodo, sector, tipo, valor, timestamp}). 'sectorId' es el id real
+// del sector ("" en el error de la mediasombra). Escribe en buf.
+size_t serializarError(const ErrorNodo& e, const char* nodo, const char* sectorId, uint32_t timestamp, char* buf, size_t n);
+
 // Parsea un comando del riel. Siempre completa 'out': si no es válido,
 // out.valido = false y out.detalle dice por qué.
 void parsearComandoRiel(const char* payload, unsigned int len, ComandoRiel& out);

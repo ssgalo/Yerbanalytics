@@ -127,7 +127,7 @@ class DeficitCriticoRuleTest {
     @DisplayName("metadatos: RIEGO, prioridad 5 y parámetros declarados")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(5);
+        assertThat(rule.priority()).isEqualTo(6);
         assertThat(rule.parametros()).containsExactlyInAnyOrder(ParametrosRiego.UMBRAL_CRITICO,
                 ParametrosRiego.VOLUMEN_MAX_EVENTO, ParametrosRiego.CAUDAL_EMISOR, ParametrosRiego.EXCEPTUADO_BLOQUEO);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());

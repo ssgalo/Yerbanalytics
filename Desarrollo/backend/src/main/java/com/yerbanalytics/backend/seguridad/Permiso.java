@@ -32,6 +32,7 @@ public enum Permiso {
     REGLAS_EDITAR("reglas.editar", "Motor de reglas", "Editar el catálogo de parámetros", REGLAS_VER),
     HARDWARE_VER("hardware.ver", "Hardware", "Ver el estado del hardware", null),
     HARDWARE_GESTIONAR("hardware.gestionar", "Hardware", "Alta y recambio de dispositivos", HARDWARE_VER),
+    HARDWARE_REPARAR("hardware.reparar", "Hardware", "Registrar la reparación de un dispositivo averiado", HARDWARE_VER),
     TOPOLOGIA_VER("topologia.ver", "Topología", "Ver la topología del vivero", null),
     TOPOLOGIA_GESTIONAR("topologia.gestionar", "Topología", "Generar la topología y cambiar su disposición", TOPOLOGIA_VER),
     CAPTURAS_VER("capturas.ver", "Captura", "Ver órdenes de captura e imágenes", null),
@@ -102,13 +103,13 @@ public enum Permiso {
     public static Set<Permiso> matrizPorDefecto(Rol rol) {
         return switch (rol) {
             case ADMINISTRADOR -> EnumSet.allOf(Permiso.class);
-            case INGENIERO_AGRONOMO -> con(LECTURAS, CONFIGURACION_EDITAR, REGLAS_EDITAR, BLOQUEOS_GESTIONAR);
+            case INGENIERO_AGRONOMO -> con(LECTURAS, CONFIGURACION_EDITAR, REGLAS_EDITAR, BLOQUEOS_GESTIONAR, HARDWARE_REPARAR);
             case PRODUCTOR_VIVERISTA -> con(LECTURAS, PASADAS_OPERAR);
             case OPERARIO -> EnumSet.of(VIVERO_VER, DIAGNOSTICOS_VER, HISTORIAL_VER, CAPTURAS_VER, PASADAS_VER,
-                    BLOQUEOS_VER, BLOQUEOS_GESTIONAR);
+                    BLOQUEOS_VER, BLOQUEOS_GESTIONAR, HARDWARE_VER, HARDWARE_REPARAR);
             case SERVICIO -> EnumSet.of(VIVERO_VER, TOPOLOGIA_VER, CAPTURAS_VER, CAPTURAS_ORDENAR,
                     DIAGNOSTICOS_VER, DIAGNOSTICOS_REGISTRAR, CAMARA_GESTIONAR, BLOQUEOS_VER, BLOQUEOS_GESTIONAR,
-                    SIMULACION_GESTIONAR, HARDWARE_VER);
+                    SIMULACION_GESTIONAR, HARDWARE_VER, HARDWARE_REPARAR);
         };
     }
 

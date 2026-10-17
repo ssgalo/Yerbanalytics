@@ -23,6 +23,7 @@ import type {
   DemoRuleUpdate,
   ManualLock,
   NewDiagnosis,
+  NodeErrorPlan,
   NuevoHardware,
   NurseryTopology,
   PairingCode,
@@ -104,6 +105,19 @@ export async function sendTelemetry(input: TelemetryInput): Promise<void> {
   await check(res, 'publicar la lectura');
 }
 
+/**
+ * Publishes an error as the node of the zone would (S-05). For the shade error the sector is ignored: the mesh belongs
+ * to the macro-zone.
+ */
+export async function sendNodeError(error: NodeErrorPlan & { zonaId: string; sector: string }): Promise<void> {
+  const res = await fetch('/api/node-errors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(error),
+  });
+  await check(res, 'publicar el error del nodo');
+}
+
 export async function setAutoEmission(active: boolean): Promise<void> {
   const res = await fetch('/api/emission', {
     method: 'PUT',
@@ -161,6 +175,19 @@ export async function getHardwareDevices(): Promise<HardwareDevice[]> {
     'consultar el registro de hardware',
   );
   return data.dispositivos;
+}
+
+/**
+ * Registers the repair of a faulty device (S-05, HU-21 CA-04): the public endpoint the dashboard uses too. Needs
+ * `hardware.reparar` on the Servicio account.
+ */
+export async function registerRepair(deviceId: string, detail: string): Promise<void> {
+  const res = await fetch(`${BACKEND}/api/hardware/${encodeURIComponent(deviceId)}/reparacion`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ detalle: detail }),
+  });
+  await check(res, 'registrar la reparación');
 }
 
 export async function getTopology(): Promise<NurseryTopology> {
