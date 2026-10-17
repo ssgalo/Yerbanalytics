@@ -1,4 +1,4 @@
-/* MapPage — detalle de macro-zona: sectores, sensado y rustificación */
+/* MapPage — detalle de macro-zona: sectores, sensado, rustificación y bloqueo manual */
 
 .page {
   display: flex;
@@ -57,10 +57,14 @@
   grid-area: hardening;
 }
 
-/* Macro-zona más ancha que alta: las tres tarjetas apiladas, a todo el ancho */
+.lock {
+  grid-area: lock;
+}
+
+/* Macro-zona más ancha que alta: las tarjetas apiladas, a todo el ancho */
 .wide {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'sectors' 'sensing' 'hardening';
+  grid-template-areas: 'sectors' 'sensing' 'hardening' 'lock';
 }
 
 /* Macro-zona más alta que ancha: los sectores miden lo que su grilla (hasta un tope; lo demás se
@@ -70,13 +74,14 @@
   grid-template-columns: fit-content(55%) minmax(0, 1fr);
   grid-template-areas:
     'sectors sensing'
-    'hardening hardening';
+    'hardening hardening'
+    'lock lock';
 }
 
 /* En pantallas angostas no entran dos columnas: se apila igual que una zona ancha */
 @media (max-width: 900px) {
   .tall {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'sectors' 'sensing' 'hardening';
+    grid-template-areas: 'sectors' 'sensing' 'hardening' 'lock';
   }
 }

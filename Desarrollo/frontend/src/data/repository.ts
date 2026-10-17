@@ -22,6 +22,8 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  ManualLock,
+  NewManualLock,
   ParametrosSecuencia,
   Pasada,
   Secuencia,
@@ -119,4 +121,13 @@ export interface DataRepository {
   getSecuenciaActual(): Promise<Secuencia | null>;
   /** Rechaza con `SecuenciaRechazadaError` si no hay una secuencia en curso. */
   cancelarSecuencia(): Promise<Secuencia>;
+  /** Bloqueos manuales vigentes, del más nuevo al más viejo (HU-19). */
+  getManualLocks(): Promise<ManualLock[]>;
+  /**
+   * Bloquea un sector o, sin `sectorId`, toda la macro-zona. Rechaza con `ManualLockError` (mensaje del
+   * 400/409) si es inválido o ya está bloqueado.
+   */
+  activateManualLock(lock: NewManualLock): Promise<ManualLock>;
+  /** Reanuda (desactiva) un bloqueo. Rechaza con `ManualLockError` si no existe o ya se reanudó (404). */
+  releaseManualLock(id: number): Promise<void>;
 }

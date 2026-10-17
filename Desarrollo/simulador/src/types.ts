@@ -292,3 +292,13 @@ export interface NuevoHardware {
   zonaId: string | null;
   sectorId: string | null;
 }
+
+/** A manual lock of the platform (`GET /api/bloqueos`). `sectorId` is null when it covers the whole zone. */
+export interface ManualLock {
+  id: number;
+  zonaId: string;
+  sectorId: string | null;
+  activadoPor: string;
+  activadoTs: number;
+  motivo: string;
+}

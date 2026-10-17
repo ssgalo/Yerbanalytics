@@ -481,6 +481,28 @@ export interface NuevoPlanRustificacion {
   etapas: Omit<EtapaRustificacion, 'orden'>[];
 }
 
+/**
+ * Bloqueo manual vigente de la actuación autónoma (HU-19). Espejo del DTO `ManualLock`; las claves
+ * son las del contrato de la API. `sectorId` es `null` si el bloqueo es de toda la macro-zona.
+ */
+export interface ManualLock {
+  id: number;
+  zonaId: string;
+  sectorId: string | null;
+  activadoPor: string;
+  /** epoch ms */
+  activadoTs: number;
+  motivo: string;
+}
+
+/** Lo que manda el dashboard al bloquear. Quién bloquea lo sabe el backend por la sesión. */
+export interface NewManualLock {
+  zonaId: string;
+  /** Sin sector, se bloquea toda la macro-zona. */
+  sectorId?: string;
+  motivo: string;
+}
+
 /** Estado operativo derivado de un dispositivo (HU-21). */
 export type EstadoHardware = 'operativo' | 'intermitente' | 'fuera_de_servicio';
 

@@ -10,7 +10,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | **C** | `add-control-demo-reglas` | ✅ | `feat/reglas-v2-control-demo` | — | `DemoControllable`, clima simulado completo (24 marcas, UV máximo, modo offline), escenarios en el simulador. Backend: 18 tests ya fallaban en `develop` (`DiagnosticoControllerTest`, `NurseryControllerTest`) |
 | **H** | `add-historial-lecturas` | ✅ | `feat/reglas-v2-historial-lecturas` | — | Tabla `zone_reading`, `ReadingHistory`, `ReadingRecorder`, `ReadingPurge`; parámetro `readings.retention-days`. Habilita 4, 7, 8 y 9 |
 | 0 | `align-reglas-existentes-v2` | ✅ | `feat/reglas-v2-align` | C | S-02 completo (estado seguro, reintento a los 15 min, parámetros `sensado.*`), confianza 70 %. R-02, guarda de ciclo y escalamiento por pulso: se mantienen (D-2 a, D-3, D-6), documentado |
-| 1 | `add-bloqueo-manual` | ⬜ | — | C | S-01 |
+| 1 | `add-bloqueo-manual` | ✅ | `feat/reglas-v2-bloqueo-manual` | C | S-01. API `/api/bloqueos`, cierre inmediato de válvulas y bombas (`ActuatorShutdown`), alertas INFO, tarjeta en sector y macro-zona, escenario `LOCK` del simulador. Migración manual de permisos (`migracion-permisos-bloqueo.sql`). Pendiente en 5: que M-01/M-02 respeten el bloqueo de zona |
 | 2 | `add-seguridad-lectura-hardware` | ⬜ | — | C | S-03, S-04 |
 | 3 | `add-fallas-esp32` | ⬜ | — | C, 2 | S-05 |
 | 4 | `add-metrica-dpv` | ⬜ | — | C, H | §1.4 DPV |
@@ -28,7 +28,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 |---|---|---|
 | R-01, R-03, R-04, R-05, R-06 | ✅ ya estaban (parámetros verificados contra §11) | — |
 | R-02 (tope en 0) | ⚠️ tope de 12 h siempre aplicado (desviación documentada) hasta que exista S-06; se reevalúa en 10 | 0 → 10 |
-| S-01 | ⬜ | 1 |
+| S-01 | ✅ (mediasombra por zona: lo cierra 5, tarea 0.4) | 1 |
 | S-02 | ✅ (escalamiento por pulso, no por intento: D-6) | 0 |
 | S-03, S-04 | ⬜ | 2 |
 | S-05 | ⬜ | 3 |

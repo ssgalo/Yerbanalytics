@@ -59,6 +59,8 @@ export interface RuleConditionResult {
   silenceZone: boolean;
   /** Sensing pulses to request, one after the other (at least one). */
   pulses: number;
+  /** A manual lock to create over the target before the pulse; null if no selected scenario asks for one. */
+  manualLock: { reason: string } | null;
   conflictos: string[];
   resumen: string[];
 }
@@ -120,6 +122,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       needsCooldownReset: false,
       silenceZone: false,
       pulses: 1,
+      manualLock: null,
       conflictos,
       resumen: [],
     };
@@ -131,6 +134,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
   let diagnostico: DiagnosisPlan | null = null;
   let silenceZone = false;
   let pulses = 1;
+  let manualLock: { reason: string } | null = null;
 
   for (const scenario of selected) {
     const patch = scenario.apply(ctx);
@@ -143,6 +147,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     diagnostico = patch.diagnosis ?? diagnostico;
     silenceZone = silenceZone || (patch.silenceZone ?? false);
     pulses = Math.max(pulses, patch.pulses ?? 1);
+    manualLock = patch.manualLock ?? manualLock;
     notes.push(...(patch.notes ?? []));
   }
 
@@ -164,6 +169,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     needsCooldownReset,
     silenceZone,
     pulses,
+    manualLock,
     conflictos,
     resumen,
   };
