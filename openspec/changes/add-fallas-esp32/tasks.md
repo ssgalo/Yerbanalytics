@@ -26,11 +26,11 @@
 ## 4. Firmware y simulador
 - [ ] 4.1 Firmware: publicar `MEDIASOMBRA_FIN_DE_CARRERA` y exponer ambos finales de carrera; compila con `arduino-cli`.
 - [ ] 4.2 Firmware: publicar caudal sólo detrás de un flag de compilación (sin hardware instalado).
-- [ ] 4.3 Simulador: botón por tipo de error (`Desarrollo/simulador/`); el backend no se toca.
+- [x] 4.3 Simulador: botón por tipo de error (`Desarrollo/simulador/`); el backend no se toca.
 
 ## 5. Cierre
 - [ ] 5.1 README del backend, README del sketch, índice, suites verdes.
 
 ## 6. Control desde el simulador (requiere `add-control-demo-reglas`)
 - [x] 6.1 Las dos reglas y el receptor como `DemoControllable` (apagado + bypass `fault`); tests.
-- [ ] 6.2 Escenarios `FAULT_NO_FLOW`, `FAULT_OVERFLOW`, `FAULT_SHADE_LIMIT` (publican en el tópico de errores) y `REPAIR` (registra la reparación) con sus tests. Ya estaba prevista la inyección de errores en 4.3: este bloque la completa con el catálogo de escenarios.
+- [x] 6.2 Escenarios `FAULT_NO_FLOW`, `FAULT_OVERFLOW`, `FAULT_SHADE_LIMIT` (publican en el tópico de errores) y `REPAIR` (registra la reparación) con sus tests. Ya estaba prevista la inyección de errores en 4.3: este bloque la completa con el catálogo de escenarios.

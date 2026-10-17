@@ -227,6 +227,29 @@ que la cuenta de rol Servicio tenga `hardware.ver` (viene en la matriz por defec
 «Lectura inválida»: la causa de que no se riegue sería ambigua. Los controles de la regla (apagar, bypass `hardware`) están en
 Telemetría → Control de reglas.
 
+**Fallas del nodo (S-05).** El ESP32 real detecta una falla, corta el actuador por su cuenta y la publica **una vez** en
+`nursery/zone/{zona}/errores`; el backend marca el dispositivo como averiado y lo saca de lo autónomo hasta que alguien registra la
+reparación. El simulador publica ese mismo mensaje en el broker (`POST /api/node-errors` de su servidor, que arma el payload del
+contrato con `buildNodeError`): **no simula el hardware** detrás (el caudalímetro no existe todavía), sólo el aviso. Son cuatro
+escenarios:
+
+| Escenario | Qué hace | Qué se ve |
+|---|---|---|
+| `FAULT_NO_FLOW` «Sin caudal» | Publica `SIN_CAUDAL` en el sector elegido (uno de la zona **con** su electroválvula registrada) con el sustrato seco fijado | «Falla hidráulica» en Hardware, alerta `CRITICAL` que pide **riego manual**, y el pulso no riega ese sector (tampoco R-02) |
+| `FAULT_OVERFLOW` «Caudal excesivo» | Publica `CAUDAL_EXCESIVO` (180 L/h) con el sustrato húmedo fijado | Lo mismo, pero la alerta **no** pide riego manual |
+| `FAULT_SHADE_LIMIT` «Falla de mediasombra» | Publica `MEDIASOMBRA_FIN_DE_CARRERA` (final de «cerrada») sin sector | «Falla mecánica en mediasombra» en toda la zona, alerta `CRITICAL` que pide cubrir a mano; `ShadingRule` deja de mover la malla |
+| `REPAIR` «Reparación» | Registra la reparación (`POST /backend/api/hardware/{id}/reparacion`) de **todos** los dispositivos averiados de la zona | La falla se levanta, queda el evento «Reparación» en el historial y el siguiente pulso vuelve a regar el sector |
+
+Antes del pulso el panel espera (hasta unos 4 s) a que el registro de hardware muestre la marca; si no aparece avisa con «⚠» y sigue:
+es justo lo que se ve con el receptor de errores apagado. **El simulador nunca marca ni limpia una falla por su cuenta**: publica el
+aviso o usa el endpoint público de reparación, el mismo que el dashboard. Necesita que la cuenta de rol Servicio tenga `hardware.ver`
+y `hardware.reparar` (vienen en la matriz por defecto; en una base ya sembrada, correr `migracion-permisos-hardware-servicio.sql` y
+`migracion-permisos-hardware-reparar.sql` del backend). Las fallas de caudal necesitan la emisión automática activa (el sustrato viaja
+en la respuesta al pulso). No se combinan con R-02, R-04, el bloqueo manual, el nodo mudo, «Lectura inválida» ni «Hardware incompleto»
+(la falla de la mediasombra, sólo con el bloqueo, el nodo mudo y «Hardware incompleto»); «Sin caudal» y «Caudal excesivo» entre sí
+tampoco, ni ninguna falla con la reparación. Los controles de las piezas (apagar el receptor `HardwareFaultService`, bypass `fault` de
+`HydraulicFaultRule` y `ShadeFaultRule`) están en Telemetría → Control de reglas.
+
 ---
 
 ## Qué endpoints del sistema usa
@@ -241,6 +264,7 @@ Ninguno es del simulador. Todos son superficie **pública** de la plataforma:
 | `GET /api/capturas/ordenes/{id}` | idem |
 | `GET /api/camara/dispositivos`, `POST /api/camara/vinculacion` | el backoffice |
 | `POST /api/diagnosticos` | el servicio de inferencia |
+| `GET /api/hardware`, `POST /api/hardware/{id}/reparacion` | el panel de Hardware del dashboard (la reparación la registra quien arregla el equipo) |
 | `GET/PUT /api/demo/rules`, `POST/DELETE /api/demo/weather`, `GET/PUT /api/demo/weather/offline` | sólo existen con el backend en modo demo (en producción dan 404) |
 
 Por eso el recorrido que se ensaya acá es literalmente el que va a correr solo cuando exista el

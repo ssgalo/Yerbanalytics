@@ -18,6 +18,7 @@ import mqtt, { type MqttClient } from 'mqtt';
 import { config } from './config.ts';
 import {
   ackTopic,
+  errorsTopic,
   isReadNow,
   parseCommandTopic,
   parseZoneCommandTopic,
@@ -25,6 +26,7 @@ import {
   telemetryTopic,
   valveDurationWarning,
   type ActuatorCommand,
+  type NodeErrorPayload,
   type TelemetryPayload,
 } from './contract.ts';
 import { answerReadNow } from './emission.ts';
@@ -189,12 +191,23 @@ export function isConnected(): boolean {
  * out at once.
  */
 export async function publish(zonaId: string, payload: TelemetryPayload): Promise<void> {
+  await publishJson(telemetryTopic(zonaId), payload);
+}
+
+/**
+ * Publishes an error as the zone's node would (S-05): same topic and payload as the firmware, QoS 1, no retain. The
+ * backend marks the device as faulty without being able to tell there was a simulator on the other end.
+ */
+export async function publishNodeError(zonaId: string, payload: NodeErrorPayload): Promise<void> {
+  await publishJson(errorsTopic(zonaId), payload);
+}
+
+async function publishJson(topic: string, payload: TelemetryPayload | NodeErrorPayload): Promise<void> {
   if (!client || !client.connected) {
     throw new PublishFailed(
       `No hay conexión con el broker MQTT (${config.mqttUrl}). Verificá que Mosquitto esté levantado.`,
     );
   }
-  const topic = telemetryTopic(zonaId);
   const message = JSON.stringify(payload);
 
   await new Promise<void>((resolve, reject) => {

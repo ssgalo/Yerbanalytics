@@ -13,6 +13,7 @@ import { backendSession } from './backend-session.ts';
 import { config } from './config.ts';
 import {
   METRIC_KEYS,
+  buildNodeError,
   toContractUnits,
   type MetricKey,
   type TelemetryPayload,
@@ -20,7 +21,8 @@ import {
 import * as store from './store.ts';
 import { InvalidInput } from './store.ts';
 import * as emission from './emission.ts';
-import { isConnected, publish } from './mqtt.ts';
+import { isConnected, publish, publishNodeError } from './mqtt.ts';
+import { parseNodeErrorRequest } from './node-errors.ts';
 
 export const api = Router();
 
@@ -164,6 +166,21 @@ api.post(
 
     await publish(zonaId, payload);
     res.status(202).json({ zonaId, serial, timestamp, metrics: Object.keys(metrics) });
+  }),
+);
+
+// ------------------------------------------------------------------
+// Node errors (S-05): a failure the node would detect and publish once on its zone's `errores` topic
+// ------------------------------------------------------------------
+
+api.post(
+  '/node-errors',
+  asyncRoute(async (req, res) => {
+    const { zonaId, input } = parseNodeErrorRequest(req.body);
+    const payload = buildNodeError(input, Date.now());
+
+    await publishNodeError(zonaId, payload);
+    res.status(202).json({ zonaId, ...payload });
   }),
 );
 

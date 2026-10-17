@@ -12,7 +12,7 @@
    ============================================================ */
 import { SCENARIOS } from './scenarios';
 import type { DiagnosisPlan, RuleScenario, ScenarioContext, TelemetryClaim, ThresholdMap } from './scenarios/types';
-import type { ParametroRegla, SimulatedWeather } from './types';
+import type { NodeErrorPlan, ParametroRegla, SimulatedWeather } from './types';
 
 export type { DiagnosisPlan, ThresholdMap } from './scenarios/types';
 
@@ -69,6 +69,14 @@ export interface RuleConditionResult {
   pinnedMetrics: Record<string, number>;
   /** The target zone needs a sector with no electrovalve registered (the simulator reads the registry, never edits it). */
   needsSectorWithoutValve: boolean;
+  /** Errors the target zone's node publishes before the pulse (S-05), in `applyOrder`; empty if no scenario asks for one. */
+  nodeErrors: NodeErrorPlan[];
+  /** An error about a sector's valve is published: the operator picks a sector of the zone that has its valve registered. */
+  needsSectorWithValve: boolean;
+  /** Repair of the zone's faulty devices to register before the pulse; null if no selected scenario asks for it. */
+  repair: { detail: string } | null;
+  /** The zone must have a device marked as faulty for the scenario to have something to repair. */
+  needsFaultyDevice: boolean;
   conflictos: string[];
   resumen: string[];
 }
@@ -133,6 +141,10 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       manualLock: null,
       pinnedMetrics: {},
       needsSectorWithoutValve: false,
+      nodeErrors: [],
+      needsSectorWithValve: false,
+      repair: null,
+      needsFaultyDevice: false,
       conflictos,
       resumen: [],
     };
@@ -141,6 +153,10 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
   const claims = new Map<string, TelemetryClaim>();
   const pinnedClaims = new Map<string, TelemetryClaim>();
   let needsSectorWithoutValve = false;
+  const nodeErrors: NodeErrorPlan[] = [];
+  let needsSectorWithValve = false;
+  let repair: { detail: string } | null = null;
+  let needsFaultyDevice = false;
   const notes: string[] = [];
   let weather: Partial<SimulatedWeather> | null = null;
   let diagnostico: DiagnosisPlan | null = null;
@@ -164,6 +180,10 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       pinnedClaims.set(metric, claim);
     }
     needsSectorWithoutValve = needsSectorWithoutValve || (patch.needsSectorWithoutValve ?? false);
+    if (patch.nodeError) nodeErrors.push(patch.nodeError);
+    needsSectorWithValve = needsSectorWithValve || (patch.needsSectorWithValve ?? false);
+    repair = patch.repair ?? repair;
+    needsFaultyDevice = needsFaultyDevice || (patch.needsFaultyDevice ?? false);
     notes.push(...(patch.notes ?? []));
   }
 
@@ -188,6 +208,10 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     manualLock,
     pinnedMetrics: Object.fromEntries([...pinnedClaims].map(([metric, claim]) => [metric, claim.value])),
     needsSectorWithoutValve,
+    nodeErrors,
+    needsSectorWithValve,
+    repair,
+    needsFaultyDevice,
     conflictos,
     resumen,
   };
