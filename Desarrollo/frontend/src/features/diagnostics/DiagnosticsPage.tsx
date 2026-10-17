@@ -75,7 +75,11 @@ export function DiagnosticsPage() {
         onFilter={(column: ColumnKey, value: string[] | Range | null) =>
           changeFilters({ ...filters, [column]: value })
         }
-        onClear={() => changeFilters(NO_COLUMN_FILTERS)}
+        onClear={() => {
+          changeFilters(NO_COLUMN_FILTERS);
+          setDiagnosisClass(null);
+        }}
+        otherFilter={diagnosisClass != null}
         sort={sort}
         onSort={setSort}
         resultCount={visible.length}

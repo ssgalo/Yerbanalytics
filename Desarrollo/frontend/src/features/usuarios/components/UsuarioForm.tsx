@@ -3,8 +3,10 @@
    Valida lo mismo que el backend antes de enviar; lo que el backend rechace igual (409 por
    username repetido, último Administrador…) se muestra con su mensaje.
    ============================================================ */
-import { useState, type FormEvent } from 'react';
-import { Card } from '@/components/ui/Card';
+import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Callout } from '@/components/ui/Callout';
+import { Field, Input, Select } from '@/components/ui/Field';
 import { ROLES, nombreRol } from '@/lib/catalogoSeguridad';
 import { errorClave } from '@/lib/claves';
 import type { EdicionUsuario, NuevoUsuario, Rol, Usuario } from '@/types/seguridad';
@@ -23,6 +25,19 @@ interface EdicionProps {
   usuario: Usuario;
   onSubmit: (edicion: EdicionUsuario) => Promise<void>;
   onCancel: () => void;
+}
+
+/** Título y aclaración del formulario; el formulario se muestra dentro de un `Popover`. */
+function FormSection({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+  return (
+    <>
+      <header className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+        <p className={styles.sectionHint}>{hint}</p>
+      </header>
+      {children}
+    </>
+  );
 }
 
 export function UsuarioForm(props: AltaProps | EdicionProps) {
@@ -71,25 +86,22 @@ export function UsuarioForm(props: AltaProps | EdicionProps) {
     }
   };
 
-  return (
-    <Card className={styles.section}>
-      <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>
-          {props.modo === 'alta' ? 'Nuevo usuario' : `Editar «${original?.username}»`}
-        </h2>
-        <span className={styles.sectionHint}>
-          {props.modo === 'alta'
-            ? 'Queda activo y tiene que cambiar la contraseña temporal en su primer ingreso'
-            : 'El nombre de usuario no se puede cambiar'}
-        </span>
-      </div>
+  const id = useId();
 
-      <form onSubmit={onSubmit}>
+  return (
+    <FormSection
+      title={props.modo === 'alta' ? 'Nuevo usuario' : `Editar «${original?.username}»`}
+      hint={
+        props.modo === 'alta'
+          ? 'Queda activo y tiene que cambiar la contraseña temporal en su primer ingreso'
+          : 'El nombre de usuario no se puede cambiar'
+      }
+    >
+      <form onSubmit={onSubmit} noValidate>
         <div className={styles.formGrid}>
-          <label className={styles.group}>
-            <span className={styles.label}>Nombre de usuario</span>
-            <input
-              className={styles.input}
+          <Field label="Nombre de usuario" htmlFor={`${id}-username`}>
+            <Input
+              id={`${id}-username`}
               value={username}
               disabled={props.modo === 'edicion'}
               autoCapitalize="none"
@@ -97,68 +109,62 @@ export function UsuarioForm(props: AltaProps | EdicionProps) {
               placeholder="jperez"
               onChange={(e) => setUsername(e.target.value)}
             />
-          </label>
-          <label className={styles.group}>
-            <span className={styles.label}>Nombre a mostrar</span>
-            <input
-              className={styles.input}
-              value={nombre}
-              placeholder="Juan Pérez"
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </label>
-          <label className={styles.group}>
-            <span className={styles.label}>Rol</span>
-            <select className={styles.select} value={rol} onChange={(e) => setRol(e.target.value as Rol)}>
+          </Field>
+          <Field label="Nombre a mostrar" htmlFor={`${id}-nombre`}>
+            <Input id={`${id}-nombre`} value={nombre} placeholder="Juan Pérez" onChange={(e) => setNombre(e.target.value)} />
+          </Field>
+          <Field label="Rol" htmlFor={`${id}-rol`}>
+            <Select id={`${id}-rol`} value={rol} modified={cambiaRol} onChange={(e) => setRol(e.target.value as Rol)}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
                   {nombreRol(r)}
                 </option>
               ))}
-            </select>
-          </label>
+            </Select>
+          </Field>
           {props.modo === 'alta' && (
-            <label className={styles.group}>
-              <span className={styles.label}>Contraseña temporal</span>
-              <input
-                className={styles.input}
+            <Field label="Contraseña temporal" htmlFor={`${id}-clave`}>
+              <Input
+                id={`${id}-clave`}
                 type="password"
                 autoComplete="new-password"
                 value={clave}
                 onChange={(e) => setClave(e.target.value)}
               />
-            </label>
+            </Field>
           )}
         </div>
 
-        {rol === 'SERVICIO' && (
-          <div role="note" className={styles.advertencia}>
-            El rol Servicio es para integraciones (el simulador, el servicio de inferencia), no para personas: sus
-            permisos son los que esas herramientas necesitan para hablar con la API.
-          </div>
-        )}
-        {cambiaRol && (
-          <div role="note" className={styles.info}>
-            Al cambiar el rol se cierran las sesiones abiertas de «{original?.username}»: vuelve a entrar con los
-            permisos de {nombreRol(rol)}.
-          </div>
-        )}
-        {error && (
-          <div role="alert" className={styles.errorBox}>
-            {error}
-          </div>
-        )}
+        <div className={styles.formNotes}>
+          {rol === 'SERVICIO' && (
+            <Callout tone="warn" role="note">
+              El rol Servicio es para integraciones (el simulador, el servicio de inferencia), no para personas: sus
+              permisos son los que esas herramientas necesitan para hablar con la API.
+            </Callout>
+          )}
+          {cambiaRol && (
+            <Callout tone="info" role="note">
+              Al cambiar el rol se cierran las sesiones abiertas de «{original?.username}»: vuelve a entrar con los
+              permisos de {nombreRol(rol)}.
+            </Callout>
+          )}
+          {error && (
+            <Callout tone="crit" role="alert">
+              {error}
+            </Callout>
+          )}
+        </div>
 
         <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={enviando}>
+          <Button type="submit" variant="primary" disabled={enviando}>
             {enviando ? 'Guardando…' : props.modo === 'alta' ? 'Dar de alta' : 'Guardar cambios'}
-          </button>
-          <button type="button" className={styles.btnSecondary} onClick={props.onCancel}>
+          </Button>
+          <Button variant="ghost" onClick={props.onCancel}>
             Cancelar
-          </button>
+          </Button>
         </div>
       </form>
-    </Card>
+    </FormSection>
   );
 }
 
@@ -192,41 +198,35 @@ export function BlanqueoForm({ usuario, onSubmit, onCancel }: BlanqueoProps) {
     }
   };
 
+  const id = useId();
+
   return (
-    <Card className={styles.section}>
-      <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>Restablecer la contraseña de «{usuario.username}»</h2>
-        <span className={styles.sectionHint}>
-          Se cierran sus sesiones y tiene que cambiarla al ingresar. La contraseña no queda registrada.
-        </span>
-      </div>
-      <form onSubmit={enviar}>
+    <FormSection
+      title={`Restablecer la contraseña de «${usuario.username}»`}
+      hint="Se cierran sus sesiones y tiene que cambiarla al ingresar. La contraseña no queda registrada."
+    >
+      <form onSubmit={enviar} noValidate>
         <div className={styles.formGrid}>
-          <label className={styles.group}>
-            <span className={styles.label}>Contraseña temporal</span>
-            <input
-              className={styles.input}
+          <Field label="Contraseña temporal" htmlFor={`${id}-clave`} error={error}>
+            <Input
+              id={`${id}-clave`}
               type="password"
               autoComplete="new-password"
               value={clave}
+              invalid={error !== null}
               onChange={(e) => setClave(e.target.value)}
             />
-          </label>
+          </Field>
         </div>
-        {error && (
-          <div role="alert" className={styles.errorBox}>
-            {error}
-          </div>
-        )}
         <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={enviando}>
+          <Button type="submit" variant="primary" disabled={enviando}>
             {enviando ? 'Guardando…' : 'Asignar contraseña temporal'}
-          </button>
-          <button type="button" className={styles.btnSecondary} onClick={onCancel}>
+          </Button>
+          <Button variant="ghost" onClick={onCancel}>
             Cancelar
-          </button>
+          </Button>
         </div>
       </form>
-    </Card>
+    </FormSection>
   );
 }

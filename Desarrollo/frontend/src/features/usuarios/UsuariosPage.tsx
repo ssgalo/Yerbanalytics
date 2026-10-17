@@ -3,11 +3,13 @@
    sesión. La ruta exige `usuarios.gestionar`; la pestaña Auditoría además `auditoria.ver`, que
    es un permiso aparte (por defecto, sólo del Administrador).
 
-   La pestaña vive en la URL (`?tab=`), como en el Motor de reglas.
+   La sección elegida vive en la URL (`?tab=`), como en el Motor de reglas; se elige con el
+   control segmentado del sistema de diseño.
    ============================================================ */
 import { useSearchParams } from 'react-router-dom';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useAuth } from '@/hooks/AuthContext';
+import { Segmented } from '@/components/ui/Seleccion';
 import { UsuariosTab } from './UsuariosTab';
 import { RolesTab } from './RolesTab';
 import { AuditoriaTab } from './AuditoriaTab';
@@ -43,20 +45,12 @@ export function UsuariosPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.tabs} role="tablist" aria-label="Secciones de usuarios">
-        {pestanias.map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            className={tab === t ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            onClick={() => elegir(t)}
-          >
-            {ETIQUETAS[t]}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="Secciones de usuarios"
+        options={pestanias.map((t) => ({ value: t, label: ETIQUETAS[t] }))}
+        value={tab}
+        onChange={elegir}
+      />
 
       {tab === 'usuarios' && <UsuariosTab />}
       {tab === 'roles' && <RolesTab />}

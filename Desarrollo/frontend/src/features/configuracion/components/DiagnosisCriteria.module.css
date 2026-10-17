@@ -122,6 +122,27 @@
   background: var(--card);
 }
 
+.orderDraggable {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+/* La fila que se arrastra queda por encima de las demás, que se acomodan debajo */
+.orderDragging {
+  position: relative;
+  z-index: 1;
+  cursor: grabbing;
+  box-shadow: var(--shadow-overlay);
+}
+
+.grip {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-right: -4px;
+  color: var(--muted);
+}
+
 /* Cambió de lugar respecto de lo guardado: el mismo borde agua que un campo modificado */
 .orderMoved {
   border-color: var(--info);

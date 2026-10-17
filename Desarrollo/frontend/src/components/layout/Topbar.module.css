@@ -7,10 +7,38 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 32px;
+  padding: 0 32px 0 20px;
   position: sticky;
   top: 0;
   z-index: 30;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sidebarToggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.sidebarToggle:hover {
+  background: var(--line2);
+  color: var(--ink);
 }
 
 .title {
@@ -77,7 +105,9 @@
   height: 40px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent-line);
+  box-shadow:
+    0 0 0 2px var(--card),
+    0 0 0 4px var(--accent-line);
   color: var(--on-brand);
   display: flex;
   align-items: center;

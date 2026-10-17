@@ -18,14 +18,19 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+/** Opciones del selector de secciones (control segmentado). */
+const secciones = async () =>
+  within(await screen.findByRole('group', { name: 'Secciones de usuarios' })).getAllByRole('button');
+
 const fila = (username: string) => document.querySelector(`tr[data-username="${username}"]`) as HTMLElement;
 
 describe('Vista Usuarios (8.1)', () => {
   it('tiene las cuatro pestañas para el Administrador', async () => {
     montarApp('/usuarios');
 
-    const tabs = await screen.findAllByRole('tab');
+    const tabs = await secciones();
     expect(tabs.map((t) => t.textContent)).toEqual(['Usuarios', 'Roles y permisos', 'Auditoría', 'Seguridad']);
+    expect(tabs[0].getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('heading', { level: 1, name: 'Usuarios' })).toBeTruthy();
   });
 
@@ -120,6 +125,46 @@ describe('Pestaña Usuarios (8.2)', () => {
   });
 });
 
+describe('Tabla de usuarios: filtro y orden por columna', () => {
+  const usernames = () =>
+    within(screen.getByRole('table', { name: 'Personas' }))
+      .getAllByRole('row')
+      .slice(1)
+      .map((r) => r.getAttribute('data-username'));
+
+  it('filtra por estado desde el encabezado y ofrece quitar el filtro', async () => {
+    montarApp('/usuarios');
+    await waitFor(() => expect(fila('operario')).toBeTruthy());
+    fireEvent.click(within(fila('operario')).getByRole('button', { name: 'Suspender' }));
+    await waitFor(() => expect(within(fila('operario')).getByText('Suspendido')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Filtrar por estado' })[0]);
+    const menu = screen.getByRole('dialog', { name: 'Filtrar por estado' });
+    fireEvent.click(within(menu).getByLabelText(/^Activo/));
+    fireEvent.click(within(menu).getByRole('button', { name: 'Aplicar' }));
+
+    expect(usernames()).toEqual(['operario']);
+    expect(screen.getByText(/de 4 cuentas/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    expect(usernames()).toHaveLength(4);
+  });
+
+  it('ordena por usuario: descendente, ascendente y sin orden', async () => {
+    montarApp('/usuarios');
+    await waitFor(() => expect(fila('operario')).toBeTruthy());
+    const original = usernames();
+    const ordenar = () => fireEvent.click(screen.getAllByRole('button', { name: /^Ordenar por usuario/ })[0]);
+
+    ordenar();
+    expect(usernames()).toEqual([...original].sort().reverse());
+    ordenar();
+    expect(usernames()).toEqual([...original].sort());
+    ordenar();
+    expect(usernames()).toEqual(original);
+  });
+});
+
 describe('Pestaña Roles y permisos (8.3)', () => {
   it('los intocables del Administrador están marcados y bloqueados', async () => {
     montarApp('/usuarios?tab=roles');
@@ -140,7 +185,9 @@ describe('Pestaña Roles y permisos (8.3)', () => {
 
     expect(editar.checked).toBe(true);
     expect(ver.checked).toBe(true);
-    expect(screen.getByRole('note').textContent).toMatch(/cierra las sesiones abiertas de los usuarios con el rol Operario/);
+    expect(screen.getByRole('region', { name: 'Cambios sin guardar' }).textContent).toMatch(
+      /cierra las sesiones abiertas de los usuarios con el rol Operario/,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
@@ -172,8 +219,12 @@ describe('Pestaña Auditoría (8.4)', () => {
     const tabla = await screen.findByRole('table', { name: 'Registro de auditoría' });
     await waitFor(() => expect(within(tabla).getAllByRole('row').length).toBeGreaterThan(3));
 
-    fireEvent.change(screen.getByLabelText('Usuario o rol objetivo'), { target: { value: 'jperez' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }));
+    // Como en una planilla: se abre el menú de la columna, se deja sólo un valor y se aplica.
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar por objetivo' }));
+    const menu = screen.getByRole('dialog', { name: 'Filtrar por objetivo' });
+    fireEvent.click(within(menu).getByLabelText('Seleccionar todo'));
+    fireEvent.click(within(menu).getByLabelText(/^jperez · usuario/));
+    fireEvent.click(within(menu).getByRole('button', { name: 'Aplicar' }));
 
     await waitFor(() => {
       const filas = within(screen.getByRole('table', { name: 'Registro de auditoría' })).getAllByRole('row').slice(1);
@@ -181,6 +232,7 @@ describe('Pestaña Auditoría (8.4)', () => {
       expect(filas[0].textContent).toMatch(/jperez/);
       expect(filas[0].textContent).toMatch(/Alta de usuario/);
     });
+    expect(screen.getByRole('button', { name: 'Filtrar por objetivo (filtrada)' })).toBeTruthy();
   });
 
   it('sin auditoria.ver la pestaña no aparece', async () => {
@@ -189,7 +241,7 @@ describe('Pestaña Auditoría (8.4)', () => {
     await repo.login('agronomo', 'demo');
     montarApp('/usuarios');
 
-    const tabs = await screen.findAllByRole('tab');
+    const tabs = await secciones();
     expect(tabs.map((t) => t.textContent)).toEqual(['Usuarios', 'Roles y permisos', 'Seguridad']);
   });
 });
@@ -198,15 +250,15 @@ describe('Pestaña Seguridad (8.5)', () => {
   it('valida el rango 5–480 y guarda el tiempo de inactividad', async () => {
     montarApp('/usuarios?tab=seguridad');
 
-    const campo = (await screen.findByLabelText('Tiempo máximo de inactividad (min)')) as HTMLInputElement;
+    const campo = (await screen.findByLabelText('Tiempo máximo de inactividad')) as HTMLInputElement;
     expect(campo.value).toBe('60');
 
     fireEvent.change(campo, { target: { value: '2' } });
     expect(screen.getByRole('alert').textContent).toMatch(/entre 5 y 480/);
-    expect((screen.getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Guardar cambios' }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.change(campo, { target: { value: '15' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     expect(await screen.findByText('Tiempo máximo de inactividad: 15 min.')).toBeTruthy();
     expect((await repo.getPolitica()).inactividadMin).toBe(15);

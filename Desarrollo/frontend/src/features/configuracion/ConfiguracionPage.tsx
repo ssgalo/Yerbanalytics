@@ -11,7 +11,7 @@ import { LimitesActuadoresForm } from './components/LimitesActuadoresForm';
 import { SeguimientoForm } from './components/SeguimientoForm';
 import { ShadeScheduleForm } from './components/ShadeScheduleForm';
 import { ConfigFieldset, ConfigLayout, ConfigRow, ConfigSection } from './components/ConfigLayout';
-import { configAudit, pendingFixes, useConfigDraft } from './useConfigDraft';
+import { pendingFixes, useConfigDraft } from './useConfigDraft';
 
 export function ConfiguracionPage() {
   const state = useConfigDraft();
@@ -55,11 +55,9 @@ export function ConfiguracionPage() {
   return (
     <ConfigLayout
       state={state}
-      audit={configAudit}
       editable={editable}
       onReset={onReset}
       blockedReason={pendingFixes(errors)}
-      intro="Calibrá las decisiones automáticas del sistema a la realidad del vivero. Arranca con valores de fábrica seguros para la yerba mate, y cada cambio se valida contra el rango fisiológico antes de aplicarse."
     >
       {draft && (
         <>

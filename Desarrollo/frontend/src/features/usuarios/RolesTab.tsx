@@ -6,13 +6,14 @@
      las ediciones (ver `matriz.ts`). El backend igual lo valida.
    - Los intocables del Administrador se ven marcados y bloqueados.
    - Guardar cierra las sesiones de los usuarios de cada rol modificado (salvo la del autor):
-     se avisa antes, no después.
+     se avisa antes, no después, en la barra de guardado. El resultado es un toast.
    ============================================================ */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Card } from '@/components/ui/Card';
+import { Callout } from '@/components/ui/Callout';
+import { SaveBar, Skeleton } from '@/components/ui/EstadosPantalla';
+import { Toast } from '@/components/ui/Toast';
 import { getSeguridadRepository } from '@/data';
 import { useAuth } from '@/hooks/AuthContext';
-import { contar } from '@/lib/plural';
 import type { PermisoCatalogo, Rol, RolPermisos } from '@/types/seguridad';
 import {
   agruparCatalogo,
@@ -55,12 +56,26 @@ export function RolesTab() {
 
   if (error) {
     return (
-      <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
+      <Callout tone="crit" role="alert">
         No se pudo cargar la matriz de permisos: {error}
+      </Callout>
+    );
+  }
+  if (!catalogo || !roles) {
+    return (
+      <div className={styles.page} aria-busy="true">
+        <span className="sr">Cargando la matriz de permisos…</span>
+        <Skeleton height={420} />
       </div>
     );
   }
-  if (!catalogo || !roles) return <div className={styles.state}>Cargando la matriz de permisos…</div>;
+
+  const nombres = modificados.map((m) => roles.find((r) => r.rol === m.rol)?.nombre ?? m.rol);
+  // La barra cuenta casillas cambiadas; el detalle, a qué roles afectan.
+  const casillasCambiadas = roles.reduce((n, r) => {
+    const b = borrador.get(r.rol) ?? new Set<string>();
+    return n + catalogo.filter((p) => b.has(p.codigo) !== r.permisos.includes(p.codigo)).length;
+  }, 0);
 
   const alternar = (r: RolPermisos, codigo: string) => {
     setResultado(null);
@@ -104,22 +119,25 @@ export function RolesTab() {
 
   return (
     <div className={styles.page}>
-      <p className={styles.intro}>
-        Qué puede hacer cada rol. Un permiso de edición necesita su par de lectura: marcarlo marca también la lectura,
-        y quitar la lectura quita la edición. El Administrador conserva siempre la gestión de usuarios y la auditoría.
-      </p>
-
-      <Card className={styles.tableCard}>
+      <section className={styles.tableSection}>
+        <header className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>Matriz de permisos</h2>
+          <p className={styles.sectionHint}>
+            Un permiso de edición necesita su par de lectura: marcarlo marca también la lectura, y quitar la lectura
+            quita la edición. El Administrador conserva siempre la gestión de usuarios y la auditoría.
+          </p>
+        </header>
         <div className={styles.tableScroll}>
-          <table className={`${styles.table} ${styles.matriz}`} aria-label="Matriz de permisos">
+          <table className={`${styles.table} ${styles.matrix}`} aria-label="Matriz de permisos">
             <thead>
               <tr>
                 <th>Permiso</th>
                 {roles.map((r) => {
                   const cambiado = modificados.some((m) => m.rol === r.rol);
                   return (
-                    <th key={r.rol} className={`${styles.rolCol} ${cambiado ? styles.rolModificado : ''}`}>
+                    <th key={r.rol} className={`${styles.roleCol} ${cambiado ? styles.roleChanged : ''}`}>
                       {r.nombre}
+                      {cambiado && <span className="sr"> (modificado)</span>}
                       {cambiado ? ' •' : ''}
                     </th>
                   );
@@ -129,22 +147,22 @@ export function RolesTab() {
             <tbody>
               {grupos.map((g) => (
                 <Fragment key={g.grupo}>
-                  <tr className={styles.grupoFila}>
+                  <tr className={styles.groupRow}>
                     <td colSpan={roles.length + 1}>{g.grupo}</td>
                   </tr>
                   {g.permisos.map((p) => (
                     <tr key={p.codigo}>
                       <td>
-                        <div className={styles.codigo}>{p.codigo}</div>
+                        <div className={styles.code}>{p.codigo}</div>
                         <div className={styles.sub}>{p.descripcion}</div>
-                        {p.lectura && <div className={styles.dependeDe}>Requiere {p.lectura}</div>}
+                        {p.lectura && <div className={styles.sub}>Requiere {p.lectura}</div>}
                       </td>
                       {roles.map((r) => {
                         const marcado = borrador.get(r.rol)?.has(p.codigo) ?? false;
                         const intocable = r.intocables.includes(p.codigo);
                         const cambio = marcado !== r.permisos.includes(p.codigo);
                         return (
-                          <td key={r.rol} className={`${styles.celda} ${cambio ? styles.celdaCambio : ''}`}>
+                          <td key={r.rol} className={`${styles.cell} ${cambio ? styles.cellChanged : ''}`}>
                             <input
                               type="checkbox"
                               aria-label={`${p.codigo} para ${r.nombre}`}
@@ -163,56 +181,35 @@ export function RolesTab() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </section>
 
-      {modificados.length > 0 && (
-        <div role="note" className={styles.advertencia}>
-          Guardar cierra las sesiones abiertas de los usuarios con{' '}
-          {modificados.length === 1 ? 'el rol' : 'los roles'}{' '}
-          {modificados.map((m) => roles.find((r) => r.rol === m.rol)?.nombre).join(', ')} (salvo la tuya): vuelven a
-          ingresar con los permisos nuevos.
-        </div>
-      )}
-      {resultado && resultado.ok.length > 0 && (
-        <div role="status" className={styles.okBox}>
-          Permisos guardados: {resultado.ok.join(', ')}.
-        </div>
-      )}
       {resultado && resultado.errores.length > 0 && (
-        <div role="alert" className={styles.errorBox}>
+        <Toast tone="crit" onClose={() => setResultado(null)}>
           {resultado.errores.map((e) => (
             <div key={e}>{e}</div>
           ))}
-        </div>
+          {resultado.ok.length > 0 && <div>Sí se guardaron: {resultado.ok.join(', ')}.</div>}
+        </Toast>
+      )}
+      {resultado && resultado.errores.length === 0 && resultado.ok.length > 0 && (
+        <Toast tone="ok" onClose={() => setResultado(null)}>
+          Permisos guardados: {resultado.ok.join(', ')}.
+        </Toast>
       )}
 
-      <div className={styles.toolbar}>
-        <span className={styles.sectionHint}>
-          {modificados.length === 0
-            ? 'Sin cambios pendientes.'
-            : `${contar(modificados.length, 'rol modificado', 'roles modificados')} sin guardar`}
-        </span>
-        <span className={styles.spacer} />
-        <button
-          type="button"
-          className={styles.btnSecondary}
-          disabled={guardando || modificados.length === 0}
-          onClick={() => {
-            setBorrador(borradorDe(roles));
-            setResultado(null);
-          }}
-        >
-          Descartar
-        </button>
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          disabled={guardando || modificados.length === 0}
-          onClick={() => void guardar()}
-        >
-          {guardando ? 'Guardando…' : 'Guardar cambios'}
-        </button>
-      </div>
+      <SaveBar
+        count={casillasCambiadas}
+        detalle={`Guardar cierra las sesiones abiertas de los usuarios con ${
+          modificados.length === 1 ? 'el rol' : 'los roles'
+        } ${nombres.join(', ')} (salvo la tuya).`}
+        onDiscard={() => {
+          setBorrador(borradorDe(roles));
+          setResultado(null);
+        }}
+        onSave={() => void guardar()}
+        saveLabel="Guardar cambios"
+        saving={guardando}
+      />
     </div>
   );
 }

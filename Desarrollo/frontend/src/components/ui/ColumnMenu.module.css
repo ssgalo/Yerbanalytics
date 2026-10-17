@@ -1,4 +1,5 @@
-/* Encabezado de columna con menú de orden y filtro */
+/* Encabezado de columna con menú de orden y filtro. `--column-hover` es el fondo del encabezado al
+   pasar o abrirlo: por defecto, el de una tarjeta (la barra de Diagnósticos es --card-2). */
 
 .root {
   position: relative;
@@ -30,7 +31,7 @@
 
 .trigger:hover,
 .trigger[aria-expanded='true'] {
-  background: var(--card);
+  background: var(--column-hover, var(--card));
 }
 
 .trigger:focus-visible {
@@ -54,21 +55,7 @@
 }
 
 .panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 30;
   display: grid;
-  width: 280px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-m);
-  box-shadow: var(--shadow-overlay);
-}
-
-.end {
-  left: auto;
-  right: 0;
 }
 
 /* Botón de orden: chico, a la derecha del desplegable; rota sin orden → desc → asc */

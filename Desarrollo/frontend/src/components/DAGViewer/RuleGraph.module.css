@@ -4,7 +4,7 @@
   position: relative;
   width: 100%;
   height: 500px;
-  background: var(--tray);
+  background: var(--art);
   border-radius: var(--r-l);
   overflow: hidden;
 }
@@ -18,11 +18,11 @@
   align-items: center;
   gap: 10px;
   padding: 7px 12px;
-  background: color-mix(in srgb, var(--tray) 88%, transparent);
-  border: 1px solid var(--tray-line);
+  background: color-mix(in srgb, var(--art) 88%, transparent);
+  border: 1px solid var(--art-line);
   border-radius: 10px;
   font-size: 11px;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
   pointer-events: none;
   z-index: 10;
   backdrop-filter: blur(6px);
@@ -41,4 +41,4 @@
 .dotBlocked  { background: var(--crit); }
 .dotPostpone { background: var(--warn); }
 .dotAction   { background: var(--info); }
-.dotSkipped  { background: var(--tray-line); }
+.dotSkipped  { background: var(--art-line); }

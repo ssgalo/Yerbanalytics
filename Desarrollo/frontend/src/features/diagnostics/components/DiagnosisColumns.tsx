@@ -16,8 +16,8 @@ import {
   type SortState,
   type ValueColumn,
 } from '../diagnosisQuery';
-import { ColumnMenu } from './ColumnMenu';
-import { RangeFilter, ValuesFilter } from './ColumnFilters';
+import { ColumnMenu } from '@/components/ui/ColumnMenu';
+import { RangeFilter, ValuesFilter } from '@/components/ui/ColumnFilters';
 import styles from './DiagnosisColumns.module.css';
 
 type Column = { label: string; sortLabels: Record<SortDir, string> } & (
@@ -57,6 +57,8 @@ interface DiagnosisColumnsProps {
   filters: ColumnFilters;
   onFilter: (column: ColumnKey, value: string[] | Range | null) => void;
   onClear: () => void;
+  /** Hay otro filtro activo fuera de las columnas (la clase elegida en los KPI). */
+  otherFilter?: boolean;
   /** `null` = sin orden. */
   sort: SortState | null;
   onSort: (sort: SortState | null) => void;
@@ -68,11 +70,12 @@ export function DiagnosisColumns({
   filters,
   onFilter,
   onClear,
+  otherFilter = false,
   sort,
   onSort,
   resultCount,
 }: DiagnosisColumnsProps) {
-  const anyFilter = Object.values(filters).some((v) => v != null);
+  const anyFilter = otherFilter || Object.values(filters).some((v) => v != null);
 
   return (
     <section className={styles.bar} aria-label="Ordenar y filtrar diagnósticos">
@@ -118,11 +121,17 @@ export function DiagnosisColumns({
       </div>
 
       <div className={styles.result}>
-        {anyFilter && (
-          <Button variant="ghost" size="sm" onClick={onClear}>
-            Quitar filtros
-          </Button>
-        )}
+        {/* Siempre ocupa su lugar: que aparezca no achica las columnas */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClear}
+          className={anyFilter ? undefined : styles.hidden}
+          aria-hidden={!anyFilter}
+          tabIndex={anyFilter ? undefined : -1}
+        >
+          Quitar filtros
+        </Button>
         <span className={styles.count} aria-live="polite">
           <b>{resultCount}</b> {resultCount === 1 ? 'diagnóstico' : 'diagnósticos'}
         </span>

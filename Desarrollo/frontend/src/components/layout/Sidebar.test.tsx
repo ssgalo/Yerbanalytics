@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { SidebarProvider } from '@/hooks/SidebarContext';
 import { ConPermisos } from '@/test/sesion';
 import type { Permiso, Rol } from '@/types/seguridad';
 
@@ -100,8 +101,12 @@ describe('Sidebar · grupo Configuración', () => {
       'Usuarios',
       'Preferencias',
     ]);
-    expect(screen.getByRole('link', { name: /Umbrales/ }).getAttribute('href')).toBe('/configuracion');
-    expect(screen.getByRole('link', { name: /Preferencias/ }).getAttribute('href')).toBe('/preferencias');
+    expect(screen.getByRole('link', { name: /Umbrales/ }).getAttribute('href')).toBe(
+      '/configuracion',
+    );
+    expect(screen.getByRole('link', { name: /Preferencias/ }).getAttribute('href')).toBe(
+      '/preferencias',
+    );
 
     fireEvent.click(grupoConfiguracion());
     expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('false');
@@ -127,6 +132,54 @@ describe('Sidebar · grupo Configuración', () => {
     montar('ADMINISTRADOR', undefined, '/hardware');
 
     expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('link', { name: /Hardware/ }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: /Hardware/ }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+  });
+});
+
+describe('Sidebar · colapsable a íconos', () => {
+  const montarConProvider = (ruta = '/') =>
+    render(
+      <MemoryRouter initialEntries={[ruta]}>
+        <ConPermisos rol="ADMINISTRADOR">
+          <SidebarProvider>
+            <Sidebar />
+          </SidebarProvider>
+        </ConPermisos>
+      </MemoryRouter>,
+    );
+  const sidebar = () => document.querySelector('aside')!;
+
+  afterEach(() => localStorage.clear());
+
+  it('Ctrl+B colapsa y expande, y se recuerda', () => {
+    montarConProvider();
+    expect(sidebar().dataset.collapsed).toBe('false');
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(sidebar().dataset.collapsed).toBe('true');
+    expect(screen.getByText('Principal').getAttribute('aria-hidden')).toBe('true');
+    expect(localStorage.getItem('yerbanalytics.sidebar.collapsed')).toBe('true');
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(sidebar().dataset.collapsed).toBe('false');
+  });
+
+  it('colapsada, el clic en Configuración la expande con el grupo abierto', () => {
+    montarConProvider();
+    fireEvent.click(screen.getByRole('button', { name: 'Colapsar menú' }));
+
+    fireEvent.click(grupoConfiguracion());
+    expect(sidebar().dataset.collapsed).toBe('false');
+    expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('colapsada, pasar el mouse por un ítem muestra su nombre', () => {
+    montarConProvider();
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+
+    fireEvent.mouseEnter(screen.getByRole('link', { name: /Historial/ }));
+    expect(screen.getByRole('tooltip').textContent).toBe('Historial');
   });
 });

@@ -240,7 +240,7 @@
   flex-direction: column;
   gap: 12px;
   min-height: 380px;
-  background: var(--tray);
+  background: var(--art);
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -252,9 +252,9 @@
   font-stretch: var(--w-exp);
   font-size: 13px;
   font-weight: 600;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
   background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid var(--tray-line);
+  border-bottom: 1px solid var(--art-line);
 }
 
 .dagLoading,
@@ -264,7 +264,7 @@
   justify-content: center;
   height: 100%;
   font-size: 13px;
-  color: var(--on-tray-muted);
+  color: var(--on-art-muted);
 }
 
 .dagError {

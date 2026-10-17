@@ -1,4 +1,4 @@
-/* Celdas de sector sobre la bandeja oscura (--tray). Un punto = un sector, con la forma de su
+/* Celdas de sector sobre la bandeja (--tray). Un punto = un sector, con la forma de su
    estado. `tray`: el punto chico del plano. `grid`: la celda numerada de la macro-zona. */
 
 .tray {
@@ -28,10 +28,10 @@
 }
 .tray.off {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px #6f7a74;
+  box-shadow: inset 0 0 0 1.5px var(--off);
 }
 .tray.sel {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -67,13 +67,10 @@
   background: var(--ok);
 }
 .grid.warn {
-  color: #fff;
-  text-shadow:
-    0 0 2px #2a1b02,
-    0 0 1px #2a1b02;
+  color: var(--ink);
 }
 .grid.warn::before {
-  background: linear-gradient(to top, var(--warn) 50%, #4a3d1c 50%);
+  background: linear-gradient(to top, var(--warn) 50%, var(--tray-2) 50%);
   box-shadow: inset 0 0 0 2px var(--warn);
 }
 .grid.crit {
@@ -89,9 +86,9 @@
   color: var(--on-tray-muted);
 }
 .grid.off::before {
-  box-shadow: inset 0 0 0 1.5px #6f7a74;
+  box-shadow: inset 0 0 0 1.5px var(--off);
 }
-/* Diagnóstico nuevo sin revisar: punto blanco arriba a la derecha. */
+/* Diagnóstico nuevo sin revisar: punto oscuro arriba a la derecha. */
 .diag::after {
   content: '';
   position: absolute;
@@ -100,21 +97,21 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--ink);
   box-shadow: 0 0 0 2px var(--tray);
   z-index: 1;
 }
 .grid:hover {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--ink);
   outline-offset: -1px;
 }
 .grid:focus-visible {
   box-shadow: none;
-  outline: 3px solid #fff;
+  outline: 3px solid var(--ink);
   outline-offset: 0;
 }
 .grid.sel {
-  outline: 3px solid #fff;
+  outline: 3px solid var(--ink);
   outline-offset: 1px;
   z-index: 1;
 }
@@ -126,6 +123,6 @@
   padding: 12px;
   color: var(--on-tray);
   box-shadow:
-    inset 0 0 0 1px #2e3833,
-    inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+    inset 0 0 0 1px var(--tray-line),
+    inset 0 -2px 0 rgba(21, 35, 27, 0.05);
 }

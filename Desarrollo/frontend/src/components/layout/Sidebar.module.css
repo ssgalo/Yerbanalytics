@@ -1,5 +1,13 @@
+/* Colapsable a íconos, como la sidebar de shadcn: se anima el ancho y los íconos no se mueven en
+   horizontal (el padding no cambia), sólo suben al desaparecer los encabezados de sección. */
 .sidebar {
+  --sb-speed: 0.22s;
+  --sb-ease: cubic-bezier(0.4, 0, 0.2, 1);
   width: 256px;
+  transition: width var(--sb-speed) var(--sb-ease);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
   flex-shrink: 0;
   background: var(--card);
   border-right: 1px solid var(--line);
@@ -7,18 +15,36 @@
   display: flex;
   flex-direction: column;
   position: sticky;
+  z-index: 50; /* sus tooltips quedan por encima del contenido */
   top: 0;
   height: 100vh;
   padding: 22px 16px 16px;
+}
+
+/* 16 + 42 (ítem: 12 + ícono 18 + 12) + 16 + 1 de borde */
+.collapsed {
+  width: 75px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 4px 8px 22px;
+  padding: 4px 8px 18px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
+  transition:
+    padding var(--sb-speed) var(--sb-ease),
+    gap var(--sb-speed) var(--sb-ease);
+}
+
+/* El logo se achica centrado sobre la columna de íconos (16 + 5 + 32/2 = 37 = 16 + 42/2). */
+.collapsed .brand {
+  padding: 4px 5px 12px;
+  margin-bottom: 10px;
+  gap: 0;
 }
 
 .logo {
@@ -26,25 +52,72 @@
   height: 48px;
   object-fit: contain;
   flex-shrink: 0;
+  transition:
+    width var(--sb-speed) var(--sb-ease),
+    height var(--sb-speed) var(--sb-ease);
+}
+
+.collapsed .logo {
+  width: 32px;
+  height: 32px;
+}
+
+.brandText {
+  min-width: 0;
+  white-space: nowrap;
+  transition: opacity var(--sb-speed) var(--sb-ease);
+}
+
+.collapsed .brandText {
+  opacity: 0;
 }
 
 .brandName {
-  display: block;
-  min-width: 0;
-  width: 100%;
-  max-width: 160px;
-  height: auto;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.brandSub {
+  font-size: var(--t-12);
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 .section {
   font-size: var(--t-12);
+  line-height: 16px;
   color: var(--muted);
   font-weight: 500;
+  height: 28px;
   padding: 6px 10px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    height var(--sb-speed) var(--sb-ease),
+    padding var(--sb-speed) var(--sb-ease),
+    opacity var(--sb-speed) var(--sb-ease);
 }
 
 .sectionTop {
+  height: 42px;
   padding-top: 20px;
+}
+
+/* Sin encabezados, los íconos quedan todos a la misma distancia: el de Gestión conserva sólo el
+   hueco que separa a los ítems dentro de un nav. */
+.collapsed .section {
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+}
+
+.collapsed .sectionTop {
+  height: 3px;
 }
 
 .nav {
@@ -65,6 +138,8 @@
   font-family: var(--font-body);
   font-size: var(--t-15);
   font-weight: 500;
+  /* el <button> del grupo no hereda el interlineado: sin esto queda más bajo que los enlaces */
+  line-height: inherit;
   text-align: left;
   transition:
     background 0.15s,
@@ -72,6 +147,24 @@
   position: relative;
   background: transparent;
   color: var(--ink-2);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity var(--sb-speed) var(--sb-ease);
+}
+
+.collapsed .label {
+  opacity: 0;
+}
+
+/* Colapsada, la flecha no asoma ni con hover o foco (que en expandida la muestran). */
+.collapsed .groupHead .chevron,
+.collapsed .groupHead:hover .chevron,
+.collapsed .groupHead:focus-visible .chevron {
+  opacity: 0;
 }
 
 .item svg {
@@ -118,45 +211,6 @@
   color: var(--brand);
 }
 
-.count {
-  margin-left: auto;
-  font-size: var(--t-12);
-  font-stretch: var(--w-cond);
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.status {
-  margin-top: auto;
-  background: var(--card-2);
-  border: 1px solid var(--line2);
-  border-radius: var(--r-m);
-  padding: 12px 13px;
-}
-
-.statusRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--t-13);
-  font-weight: 600;
-}
-
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 0 3px var(--ok-soft);
-}
-
-.statusSub {
-  font-size: var(--t-12);
-  color: var(--muted);
-  margin-top: 6px;
-  line-height: 1.45;
-}
-
 /* ── Grupo desplegable (Configuración) ── */
 .groupHead {
   color: var(--ink-2);
@@ -172,14 +226,48 @@
   color: var(--brand);
 }
 
+/* La flecha aparece al pasar el mouse (o con foco) y queda fija mientras el grupo está abierto. */
 .chevron {
   display: grid;
   margin-left: auto;
-  transition: transform 0.15s;
+  opacity: 0;
+  transition:
+    transform 0.15s,
+    opacity 0.15s;
+}
+
+.groupHead:hover .chevron,
+.groupHead:focus-visible .chevron,
+.chevronOpen {
+  opacity: 1;
 }
 
 .chevronOpen {
   transform: rotate(180deg);
+}
+
+/* Con la sidebar colapsada el grupo se pliega (animado) y sale del árbol de accesibilidad. */
+.subWrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--sb-speed) var(--sb-ease),
+    opacity var(--sb-speed) var(--sb-ease);
+}
+
+.subWrap > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.collapsed .subWrap {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--sb-speed) var(--sb-ease),
+    opacity var(--sb-speed) var(--sb-ease),
+    visibility 0s var(--sb-speed);
 }
 
 /* Las vistas del grupo cuelgan de una guía vertical alineada con el ícono del encabezado. */
@@ -201,4 +289,62 @@
 /* La barra de acento del ítem activo sigue pegada al borde del sidebar, no a la guía. */
 .subItem.itemActive::before {
   left: -47px;
+}
+
+/* ── Borde clickeable para colapsar/expandir ── */
+.rail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: w-resize;
+}
+
+.rail::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.rail:hover::after {
+  background: var(--line-field);
+}
+
+.collapsed .rail {
+  cursor: e-resize;
+}
+
+/* ── Nombre del ítem con la sidebar colapsada ── */
+.tooltip {
+  position: fixed;
+  left: 83px;
+  transform: translateY(-50%);
+  z-index: 60;
+  pointer-events: none;
+  white-space: nowrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-overlay);
+  padding: 6px 10px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink);
+  animation: tooltipIn 0.12s var(--sb-ease);
+}
+
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    transform: translate(-4px, -50%);
+  }
 }

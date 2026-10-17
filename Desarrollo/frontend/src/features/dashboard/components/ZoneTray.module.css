@@ -1,4 +1,4 @@
-/* ZoneTray — una macro-zona como bandeja oscura con sus sectores */
+/* ZoneTray — una macro-zona como bandeja con sus sectores */
 
 .tray {
   position: relative;
@@ -11,14 +11,14 @@
   text-decoration: none;
   box-shadow:
     inset 0 0 0 1px var(--tray-line),
-    inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+    inset 0 -2px 0 rgba(21, 35, 27, 0.05);
   transition: box-shadow 0.12s;
 }
 
 .tray:hover {
   box-shadow:
-    inset 0 0 0 1px var(--on-tray-muted),
-    inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+    inset 0 0 0 1px var(--accent-line),
+    var(--accent-glow);
 }
 
 .tray:hover .code {
@@ -88,7 +88,7 @@
 }
 
 .nodeWarn {
-  color: var(--warn);
+  color: var(--warn-ink);
   font-weight: 600;
 }
 
@@ -105,7 +105,7 @@
 /* Tope de alto según la pantalla; lo que no entra se desplaza */
 .scroll {
   --scroll-max-h: max(220px, 55vh);
-  --scroll-fade: 36px;
+  --scroll-fade: 56px;
 }
 
 /* `--columns` = sectoresPorFila de la topología; `--cell-max` y `--cell-gap` los fija el plano.
@@ -131,8 +131,8 @@
   margin-top: 10px;
   padding: 3px 8px;
   border-radius: var(--r-s);
-  background: var(--tray-2);
-  color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn-ink);
   font-size: var(--t-12);
 }
 

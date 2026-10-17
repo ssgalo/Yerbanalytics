@@ -1,66 +1,17 @@
-/* Vista Usuarios (HU-20): pestañas, tablas, formularios y matriz de permisos */
+/* Vista Usuarios (HU-20): sólo maquetación. Botones, campos, chips y avisos salen del sistema de
+   diseño (`components/ui/`); las secciones repiten las de Configuración. */
 
 .page {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  animation: ybFade 0.4s both;
 }
 
-.state {
-  padding: 40px;
-  font-family: var(--font-body);
-  color: var(--muted);
-}
-
-.intro {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-  max-width: 760px;
-  line-height: 1.5;
-}
-
-/* --- Pestañas (mismo patrón que Motor de reglas) --- */
-.tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  width: fit-content;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-}
-
-.tab {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.tab:hover {
-  color: var(--ink);
-}
-
-.tabActive {
-  background: var(--ink);
-  color: var(--on-brand);
-}
-
-.tabActive:hover {
-  color: var(--on-brand);
-}
-
-/* --- Barra de herramientas --- */
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px 16px;
   flex-wrap: wrap;
 }
 
@@ -68,54 +19,78 @@
   flex: 1;
 }
 
-.check {
-  display: flex;
+.toggle {
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-size: 13px;
+  gap: 10px;
+  font-size: var(--t-13);
   font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
+  color: var(--ink-2);
 }
 
-/* --- Tarjetas y tablas --- */
+/* --- Secciones (mismo armazón que ConfigSection) --- */
 .section {
-  padding: 18px 20px;
+  min-width: 0;
+  padding: 18px 22px 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
 }
 
 .sectionHead {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .sectionTitle {
   margin: 0;
   font-family: var(--font-display);
   font-stretch: var(--w-exp);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--t-15);
+  font-weight: 650;
+  line-height: 1.35;
   color: var(--ink);
 }
 
 .sectionHint {
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: var(--t-13);
   color: var(--muted);
 }
 
-.tableCard {
+/* Sección cuyo cuerpo es una tabla al ras del borde. */
+.tableSection {
+  composes: section;
   padding: 0;
   overflow: hidden;
 }
 
-.tableHead {
-  padding: 14px 18px 10px;
+.tableSection > .sectionHead {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 18px 22px 12px;
 }
 
+/* Resultado del filtro, a la derecha del título: "3 de 5 · Quitar filtros". */
+.result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--t-13);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.result b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* --- Tablas --- */
 .tableScroll {
   overflow-x: auto;
 }
@@ -123,21 +98,28 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--t-13);
+  font-stretch: var(--w-cond);
+  /* Fondo de un encabezado de columna al pasar o abrir su menú. */
+  --column-hover: var(--card-2);
 }
 
+/* El encabezado va del color de la tabla; sólo lo separa una línea. */
 .table th {
   text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: var(--t-12);
+  font-weight: 600;
   color: var(--muted);
-  padding: 11px 16px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--line2);
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
   white-space: nowrap;
+}
+
+/* Encabezado con menú de filtro y orden: el botón ocupa toda la celda, como en una planilla. */
+.table th.thMenu {
+  padding: 0 0 0 4px;
+  min-width: 130px;
 }
 
 .table td {
@@ -147,16 +129,29 @@
   vertical-align: middle;
 }
 
-.table tr:last-child td {
+.table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.username {
-  font-weight: 700;
+/* El hover no tapa una casilla modificada de la matriz. */
+.table tbody tr:hover td:not(.cellChanged) {
+  background: var(--card-2);
+}
+
+.thActions {
+  width: 1%;
+}
+
+.userCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
 }
 
 .sub {
-  font-size: 11.5px;
+  margin-top: 2px;
+  font-size: var(--t-12);
   color: var(--muted);
 }
 
@@ -164,309 +159,140 @@
   color: var(--muted);
 }
 
-.mono {
-  font-family: var(--font-display);
-  font-stretch: var(--w-exp);
+.num {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.acciones {
+.stateCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.actions {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
-.empty {
-  padding: 24px 16px;
+/* Tabla vacía: una línea discreta, sin cartel. */
+.table td.emptyCell {
+  padding: 18px 16px;
   text-align: center;
   color: var(--muted);
 }
 
-.yo {
-  margin-left: 6px;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--info-ink);
-  background: var(--info-soft);
-  border-radius: 999px;
-  padding: 1px 7px;
+.table tbody tr:hover td.emptyCell {
+  background: none;
 }
 
 /* --- Formularios --- */
 .formGrid {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px 16px;
+  align-items: start;
 }
 
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.formNotes {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
 }
 
-.label {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.input,
-.select {
-  appearance: none;
-  border: 1px solid var(--line-field);
-  background-color: var(--card);
-  border-radius: 10px;
-  padding: 9px 13px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  color: var(--ink);
-  outline: none;
-  min-width: 0;
-}
-
-.input:disabled {
-  background: var(--bg);
-  color: var(--muted);
-}
-
-.select {
-  padding-right: 32px;
-  cursor: pointer;
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="%236A776E" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>');
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-}
-
-.inputCorto {
-  width: 110px;
+.formNotes:empty {
+  display: none;
 }
 
 .formActions {
   display: flex;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 18px;
   align-items: center;
 }
 
-/* --- Avisos --- */
-.advertencia,
-.info,
-.errorBox,
-.okBox {
-  margin-top: 12px;
-  border-radius: 10px;
-  padding: 10px 13px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.45;
+.popText {
+  margin: 0;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--ink-2);
 }
 
-.advertencia {
-  background: var(--warn-soft);
-  color: var(--warn-ink);
-}
-
-.info {
-  background: var(--info-soft);
-  color: var(--info-ink);
-}
-
-.errorBox {
-  background: var(--crit-soft);
-  color: var(--crit-ink);
-}
-
-.okBox {
-  background: var(--ok-soft);
-  color: var(--ok-ink);
-}
-
-.feedbackOk {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ok-ink);
-}
-
-.feedbackErr {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--crit-ink);
-}
-
-/* --- Botones --- */
-.btnPrimary {
-  border: none;
-  background-color: var(--brand);
-  color: var(--on-brand);
-  border-radius: 10px;
-  padding: 10px 18px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.btnPrimary:disabled {
-  background-color: var(--line);
-  color: var(--faint);
-  cursor: not-allowed;
-}
-
-.btnSecondary {
-  border: 1px solid var(--line);
-  background-color: var(--card);
-  color: var(--ink);
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btnSecondary:hover {
-  border-color: var(--muted);
-}
-
-.btnSecondary:disabled {
-  color: var(--faint);
-  cursor: not-allowed;
-}
-
-.btnDanger {
-  border: none;
-  background: var(--crit);
-  color: #fff;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.btnLink {
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btnLink:hover:not(:disabled) {
-  border-color: var(--muted);
-}
-
-.btnLink:disabled {
-  color: var(--faint);
-  cursor: not-allowed;
-}
-
-.btnLinkDanger {
-  composes: btnLink;
-  color: var(--crit-ink);
+.narrow {
+  max-width: 280px;
 }
 
 /* --- Matriz rol × permiso --- */
-.matriz th.rolCol,
-.matriz td.celda {
+.matrix th.roleCol,
+.matrix td.cell {
   text-align: center;
   width: 118px;
 }
 
-.grupoFila td {
-  background: var(--bg);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding-top: 9px;
-  padding-bottom: 9px;
+.roleChanged {
+  color: var(--info-ink) !important;
 }
 
-.codigo {
+.groupRow td {
+  background: var(--card-2);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.table tbody .groupRow:hover td {
+  background: var(--card-2);
+}
+
+.code {
   font-family: var(--font-display);
   font-stretch: var(--w-exp);
-  font-size: 12.5px;
+  font-size: var(--t-13);
   font-weight: 600;
 }
 
-.dependeDe {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.celda input {
+.cell input {
   width: 16px;
   height: 16px;
   cursor: pointer;
   accent-color: var(--brand);
 }
 
-.celda input:disabled {
+.cell input:disabled {
   cursor: not-allowed;
 }
 
-.celdaCambio {
-  background: var(--warn-soft);
-}
-
-.rolModificado {
-  color: var(--warn-ink);
+/* Modificado y sin guardar: agua, como el borde de un campo modificado. */
+.table td.cellChanged {
+  background: var(--info-soft);
 }
 
 /* --- Auditoría --- */
-.filtros {
+.integrity {
   display: flex;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  align-items: flex-end;
 }
 
-.integridad {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 12px;
-  padding: 11px 14px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.integra {
-  background: var(--ok-soft);
-  color: var(--ok-ink);
-}
-
-.rota {
-  background: var(--crit-soft);
-  color: var(--crit-ink);
-}
-
-.paginacion {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--line2);
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
-.detalle {
-  font-size: 12px;
+.detail {
+  font-size: var(--t-12);
   color: var(--muted);
   max-width: 420px;
   word-break: break-word;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line2);
+  font-size: var(--t-13);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
 }

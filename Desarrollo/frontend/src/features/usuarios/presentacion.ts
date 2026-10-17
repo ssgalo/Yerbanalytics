@@ -1,7 +1,7 @@
 /* Presentación de usuarios y auditoría: fechas, estados y el resumen legible de un detalle. */
 import { ETIQUETA_TIPO_AUDITORIA, INACTIVIDAD_MAX, INACTIVIDAD_MIN, nombreRol } from '@/lib/catalogoSeguridad';
-import type { ColorPair } from '@/types/domain';
-import type { EstadoUsuario, FiltrosAuditoria, RegistroAuditoria, TipoAuditoria } from '@/types/seguridad';
+import type { ChipTone } from '@/components/ui/Chip';
+import type { EstadoUsuario, RegistroAuditoria } from '@/types/seguridad';
 
 const p2 = (n: number) => String(n).padStart(2, '0');
 
@@ -20,10 +20,11 @@ export function fechaHoraExacta(iso: string): string {
   return `${fechaHora(iso)}:${p2(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, '0')}`;
 }
 
-export const ESTADO_USUARIO: Record<EstadoUsuario, { label: string } & ColorPair> = {
-  ACTIVO: { label: 'Activo', soft: 'var(--ok-soft)', ink: 'var(--ok-ink)' },
-  SUSPENDIDO: { label: 'Suspendido', soft: 'var(--warn-soft)', ink: 'var(--warn-ink)' },
-  BAJA: { label: 'Baja', soft: 'var(--off-soft)', ink: 'var(--muted)' },
+/** Estado de una cuenta como chip: activo = ok, suspendido = observación, baja = fuera de servicio. */
+export const ESTADO_USUARIO: Record<EstadoUsuario, { label: string; tone: ChipTone }> = {
+  ACTIVO: { label: 'Activo', tone: 'ok' },
+  SUSPENDIDO: { label: 'Suspendido', tone: 'warning' },
+  BAJA: { label: 'Baja', tone: 'offline' },
 };
 
 export function etiquetaTipo(tipo: string): string {
@@ -67,34 +68,10 @@ export function resumenDetalle(r: RegistroAuditoria): string {
   return resto.length ? resto.map(([k, v]) => `${k}: ${valor(k, v)}`).join(' · ') : '—';
 }
 
-/* ---- Filtros de la auditoría ---- */
+/* ---- Auditoría ---- */
 
+/** Filas por página de la tabla de auditoría (el filtro y el orden se hacen sobre el registro entero). */
 export const TAMANIO_PAGINA_AUDITORIA = 25;
-
-export interface FormFiltrosAuditoria {
-  autor: string;
-  objetivo: string;
-  tipo: TipoAuditoria | '';
-  /** yyyy-mm-dd del input de fecha, en hora local. */
-  desde: string;
-  hasta: string;
-}
-
-export const SIN_FILTROS_AUDITORIA: FormFiltrosAuditoria = { autor: '', objetivo: '', tipo: '', desde: '', hasta: '' };
-
-/** Del formulario a la consulta: los días locales pasan a instantes (desde el inicio, hasta el final del día). */
-export function aConsulta(f: FormFiltrosAuditoria, pagina: number): FiltrosAuditoria {
-  const instante = (dia: string, hora: string) => (dia ? new Date(`${dia}T${hora}`).toISOString() : undefined);
-  return {
-    autor: f.autor.trim() || undefined,
-    objetivo: f.objetivo.trim() || undefined,
-    tipo: f.tipo || undefined,
-    desde: instante(f.desde, '00:00:00.000'),
-    hasta: instante(f.hasta, '23:59:59.999'),
-    pagina,
-    tamanio: TAMANIO_PAGINA_AUDITORIA,
-  };
-}
 
 /* ---- Política de sesión ---- */
 

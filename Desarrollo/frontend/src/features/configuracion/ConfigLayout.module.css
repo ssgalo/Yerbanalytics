@@ -25,6 +25,7 @@
 
 .headSide {
   display: flex;
+  margin-left: auto;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
@@ -74,7 +75,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .state {

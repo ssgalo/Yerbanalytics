@@ -1,10 +1,10 @@
 /* Filtros del menú de columna. Las columnas categóricas se filtran eligiendo valores con casillas;
    la fecha, con un rango "desde / hasta". Los dos confirman con "Aplicar". */
 import { useId, useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { Field, Input } from '@/components/ui/Field';
-import { cx } from '@/components/ui/estado';
-import type { Range } from '../diagnosisQuery';
+import { Button } from './Button';
+import { Field, Input } from './Field';
+import { cx } from './estado';
+import type { Range } from '@/lib/columnQuery';
 import styles from './ColumnFilters.module.css';
 
 interface ActionsProps {
