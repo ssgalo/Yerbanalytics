@@ -12,16 +12,8 @@ public enum ParametrosMediasombra implements DefinicionParametro {
 
     UV_UMBRAL("mediasombra.uv-umbral",
             "Índice UV de protección",
-            "Con un índice UV de pronóstico igual o mayor a este, la mediasombra pasa a posición protectora.",
-            TipoParametro.NUMERO, "índice", "7", 1.0, 11.0, 1, "motor-reglas: ShadingRule"),
-    APERTURA_PROTECCION_UV("mediasombra.apertura-proteccion-uv",
-            "Apertura protectora ante pico UV",
-            "Apertura de la mediasombra cuando se supera el índice UV de protección.",
-            TipoParametro.ENTERO, "%", "30", 0.0, 100.0, 0, "motor-reglas: ShadingRule"),
-    APERTURA_MAXIMA("mediasombra.apertura-maxima",
-            "Apertura máxima de la mediasombra",
-            "Tope de apertura que admite el plan de rustificación.",
-            TipoParametro.ENTERO, "%", "100", 10.0, 100.0, 0, "motor-reglas: ShadingRule");
+            "Con un índice UV de pronóstico igual o mayor a este, la mediasombra se cierra (el hardware es binario: abierta o cerrada).",
+            TipoParametro.NUMERO, "índice", "7", 1.0, 11.0, 1, "motor-reglas: ShadingRule");
 
     private final String clave;
     private final String etiqueta;

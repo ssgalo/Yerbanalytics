@@ -98,26 +98,15 @@ class ConfiguracionServiceCatalogoTest {
     // ------------------------------------------------------------------ 5.2
 
     @Test
-    void rustificacion_rechazaUnaEtapaPorEncimaDeLaAperturaMaximaDelCatalogo() {
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosMediasombra.APERTURA_MAXIMA, "60")));
-
-        assertThatThrownBy(() -> service.updateConfiguracion(cfg(List.of(new RustificacionEtapa(1, 1, 10, 70))), "Ana"))
+    void rustificacion_rechazaUnaEtapaPorEncimaDeCien() {
+        assertThatThrownBy(() -> service.updateConfiguracion(cfg(List.of(new RustificacionEtapa(1, 1, 10, 101))), "Ana"))
                 .isInstanceOf(InvalidConfigurationException.class)
-                .hasMessageContaining("60");
+                .hasMessageContaining("100");
         verify(operativaRepo, never()).save(any());
     }
 
     @Test
-    void rustificacion_aceptaUnaEtapaIgualALaAperturaMaximaDelCatalogo() {
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosMediasombra.APERTURA_MAXIMA, "60")));
-
-        service.updateConfiguracion(cfg(List.of(new RustificacionEtapa(1, 1, 10, 60))), "Ana");
-
-        verify(operativaRepo).save(any(ConfiguracionOperativaEntity.class));
-    }
-
-    @Test
-    void rustificacion_conLaFabricaDelCatalogoAceptaHastaCien() {
+    void rustificacion_aceptaHastaCien() {
         service.updateConfiguracion(cfg(List.of(new RustificacionEtapa(1, 1, 10, 100))), "Ana");
 
         verify(operativaRepo).save(any(ConfiguracionOperativaEntity.class));

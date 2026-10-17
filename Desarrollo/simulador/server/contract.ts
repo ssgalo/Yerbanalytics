@@ -86,7 +86,7 @@ export function telemetryTopicFor(zonaId: string, demoMode: boolean): string {
 export const INPUT_DEFAULT_SEC = 10;
 /**
  * Opening (%) below which the firmware DEPLOYS the shade mesh (closes it): `shade SET {targetPct}` is an OPENING, and
- * >= this value rolls the mesh up. Mirrors MEDIASOMBRA_UMBRAL_APERTURA_PCT in `embebido/comun/config.example.h`.
+ * >= this value rolls the mesh up. The hardware is binary, so the backend only sends 100 (open) or 0 (closed). Mirrors MEDIASOMBRA_UMBRAL_APERTURA_PCT in `embebido/comun/config.example.h`.
  */
 export const SHADE_DEPLOY_BELOW_OPENING_PCT = 50;
 

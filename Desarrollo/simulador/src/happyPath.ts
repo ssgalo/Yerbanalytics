@@ -118,18 +118,21 @@ function branchReadout(trace: EvaluationTrace, branch: string, actionType: strin
   return { acted: false, detail: 'sin acción' };
 }
 
+/** «Mediasombra cerrada/abierta» + el motivo, sin repetir lo que el motivo ya dice. */
+function shadeDetail(openingPct: number, reason: string): string {
+  const state = openingPct < SHADE_DEPLOY_BELOW_OPENING_PCT ? 'cerrada' : 'abierta';
+  return /^Mediasombra (cerrada|abierta)/.test(reason) ? reason : `Mediasombra ${state} · ${reason}`;
+}
+
 /** Resumen de la traza del Inspector: por rama, si actuó y por qué sí o por qué no. */
 export function summarizeTrace(trace: EvaluationTrace): HappyPathReadout {
   const riego = branchReadout(trace, 'RIEGO', 'ACTIVAR_VALVULA', 'Riego');
   const insumo = branchReadout(trace, 'INSUMO', 'ACTIVAR_BOMBA', 'Insumo');
   const shade = branchReadout(trace, 'MEDIASOMBRA', 'MOVER_MEDIASOMBRA', 'Mediasombra');
   const opening = /\[apertura=(\d+)\]/.exec(shade.detail);
-  // La orden lleva el % de APERTURA: por debajo del umbral del firmware la malla se despliega (queda cerrada).
+  // El hardware es binario: la orden lleva 100 (abierta) o 0 (cerrada) y el texto no muestra porcentajes.
   const mediasombra = shade.acted && opening
-    ? {
-        acted: true,
-        detail: `Mediasombra ${Number(opening[1]) < SHADE_DEPLOY_BELOW_OPENING_PCT ? 'cerrada' : 'abierta'} (${opening[1]} % de apertura) · ${shade.detail.replace(opening[0], '').trim()}`,
-      }
+    ? { acted: true, detail: shadeDetail(Number(opening[1]), shade.detail.replace(opening[0], '').trim()) }
     : shade;
   return { riego, insumo, mediasombra, allActed: riego.acted && insumo.acted && mediasombra.acted };
 }

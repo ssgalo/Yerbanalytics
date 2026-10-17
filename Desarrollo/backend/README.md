@@ -89,6 +89,15 @@ valores de 96 a 100, que el rango nuevo no admite: el catálogo los ignora y cae
 Corré `src/main/resources/migracion-confianza-70.sql` (idempotente, antes o después de arrancar) para
 borrarlos. No se pierde nada más.
 
+### Migración manual pendiente · mediasombra binaria
+
+La mediasombra es binaria (el firmware enrolla con un objetivo >= 50 y desenrolla por debajo), así que
+`ShadingRule` sólo pide 100 (abierta) o 0 (cerrada) y reenvía el cierre mientras dure el pico de UV
+(el valor guardado es lo último que mandó el backend, no la posición real; el firmware responde
+`sin_cambio` si ya está ahí). Salen `mediasombra.apertura-proteccion-uv` y `mediasombra.apertura-maxima`:
+corré `src/main/resources/migracion-mediasombra-binaria.sql` (idempotente) para borrar sus overrides; el
+catálogo los ignora con un warn si no lo hacés. El tope de las etapas de rustificación pasa a 100 % fijo.
+
 ### Migración manual pendiente · pulso de sensado y pasada diaria
 
 El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso

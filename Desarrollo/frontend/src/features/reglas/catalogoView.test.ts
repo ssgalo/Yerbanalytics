@@ -155,7 +155,7 @@ describe('filtrarParametros (vista por parámetro)', () => {
   it('el filtro por rama deja los parámetros que usa alguna regla de esa rama', () => {
     const c = catalogoDeFabrica();
     const claves = filtrarParametros(c, { ...sinFiltros, rama: 'MEDIASOMBRA' }).map((p) => p.clave);
-    expect(claves).toHaveLength(3);
+    expect(claves).toHaveLength(1);
     expect(claves.every((k) => k.startsWith('mediasombra.'))).toBe(true);
   });
 

@@ -108,14 +108,14 @@ test('readout: the three rules acted', () => {
     trace([
       rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Déficit: riega 6 L' }] }),
       rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'Dosificación autorizada' }] }),
-      rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=30] Pico UV' }] }),
+      rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=0] Mediasombra cerrada por pico de radiación UV (índice 9.5 ≥ umbral 7.0).' }] }),
     ]),
   );
   assert.equal(r.riego.acted, true);
   assert.equal(r.riego.detail, 'Déficit: riega 6 L');
   assert.equal(r.insumo.acted, true);
   assert.equal(r.mediasombra.acted, true);
-  assert.match(r.mediasombra.detail, /^Mediasombra cerrada \(30 % de apertura\)/);
+  assert.match(r.mediasombra.detail, /^Mediasombra cerrada por pico de radiación UV/);
   assert.equal(r.allActed, true);
 });
 
@@ -154,9 +154,9 @@ test('readout: shade already protective is not an action but explains itself', (
 
 test('readout: opening at or above the firmware threshold (50) is open, not closed', () => {
   const r = summarizeTrace(
-    trace([rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=50] Plan' }] })]),
+    trace([rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=100] Plan de rustificación: día 3 — mediasombra abierta.' }] })]),
   );
-  assert.match(r.mediasombra.detail, /^Mediasombra abierta \(50 % de apertura\)/);
+  assert.match(r.mediasombra.detail, /^Mediasombra abierta · Plan de rustificación/);
 });
 
 /* ---- thresholds with a visible warning ---- */
@@ -216,7 +216,7 @@ function fakeDeps(over: Partial<HappyPathDeps> = {}) {
         [
           rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Riega 720 s' }] }),
           rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'Dosifica 10 ml' }] }),
-          rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=30] UV' }] }),
+          rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=0] UV' }] }),
         ],
         pulses,
       ),
@@ -339,7 +339,7 @@ const allActed = summarizeTrace(
   trace([
     rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Riega 720 s' }] }),
     rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'Dosifica 10 ml' }] }),
-    rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=30] UV' }] }),
+    rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=0] UV' }] }),
   ]),
 );
 

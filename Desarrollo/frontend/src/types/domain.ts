@@ -405,9 +405,8 @@ export interface MetricThreshold {
 }
 
 /**
- * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego y la
- * apertura máx. de mediasombra no viven acá: son parámetros del catálogo del motor de reglas
- * (`riego.volumen-max-evento`, `mediasombra.apertura-maxima`).
+ * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego no
+ * vive acá: es un parámetro del catálogo del motor de reglas (`riego.volumen-max-evento`).
  */
 export interface ConfigOperativa {
   insumoDosisMax24hMl: number;

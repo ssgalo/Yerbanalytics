@@ -6,7 +6,6 @@ import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.dto.RustificacionEtapa;
 import com.yerbanalytics.backend.dto.UmbralMetrica;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
-import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
@@ -189,15 +188,16 @@ public class ConfiguracionService {
     // Validación fisiológica (HU-15 CA-03..06)
     // ------------------------------------------------------------------
 
+    /** La mediasombra es binaria: la apertura de una etapa llega hasta 100 %. */
+    private static final double APERTURA_MAXIMA_PCT = 100.0;
+
     private void validar(Configuracion cfg) {
         if (cfg == null) {
             throw new InvalidConfigurationException("La configuración es obligatoria.");
         }
         validarUmbrales(cfg.umbrales());
         validarOperativa(cfg.operativa());
-        // La apertura máxima es un parámetro del catálogo de reglas: se valida contra su valor vigente.
-        validarRustificacion(cfg.rustificacion(),
-                catalogoParametros.vigentes().numero(ParametrosMediasombra.APERTURA_MAXIMA));
+        validarRustificacion(cfg.rustificacion(), APERTURA_MAXIMA_PCT);
     }
 
     private void validarUmbrales(List<UmbralMetrica> umbrales) {

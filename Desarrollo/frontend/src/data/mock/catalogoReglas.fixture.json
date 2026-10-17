@@ -142,9 +142,7 @@
       "rama": "MEDIASOMBRA",
       "prioridad": 14,
       "parametros": [
-        "mediasombra.uv-umbral",
-        "mediasombra.apertura-proteccion-uv",
-        "mediasombra.apertura-maxima"
+        "mediasombra.uv-umbral"
       ]
     },
     {
@@ -767,46 +765,6 @@
       "min": 1.0,
       "max": 11.0,
       "decimales": 1,
-      "refSpec": "motor-reglas: ShadingRule",
-      "modificado": false,
-      "usadoPor": [
-        "ShadingRule"
-      ],
-      "updatedBy": null,
-      "updatedTs": null
-    },
-    {
-      "clave": "mediasombra.apertura-proteccion-uv",
-      "etiqueta": "Apertura protectora ante pico UV",
-      "descripcion": "Apertura de la mediasombra cuando se supera el índice UV de protección.",
-      "familia": "MEDIASOMBRA",
-      "tipo": "ENTERO",
-      "unidad": "%",
-      "valor": "30",
-      "fabrica": "30",
-      "min": 0.0,
-      "max": 100.0,
-      "decimales": 0,
-      "refSpec": "motor-reglas: ShadingRule",
-      "modificado": false,
-      "usadoPor": [
-        "ShadingRule"
-      ],
-      "updatedBy": null,
-      "updatedTs": null
-    },
-    {
-      "clave": "mediasombra.apertura-maxima",
-      "etiqueta": "Apertura máxima de la mediasombra",
-      "descripcion": "Tope de apertura que admite el plan de rustificación.",
-      "familia": "MEDIASOMBRA",
-      "tipo": "ENTERO",
-      "unidad": "%",
-      "valor": "100",
-      "fabrica": "100",
-      "min": 10.0,
-      "max": 100.0,
-      "decimales": 0,
       "refSpec": "motor-reglas: ShadingRule",
       "modificado": false,
       "usadoPor": [

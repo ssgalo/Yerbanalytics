@@ -77,7 +77,30 @@ class ShadingAndFollowUpRuleTest {
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.MOVER_MEDIASOMBRA);
-        assertThat(acciones.get(0).motivo()).contains("[apertura=30]");
+        assertThat(acciones.get(0).motivo()).contains("[apertura=0]").contains("Mediasombra cerrada")
+                .doesNotContain("%");
+    }
+
+    @Test
+    @DisplayName("ShadingRule: con pico UV reenvía el cierre aunque lo guardado ya sea 0 (el nodo pudo reiniciar)")
+    void picoUV_reenviaAunqueLoGuardadoYaSeaCerrado() {
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
+        sector.setActuadorShade(0);
+        WeatherForecast forecast = new WeatherForecast(10.0, 9.5, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of());
+
+        List<RuleAction> acciones = evaluar(rule, RuleContextTestFactory.conForecast(sector, zona, forecast));
+
+        assertThat(acciones.get(0).type()).isEqualTo(ActionType.MOVER_MEDIASOMBRA);
+    }
+
+    @Test
+    @DisplayName("ShadingRule: sin pico UV ni plan no mueve la mediasombra")
+    void sinPico_noMueve() {
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "");
+
+        List<RuleAction> acciones = evaluar(rule, RuleContextTestFactory.basico(sector, zona));
+
+        assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
     }
 
     @Test
@@ -85,8 +108,8 @@ class ShadingAndFollowUpRuleTest {
     void aperturaYaCorrecta_noopInfo() {
         String hoy = LocalDate.now(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA).format(DateTimeFormatter.ISO_LOCAL_DATE);
         ShadingRule rule = new ShadingRule(rustificacionRepository, hoy);
-        // sector tiene apertura 50%, plan dice 50%
-        sector.setActuadorShade(50);
+        // sector abierto (100), plan dice 50 → abierta: mismo estado binario
+        sector.setActuadorShade(100);
         when(rustificacionRepository.findAllByOrderByOrdenAsc())
                 .thenReturn(List.of(new RustificacionEtapaEntity(1, 1, 365, 50)));
 
@@ -102,7 +125,7 @@ class ShadingAndFollowUpRuleTest {
     void diaDelCiclo_usaLaZonaDelVivero() {
         // 01:00 UTC del 3/10 son las 22:00 del 2/10 en Buenos Aires: siembra el 1/10 → día 2 del ciclo (no 3).
         ShadingRule rule = new ShadingRule(rustificacionRepository, "2026-10-01");
-        sector.setActuadorShade(50);
+        sector.setActuadorShade(100);
         when(rustificacionRepository.findAllByOrderByOrdenAsc()).thenReturn(List.of(
                 new RustificacionEtapaEntity(1, 1, 2, 40), new RustificacionEtapaEntity(2, 3, 5, 60)));
         RuleContext ctx = new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
@@ -110,7 +133,7 @@ class ShadingAndFollowUpRuleTest {
 
         List<RuleAction> acciones = evaluar(rule, ctx);
 
-        assertThat(acciones.get(0).motivo()).contains("[apertura=40]");
+        assertThat(acciones.get(0).motivo()).contains("[apertura=0]");
     }
 
     @Test
@@ -118,7 +141,7 @@ class ShadingAndFollowUpRuleTest {
     void aperturaDiferenteAlPlan_moverMediasombra() {
         String hoy = LocalDate.now(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA).format(DateTimeFormatter.ISO_LOCAL_DATE);
         ShadingRule rule = new ShadingRule(rustificacionRepository, hoy);
-        sector.setActuadorShade(30); // actual 30%, plan dice 60%
+        sector.setActuadorShade(0); // cerrada, plan dice 60 → abierta
         when(rustificacionRepository.findAllByOrderByOrdenAsc())
                 .thenReturn(List.of(new RustificacionEtapaEntity(1, 1, 365, 60)));
 
@@ -127,11 +150,11 @@ class ShadingAndFollowUpRuleTest {
 
         assertThat(acciones).hasSize(1);
         assertThat(acciones.get(0).type()).isEqualTo(ActionType.MOVER_MEDIASOMBRA);
-        assertThat(acciones.get(0).motivo()).contains("[apertura=60]");
+        assertThat(acciones.get(0).motivo()).contains("[apertura=100]");
     }
 
     @Test
-    @DisplayName("ShadingRule: declara sus tres parámetros y registra el UV contra el umbral")
+    @DisplayName("ShadingRule: declara su único parámetro y registra el UV contra el umbral")
     void declaraLosParametrosYRegistraElUv() {
         ShadingRule rule = new ShadingRule(rustificacionRepository, "");
         WeatherForecast forecast = new WeatherForecast(10.0, 9.5, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of());
@@ -139,8 +162,7 @@ class ShadingAndFollowUpRuleTest {
 
         rule.evaluate(RuleContextTestFactory.conForecast(sector, zona, forecast), ev);
 
-        assertThat(rule.parametros()).containsExactly(ParametrosMediasombra.UV_UMBRAL,
-                ParametrosMediasombra.APERTURA_PROTECCION_UV, ParametrosMediasombra.APERTURA_MAXIMA);
+        assertThat(rule.parametros()).containsExactly(ParametrosMediasombra.UV_UMBRAL);
         assertThat(ev.comparaciones()).hasSize(1);
         assertThat(ev.comparaciones().get(0).recibido()).isEqualTo(9.5);
         assertThat(ev.comparaciones().get(0).operador()).isEqualTo(Operador.GE);
@@ -160,8 +182,8 @@ class ShadingAndFollowUpRuleTest {
     }
 
     @Test
-    @DisplayName("ShadingRule: umbral UV, apertura protectora y apertura máxima salen del catálogo")
-    void losParametrosSalenDelCatalogo() {
+    @DisplayName("ShadingRule: el umbral UV sale del catálogo")
+    void elUmbralSaleDelCatalogo() {
         ShadingRule rule = new ShadingRule(rustificacionRepository, "");
         WeatherForecast forecast = new WeatherForecast(10.0, 8.0, Instant.now(), 20.0, "Soleado", 40.0, java.util.List.of());
         RuleContext ctx = RuleContextTestFactory.conForecast(sector, zona, forecast);
@@ -169,12 +191,6 @@ class ShadingAndFollowUpRuleTest {
         // UV 8 < umbral 9: no es pico.
         assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.UV_UMBRAL, "9"))).get(0).type())
                 .isEqualTo(ActionType.NOOP_INFO);
-        // Apertura protectora 40 %.
-        assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.APERTURA_PROTECCION_UV, "40"))).get(0).motivo())
-                .contains("[apertura=40]");
-        // El tope de apertura (20 %) manda sobre la protectora (30 %).
-        assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.APERTURA_MAXIMA, "20"))).get(0).motivo())
-                .contains("[apertura=20]");
     }
 
     // ===== FollowUpRule =====
