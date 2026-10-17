@@ -71,8 +71,9 @@ export interface Diagnosis {
 
 /** Estado de los actuadores físicos del sector. */
 export interface Actuadores {
-  /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno en la tanda de la macro-zona) o `Cerrada`. */
+  /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno: en la tanda de la macro-zona o en la cola del nodo) o `Cerrada`. */
   valve: string;
+  /** Bomba de insumo: `Dosificando`, `En cola` (el nodo la tiene esperando su turno: sirve una carga a la vez) o `En espera`. Se muestra tal cual llega. */
   pump: string;
   shade: number;
 }

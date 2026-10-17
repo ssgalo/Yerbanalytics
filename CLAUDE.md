@@ -461,7 +461,11 @@ Invariantes a respetar al tocar esta área:
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
   El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. Los errores del nodo
   (`nursery/zone/{zona}/errores`, S-05) también: `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType` y `buildNodeError` del simulador. El comando de
-  zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos.
+  zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos. Y los ACK intermedios del nodo
+  (`status: "EN_CURSO"` con `detalle.tipo` `en_cola` / `iniciado`, `cola_llena`, las claves `posicion` / `esperaMaxSec`) y
+  `parametros.prioridad = "INMEDIATA"` del `shade SET` de seguridad (cola de cargas del nodo, `add-cola-actuadores-nodo`):
+  el nodo sirve a lo sumo `MAX_CARGAS_SIMULTANEAS` cargas a la vez y el simulador hace lo mismo (`server/nodeQueue.ts`,
+  `SIM_NODE_MAX_LOADS`). Orden de despliegue: backend antes que firmware.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.
 
