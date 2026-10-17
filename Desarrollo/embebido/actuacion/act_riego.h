@@ -25,6 +25,15 @@ namespace act_riego {
 
 void iniciar();
 
+// Valida un ON (sector, acción, duración o dosis) y calcula su duración efectiva, ya recortada a los límites locales,
+// y los ml efectivos (0 en un riego). Devuelve null si es válido; si no, el detalle.tipo del ERROR que le corresponde.
+// No toca el hardware: task_actuacion lo usa al LLEGAR el comando, antes de decidir si arranca o espera en la cola.
+const char* evaluar(const Comando& cmd, uint32_t& duracionMs, float& ml);
+
+// ¿Hay un tramo en curso de ese sector? tipo: 0 = riego (valve), 1 = insumo (pump). Lo usa la cola de cargas para soltar
+// el lugar de lo que ya terminó.
+bool activo(int sector, int tipo);
+
 // Ejecuta un comando de válvula (riego) o bomba (insumo) del sector cmd.sector.
 // ON arranca (y si el sector ya tenía uno en curso, el viejo termina con ack
 // ERROR "reemplazado", que sale por atender()); OFF corta.

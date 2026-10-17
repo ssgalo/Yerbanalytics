@@ -104,6 +104,17 @@ void iniciar() {
   detenerMotor();   // estado seguro
 }
 
+bool moviendoseAhora() {
+  return moviendo;
+}
+
+bool yaEnPosicion(const Comando& cmd) {
+  if (moviendo || cmd.accion != TipoAccion::POSICIONAR || cmd.targetPct < 0) {
+    return false;
+  }
+  return finActivado(pinFin(cmd.targetPct >= MEDIASOMBRA_UMBRAL_APERTURA_PCT));
+}
+
 bool comenzar(const Comando& cmd, Ack& ack) {
   ackBase(ack, cmd.commandId, cmd.sector);
   ack.status = EstadoAck::ERROR;

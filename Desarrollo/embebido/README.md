@@ -151,6 +151,7 @@ La bomba de riego, la bomba de insumo, la mediasombra y el riel son **compartido
 | `FINES_CARRERA_NC` | `1` para microswitches NC (cableados con C y NC). Vale para los 4 finales |
 | `INSUMO_SEG_POR_DEFECTO` | Cuánto bombea el insumo cuando el backend manda `pump ON` sin parámetros (es lo que manda hoy) |
 | `MEDIASOMBRA_UMBRAL_APERTURA_PCT` | `targetPct` (% de apertura) desde el que se enrolla |
+| `MAX_CARGAS_SIMULTANEAS` | `1` (de fábrica) → el nodo corre una carga a la vez y encola el resto (ver "Cola de cargas"). Subilo sólo con una fuente que banque más. Si tu `config.h` no lo define, el módulo asume 1 |
 | `LIMITE_VALVULA_SEG_MAX` | 1200 s, igual al máximo del contrato (`CONTRATO_VALVULA_DURACION_MAX_SEG`). Si es menor, no compila (`static_assert` en `actuacion/act_riego.cpp`) |
 | `ENVIAR_ERRORES_CAUDAL` | `0` (de fábrica) → no se compila `task_actuacion::informarErrorCaudal()`, el punto de integración del caudalímetro (S-05). El hardware no está instalado en el vivero; los errores de caudal los inyecta el simulador |
 | `RIEL_POSICION_SECTOR_1/2`, `RIEL_DIR_HACIA_HOME` | Calibración del riel en pasos y sentido del motor |
@@ -246,10 +247,46 @@ Fuente de verdad: `comun/contrato.h`. Los espejos del backend son `ContratoNodo.
 - Todos llevan `commandId`.
 - `accion` no distingue mayúsculas y acepta también los nombres históricos (`open`, `inject`,
   `close`, `move`).
-- Riego e insumo de los dos sectores pueden correr a la vez. Las bombas prenden mientras algún
-  sector las necesite, y nunca con su válvula cerrada.
+- **El nodo corre a lo sumo `MAX_CARGAS_SIMULTANEAS` cargas a la vez** (ver "Cola de cargas" abajo): riego e
+  insumo de los dos sectores y la mediasombra hacen cola. Las bombas prenden mientras algún sector las
+  necesite, y nunca con su válvula cerrada.
 - Un `ON` para algo que ya está en curso lo **reemplaza**: el comando viejo termina con ack
   `ERROR` y `reemplazado`.
+- `shade SET` acepta `"parametros":{"prioridad":"INMEDIATA"}`: arranca ya aunque el nodo esté lleno. Lo manda **sólo**
+  el estado seguro del backend; en `valve ON` / `pump ON` se ignora, y cualquier otro valor cuenta como ausente.
+
+### Cola de cargas (`actuacion/cola_cargas`)
+
+El 17/10/2026 el motor mandó riego, insumo y mediasombra en un mismo pulso, el nodo prendió dos válvulas, dos
+minibombas y el motor de la malla a la vez, la fuente del prototipo no aguantó el pico, cayó la tensión y el ESP32 se
+reinició ~7 s después (con otro client id de MQTT): quedaron acciones cortadas y los ack finales nunca llegaron.
+Por eso el nodo **serializa las cargas** (design `openspec/changes/add-cola-actuadores-nodo/`):
+
+- **Carga** = un tramo de riego de un sector, un tramo de insumo de un sector, o un movimiento de la mediasombra.
+  Corren a lo sumo `MAX_CARGAS_SIMULTANEAS` (`config.h`, 1 por defecto; si tu `config.h` no lo define, el módulo
+  asume 1). El resto espera en una cola **en RAM** (`COLA_CARGAS_MAX` = 8), en orden de llegada. Cola llena →
+  `ERROR cola_llena` al instante. Se pierde en un reinicio: lo encolado termina como la alerta "no confirmó a
+  tiempo" del backend.
+- **Lo de seguridad no hace cola:** `valve OFF` / `pump OFF` actúan ya, cortan el tramo en curso de ese sector y
+  actuador y descartan lo encolado de lo mismo (cada uno recibe `ERROR cancelado`). Un `shade SET` con
+  `prioridad: "INMEDIATA"` arranca ya y descarta el `SET` encolado (`ERROR reemplazado`). Un comando inválido o un
+  `sin_cambio` responde en el acto y no ocupa lugar.
+- **Reemplazo:** un comando para lo mismo que está en curso lo reemplaza y arranca (mismo lugar, no suma consumo); si
+  estaba encolado toma su lugar en la fila.
+- **El riel no entra en el límite:** tiene su propio slot y su propio ciclo (`act_riel`), y ya se probó solo. Una pasada
+  que coincida con una carga en curso sigue sumando consumo (riesgo conocido).
+- La lógica es **pura** (`cola_cargas.{h,cpp}`: sin `Arduino.h` ni FreeRTOS, el reloj entra como argumento) y la
+  conecta `task_actuacion` con los drivers (`act_riego`, `act_mediasombra`), que no cambiaron de contrato.
+- **Prueba en el host** (no hace falta placa): `test/host/cola_cargas_test.cpp`.
+
+  ```bash
+  cd Desarrollo/embebido
+  g++ -std=c++17 -Wall -Wextra -I actuacion actuacion/cola_cargas.cpp test/host/cola_cargas_test.cpp -o /tmp/cola && /tmp/cola
+  ```
+
+  Está fuera de `actuacion/` a propósito, para no romper la copia plana (`cp actuacion/* …`) de arduino-cli.
+- Los ack ya no son uno solo por comando: ver "Ack". Y `task_red` ya no pierde los ack con la red caída (como los
+  eventos del riel: mira el primero, publica y recién ahí lo saca; `sys.ack` es de 16).
 
 ### Ack
 
@@ -259,7 +296,20 @@ Fuente de verdad: `comun/contrato.h`. Los espejos del backend son `ContratoNodo.
 { "commandId": "abc-125", "status": "ERROR",   "detalle": { "tipo": "falla_mecanica" } }
 ```
 
-El ack sale **cuando termina** la acción, no cuando llega el comando. Los valores de `tipo` son:
+El ack **final** sale **cuando termina** la acción, no cuando llega el comando. Además, por cada comando de carga
+(`valve ON`, `pump ON`, `shade SET`) el nodo publica ack **intermedios** (`status: "EN_CURSO"`, mismo tópico y mismo
+`commandId`) para que el backend sepa cuándo la carga espera turno y cuándo arrancó de verdad:
+
+```json
+{ "commandId": "abc-126", "status": "EN_CURSO", "detalle": { "tipo": "en_cola", "posicion": 2, "esperaMaxSec": 45 } }
+{ "commandId": "abc-126", "status": "EN_CURSO", "detalle": { "tipo": "iniciado", "durationSec": 10, "ml": 10 } }
+```
+
+Secuencia: `[en_cola] → iniciado → final`. `en_cola` sólo sale si el comando no pudo arrancar al llegar; `posicion` (1 = el
+próximo) y `esperaMaxSec` son una cota superior de la espera. Un encolado que se descarta pasa directo a su final
+(`cancelado` / `reemplazado`). Los `OFF`, `sin_cambio` e inválidos sólo llevan el final. El backend nuevo sigue
+funcionando sin intermedios (firmware viejo, sketch `vivero_esp32_red`); **el backend viejo no entiende `EN_CURSO`
+(pierde el ack final): desplegar el backend antes que el firmware**. Los valores de `tipo` son:
 
 | Tipo | Cuándo sale |
 |---|---|
@@ -270,12 +320,15 @@ El ack sale **cuando termina** la acción, no cuando llega el comando. Los valor
 | `cancelado` | Llegó un `OFF` |
 | `falla_mecanica` | La mediasombra no llegó al final de carrera a tiempo |
 | `comando_invalido`, `accion_invalida`, `duracion_invalida`, `parametros_invalidos` | El comando no se pudo ejecutar |
+| `cola_llena` | La cola de cargas no tenía lugar (`ERROR`, final) |
+| `en_cola`, `iniciado` | Intermedios (`EN_CURSO`): la carga espera turno / arrancó |
 
 Un `commandId` repetido no se vuelve a ejecutar:
-- si sigue en curso, se ignora;
+- si sigue en curso **o está encolado**, se ignora (no se reenvían intermedios);
 - si ya terminó, se reenvía su ack.
 
-> **Qué hace el backend con el ack** (`SeguimientoComandosService`): un `SUCCESS` cierra el seguimiento;
+> **Qué hace el backend con el ack** (`SeguimientoComandosService`): un `EN_CURSO` mantiene el comando pendiente y
+> recalcula su plazo desde el arranque; un `SUCCESS` cierra el seguimiento;
 > un `ERROR` que es una falla deja una alerta en el historial (`falla_mecanica` es crítica; `reemplazado`
 > y `cancelado` no son fallas); y si no llega ningún ack en `durationSec` + 90 s, alerta
 > `ActuadorSinRespuesta`. No cambia ninguna decisión del motor.

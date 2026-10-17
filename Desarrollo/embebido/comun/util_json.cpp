@@ -103,6 +103,17 @@ bool parsearComando(const char* payload, unsigned int len, Comando& out) {
   out.durationSec = params[KEY_DURATION]  | 0L;
   out.ml          = params[KEY_ML]        | 0.0f;
   out.targetPct   = params[KEY_TARGET_PCT] | -1;
+
+  // Prioridad: sólo "INMEDIATA" cuenta; cualquier otro valor es como si no viniera (con log, sin fallar).
+  out.prioridadInmediata = false;
+  if (!params[KEY_PRIORIDAD].isNull()) {
+    const char* prioridad = params[KEY_PRIORIDAD] | "";
+    if (strcmp(prioridad, PRIORIDAD_INMEDIATA) == 0) {
+      out.prioridadInmediata = true;
+    } else {
+      Serial.printf("[json] parametros.prioridad '%s' desconocida: se ignora\n", prioridad);
+    }
+  }
   return true;
 }
 
@@ -132,7 +143,11 @@ size_t serializarAck(const Ack& a, char* buf, size_t n) {
   if (a.commandId[0] != '\0') {
     doc[KEY_COMMAND_ID] = a.commandId;
   }
-  doc[KEY_STATUS] = (a.status == EstadoAck::SUCCESS) ? STATUS_SUCCESS : STATUS_ERROR;
+  switch (a.status) {
+    case EstadoAck::SUCCESS:  doc[KEY_STATUS] = STATUS_SUCCESS;  break;
+    case EstadoAck::EN_CURSO: doc[KEY_STATUS] = STATUS_EN_CURSO; break;
+    default:                  doc[KEY_STATUS] = STATUS_ERROR;    break;
+  }
 
   JsonObject detalle = doc[KEY_DETALLE].to<JsonObject>();
   if (a.tipoDetalle[0] != '\0') {
@@ -141,6 +156,10 @@ size_t serializarAck(const Ack& a, char* buf, size_t n) {
   if (a.durationSec > 0) detalle[KEY_DURATION]   = a.durationSec;
   if (a.ml > 0)          detalle[KEY_ML]          = a.ml;
   if (a.targetPct >= 0)  detalle[KEY_TARGET_PCT]  = a.targetPct;
+  if (a.status == EstadoAck::EN_CURSO && a.posicion > 0) {
+    detalle[KEY_POSICION]   = a.posicion;     // sólo en_cola
+    detalle[KEY_ESPERA_MAX] = a.esperaMaxSec;
+  }
 
   return serializeJson(doc, buf, n);
 }

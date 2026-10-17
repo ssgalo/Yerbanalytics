@@ -109,18 +109,49 @@ static const char* KEY_DETALLE    = "detalle";
 static const char* KEY_TIPO       = "tipo";
 static const char* STATUS_SUCCESS = "SUCCESS";
 static const char* STATUS_ERROR   = "ERROR";
+// Intermedio: no cierra el comando (ver "Ack de actuador" abajo). Espejos: ContratoNodo.ACK_EN_CURSO,
+// simulador/server/contract.ts (ACK_STATUSES).
+static const char* STATUS_EN_CURSO = "EN_CURSO";
 
-//  Ack de actuador (add-secuencias-demo-expo, design §1.2)
-//    Topic: nursery/zone/{zona}/sector/{sector}/ack. Un único ack por comando, publicado al
-//    TERMINAR de cumplirlo:
+//  Ack de actuador (add-secuencias-demo-expo, design §1.2; ACK intermedios: add-cola-actuadores-nodo)
+//    Topic: nursery/zone/{zona}/sector/{sector}/ack. Por cada comando de CARGA (valve/pump ON, shade SET) el nodo
+//    publica, en orden y con el mismo commandId:
+//        [EN_CURSO en_cola] -> EN_CURSO iniciado -> ack FINAL (SUCCESS | ERROR)
+//    El nodo corre a lo sumo MAX_CARGAS_SIMULTANEAS cargas a la vez (la fuente no banca más): el resto espera en una
+//    cola en RAM, en orden de llegada. Un comando que se descarta de la cola no tiene 'iniciado': pasa directo a su final.
+//    El ACK FINAL se publica al TERMINAR de cumplirlo y es el único que cierra el comando:
 //      valve/pump ON   -> al final de la duración (SUCCESS ok), o ERROR cancelado si llega un OFF
-//                         (o ERROR reemplazado si llega otro ON para lo mismo). No hay ack de "apertura".
-//      valve/pump OFF  -> ack inmediato (SUCCESS ok), haya o no riego en curso.
+//                         (o ERROR reemplazado si llega otro ON para lo mismo).
+//      valve/pump OFF  -> ack inmediato (SUCCESS ok), haya o no riego en curso. Sólo el final.
 //      shade SET       -> al tocar el final de carrera (SUCCESS ok) o al rendirse (ERROR falla_mecanica).
-//      comando inválido -> ERROR inmediato con el tipo que corresponda.
+//      comando inválido -> ERROR inmediato con el tipo que corresponda. Sólo el final.
+//      cola llena      -> ERROR cola_llena inmediato (COLA_CARGAS_MAX comandos esperando).
+//    ACK INTERMEDIO (status EN_CURSO, detalle.tipo):
+//      en_cola   el comando no pudo arrancar al llegar. posicion (1 = el próximo) y esperaMaxSec: cota superior
+//                de la espera (lo que le queda a lo que corre + la duración de lo que tiene adelante).
+//      iniciado  la carga arrancó de verdad (al llegar o al salir de la cola); lleva la duración efectiva
+//                (durationSec, ml o targetPct), ya recortada a los límites locales.
+//    PREEMPCIÓN: se decide al llegar el comando.
+//      inválido                       ERROR inmediato; no ocupa lugar.
+//      valve OFF / pump OFF           actúa YA: corta el tramo en curso de ese sector y actuador y descarta lo
+//                                     encolado de lo mismo (cada uno recibe ERROR cancelado). Su ack: SUCCESS ok.
+//      shade SET ya en la posición    SUCCESS sin_cambio inmediato (si no hay movimiento en curso).
+//      shade SET prioridad INMEDIATA  arranca YA aunque el límite esté lleno y descarta el SET encolado
+//                                     (ERROR reemplazado). Lo manda sólo ActuatorShutdown (estado seguro).
+//      valve ON / pump ON / shade SET arrancan si hay lugar; si no, a la cola. Si el mismo sector y actuador (o la
+//                                     malla) ya corre: lo reemplaza y arranca (ERROR reemplazado al viejo); si
+//                                     está encolado: toma su lugar en la fila (ERROR reemplazado al viejo).
+//    parametros.prioridad: "INMEDIATA" | ausente. Sólo se honra en shade SET; en valve/pump ON se ignora y
+//    cualquier otro valor se trata como ausente (un valor raro nunca debe hacer fallar un cierre de seguridad).
+//    Un firmware viejo ignora la clave; un backend viejo no entiende EN_CURSO (desplegar el backend primero).
+//    Un commandId encolado cuenta como "en curso" para el dedup: su reentrega se ignora.
 //    El ESP32 de vivero_esp32_red publica QoS 0 (PubSubClient); el backend suscribe QoS 1. Sin retain.
 //      {"commandId":"<uuid>","status":"SUCCESS","detalle":{"tipo":"ok","durationSec":20}}
 //      {"commandId":"<uuid>","status":"ERROR","detalle":{"tipo":"falla_mecanica"}}
+//      {"commandId":"<uuid>","status":"EN_CURSO","detalle":{"tipo":"en_cola","posicion":2,"esperaMaxSec":45}}
+//      {"commandId":"<uuid>","status":"EN_CURSO","detalle":{"tipo":"iniciado","durationSec":20}}
+//      {"commandId":"<uuid>","status":"EN_CURSO","detalle":{"tipo":"iniciado","durationSec":10,"ml":10}}
+//      {"commandId":"<uuid>","status":"EN_CURSO","detalle":{"tipo":"iniciado","targetPct":0}}
 //    "detalle" es un OBJETO (en el evento del riel es un string).
 //    Valores de detalle.tipo (unión de lo que emite el firmware modular y el sketch de la expo):
 //      ok                    SUCCESS  comando cumplido
@@ -134,7 +165,10 @@ static const char* STATUS_ERROR   = "ERROR";
 //      actuador_desconocido  ERROR    actuador que este nodo no tiene
 //      falla_mecanica        ERROR    la mediasombra no tocó el final de carrera a tiempo
 //      reemplazado           ERROR    otro commandId interrumpió; éste se abortó (no es una falla)
-//      cancelado             ERROR    un OFF cortó el riego en curso (no es una falla)
+//      cancelado             ERROR    un OFF cortó el riego en curso o descartó el encolado (no es una falla)
+//      cola_llena            ERROR    la cola de cargas del nodo no tiene lugar (add-cola-actuadores-nodo)
+//      en_cola               EN_CURSO la carga espera su turno (intermedio)
+//      iniciado              EN_CURSO la carga arrancó (intermedio)
 static const char* DETALLE_OK                   = "ok";
 static const char* DETALLE_SIN_CAMBIO           = "sin_cambio";
 static const char* DETALLE_LIMITE_EXCEDIDO      = "limite_excedido";
@@ -147,6 +181,15 @@ static const char* DETALLE_ACTUADOR_DESCONOCIDO = "actuador_desconocido";
 static const char* DETALLE_FALLA_MECANICA       = "falla_mecanica";
 static const char* DETALLE_REEMPLAZADO          = "reemplazado";
 static const char* DETALLE_CANCELADO            = "cancelado";
+static const char* DETALLE_COLA_LLENA           = "cola_llena";
+static const char* DETALLE_EN_COLA              = "en_cola";
+static const char* DETALLE_INICIADO             = "iniciado";
+
+// Claves del ACK intermedio y de la prioridad. "posicion" (KEY_POSICION, más abajo, en la sección del riel) se
+// reutiliza: en el ACK es el lugar en la cola (1 = el próximo).
+static const char* KEY_ESPERA_MAX      = "esperaMaxSec";   // en detalle de en_cola
+static const char* KEY_PRIORIDAD       = "prioridad";      // en parametros de shade SET
+static const char* PRIORIDAD_INMEDIATA = "INMEDIATA";
 
 // ----------------------------------------------------------------------------
 //  Errores del nodo (add-fallas-esp32, S-05 de reglas_v2)

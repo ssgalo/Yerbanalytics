@@ -144,38 +144,14 @@ void iniciar() {
   }
 }
 
-bool comenzar(const Comando& cmd, Ack& ack) {
-  ackBase(ack, cmd.commandId, cmd.sector);
-  ack.status = EstadoAck::ERROR;
-
-  int s = cmd.sector;
-  int tipo = (cmd.actuador == TipoActuador::VALVULA) ? RIEGO : INSUMO;
-  if (s < 1 || s > CANT_SECTORES) {
-    strlcpy(ack.tipoDetalle, "sector_invalido", sizeof(ack.tipoDetalle));
-    return true;
-  }
-
-  if (cmd.accion == TipoAccion::APAGAR) {
-    terminar(s, tipo, EstadoAck::ERROR, "cancelado");
-    aplicarReles();
-    ack.status = EstadoAck::SUCCESS;
-    strlcpy(ack.tipoDetalle, "ok", sizeof(ack.tipoDetalle));
-    return true;
-  }
-  if (cmd.accion != TipoAccion::ENCENDER) {
-    strlcpy(ack.tipoDetalle, "accion_invalida", sizeof(ack.tipoDetalle));
-    return true;
-  }
-
-  // Duración del tramo, con los límites locales.
-  uint32_t duracionMs;
-  float ml = 0;
-  bool limite = false;
+// Valida un ON y calcula su duración con los límites locales. Devuelve null si es válido; si no, el detalle.tipo del error.
+static const char* evaluarEncendido(const Comando& cmd, int tipo, uint32_t& duracionMs, float& ml, bool& limite) {
+  ml = 0;
+  limite = false;
   if (tipo == RIEGO) {
     long seg = cmd.durationSec;
     if (seg <= 0) {
-      strlcpy(ack.tipoDetalle, "duracion_invalida", sizeof(ack.tipoDetalle));
-      return true;
+      return "duracion_invalida";
     }
     if (seg > LIMITE_VALVULA_SEG_MAX) {
       Serial.printf("[riego] Duración %lds excede el límite; se recorta a %ds\n", seg, LIMITE_VALVULA_SEG_MAX);
@@ -201,6 +177,60 @@ bool comenzar(const Comando& cmd, Ack& ack) {
       duracionMs = (uint32_t) LIMITE_INSUMO_SEG_MAX * 1000UL;
       limite = true;
     }
+  }
+  return nullptr;
+}
+
+const char* evaluar(const Comando& cmd, uint32_t& duracionMs, float& ml) {
+  int s = cmd.sector;
+  if (s < 1 || s > CANT_SECTORES) {
+    return "sector_invalido";
+  }
+  if (cmd.accion != TipoAccion::ENCENDER) {
+    return "accion_invalida";
+  }
+  bool limite;
+  return evaluarEncendido(cmd, (cmd.actuador == TipoActuador::VALVULA) ? RIEGO : INSUMO, duracionMs, ml, limite);
+}
+
+bool activo(int sector, int tipo) {
+  if (sector < 1 || sector > CANT_SECTORES || tipo < RIEGO || tipo > INSUMO) {
+    return false;
+  }
+  return tramos[sector][tipo].activo;
+}
+
+bool comenzar(const Comando& cmd, Ack& ack) {
+  ackBase(ack, cmd.commandId, cmd.sector);
+  ack.status = EstadoAck::ERROR;
+
+  int s = cmd.sector;
+  int tipo = (cmd.actuador == TipoActuador::VALVULA) ? RIEGO : INSUMO;
+  if (s < 1 || s > CANT_SECTORES) {
+    strlcpy(ack.tipoDetalle, "sector_invalido", sizeof(ack.tipoDetalle));
+    return true;
+  }
+
+  if (cmd.accion == TipoAccion::APAGAR) {
+    terminar(s, tipo, EstadoAck::ERROR, "cancelado");
+    aplicarReles();
+    ack.status = EstadoAck::SUCCESS;
+    strlcpy(ack.tipoDetalle, "ok", sizeof(ack.tipoDetalle));
+    return true;
+  }
+  if (cmd.accion != TipoAccion::ENCENDER) {
+    strlcpy(ack.tipoDetalle, "accion_invalida", sizeof(ack.tipoDetalle));
+    return true;
+  }
+
+  // Duración del tramo, con los límites locales.
+  uint32_t duracionMs;
+  float ml;
+  bool limite;
+  const char* error = evaluarEncendido(cmd, tipo, duracionMs, ml, limite);
+  if (error != nullptr) {
+    strlcpy(ack.tipoDetalle, error, sizeof(ack.tipoDetalle));
+    return true;
   }
 
   // Un comando nuevo para lo mismo reemplaza al que estaba en curso.
