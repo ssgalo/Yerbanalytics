@@ -33,6 +33,7 @@ class EscalamientoNodoServiceTest {
 
     private ZonaRepository zonas;
     private HistorialService historial;
+    private ZoneSafeState safeState;
     private EscalamientoNodoService service;
     private ZonaEntity mz3;
 
@@ -40,7 +41,9 @@ class EscalamientoNodoServiceTest {
     void setUp() {
         zonas = mock(ZonaRepository.class);
         historial = mock(HistorialService.class);
-        service = new EscalamientoNodoService(zonas, historial,
+        safeState = mock(ZoneSafeState.class);
+        when(safeState.order(anyString())).thenReturn(new ZoneSafeState.Result(3, 0));
+        service = new EscalamientoNodoService(zonas, historial, safeState,
                 Clock.fixed(Instant.parse("2026-10-14T13:00:00Z"), ZoneOffset.UTC));
         mz3 = new ZonaEntity();
         mz3.setId("MZ-3");
@@ -82,6 +85,60 @@ class EscalamientoNodoServiceTest {
     }
 
     @Test
+    @DisplayName("S-02: al tercer pulso sin respuesta ordena el estado seguro de la zona, una sola vez")
+    void thirdMissedPulseOrdersTheSafeStateOnce() {
+        service.registrarSinRespuesta("MZ-3");
+        service.registrarSinRespuesta("MZ-3");
+        verify(safeState, never()).order(anyString());
+
+        service.registrarSinRespuesta("MZ-3");
+        verify(safeState).order("MZ-3");
+
+        service.registrarSinRespuesta("MZ-3");
+        service.registrarSinRespuesta("MZ-3");
+        verify(safeState, times(1)).order(anyString());
+    }
+
+    @Test
+    @DisplayName("la alerta CRITICAL deja registrado que se ordenó el estado seguro")
+    void criticalAlertMentionsTheSafeState() {
+        mz3.setPulsosSinRespuesta(2);
+
+        service.registrarSinRespuesta("MZ-3");
+
+        ArgumentCaptor<DetalleAlerta> det = ArgumentCaptor.forClass(DetalleAlerta.class);
+        verify(historial).registrarAlerta(eq("MZ-3"), eq("Macro-zona 3"), eq(EscalamientoNodoService.REGLA),
+                det.capture(), anyLong());
+        assertThat(det.getValue().nivel()).isEqualTo(NivelAlerta.CRITICAL);
+        assertThat(det.getValue().texto()).contains("estado seguro").contains("3 órdenes");
+    }
+
+    @Test
+    @DisplayName("si el estado seguro no pudo ordenarse, la alerta lo dice y el nodo igual queda fuera de servicio")
+    void failedSafeStateIsReportedAndDoesNotBreakTheCount() {
+        mz3.setPulsosSinRespuesta(2);
+        when(safeState.order("MZ-3")).thenThrow(new RuntimeException("base caída"));
+
+        service.registrarSinRespuesta("MZ-3");
+
+        assertThat(EscalamientoNodoService.fueraDeServicio(mz3)).isTrue();
+        ArgumentCaptor<DetalleAlerta> det = ArgumentCaptor.forClass(DetalleAlerta.class);
+        verify(historial).registrarAlerta(eq("MZ-3"), eq("Macro-zona 3"), eq(EscalamientoNodoService.REGLA),
+                det.capture(), anyLong());
+        assertThat(det.getValue().texto()).contains("no se pudo ordenar el estado seguro");
+    }
+
+    @Test
+    @DisplayName("cuando el nodo vuelve no se ordena nada: sin acciones retroactivas")
+    void nodeBackOrdersNothing() {
+        mz3.setPulsosSinRespuesta(3);
+
+        service.reiniciar(mz3);
+
+        verify(safeState, never()).order(anyString());
+    }
+
+    @Test
     void fueraDeServicioLosPulsosSiguientesNoRepitenAlertas() {
         mz3.setPulsosSinRespuesta(3);
 
@@ -96,7 +153,7 @@ class EscalamientoNodoServiceTest {
     void laCuentaPersistidaSobreviveAUnReinicio() {
         // Lo que dejó la racha antes del reinicio vive en la fila de la zona: un servicio nuevo la retoma.
         mz3.setPulsosSinRespuesta(2);
-        EscalamientoNodoService trasReinicio = new EscalamientoNodoService(zonas, historial, Clock.systemUTC());
+        EscalamientoNodoService trasReinicio = new EscalamientoNodoService(zonas, historial, safeState, Clock.systemUTC());
 
         trasReinicio.registrarSinRespuesta("MZ-3");
 

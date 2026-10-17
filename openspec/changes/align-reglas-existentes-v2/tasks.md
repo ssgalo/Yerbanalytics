@@ -23,10 +23,10 @@ Rama: `feat/reglas-v2-align`.
 - [x] 2.4 Frontend: la familia aparece en Motor de reglas → Parámetros.
 
 ## 3. Estado seguro (S-02)
-- [ ] 3.1 Test: el 3.er `registrarSinRespuesta` pide el estado seguro una vez; el 4.º no.
-- [ ] 3.2 Test: con el nodo de vuelta no hay ningún comando.
-- [ ] 3.3 Implementar vía `ComandoActuadorPublisher` (válvulas, bombas, mediasombra cerrada).
-- [ ] 3.4 Test: `SeguimientoComandosService` vigila esos comandos.
+- [x] 3.1 Test: el 3.er `registrarSinRespuesta` pide el estado seguro una vez; el 4.º no.
+- [x] 3.2 Test: con el nodo de vuelta no hay ningún comando.
+- [x] 3.3 Implementar vía `ComandoActuadorPublisher` (válvulas, bombas, mediasombra cerrada).
+- [x] 3.4 Test: `SeguimientoComandosService` vigila esos comandos.
 
 ## 4. Reintento con nodo caído
 - [ ] 4.1 Test en `SensingScheduler`: zona con cuenta ≥ 3 recibe `LEER_AHORA` cada 15 min; zona sana, no.
