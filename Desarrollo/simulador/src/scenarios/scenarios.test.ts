@@ -81,7 +81,7 @@ test('R-01 or R-03 together with R-04 also reset the cooldowns', () => {
 test('the registry keeps the order and keys of the original catalog', () => {
   assert.deepEqual(
     SCENARIOS.map((s) => s.key),
-    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE'],
+    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK'],
   );
 });
 
@@ -151,6 +151,46 @@ test('the node-offline scenario exercises the escalation piece of the backend', 
   assert.deepEqual(scenario?.backendRules, ['EscalamientoNodo']);
 });
 
+/* ------------------------------------------------------------------ bloqueo manual (S-01) */
+
+test('the manual-lock scenario asks for a lock on the target zone and publishes dry soil', () => {
+  const result = calculateConditions(['LOCK'], thresholds);
+  assert.deepEqual(result.manualLock, { reason: 'Bloqueo de prueba desde el simulador' });
+  // Dry enough for R-01 to irrigate if nothing stopped it: the lock is the only reason it does not.
+  assert.ok(result.telemetria.humSus < thresholds.umbralHumedad);
+  assert.ok(result.telemetria.humSus > thresholds.umbralCritico);
+  assert.equal(result.needsCooldownReset, true);
+  assert.equal(result.silenceZone, false);
+  assert.equal(result.pulses, 1);
+  assert.match(result.resumen.join(' | '), /bloqueo/i);
+});
+
+test('without it no lock is requested', () => {
+  assert.equal(calculateConditions(['R01'], thresholds).manualLock, null);
+});
+
+test('the lock scenario exercises ManualLockRule and nothing else', () => {
+  const scenario = SCENARIOS.find((s) => s.key === 'LOCK');
+  assert.deepEqual(scenario?.backendRules, ['ManualLockRule']);
+  assert.equal(scenario?.needsDiagnosis, false);
+});
+
+test('a lock cannot be shown next to saturated soil or a silent node: the cause would be ambiguous', () => {
+  for (const other of ['R04', 'NODE_OFFLINE']) {
+    for (const selected of [[other, 'LOCK'], ['LOCK', other]]) {
+      const result = calculateConditions(selected, thresholds);
+      assert.equal(result.conflictos.length, 1, selected.join('+'));
+      assert.equal(result.manualLock, null, 'with a conflict nothing is applied');
+    }
+  }
+});
+
+test('the lock scenario coexists with the dry-soil rules', () => {
+  for (const other of ['R01', 'R02']) {
+    assert.equal(calculateConditions([other, 'LOCK'], thresholds).conflictos.length, 0, other);
+  }
+});
+
 /* ------------------------------------------------------------------ resumen */
 
 test('the preview does not mention the humidity that another selected rule overrode', () => {
@@ -179,7 +219,7 @@ test('backend rules with no scenario are the ones no scenario lists as exercised
   const rules = [demoRule('ShadingRule'), demoRule('ZoneShading'), demoRule('DeficitCriticoRule'), demoRule('ManualLockRule')];
   assert.deepEqual(
     rulesWithoutScenario(rules).map((r) => r.name),
-    ['ZoneShading', 'ManualLockRule'],
+    ['ZoneShading'],
   );
 });
 

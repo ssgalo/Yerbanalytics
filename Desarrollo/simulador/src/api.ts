@@ -21,6 +21,7 @@ import type {
   CaptureOrder,
   DemoRule,
   DemoRuleUpdate,
+  ManualLock,
   NewDiagnosis,
   NuevoHardware,
   NurseryTopology,
@@ -286,6 +287,32 @@ export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void>
     body: JSON.stringify({ ejecutarMotor }),
   });
   await check(res, 'disparar el pulso de sensado');
+}
+
+/* ----------------------------------------------------------------
+   Manual locks (public platform API: the same one the dashboard uses)
+   ---------------------------------------------------------------- */
+
+export async function getManualLocks(): Promise<ManualLock[]> {
+  return json(await fetch(`${BACKEND}/api/bloqueos`), 'consultar los bloqueos manuales');
+}
+
+/** Locks the whole zone, or only `sectorId` when given. The backend answers 409 if it is already locked. */
+export async function createManualLock(lock: {
+  zonaId: string;
+  sectorId?: string;
+  motivo: string;
+}): Promise<ManualLock> {
+  const res = await fetch(`${BACKEND}/api/bloqueos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(lock),
+  });
+  return json(res, 'crear el bloqueo manual');
+}
+
+export async function releaseManualLock(id: number): Promise<void> {
+  await check(await fetch(`${BACKEND}/api/bloqueos/${id}`, { method: 'DELETE' }), 'levantar el bloqueo manual');
 }
 
 /* ----------------------------------------------------------------

@@ -8,11 +8,14 @@
 --  ver ni gestionar bloqueos. Este script agrega los de la matriz por defecto
 --  (`Permiso.matrizPorDefecto`):
 --
---    bloqueos.ver        Administrador, Ingeniero Agrónomo, Productor Viverista, Operario
---    bloqueos.gestionar  Administrador, Ingeniero Agrónomo, Operario
+--    bloqueos.ver        Administrador, Ingeniero Agrónomo, Productor Viverista, Operario, Servicio
+--    bloqueos.gestionar  Administrador, Ingeniero Agrónomo, Operario, Servicio
 --
---  El rol Servicio no los recibe acá: el simulador los pide con su propia
---  matriz (ver el README del simulador).
+--  El rol Servicio los recibe porque el simulador (cuenta de rol Servicio) crea y
+--  levanta bloqueos desde su escenario «Bloqueo manual». Es el mismo rol que usa
+--  el servicio de inferencia: si preferís separarlos, quitá estas dos filas desde
+--  la matriz del dashboard (Configuración → Usuarios) y el escenario avisará que
+--  el backend lo rechaza.
 --
 --  QUÉ SE PIERDE
 --    Nada. Sólo inserta filas que no existan; no toca las que el Administrador
@@ -36,7 +39,9 @@ FROM (VALUES
     ('OPERARIO',            'bloqueos.ver'),
     ('ADMINISTRADOR',       'bloqueos.gestionar'),
     ('INGENIERO_AGRONOMO',  'bloqueos.gestionar'),
-    ('OPERARIO',            'bloqueos.gestionar')
+    ('OPERARIO',            'bloqueos.gestionar'),
+    ('SERVICIO',            'bloqueos.ver'),
+    ('SERVICIO',            'bloqueos.gestionar')
 ) AS v(rol, permiso)
 WHERE NOT EXISTS (
     SELECT 1 FROM rol_permiso rp WHERE rp.rol = v.rol AND rp.permiso = v.permiso
