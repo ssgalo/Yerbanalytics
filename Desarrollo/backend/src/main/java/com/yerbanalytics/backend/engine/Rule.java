@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -13,8 +14,11 @@ import java.util.List;
  * ordenadas ascendentemente por {@link #priority()}. Una regla de prioridad baja
  * (bloqueante) puede emitir una acción de tipo {@code ABORT_*} para detener la
  * cadena antes de que las reglas ejecutoras sean evaluadas.
+ *
+ * <p>Toda regla es un {@link DemoControllable}: el simulador la apaga y acelera por {@code /api/demo/rules}
+ * con las {@code cooldownKeys()} y {@code bypassKeys()} que declare (por defecto ninguna).
  */
-public interface Rule extends ConsumidorParametros {
+public interface Rule extends ConsumidorParametros, DemoControllable {
 
     /**
      * Número de prioridad de esta regla. Menor valor = mayor precedencia.
@@ -63,24 +67,6 @@ public interface Rule extends ConsumidorParametros {
      */
     default boolean usaDiagnostico() {
         return false;
-    }
-
-    /**
-     * Cooldown keys this rule declares (e.g. {@code "cycle"}, {@code "cap"}).
-     * The demo controller uses these to list available cooldown controls in the simulator UI.
-     * Defaults to none.
-     */
-    default java.util.Set<String> cooldownKeys() {
-        return java.util.Set.of();
-    }
-
-    /**
-     * Bypass keys this rule declares (e.g. {@code "in-progress"}, {@code "window"}).
-     * The demo controller uses these to list available bypass toggles in the simulator UI.
-     * Defaults to none.
-     */
-    default java.util.Set<String> bypassKeys() {
-        return java.util.Set.of();
     }
 
     /**
