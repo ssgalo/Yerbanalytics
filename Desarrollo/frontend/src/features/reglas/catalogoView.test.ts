@@ -69,7 +69,7 @@ describe('filtrarReglas', () => {
 
   it('sin filtros devuelve todas', () => {
     const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, sinFiltros)).toHaveLength(14);
+    expect(filtrarReglas(c, sinFiltros)).toHaveLength(16);
   });
 
   it('busca por nombre de regla o de alguno de sus parámetros, sin importar tildes ni mayúsculas', () => {
@@ -120,9 +120,10 @@ describe('filtrarParametros (vista por parámetro)', () => {
 
     const claves = lista.map((p) => p.clave);
     expect(new Set(claves).size).toBe(claves.length);
-    // El umbral de riego lo usan cuatro reglas y aparece una sola vez, en el orden en que corre el motor.
+    // El umbral de riego lo usan cuatro reglas (y la alerta de falla hidráulica) y aparece una sola vez, en el orden en que corre el motor.
     expect(lista.find((p) => p.clave === 'riego.umbral-humedad')!.usadoPor).toEqual([
       'FueraDeVentanaRiegoRule',
+      'HardwareFaultService',
       'PausaTrasAplicacionRule',
       'PosponerPorLluviaRule',
       'RiegoPorDeficitRule',

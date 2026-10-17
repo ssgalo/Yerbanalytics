@@ -20,8 +20,8 @@
 - [x] 2.6 Reparación: endpoint, permiso `hardware.reparar` en `MapaPermisos`, evento de historial.
 
 ## 3. Frontend
-- [ ] 3.1 Vista de Hardware: estado "Falla hidráulica"/"Falla mecánica" y botón Registrar reparación con detalle obligatorio.
-- [ ] 3.2 Tests y lint.
+- [x] 3.1 Vista de Hardware: estado "Falla hidráulica"/"Falla mecánica" y botón Registrar reparación con detalle obligatorio.
+- [x] 3.2 Tests y lint.
 
 ## 4. Firmware y simulador
 - [ ] 4.1 Firmware: publicar `MEDIASOMBRA_FIN_DE_CARRERA` y exponer ambos finales de carrera; compila con `arduino-cli`.

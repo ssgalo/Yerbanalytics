@@ -27,7 +27,7 @@ export const DESCRIPCION_RAMA: Record<RamaRegla, string> = {
 
 /**
  * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
- * escalamiento del nodo y el guard de lectura inválida): el backend los lista en
+ * escalamiento del nodo, el guard de lectura inválida y el servicio de fallas del hardware): el backend los lista en
  * `usadoPor` junto a las reglas. Se muestran en su propio grupo de la pestaña Parámetros.
  */
 export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string; rama: RamaRegla }> = {
@@ -54,6 +54,11 @@ export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string;
   ReadingValidationGuard: {
     titulo: 'Lectura inválida',
     descripcion: 'Hasta dónde llega lo físicamente posible para cada métrica y cuántas veces se vuelve a leer un valor fuera de rango',
+    rama: 'GLOBAL',
+  },
+  HardwareFaultService: {
+    titulo: 'Alerta de falla hidráulica',
+    descripcion: 'Con qué humedad de sustrato la alerta de una falla hidráulica pide el riego manual del sector',
     rama: 'GLOBAL',
   },
 };

@@ -31,10 +31,11 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
     expect(p?.usadoPor).toEqual(['DespachoRiego']);
   });
 
-  it('el umbral de riego es compartido por R-01, R-03, R-05 y R-06, y no hay claves de las reglas viejas', () => {
+  it('el umbral de riego es compartido por R-01, R-03, R-05 y R-06 (y por la alerta de falla hidráulica), y no hay claves de las reglas viejas', () => {
     const umbral = catalogo.parametros.find((x) => x.clave === 'riego.umbral-humedad');
     expect(umbral?.usadoPor).toEqual([
       'FueraDeVentanaRiegoRule',
+      'HardwareFaultService',
       'PausaTrasAplicacionRule',
       'PosponerPorLluviaRule',
       'RiegoPorDeficitRule',
@@ -171,7 +172,7 @@ function leerReglasDelBackend(): Record<string, string> {
 
 /**
  * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
- * escalamiento del nodo y el guard de lectura inválida): también
+ * escalamiento del nodo, el guard de lectura inválida y el servicio de fallas del hardware): también
  * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
@@ -180,6 +181,7 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   PulsoSensado: resolve(DIR_ENGINE, '..', 'sensing', 'PulsoSensadoService.java'),
   EscalamientoNodo: resolve(DIR_ENGINE, '..', 'service', 'EscalamientoNodoService.java'),
   ReadingValidationGuard: resolve(DIR_ENGINE, '..', 'readings', 'ReadingValidationGuard.java'),
+  HardwareFaultService: resolve(DIR_ENGINE, '..', 'service', 'HardwareFaultService.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {

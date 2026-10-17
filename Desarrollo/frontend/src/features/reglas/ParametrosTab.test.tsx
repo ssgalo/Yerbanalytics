@@ -64,7 +64,7 @@ describe('ParametrosTab · agrupación (7.2)', () => {
 
     const grupos = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(grupos).toEqual([
-      expect.stringMatching(/Global · 3 reglas/),
+      expect.stringMatching(/Global · 4 reglas/),
       // Lo que lee parámetros sin ser una regla va justo después de la rama a la que pertenece.
       expect.stringMatching(/Lectura inválida/),
       expect.stringMatching(/Historial de lecturas/),
@@ -90,8 +90,9 @@ describe('ParametrosTab · agrupación (7.2)', () => {
 
   it('muestra "Sin parámetros configurables" para las reglas sin umbrales', () => {
     montar(catalogoDeFabrica());
-    // Bloqueo manual, hardware incompleto y seguimiento (la regla de ciclo lee el umbral crítico para dejar pasar a R-02).
-    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(3);
+    // Bloqueo manual, hardware incompleto, falla hidráulica, falla de la mediasombra y seguimiento (la regla de ciclo lee
+    // el umbral crítico para dejar pasar a R-02).
+    expect(screen.getAllByText('Sin parámetros configurables')).toHaveLength(5);
   });
 });
 
@@ -129,13 +130,13 @@ describe('ParametrosTab · ejecución del riego (13.3)', () => {
 });
 
 describe('ParametrosTab · parámetro compartido (7.3)', () => {
-  it('marca el parámetro compartido con las otras tres reglas que lo usan', () => {
+  it('marca el parámetro compartido con las otras reglas (y la alerta de falla hidráulica) que lo usan', () => {
     montar(catalogoDeFabrica());
     abrir(/Riego por déficit/);
 
-    const chips = screen.getAllByText(/Compartido con 3 reglas/);
+    const chips = screen.getAllByText(/Compartido con 4 reglas/);
     const chip = chips.find((c) => c.closest('[data-clave]')?.getAttribute('data-clave') === COMPARTIDO)!;
-    expect(chip.textContent).toMatch(/fuera de ventana.*Pausa tras.*Posponer por lluvia/);
+    expect(chip.textContent).toMatch(/fuera de ventana.*Alerta de falla hidráulica.*Pausa tras.*Posponer por lluvia/);
     // R-01 no se cita a sí misma.
     expect(chip.textContent).not.toMatch(/Riego por déficit/);
   });

@@ -15,10 +15,17 @@
       "parametros": []
     },
     {
+      "id": "HydraulicFaultRule",
+      "label": "🚰 Falla hidráulica (S-05)",
+      "rama": "GLOBAL",
+      "prioridad": 2,
+      "parametros": []
+    },
+    {
       "id": "StaleSensorRule",
       "label": "📵 Sensor sin datos recientes",
       "rama": "GLOBAL",
-      "prioridad": 2,
+      "prioridad": 3,
       "parametros": [
         "seguridad.antiguedad-max-lectura"
       ]
@@ -27,7 +34,7 @@
       "id": "SustratoSaturadoRule",
       "label": "💧 Sustrato saturado (R-04)",
       "rama": "RIEGO",
-      "prioridad": 3,
+      "prioridad": 4,
       "parametros": [
         "riego.saturacion-bloqueo",
         "riego.saturacion-alerta"
@@ -37,7 +44,7 @@
       "id": "CicloLecturaRiegoRule",
       "label": "🔁 Un riego por ciclo de lectura",
       "rama": "RIEGO",
-      "prioridad": 4,
+      "prioridad": 5,
       "parametros": [
         "riego.umbral-critico"
       ]
@@ -46,7 +53,7 @@
       "id": "DeficitCriticoRule",
       "label": "🚨 Déficit hídrico crítico (R-02)",
       "rama": "RIEGO",
-      "prioridad": 5,
+      "prioridad": 6,
       "parametros": [
         "riego.umbral-critico",
         "riego.volumen-max-evento",
@@ -58,7 +65,7 @@
       "id": "DailyDoseLimitRule",
       "label": "🛑 Límite de dosis diaria",
       "rama": "INSUMO",
-      "prioridad": 6,
+      "prioridad": 7,
       "parametros": [
         "insumo.max-dosis-24h"
       ]
@@ -67,7 +74,7 @@
       "id": "FueraDeVentanaRiegoRule",
       "label": "🌙 Riego fuera de ventana horaria (R-05)",
       "rama": "RIEGO",
-      "prioridad": 7,
+      "prioridad": 8,
       "parametros": [
         "riego.ventana-normal",
         "riego.umbral-humedad",
@@ -78,7 +85,7 @@
       "id": "PausaTrasAplicacionRule",
       "label": "⏸️ Pausa tras una aplicación (R-06)",
       "rama": "RIEGO",
-      "prioridad": 8,
+      "prioridad": 9,
       "parametros": [
         "riego.pausa-tras-aplicacion",
         "riego.umbral-humedad",
@@ -89,7 +96,7 @@
       "id": "PosponerPorLluviaRule",
       "label": "🌧️ Posponer por lluvia (R-03)",
       "rama": "RIEGO",
-      "prioridad": 9,
+      "prioridad": 10,
       "parametros": [
         "riego.lluvia-probabilidad",
         "riego.lluvia-mm",
@@ -122,10 +129,17 @@
       ]
     },
     {
+      "id": "ShadeFaultRule",
+      "label": "⚙️ Falla mecánica en mediasombra (S-05)",
+      "rama": "MEDIASOMBRA",
+      "prioridad": 13,
+      "parametros": []
+    },
+    {
       "id": "ShadingRule",
       "label": "⛅ Control de mediasombra",
       "rama": "MEDIASOMBRA",
-      "prioridad": 13,
+      "prioridad": 14,
       "parametros": [
         "mediasombra.uv-umbral",
         "mediasombra.apertura-proteccion-uv",
@@ -398,6 +412,7 @@
       "modificado": false,
       "usadoPor": [
         "FueraDeVentanaRiegoRule",
+        "HardwareFaultService",
         "PausaTrasAplicacionRule",
         "PosponerPorLluviaRule",
         "RiegoPorDeficitRule"

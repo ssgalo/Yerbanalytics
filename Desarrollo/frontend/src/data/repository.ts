@@ -80,6 +80,11 @@ export interface DataRepository {
   registerDevice(device: NuevoDispositivo): Promise<HardwareData>;
   /** Recambia un dispositivo reutilizando su registro y devuelve la flota actualizada (HU-21 CA-05). */
   replaceDevice(id: string, device: NuevoDispositivo): Promise<HardwareData>;
+  /**
+   * Registra la reparación de un dispositivo averiado (S-05, HU-21 CA-04): levanta la falla y lo devuelve a lo
+   * autónomo. El detalle es obligatorio; devuelve la flota actualizada o rechaza con el motivo.
+   */
+  registerRepair(id: string, detalle: string): Promise<HardwareData>;
   /** Devuelve el resumen de la topología cargada en el vivero (HU-18 CA-01). */
   getTopologia(): Promise<TopologiaVivero>;
   /** Genera (o regenera) la grilla lógica del vivero y devuelve el resumen resultante (HU-18 CA-01). */

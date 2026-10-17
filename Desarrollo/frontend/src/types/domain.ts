@@ -524,7 +524,13 @@ export interface Dispositivo {
   estadoSoft: string;
   estadoInk: string;
   bateriaBaja: boolean;
+  /**
+   * Falla marcada: el `tipo` del error que informó el nodo (`SIN_CAUDAL`, `CAUDAL_EXCESIVO`,
+   * `MEDIASOMBRA_FIN_DE_CARRERA`, S-05); `null` si está sano. `lib/fallas.ts` lo traduce a texto.
+   */
   falla: string | null;
+  /** Epoch ms en que se marcó la falla; `null` si está sano o no se sabe. */
+  fallaDesde: number | null;
 }
 
 /** Sector con mapeo de hardware incompleto (HU-18 CA-04). */

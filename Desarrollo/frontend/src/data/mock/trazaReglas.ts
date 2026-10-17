@@ -261,6 +261,17 @@ const EVALUADORES: Record<string, Evaluador> = {
   // La demo siempre tiene el hardware completo mapeado: la regla confirma que la cadena sigue (S-04).
   IncompleteHardwareRule: () => noop('Hardware completo: el sector tiene mapeados los actuadores que requiere.'),
 
+  // La demo no tiene dispositivos averiados: las dos reglas de falla confirman que la cadena sigue (S-05).
+  HydraulicFaultRule: (ev) => {
+    ev.compararFijo('Electroválvula del sector sin falla hidráulica', true, 'EQ', true);
+    return noop('Sin falla hidráulica: la electroválvula del sector está sana.');
+  },
+
+  ShadeFaultRule: (ev) => {
+    ev.compararFijo('Mediasombra de la macro-zona sin falla mecánica', true, 'EQ', true);
+    return noop('Sin falla mecánica: la mediasombra de la macro-zona está sana.');
+  },
+
   StaleSensorRule: (ev, e) => {
     const vieja = ev.comparar('Antigüedad de la última lectura', e.antiguedadSeg, 'GT', 'seguridad.antiguedad-max-lectura');
     // La humedad de sustrato se mide aparte: si la sonda falla, el resto de la lectura sigue fresco.
