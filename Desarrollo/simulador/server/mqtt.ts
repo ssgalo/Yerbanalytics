@@ -9,8 +9,8 @@
    backend rules engine are visible in the console. This validates the full cyber-physical loop
    (measure → detect → decide → command) without needing physical hardware. For the macro-zones
    it simulates (the ones with a simulated sensor) it also answers each command with the ack the
-   firmware would send when the action ends; commands for other zones belong to a real node and
-   are only logged.
+   firmware would send (queue of loads included: `nodeQueue.ts`); commands for other zones belong to
+   a real node and are only logged.
 
    Error messages reaching the UI are in Spanish; console output is internal, so it is not.
    ============================================================ */
@@ -22,15 +22,16 @@ import {
   isReadNow,
   parseCommandTopic,
   parseZoneCommandTopic,
-  simulatedAck,
   telemetryTopicFor,
   valveDurationWarning,
+  type ActuatorAck,
   type ActuatorCommand,
   type NodeErrorPayload,
   type TelemetryPayload,
 } from './contract.ts';
 import { demoMode } from './demo-mode.ts';
 import { answerReadNow } from './emission.ts';
+import { SimulatedNodes } from './nodeQueue.ts';
 import { listSensors } from './store.ts';
 
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
@@ -158,25 +159,37 @@ function handleZoneCommand(topic: string, message: Buffer): void {
 }
 
 /**
- * Publishes, after the time the action would take, the ack the firmware would send. Only for
- * macro-zones with a simulated sensor: a command for another zone is a real node's to answer.
+ * Hands the command to the simulated node of its macro-zone, which queues loads like the firmware does and emits
+ * the intermediate and final acks (add-cola-actuadores-nodo). Only for macro-zones with a simulated sensor: a
+ * command for another zone is a real node's to answer.
  */
 function scheduleAck(topic: string, command: ActuatorCommand): void {
   const target = parseCommandTopic(topic);
   if (!target || !listSensors().some((s) => s.zonaId === target.zonaId)) return;
+  simulatedNodes.receive(target.zonaId, target.sectorId, command);
+}
 
-  const { delayMs, ack } = simulatedAck(command);
-  const ackOn = ackTopic(target.zonaId, target.sectorId);
-  setTimeout(() => {
-    if (!client || !client.connected) {
-      console.warn(`[simulator] no broker connection: ack for ${ack.commandId ?? '?'} not sent`);
-      return;
-    }
-    client.publish(ackOn, JSON.stringify(ack), { qos: 1 }, (error) => {
-      if (error) console.error(`[simulator] failed to publish ack on ${ackOn}: ${error.message}`);
-      else console.log(`[simulator] → ACK topic=${ackOn} status=${ack.status} tipo=${ack.detalle.tipo}`);
-    });
-  }, delayMs);
+/** One load queue per simulated macro-zone, with the real clock. */
+const simulatedNodes = new SimulatedNodes(
+  {
+    now: () => Date.now(),
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
+    maxLoads: config.nodeMaxLoads,
+  },
+  publishAck,
+);
+
+function publishAck(zonaId: string, sectorId: string, ack: ActuatorAck): void {
+  const ackOn = ackTopic(zonaId, sectorId);
+  if (!client || !client.connected) {
+    console.warn(`[simulator] no broker connection: ack for ${ack.commandId ?? '?'} not sent`);
+    return;
+  }
+  client.publish(ackOn, JSON.stringify(ack), { qos: 1 }, (error) => {
+    if (error) console.error(`[simulator] failed to publish ack on ${ackOn}: ${error.message}`);
+    else console.log(`[simulator] → ACK topic=${ackOn} status=${ack.status} tipo=${ack.detalle.tipo}`);
+  });
 }
 
 /** `true` when the broker connection is alive. The UI uses it to warn before trying. */

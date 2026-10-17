@@ -60,6 +60,12 @@ export const config = {
    */
   backendUser: str('BACKEND_USUARIO', ''),
   backendPassword: str('BACKEND_CLAVE', ''),
+  /**
+   * How many loads (valve/pump run, shade movement) a simulated node runs at once; the rest wait in its queue. Mirrors
+   * MAX_CARGAS_SIMULTANEAS in the firmware's config.h (add-cola-actuadores-nodo). 1 = what the prototype's power
+   * supply can take.
+   */
+  nodeMaxLoads: int('SIM_NODE_MAX_LOADS', 1),
   mqttUrl: str('MQTT_URL', 'mqtt://localhost:1883'),
   mqttClientId: str('MQTT_CLIENT_ID', 'yerbanalytics-simulator'),
   /** Serve the `dist/` build instead of mounting Vite in middleware mode. */

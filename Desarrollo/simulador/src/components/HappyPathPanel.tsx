@@ -9,7 +9,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
-import { STEP_ORDER, STEP_WAIT_MS, hintFor, loadThresholds, pickTarget, runHappyPath, type HappyPathMode, type HappyPathOutcome, type StepKey, type StepStatus } from '../happyPath';
+import {
+  hintFor,
+  initialProgress,
+  loadThresholds,
+  pickTarget,
+  progressDone,
+  readProgress,
+  runHappyPath,
+  type ActionProgress,
+  type HappyPathMode,
+  type HappyPathOutcome,
+  type HappyTarget,
+} from '../happyPath';
 import type { SectorRef, SimulatedSensor } from '../types';
 
 interface Props {
@@ -21,15 +33,15 @@ interface Props {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const LABELS: Record<StepKey, string> = { riego: 'Riego', insumo: 'Dosificación de insumo', mediasombra: 'Mediasombra' };
+type ActionKey = keyof ActionProgress;
 
-const STATUS_TEXT: Record<StepKey, Record<StepStatus, string>> = {
-  riego: { pending: 'pendiente', running: 'en curso', finishing: 'esperando que termine (regando…)', pause: `pausa ${STEP_WAIT_MS / 1000} s`, done: 'hecho' },
-  insumo: { pending: 'pendiente', running: 'en curso', finishing: 'esperando que termine (dosificando…)', pause: `pausa ${STEP_WAIT_MS / 1000} s`, done: 'hecho' },
-  mediasombra: { pending: 'pendiente', running: 'en curso', finishing: 'en curso', pause: 'en curso', done: 'hecho' },
-};
+const ACTIONS: ActionKey[] = ['riego', 'insumo', 'mediasombra'];
 
-const INITIAL_STATUS: Record<StepKey, StepStatus> = { riego: 'pending', insumo: 'pending', mediasombra: 'pending' };
+const LABELS: Record<ActionKey, string> = { riego: 'Riego', insumo: 'Dosificación de insumo', mediasombra: 'Mediasombra' };
+
+/** Cada cuánto se relee el estado de los actuadores mientras hay acciones sin terminar, y hasta cuándo. */
+const PROGRESS_POLL_MS = 2_000;
+const PROGRESS_GIVE_UP_MS = 10 * 60_000;
 
 export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
   const [mode, setMode] = useState<HappyPathMode | null>(null);
@@ -38,7 +50,8 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
   const [log, setLog] = useState<string[]>([]);
   const [outcome, setOutcome] = useState<HappyPathOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stepStatus, setStepStatus] = useState<Record<StepKey, StepStatus>>(INITIAL_STATUS);
+  const [progress, setProgress] = useState<ActionProgress | null>(null);
+  const [progressTarget, setProgressTarget] = useState<HappyTarget | null>(null);
   const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
 
   const loadMode = useCallback(async () => {
@@ -62,7 +75,8 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
     setRunning(true);
     setError(null);
     setOutcome(null);
-    setStepStatus(INITIAL_STATUS);
+    setProgress(null);
+    setProgressTarget(null);
     const lines: string[] = [];
     const push = (line: string) => {
       lines.push(line);
@@ -86,16 +100,13 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
       } else {
         setCatalogWarning(null);
       }
-      setOutcome(
-        await runHappyPath(current, chosen, thresholds, {
+      const result = await runHappyPath(current, chosen, thresholds, {
           zeroCooldowns: api.zeroDemoCooldowns,
           getRules: api.getDemoRules,
           updateRule: api.updateDemoRule,
           setWeather: api.setSimulatedWeather,
           clearWeather: api.clearSimulatedWeather,
           setOffline: api.setOfflineForecast,
-          getActuators: api.getZoneActuators,
-          onStep: (key, status) => setStepStatus((prev) => ({ ...prev, [key]: status })),
           getEmission: async () => (await api.getStatus()).emission.active,
           setEmission: api.setAutoEmission,
           getPinned: async (zonaId) => (await api.getPinnedReadings())[zonaId] ?? {},
@@ -106,8 +117,11 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
           getTrace: api.getEvaluationTrace,
           sleep,
           log: push,
-        }),
-      );
+        });
+      setOutcome(result);
+      // El avance de cada acción se sigue del snapshot (efecto de abajo): la corrida no espera que termine ninguna.
+      setProgress(initialProgress(result.readout));
+      setProgressTarget(chosen);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
@@ -116,6 +130,27 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
       setRunning(false);
     }
   };
+
+  // El nodo serializa las cargas: el riego y la dosificación avanzan de a una (en cola → en curso → hecho). Se sigue su
+  // estado en el snapshot hasta que terminen (o hasta rendirse). La corrida del pulso no espera nada de esto.
+  useEffect(() => {
+    if (!progress || !progressTarget || progressDone(progress)) return undefined;
+    let cancelled = false;
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      if (Date.now() - startedAt > PROGRESS_GIVE_UP_MS) {
+        window.clearInterval(timer);
+        return;
+      }
+      void readProgress(progress, progressTarget.sectorId, () => api.getZoneActuators(progressTarget.zonaId)).then((next) => {
+        if (!cancelled) setProgress((current) => (current === progress ? next : current));
+      });
+    }, PROGRESS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [progress, progressTarget]);
 
   const disabled = running || pasadaEnCurso || mode === null || noTarget;
 
@@ -160,18 +195,19 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
 
       {(running || outcome) && (
         <div className="card" style={{ marginTop: 12 }}>
-          <p className="sectionTitle" style={{ marginBottom: 6 }}>Pasos (una carga a la vez)</p>
-          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-            {STEP_ORDER.map((key) => {
-              const readout = outcome?.steps.find((st) => st.key === key)?.readout;
+          <p className="sectionTitle" style={{ marginBottom: 6 }}>Resultado del pulso</p>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+            {ACTIONS.map((key) => {
+              const readout = outcome?.readout?.[key];
+              const label = progress?.[key];
               return (
                 <li key={key} style={{ color: readout?.acted ? 'var(--accent)' : 'var(--ink)' }}>
-                  <strong>{LABELS[key]}:</strong> {STATUS_TEXT[key][stepStatus[key]]}
+                  <strong>{LABELS[key]}:</strong> {label ?? (running ? 'evaluando…' : 'sin dato')}
                   {readout && ` — ${readout.acted ? 'actuó' : 'no actuó'}: ${readout.detail}`}
                 </li>
               );
             })}
-          </ol>
+          </ul>
           {outcome && outcome.leftActive.length > 0 && (
             <p className="muted" style={{ marginTop: 8, fontSize: 12.5 }}>
               Quedó activo: {outcome.leftActive.join(', ')}. Se desactivan desde Telemetría → Control de reglas.
