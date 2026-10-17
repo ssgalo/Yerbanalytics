@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.util.Map;
@@ -35,6 +36,7 @@ class SeguimientoComandosServiceTest {
     private final HistorialService historial = mock(HistorialService.class);
     private final ZonaRepository zonas = mock(ZonaRepository.class);
     private final Clock reloj = mock(Clock.class);
+    private final ApplicationEventPublisher eventos = mock(ApplicationEventPublisher.class);
     private SeguimientoComandosService seguimiento;
 
     @BeforeEach
@@ -44,7 +46,7 @@ class SeguimientoComandosServiceTest {
         zona.setId("MZ-1");
         zona.setName("Macro-zona 1");
         when(zonas.findById("MZ-1")).thenReturn(Optional.of(zona));
-        seguimiento = new SeguimientoComandosService(historial, zonas, reloj, MARGEN_MS);
+        seguimiento = new SeguimientoComandosService(historial, zonas, reloj, MARGEN_MS, eventos);
     }
 
     private static AckActuador ack(String zonaId, String sectorId, String commandId, String status, String tipo) {
@@ -164,5 +166,75 @@ class SeguimientoComandosServiceTest {
 
         verify(historial).registrarAlerta(eq("MZ-9"), eq("MZ-9"), eq(SeguimientoComandosService.REGLA_SIN_RESPUESTA),
                 any(DetalleAlerta.class), anyLong());
+    }
+
+    private ActuatorStopped eventoPublicado() {
+        ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
+        verify(eventos).publishEvent(evento.capture());
+        return (ActuatorStopped) evento.getValue();
+    }
+
+    @Test
+    void unCanceladoDeLaValvulaAvisaQueElRiegoSeCorto() {
+        seguimiento.registrarEnvio("c-8", "MZ-1", "MZ-1-004", "valve", Map.of("durationSec", 300));
+
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-004", "c-8", "ERROR", "cancelado"));
+
+        assertThat(eventoPublicado()).isEqualTo(new ActuatorStopped("MZ-1", "MZ-1-004", "valve", "c-8", "cancelado"));
+        sinAlertas();
+    }
+
+    @Test
+    void unReemplazadoDeLaValvulaNoCierraNada() {
+        seguimiento.registrarEnvio("c-9", "MZ-1", "MZ-1-004", "valve", Map.of("durationSec", 300));
+
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-004", "c-9", "ERROR", "reemplazado"));
+
+        verify(eventos, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void unRiegoTerminadoEnPazNoAvisaNada() {
+        seguimiento.registrarEnvio("c-10", "MZ-1", "MZ-1-004", "valve", Map.of("durationSec", 300));
+
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-004", "c-10", "SUCCESS", "ok"));
+
+        verify(eventos, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void elAckFinalDeLaBombaAvisaSeaOkCanceladoOError() {
+        for (String[] caso : new String[][]{{"SUCCESS", "ok"}, {"ERROR", "cancelado"}, {"ERROR", "comando_invalido"}}) {
+            org.mockito.Mockito.clearInvocations(eventos);
+            String id = "p-" + caso[1];
+            seguimiento.registrarEnvio(id, "MZ-1", "MZ-1-005", "pump", Map.of("ml", 10));
+
+            seguimiento.registrarAck(ack("MZ-1", "MZ-1-005", id, caso[0], caso[1]));
+
+            assertThat(eventoPublicado()).isEqualTo(new ActuatorStopped("MZ-1", "MZ-1-005", "pump", id, caso[1]));
+        }
+    }
+
+    @Test
+    void unReemplazadoDeLaBombaNoAvisa() {
+        seguimiento.registrarEnvio("p-1", "MZ-1", "MZ-1-005", "pump", Map.of("ml", 10));
+
+        seguimiento.registrarAck(ack("MZ-1", "MZ-1-005", "p-1", "ERROR", "reemplazado"));
+
+        verify(eventos, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void elPlazoDeLaBombaIncluyeLosMlPedidos() {
+        // 1 ml = 1 s de bomba (BOMBA_INSUMO_MS_POR_ML 1000 del firmware).
+        seguimiento.registrarEnvio("p-2", "MZ-1", "MZ-1-005", "pump", Map.of("ml", 20));
+
+        when(reloj.millis()).thenReturn(T0 + 20_000L + MARGEN_MS - 1);
+        seguimiento.revisarVencidos();
+        sinAlertas();
+
+        when(reloj.millis()).thenReturn(T0 + 20_000L + MARGEN_MS);
+        seguimiento.revisarVencidos();
+        alertaRegistrada(SeguimientoComandosService.REGLA_SIN_RESPUESTA);
     }
 }

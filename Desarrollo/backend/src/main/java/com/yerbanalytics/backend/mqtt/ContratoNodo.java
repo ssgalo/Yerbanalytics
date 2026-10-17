@@ -50,6 +50,15 @@ public final class ContratoNodo {
     public static final int DURACION_VALVULA_MAX_SEG = 1200;
 
     /**
+     * Milisegundos de bomba de insumo por ml pedido en {@code pump ON {"ml"}}. Espeja
+     * {@code BOMBA_INSUMO_MS_POR_ML} del firmware ({@code comun/config.h}): con él el backend sabe cuánto dura la dosis.
+     */
+    public static final long BOMBA_INSUMO_MS_POR_ML = 1000L;
+
+    /** Tope de ml por dosis que acepta el firmware ({@code LIMITE_BOMBA_ML_MAX}); un rango del catálogo no lo supera. */
+    public static final int BOMBA_ML_MAX = 50;
+
+    /**
      * Comando de zona (backend → nodo testigo), con el id de la zona. Espeja la sección "Comando de
      * zona" de {@code contrato.h} ({@code contratoTopicComandoZona}). QoS 1, sin retain. A nivel zona
      * y no sector porque el sensado es por macro-zona.

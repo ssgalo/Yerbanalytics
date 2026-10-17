@@ -33,7 +33,8 @@ import java.util.regex.Pattern;
  *       bloqueo manual, sensor sin datos y, para R-01, ventana cerrada o pausa por aplicación). "La humedad se
  *       recuperó" no cancela.</li>
  *   <li>{@code ACTIVAR_BOMBA}: actualiza el campo del sector, registra en historial y publica
- *       {@code pump ON}.</li>
+ *       {@code pump ON {"ml"}} con la dosis de la regla. El "Dosificando" lo cierra {@code SupplyDoseService}
+ *       (ack final de la bomba o, si no llega, el plazo de la dosis); acá nada lo vuelve a "En espera".</li>
  *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} con el porcentaje del motivo
  *       ({@code [apertura=N]}) y publica {@code shade SET}.</li>
  *   <li>{@code ALERTA}: se persiste como evento "Alerta", una sola vez por macro-zona, regla y ciclo de
@@ -111,9 +112,18 @@ public class ActionExecutor {
                     log.info("Sector {}: ACTIVAR_BOMBA — {}", ctx.sector().getId(), action.motivo());
                     ctx.sector().setActuadorPump("Dosificando");
                     if (!"Dosificando".equals(oldPump)) {
-                        historialService.registrarInsumo(ctx.sector());
-                        // --- Downlink: enviar orden física al nodo actuador ---
-                        publishCommand(ctx, "pump", "ON", Map.of());
+                        // La dosis la decide el backend (insumo.dosis-ml); sin detalle, el firmware usa la suya.
+                        if (action.detalle() instanceof DetalleInsumo dosis) {
+                            historialService.registrarInsumo(ctx.sector(), dosis.ml());
+                            // --- Downlink: enviar orden física al nodo actuador ---
+                            publishCommand(ctx, "pump", "ON", Map.of("ml", dosis.ml()));
+                        } else {
+                            historialService.registrarInsumo(ctx.sector());
+                            publishCommand(ctx, "pump", "ON", Map.of());
+                        }
+                    } else {
+                        log.info("Sector {}: ya está dosificando; no se vuelve a ordenar hasta que el ack o el plazo "
+                                + "de la dosis lo cierren.", ctx.sector().getId());
                     }
                 }
 

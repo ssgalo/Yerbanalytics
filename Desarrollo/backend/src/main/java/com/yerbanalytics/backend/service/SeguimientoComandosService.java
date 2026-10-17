@@ -9,6 +9,7 @@ import com.yerbanalytics.backend.repository.ZonaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>Ack ERROR:</b> si es una falla (p. ej. {@code falla_mecanica}, comando rechazado) queda una
  *       alerta en el historial de la macro-zona; {@code reemplazado} y {@code cancelado} son esperables
  *       y sólo se loguean.</li>
+ *   <li><b>Cierre de estado:</b> un {@code cancelado} de la válvula, y el ack final de la bomba (ok, cancelado
+ *       o error), publican un {@link ActuatorStopped}: el "regando" y el "dosificando" se derivan por tiempo y
+ *       esto los cierra al instante. Un {@code reemplazado} no cierra nada.</li>
  *   <li><b>Sin ack en el plazo:</b> alerta {@value #REGLA_SIN_RESPUESTA} (el nodo está apagado, sin
  *       WiFi o no recibió el comando). Es el equivalente de {@code RIEL_SIN_RESPUESTA}.</li>
  * </ul>
@@ -75,15 +79,18 @@ public class SeguimientoComandosService {
     private final ZonaRepository zonaRepository;
     private final Clock reloj;
     private final long margenMs;
+    private final ApplicationEventPublisher eventos;
 
     public SeguimientoComandosService(HistorialService historialService,
                                       ZonaRepository zonaRepository,
                                       Clock reloj,
-                                      @Value("${yerbanalytics.actuadores.ack-margen-ms:90000}") long margenMs) {
+                                      @Value("${yerbanalytics.actuadores.ack-margen-ms:90000}") long margenMs,
+                                      ApplicationEventPublisher eventos) {
         this.historialService = historialService;
         this.zonaRepository = zonaRepository;
         this.reloj = reloj;
         this.margenMs = margenMs;
+        this.eventos = eventos;
     }
 
     /**
@@ -99,6 +106,11 @@ public class SeguimientoComandosService {
         Object duracion = parametros != null ? parametros.get("durationSec") : null;
         if (duracion instanceof Number n && n.longValue() > 0) {
             duracionMs = n.longValue() * 1000L;
+        }
+        // La bomba de insumo dura lo que pida el comando en ml (el firmware la calibra a 1 s por ml).
+        Object ml = parametros != null ? parametros.get("ml") : null;
+        if (ml instanceof Number n && n.doubleValue() > 0) {
+            duracionMs = Math.max(duracionMs, (long) (n.doubleValue() * ContratoNodo.BOMBA_INSUMO_MS_POR_ML));
         }
         pendientes.put(commandId, new Pendiente(commandId, zonaId, sectorId, actuador,
                 reloj.millis() + duracionMs + margenMs));
@@ -119,6 +131,7 @@ public class SeguimientoComandosService {
 
         if (ContratoNodo.ACK_SUCCESS.equals(ack.status())) {
             log.info("Sector {}: el nodo confirmó {} ({}).", sectorId, nombre(actuador), tipo);
+            avisarSiTerminoLaBomba(zonaId, sectorId, actuador, commandId, tipo);
             return;
         }
         if (!ContratoNodo.ACK_ERROR.equals(ack.status())) {
@@ -128,10 +141,17 @@ public class SeguimientoComandosService {
         }
         if (ContratoNodo.ACK_TIPO_REEMPLAZADO.equals(tipo) || ContratoNodo.ACK_TIPO_CANCELADO.equals(tipo)) {
             log.info("Sector {}: {} terminó antes de tiempo ({}).", sectorId, nombre(actuador), tipo);
+            // Un cancelado es que alguien cortó el actuador (OFF manual, protección del nodo): el estado "regando" /
+            // "dosificando" que el backend deriva por tiempo ya no es cierto. Un reemplazado, en cambio, es que otro
+            // comando más nuevo tomó su lugar: ese sigue vigente y no se cierra nada.
+            if (ContratoNodo.ACK_TIPO_CANCELADO.equals(tipo)) {
+                avisarCorte(zonaId, sectorId, actuador, commandId, tipo);
+            }
             return;
         }
 
         log.warn("Sector {}: el nodo informó un error en {} ({}).", sectorId, nombre(actuador), tipo);
+        avisarSiTerminoLaBomba(zonaId, sectorId, actuador, commandId, tipo);
         if (ContratoNodo.ACK_TIPO_FALLA_MECANICA.equals(tipo)) {
             alertar(zonaId, NivelAlerta.CRITICAL, REGLA_FALLA, "Sector " + sectorId + ": "
                     + "la mediasombra no llegó al final de carrera a tiempo (" + tipo + "). "
@@ -160,6 +180,25 @@ public class SeguimientoComandosService {
     /** Cantidad de comandos esperando ack (para tests y diagnóstico). */
     int pendientes() {
         return pendientes.size();
+    }
+
+    /** El ack final de la bomba (ok o error) cierra la dosis; el de la válvula no: ella se cierra sola por tiempo. */
+    private void avisarSiTerminoLaBomba(String zonaId, String sectorId, String actuador, String commandId, String tipo) {
+        if ("pump".equals(actuador)) {
+            avisarCorte(zonaId, sectorId, actuador, commandId, tipo);
+        }
+    }
+
+    /** Sólo para válvula y bomba (los que derivan un estado por tiempo) y si se sabe de qué comando es el ack. */
+    private void avisarCorte(String zonaId, String sectorId, String actuador, String commandId, String tipo) {
+        if (!"valve".equals(actuador) && !"pump".equals(actuador)) {
+            return;
+        }
+        try {
+            eventos.publishEvent(new ActuatorStopped(zonaId, sectorId, actuador, commandId, tipo));
+        } catch (RuntimeException e) {
+            log.error("Sector {}: falló al cerrar el estado de {} tras el ack {}.", sectorId, nombre(actuador), tipo, e);
+        }
     }
 
     private void alertar(String zonaId, NivelAlerta nivel, String regla, String texto) {

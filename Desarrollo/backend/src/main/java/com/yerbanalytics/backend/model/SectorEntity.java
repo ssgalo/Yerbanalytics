@@ -10,8 +10,12 @@ import lombok.AllArgsConstructor;
  * Sector del vivero (~100 tubetes con su microaspersor). NO almacena métricas sensadas:
  * la lectura es de la macro-zona ({@link ZonaEntity}). Su estado de salud se deriva de esa
  * lectura, pero el diagnóstico de IA y los actuadores sí son propios del sector.
+ *
+ * <p><b>{@code @DynamicUpdate}:</b> la telemetría carga los sectores y los guarda; sin esto reescribiría todas las
+ * columnas, y un cambio confirmado en el medio por un UPDATE dirigido ({@code cambiarBomba}) volvería atrás.
  */
 @Entity
+@org.hibernate.annotations.DynamicUpdate   // sólo escribe las columnas que cambiaron: ver SupplyDoseService (cierre de la bomba)
 @Table(name = "sector")
 @Getter
 @Setter

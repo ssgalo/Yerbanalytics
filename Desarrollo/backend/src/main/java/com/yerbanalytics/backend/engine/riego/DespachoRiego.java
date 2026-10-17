@@ -30,10 +30,12 @@ import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import com.yerbanalytics.backend.service.ConfiguracionService;
+import com.yerbanalytics.backend.service.ActuatorStopped;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -96,6 +98,9 @@ import java.util.stream.Collectors;
  * sector N+1 antes de que cierre el N. Tras un reinicio se reconstruye del historial; lo pendiente se
  * pierde y la próxima telemetría lo vuelve a decidir.
  *
+ * <p>El ack sí lo cierra cuando algo corta la válvula desde afuera: ver {@link #onActuatorStopped}. Deja una alerta
+ * "RiegoCortado" en el historial, y la reconstrucción descarta los riegos anteriores a ella.
+ *
  * <p><b>Concurrencia:</b> la cola la tocan el hilo MQTT, este scheduler y los controllers; el mapa de
  * riegos en curso es concurrente (lo lee el snapshot del dashboard) y el tick está serializado.
  */
@@ -113,8 +118,11 @@ public class DespachoRiego implements ConsumidorParametros {
     /** Lo más atrás que se mira el historial para el último riego y la última aplicación (24 h, como el contexto de las reglas). */
     private static final long VENTANA_HISTORIAL_MS = 24L * 3_600_000L;
 
-    /** Riego en curso de un sector: de qué zona es y cuándo se da por cerrado. */
-    private record Curso(String zonaId, long finMs) {
+    /**
+     * Riego en curso de un sector: de qué zona es, cuándo se da por cerrado y con qué comando se abrió
+     * ({@code null} si se reconstruyó del historial, que no lo guarda).
+     */
+    private record Curso(String zonaId, long finMs, String commandId) {
     }
 
     private final ColaRiego cola;
@@ -240,6 +248,47 @@ public class DespachoRiego implements ConsumidorParametros {
         asegurarReconstruido();
         Curso c = enCurso.get(sectorId);
         return c != null && c.finMs() > reloj.millis() ? c.finMs() : null;
+    }
+
+    /**
+     * Un {@code cancelado} de la válvula (el nodo informa que algo la cortó: {@code valve OFF} manual, protección
+     * del nodo) cierra el riego en curso del sector ya, sin esperar a {@code ts + duración + 5 s}, y deja una
+     * alerta INFO "Riego cortado antes de tiempo" en el historial. Esa huella es la que evita que el riego
+     * resucite al reconstruir tras un reinicio. Si el sector no figuraba regando (p. ej. el OFF de una secuencia de
+     * Demo Expo o del estado seguro sobre una válvula que el despacho no abrió) no pasa nada. Un {@code reemplazado}
+     * no llega hasta acá: otro comando más nuevo tomó el lugar y ese sigue vigente.
+     *
+     * <p>Sin {@code synchronized}: corre en el hilo MQTT y no debe esperar a un tick que está publicando.
+     */
+    @EventListener
+    public void onActuatorStopped(ActuatorStopped evento) {
+        if (!"valve".equals(evento.actuator()) || !ContratoNodo.ACK_TIPO_CANCELADO.equals(evento.ackType())) {
+            return;
+        }
+        long ahora = reloj.millis();
+        Curso c = enCurso.get(evento.sectorId());
+        if (c == null || c.finMs() <= ahora) {
+            return;
+        }
+        // Un cancelado cita el comando que se cortó. Si no es el que abrió ESTE riego es de uno anterior (OFF y
+        // reapertura inmediata): el riego nuevo sigue. Los reconstruidos no conocen su comando y aceptan cualquiera.
+        if (c.commandId() != null && !c.commandId().equals(evento.commandId())) {
+            log.info("Sector {}: cancelado tardío del comando {}; el riego en curso es de {}, no se cierra.",
+                    evento.sectorId(), evento.commandId(), c.commandId());
+            return;
+        }
+        if (!enCurso.remove(evento.sectorId(), c)) {
+            return;
+        }
+        log.warn("Sector {}: el riego se cortó antes de tiempo (ack cancelado); se cierra y puede volver a regarse.",
+                evento.sectorId());
+        try {
+            String zonaName = zonaRepository.findById(c.zonaId()).map(ZonaEntity::getName).orElse(c.zonaId());
+            historialService.registrarCorteRiego(c.zonaId(), zonaName, evento.sectorId(), ahora);
+        } catch (RuntimeException e) {
+            log.error("Sector {}: el riego se cerró en memoria pero no se pudo dejar la huella en el historial; "
+                    + "un reinicio lo volvería a dar por abierto hasta que venza.", evento.sectorId(), e);
+        }
     }
 
     /**
@@ -446,7 +495,7 @@ public class DespachoRiego implements ConsumidorParametros {
             }
             // La válvula ya abrió: se marca en curso ANTES de escribir el historial. Si el registro falla, el
             // sector sigue "regando" en memoria y no se vuelve a publicar, y el ciclo recuerda el riego.
-            enCurso.put(s.sectorId(), new Curso(zonaId, ahora + d.duracionSeg() * 1000L + MARGEN_MS));
+            enCurso.put(s.sectorId(), new Curso(zonaId, ahora + d.duracionSeg() * 1000L + MARGEN_MS, r.commandId()));
             ultimoRiego.merge(s.sectorId(), ahora, Math::max);
             if (s.esDeficitCritico()) {
                 ultimoRiegoCritico.merge(s.sectorId(), ahora, Math::max);
@@ -687,10 +736,18 @@ public class DespachoRiego implements ConsumidorParametros {
             return true;
         }
         try {
-            for (HistorialEventoEntity e : historialRepository.riegosDesde(ahora - VENTANA_RECONSTRUCCION_MS)) {
+            long desde = ahora - VENTANA_RECONSTRUCCION_MS;
+            // Los cortes por ack cancelado: un riego anterior al último corte de su sector ya no está abierto.
+            Map<String, Long> cortes = new HashMap<>();
+            for (HistorialEventoEntity c : historialRepository.findByTipoAndReglaAndTsGreaterThanEqual(
+                    "Alerta", HistorialService.REGLA_RIEGO_CORTADO, desde)) {
+                cortes.merge(c.getSectorId(), c.getTs(), Math::max);
+            }
+            for (HistorialEventoEntity e : historialRepository.riegosDesde(desde)) {
                 long fin = e.getTs() + e.getDuracionSeg() * 1000L + MARGEN_MS;
-                if (fin > ahora) {
-                    enCurso.merge(e.getSectorId(), new Curso(e.getZonaId(), fin),
+                Long corte = cortes.get(e.getSectorId());
+                if (fin > ahora && (corte == null || e.getTs() > corte)) {
+                    enCurso.merge(e.getSectorId(), new Curso(e.getZonaId(), fin, null),
                             (a, b) -> a.finMs() >= b.finMs() ? a : b);
                 }
             }

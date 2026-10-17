@@ -1,12 +1,14 @@
 package com.yerbanalytics.backend.engine.rules;
 
 import com.yerbanalytics.backend.engine.ActionType;
+import com.yerbanalytics.backend.engine.DetalleInsumo;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
+import com.yerbanalytics.backend.engine.parametros.ParametrosInsumo;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import org.springframework.stereotype.Component;
@@ -21,8 +23,9 @@ import java.util.List;
  * <p><b>Condición:</b> el sector está en estado {@code "critical"} Y la confianza del
  * diagnóstico alcanza {@code diagnostico.confianza-minima} (HU-07 CA-01/02).
  *
- * <p><b>Acción si se cumple:</b> {@code ACTIVAR_BOMBA} — el {@link com.yerbanalytics.backend.engine.ActionExecutor}
- * activará la bomba peristáltica y registrará la dosificación en el historial.
+ * <p><b>Acción si se cumple:</b> {@code ACTIVAR_BOMBA} con la dosis en ml ({@code insumo.dosis-ml}) — el
+ * {@link com.yerbanalytics.backend.engine.ActionExecutor} activará la bomba peristáltica con esa cantidad y
+ * registrará la dosificación en el historial.
  *
  * <p><b>Acción si no se cumple:</b> {@code NOOP_INFO} — Registro de Inacción
  * que explica qué condición falló (status, confianza insuficiente, o sin diagnóstico).
@@ -64,7 +67,7 @@ public class SupplyRule implements Rule {
 
     @Override
     public List<DefinicionParametro> parametros() {
-        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA);
+        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosInsumo.DOSIS_ML);
     }
 
     @Override
@@ -91,7 +94,9 @@ public class SupplyRule implements Rule {
             String motivo = String.format(
                     "Diagnóstico IA: %s (confianza %.0f%% ≥ %.0f%%). Dosificación autorizada.",
                     estado, conf, confUmbral);
-            return List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, NAME, motivo));
+            // La cantidad la decide el backend: sin ella el firmware dosificaría su valor por defecto.
+            int ml = (int) Math.round(ev.numero(ParametrosInsumo.DOSIS_ML));
+            return List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, NAME, motivo, new DetalleInsumo(ml)));
         } else {
             String motivo = String.format(
                     "Diagnóstico IA: %s (confianza %.0f%% < %.0f%% requerida). No se dosifica.",

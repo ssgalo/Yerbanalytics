@@ -450,8 +450,16 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
 - La cola y lo que está regando están en memoria. Un reinicio pierde lo pendiente y reconstruye lo
   abierto del historial; la siguiente telemetría vuelve a decidir.
 - El estado de la válvula del dashboard (`Regando` / `En cola` / `Cerrada`) lo deriva el despacho; el
-  ESP32 corta solo al cumplir la duración. El ACK no cambia ese estado: `SeguimientoComandosService` lo
-  escucha sólo para alertar en el historial si el nodo informa una falla o no contesta a tiempo.
+  ESP32 corta solo al cumplir la duración. El ACK `SUCCESS` no cambia ese estado: `SeguimientoComandosService` lo
+  escucha para alertar en el historial si el nodo informa una falla o no contesta a tiempo.
+- **Riego cortado desde afuera.** Un ACK `ERROR cancelado` de la válvula (un `valve OFF` manual, la protección del
+  nodo) cierra el riego en curso de ese sector: el seguimiento publica un `ActuatorStopped` y `DespachoRiego` lo saca
+  de lo que está regando (el cupo se libera y el sector puede volver a regarse) y deja una alerta `INFO` con regla
+  `RiegoCortado` y el sector real en el historial. Esa fila es la que la reconstrucción tras un reinicio respeta: un
+  riego anterior al último corte de su sector no se da por abierto. `reemplazado` no cierra nada (otro comando más
+  nuevo lo tomó). Si el sector no figuraba regando (un OFF de una secuencia de Demo Expo o del estado seguro) no
+  se registra nada. Un `cancelado` sin comando pendiente (se perdió en un reinicio) no se puede atribuir a la
+  válvula y no cierra nada: el riego vence solo por tiempo.
 
 > **No operar con plantines reales sin E-01 y S-06.** Un sensor de humedad trabado en un valor seco
 > plausible haría regar en cada ciclo de lectura de la ventana (~20 L por día y por sector con el 40 %
@@ -463,8 +471,15 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
 El pronóstico (Open-Meteo) se pide con timeouts HTTP (`yerbanalytics.weather.connect-timeout-ms`,
 3 s, y `read-timeout-ms`, 5 s) y se precalienta al arrancar; un refresco colgado se reemplaza a los 60 s.
 
-Otros límites conocidos: R-06 depende de los eventos "Insumo" y la bomba conserva el enganche
-`Dosificando`; el cupo se llena por número de sector, no por urgencia. El detalle de qué cubre y qué
+**Dosificación (bomba de insumo).** `SupplyRule` decide la dosis con `insumo.dosis-ml` (10 ml de fábrica, 1–50: el
+tope del firmware) y el `ActionExecutor` publica `pump ON {"ml": N}`; el firmware calcula el tiempo (1 s por ml). Mientras
+el sector figura `Dosificando` no se ordena otra dosis. Ese estado lo cierra `SupplyDoseService`: al ACK final de la
+bomba (`ok`, `cancelado` o un error; un `reemplazado` no) y, de respaldo, por tiempo: pasada la duración de la dosis
+(`duracion_seg` de su fila "Insumo") más `yerbanalytics.actuadores.ack-margen-ms`, así un nodo que se reinicia a mitad
+de la dosis no deja el sector colgado (también limpia los que quedaron así antes de un reinicio del backend).
+Es la base mínima de `add-dosificacion-base`, que la reemplaza por insumos, tanques y precondiciones.
+
+Otros límites conocidos: R-06 depende de los eventos "Insumo"; el cupo se llena por número de sector, no por urgencia. El detalle de qué cubre y qué
 no cada regla frente a la spec está en
 [`diferencias-motor-reglas-vs-reglas-v2.md`](../../docs-motor-reglas-e-integracion/diferencias-motor-reglas-vs-reglas-v2.md).
 

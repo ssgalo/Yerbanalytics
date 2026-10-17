@@ -58,6 +58,26 @@ class ActionExecutorPublicacionTest {
     }
 
     @Test
+    void activarBombaConDosisPublicaLosMlYLaDejaEnElHistorial() {
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis", new DetalleInsumo(25))),
+                ctx, OrigenEvaluacion.TELEMETRIA);
+
+        verify(historial).registrarInsumo(sector, 25);
+        verify(publisher).publicar("MZ-1", "MZ-1-001", "pump", "ON", Map.of("ml", 25));
+        assertThat(sector.getActuadorPump()).isEqualTo("Dosificando");
+    }
+
+    @Test
+    void siElSectorYaEstaDosificandoNoPublicaOtraVez() {
+        sector.setActuadorPump("Dosificando");
+
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis", new DetalleInsumo(10))),
+                ctx, OrigenEvaluacion.TELEMETRIA);
+
+        verify(publisher, never()).publicar(any(), any(), eq("pump"), any(), any());
+    }
+
+    @Test
     void moverMediasombraPublicaElPorcentajeDelMotivo() {
         executor.execute(List.of(RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "ShadingRule", "cerrar [apertura=40]")), ctx, OrigenEvaluacion.TELEMETRIA);
 

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
+import com.yerbanalytics.backend.service.ActuatorStopped;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -83,6 +84,8 @@ class DespachoRiegoTest {
     private DespachoRiego despacho;
     /** begin / commit / rollback de las transacciones y "publish" de cada comando, en orden. */
     private List<String> eventos;
+    /** commandId de cada comando publicado, en orden (cmd-0, cmd-1…). */
+    private final List<String> comandosPublicados = Collections.synchronizedList(new ArrayList<>());
 
     @BeforeEach
     void setUp() {
@@ -92,7 +95,9 @@ class DespachoRiegoTest {
         publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any())).thenAnswer(i -> {
             eventos.add("publish");
-            return new ComandoActuadorPublisher.Resultado(true, "c", null);
+            String commandId = "cmd-" + comandosPublicados.size();
+            comandosPublicados.add(commandId);
+            return new ComandoActuadorPublisher.Resultado(true, commandId, null);
         });
         historial = mock(HistorialService.class);
         historialRepository = mock(HistorialRepository.class);
@@ -1169,5 +1174,113 @@ class DespachoRiegoTest {
         despacho.tick();
 
         verify(publisher, times(1)).publicar(eq("MZ-1"), eq("MZ-1-001"), any(), any(), any());
+    }
+
+    // ------------------------------------------------------------------ riego cortado desde afuera
+
+    private HistorialEventoEntity corte(String sectorId, Instant ts) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId("c-" + sectorId + ts);
+        e.setSectorId(sectorId);
+        e.setZonaId(zonaDe(sectorId));
+        e.setTipo("Alerta");
+        e.setRegla(HistorialService.REGLA_RIEGO_CORTADO);
+        e.setTs(ts.toEpochMilli());
+        return e;
+    }
+
+    @Test
+    void unCanceladoDeLaValvulaCierraElRiegoEnCursoYDejaHuellaEnElHistorial() {
+        pedir("MZ-2", 3, 600);
+        despacho.tick();
+        assertThat(despacho.estadoValvula(id("MZ-2", 3))).isEqualTo("Regando");
+
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 3), "valve", "cmd-0", "cancelado"));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 3))).isEqualTo("Cerrada");
+        assertThat(despacho.finRiegoEnCurso(id("MZ-2", 3))).isNull();
+        verify(historial).registrarCorteRiego(eq("MZ-2"), any(), eq(id("MZ-2", 3)), eq(T0.toEpochMilli()));
+    }
+
+    @Test
+    void conElCupoLiberadoElDespachoAbreElSiguienteDeLaCola() {
+        usarSimultaneos(1);
+        pedir("MZ-2", 1, 600);
+        pedir("MZ-2", 2, 600);
+        despacho.tick();
+        assertThat(sectoresPublicados()).containsExactly(id("MZ-2", 1));
+
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 1), "valve", "cmd-0", "cancelado"));
+        despacho.tick();
+
+        verify(publisher).publicar(eq("MZ-2"), eq(id("MZ-2", 2)), eq("valve"), eq("ON"), any());
+    }
+
+    @Test
+    void unCortePorUnSectorQueNoEstabaRegandoNoDejaNada() {
+        // p. ej. un OFF de una secuencia de Demo Expo o del estado seguro sobre una válvula que el despacho no abrió.
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 7), "valve", "cmd-x", "cancelado"));
+
+        verify(historial, never()).registrarCorteRiego(any(), any(), any(), anyLong());
+        assertThat(despacho.estadoValvula(id("MZ-2", 7))).isEqualTo("Cerrada");
+    }
+
+    @Test
+    void soloUnCanceladoDeLaValvulaCierraElRiego() {
+        pedir("MZ-2", 3, 600);
+        despacho.tick();
+
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 3), "pump", "cmd-0", "cancelado"));
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 3), "valve", "cmd-0", "reemplazado"));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 3))).isEqualTo("Regando");
+        verify(historial, never()).registrarCorteRiego(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void unCanceladoTardioDeUnComandoViejoNoCierraElRiegoNuevoDelMismoSector() {
+        usarSimultaneos(1);
+        pedir("MZ-2", 1, 600);
+        despacho.tick();                                   // cmd-0 abre el sector
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 1), "valve", "cmd-0", "cancelado"));
+        reloj.avanzar(Duration.ofMinutes(241));            // otro ciclo de lectura: la guarda de ciclo ya no frena
+        pedir("MZ-2", 1, 600);
+        despacho.tick();                                   // cmd-1 lo vuelve a abrir
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+
+        // El ack cancelado de cmd-0 llega tarde: es del riego viejo, no del nuevo.
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 1), "valve", "cmd-0", "cancelado"));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+        verify(historial, times(1)).registrarCorteRiego(any(), any(), any(), anyLong());
+
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 1), "valve", "cmd-1", "cancelado"));
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Cerrada");
+    }
+
+    @Test
+    void trasUnReinicioUnRiegoCortadoDespuesDeAbrirseNoResucita() {
+        when(historialRepository.riegosDesde(anyLong())).thenReturn(List.of(
+                riego(id("MZ-2", 1), T0.minusSeconds(100), 600),
+                riego(id("MZ-2", 2), T0.minusSeconds(100), 600)));
+        when(historialRepository.findByTipoAndReglaAndTsGreaterThanEqual(eq("Alerta"),
+                eq(HistorialService.REGLA_RIEGO_CORTADO), anyLong()))
+                .thenReturn(List.of(corte(id("MZ-2", 1), T0.minusSeconds(40))));
+
+        DespachoRiego reiniciado = nuevoDespacho();
+
+        assertThat(reiniciado.estadoValvula(id("MZ-2", 1))).isEqualTo("Cerrada");
+        assertThat(reiniciado.estadoValvula(id("MZ-2", 2))).isEqualTo("Regando");
+    }
+
+    @Test
+    void trasUnReinicioUnRiegoNuevoPosteriorAlCorteSiCuenta() {
+        when(historialRepository.riegosDesde(anyLong())).thenReturn(List.of(
+                riego(id("MZ-2", 1), T0.minusSeconds(30), 600)));
+        when(historialRepository.findByTipoAndReglaAndTsGreaterThanEqual(eq("Alerta"),
+                eq(HistorialService.REGLA_RIEGO_CORTADO), anyLong()))
+                .thenReturn(List.of(corte(id("MZ-2", 1), T0.minusSeconds(90))));
+
+        assertThat(nuevoDespacho().estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
     }
 }
