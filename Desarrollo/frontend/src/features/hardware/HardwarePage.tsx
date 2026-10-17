@@ -9,11 +9,16 @@ import { HardwareFilters, type HardwareFilterState } from './components/Hardware
 import { HardwareTable } from './components/HardwareTable';
 import { SectoresIncompletos } from './components/SectoresIncompletos';
 import { AltaHardwareForm } from './components/AltaHardwareForm';
+import { ReparacionForm } from './components/ReparacionForm';
 import styles from './Hardware.module.css';
 
 const INITIAL: HardwareFilterState = { tipo: 'Todos', estado: 'Todos', zona: 'Todas' };
 
-type Panel = { mode: 'alta' } | { mode: 'recambio'; device: Dispositivo } | null;
+type Panel =
+  | { mode: 'alta' }
+  | { mode: 'recambio'; device: Dispositivo }
+  | { mode: 'reparacion'; device: Dispositivo }
+  | null;
 type Feedback = { kind: 'ok'; msg: string } | null;
 
 /** Macro-zona a la que pertenece un dispositivo (por zona o por prefijo del sector). */
@@ -27,9 +32,12 @@ function zonaDe(d: Dispositivo): string {
 }
 
 export function HardwarePage() {
-  const { data, loading, error, mutating, register, replace } = useHardware();
-  // Alta y recambio sólo con `hardware.gestionar`; sin él, la flota se ve igual pero sin acciones.
-  const gestionar = useAuth().puede('hardware.gestionar');
+  const { data, loading, error, mutating, register, replace, repair } = useHardware();
+  // Alta y recambio sólo con `hardware.gestionar`; registrar una reparación, con `hardware.reparar`. Sin ellos la flota
+  // se ve igual pero sin acciones.
+  const { puede } = useAuth();
+  const gestionar = puede('hardware.gestionar');
+  const reparar = puede('hardware.reparar');
   const [filters, setFilters] = useState<HardwareFilterState>(INITIAL);
   const [panel, setPanel] = useState<Panel>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -72,6 +80,12 @@ export function HardwarePage() {
     setFeedback({ kind: 'ok', msg: `${device.tipoLabel} recambiado en ${device.ubicacion}.` });
   };
 
+  const submitReparacion = (device: Dispositivo) => async (detalle: string) => {
+    await repair(device.id, detalle);
+    setPanel(null);
+    setFeedback({ kind: 'ok', msg: `Reparación registrada en ${device.tipoLabel} · ${device.ubicacion}.` });
+  };
+
   return (
     <div>
       <p className={styles.intro}>
@@ -100,12 +114,21 @@ export function HardwarePage() {
         )}
       </div>
 
-      {panel && gestionar && (
+      {panel && panel.mode !== 'reparacion' && gestionar && (
         <AltaHardwareForm
           mode={panel.mode}
           device={panel.mode === 'recambio' ? panel.device : undefined}
           busy={mutating}
           onSubmit={panel.mode === 'recambio' ? submitRecambio(panel.device) : submitAlta}
+          onCancel={() => setPanel(null)}
+        />
+      )}
+
+      {panel?.mode === 'reparacion' && reparar && (
+        <ReparacionForm
+          device={panel.device}
+          busy={mutating}
+          onSubmit={submitReparacion(panel.device)}
           onCancel={() => setPanel(null)}
         />
       )}
@@ -119,6 +142,14 @@ export function HardwarePage() {
             ? (device) => {
                 setFeedback(null);
                 setPanel({ mode: 'recambio', device });
+              }
+            : undefined
+        }
+        onReparar={
+          reparar
+            ? (device) => {
+                setFeedback(null);
+                setPanel({ mode: 'reparacion', device });
               }
             : undefined
         }

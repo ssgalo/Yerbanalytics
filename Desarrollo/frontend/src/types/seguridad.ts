@@ -7,7 +7,7 @@
 /** Los cinco roles fijos. El código viaja tal cual en el JSON. */
 export type Rol = 'ADMINISTRADOR' | 'INGENIERO_AGRONOMO' | 'PRODUCTOR_VIVERISTA' | 'OPERARIO' | 'SERVICIO';
 
-/** Código de permiso del catálogo (los 20 del enum `Permiso` del backend). */
+/** Código de permiso del catálogo (los 23 del enum `Permiso` del backend). */
 export type Permiso =
   | 'vivero.ver'
   | 'diagnosticos.ver'
@@ -19,6 +19,7 @@ export type Permiso =
   | 'reglas.editar'
   | 'hardware.ver'
   | 'hardware.gestionar'
+  | 'hardware.reparar'
   | 'topologia.ver'
   | 'topologia.gestionar'
   | 'capturas.ver'
@@ -26,6 +27,8 @@ export type Permiso =
   | 'camara.gestionar'
   | 'pasadas.ver'
   | 'pasadas.operar'
+  | 'bloqueos.ver'
+  | 'bloqueos.gestionar'
   | 'simulacion.gestionar'
   | 'usuarios.gestionar'
   | 'auditoria.ver';

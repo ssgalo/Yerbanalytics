@@ -11,7 +11,7 @@
    backend used, including the low-battery macro-zone, which exists to exercise the
    "Batería Baja" alert (HU-21 CA-02).
    ============================================================ */
-import { macroZoneIndex, type ContractMetrics, type TelemetryPayload } from './contract.ts';
+import { macroZoneIndex, toContractUnits, type ContractMetrics, type MetricKey, type TelemetryPayload } from './contract.ts';
 import { publish } from './mqtt.ts';
 import { fetchFromBackend } from './proxy.ts';
 
@@ -28,6 +28,18 @@ let active = false;
  * empty, so launching the simulator never leaves a zone mute from a previous session.
  */
 const silenced = new Set<string>();
+
+/** Metrics in UI units (`ce` in dS/m) that a zone's node answers with, whatever the random reading says. */
+export type PinnedMetrics = Partial<Record<MetricKey, number>>;
+
+/**
+ * Pinned readings: macro-zone → the metrics every reading of that zone carries over the random ones, however many times
+ * the backend asks again. A scenario needs them because the answer to a pulse is what the engine decides on, and a
+ * reading published beforehand is overwritten by it ("Lectura inválida" pins an impossible value, "Hardware incompleto"
+ * dry soil). In memory, like `silenced`: it always starts empty. Values are kept in UI units (what the operator typed)
+ * and converted to contract units when published.
+ */
+const pinned = new Map<string, PinnedMetrics>();
 
 /** Collaborators, replaceable in tests (see setDependencies). Defaults are the real ones. */
 interface Dependencies {
@@ -80,7 +92,7 @@ async function emitZone(i: number): Promise<void> {
     battery: i === LOW_BATTERY_ZONE ? Math.floor(around(12, 8)) : Math.floor(around(70, 30)),
     signal: Math.floor(-55 - Math.random() * 35), // dBm: -55 to -89
     timestamp: Date.now(),
-    metrics: randomMetrics(),
+    metrics: { ...randomMetrics(), ...toContractUnits(pinned.get(`MZ-${i}`) ?? {}) },
   };
   await deps.publish(`MZ-${i}`, payload);
 }
@@ -124,6 +136,20 @@ export async function answerReadNow(zonaId: string): Promise<void> {
 export function setSilenced(zonaId: string, on: boolean): void {
   if (on) silenced.add(zonaId);
   else silenced.delete(zonaId);
+}
+
+/**
+ * Pins `metrics` (UI units) on the readings of a zone until they are released: every reading it publishes carries them.
+ * Replaces what was pinned for the zone; `null` or an empty set releases it. Idempotent.
+ */
+export function setPinnedMetrics(zonaId: string, metrics: PinnedMetrics | null): void {
+  if (metrics === null || Object.keys(metrics).length === 0) pinned.delete(zonaId);
+  else pinned.set(zonaId, { ...metrics });
+}
+
+/** Pinned readings by zone, in UI units. */
+export function pinnedMetrics(): Record<string, PinnedMetrics> {
+  return Object.fromEntries([...pinned].map(([zone, metrics]) => [zone, { ...metrics }]));
 }
 
 export function isSilenced(zonaId: string): boolean {

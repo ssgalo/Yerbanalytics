@@ -25,7 +25,7 @@ import java.util.List;
  * sector con el segundo pulso: la humedad sale de UN nodo testigo para 100 sectores y, en el momento del segundo
  * pulso, puede seguir baja porque el nodo está en un sector que todavía no se regó.
  *
- * <p><b>Prioridad 3</b>, después de R-04 (la saturación se evalúa siempre, también recién regado) y antes de todas las reglas que riegan. Tiene DOS guardas y no valen lo mismo:
+ * <p><b>Prioridad 5</b>, después de R-04 (la saturación se evalúa siempre, también recién regado) y antes de todas las reglas que riegan. Tiene DOS guardas y no valen lo mismo:
  * <ul>
  *   <li><b>Riego en curso:</b> corta a todos, R-02 incluida (no se abre una válvula que ya está abierta).</li>
  *   <li><b>Ya regó en este ciclo:</b> corta sólo a R-01. A R-02 {@code reglas_v2} le da únicamente su tope
@@ -42,7 +42,7 @@ import java.util.List;
 @Component
 public class CicloLecturaRiegoRule implements Rule {
 
-    private static final int PRIORITY = 3;
+    private static final int PRIORITY = 5;
     public static final String NAME = "CicloLecturaRiegoRule";
     /** Clave de cooldown: minutos que dura la guarda "ya regó en este ciclo" (0 la desactiva). */
     public static final String COOLDOWN_CYCLE = "cycle";

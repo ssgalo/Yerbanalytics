@@ -12,7 +12,7 @@
    ============================================================ */
 import { SCENARIOS } from './scenarios';
 import type { DiagnosisPlan, RuleScenario, ScenarioContext, TelemetryClaim, ThresholdMap } from './scenarios/types';
-import type { ParametroRegla, SimulatedWeather } from './types';
+import type { NodeErrorPlan, ParametroRegla, SimulatedWeather } from './types';
 
 export type { DiagnosisPlan, ThresholdMap } from './scenarios/types';
 
@@ -29,6 +29,8 @@ export const DEFAULT_THRESHOLDS: Record<string, number> = {
   'riego.lluvia-mm': 5,
   'mediasombra.uv-umbral': 7,
   'diagnostico.confianza-minima': 70,
+  'seguridad.rango-hum-max': 100,
+  'seguridad.relecturas-invalidas': 2,
 };
 
 export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
@@ -46,6 +48,8 @@ export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
     lluviaMm: get('riego.lluvia-mm'),
     uvUmbral: get('mediasombra.uv-umbral'),
     confianzaMinima: get('diagnostico.confianza-minima'),
+    humedadMaxima: get('seguridad.rango-hum-max'),
+    relecturasInvalidas: get('seguridad.relecturas-invalidas'),
   };
 }
 
@@ -59,6 +63,20 @@ export interface RuleConditionResult {
   silenceZone: boolean;
   /** Sensing pulses to request, one after the other (at least one). */
   pulses: number;
+  /** A manual lock to create over the target before the pulse; null if no selected scenario asks for one. */
+  manualLock: { reason: string } | null;
+  /** Metrics pinned on the target zone's readings (every reading carries them); empty if no scenario asks for it. */
+  pinnedMetrics: Record<string, number>;
+  /** The target zone needs a sector with no electrovalve registered (the simulator reads the registry, never edits it). */
+  needsSectorWithoutValve: boolean;
+  /** Errors the target zone's node publishes before the pulse (S-05), in `applyOrder`; empty if no scenario asks for one. */
+  nodeErrors: NodeErrorPlan[];
+  /** An error about a sector's valve is published: the operator picks a sector of the zone that has its valve registered. */
+  needsSectorWithValve: boolean;
+  /** Repair of the zone's faulty devices to register before the pulse; null if no selected scenario asks for it. */
+  repair: { detail: string } | null;
+  /** The zone must have a device marked as faulty for the scenario to have something to repair. */
+  needsFaultyDevice: boolean;
   conflictos: string[];
   resumen: string[];
 }
@@ -120,17 +138,31 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       needsCooldownReset: false,
       silenceZone: false,
       pulses: 1,
+      manualLock: null,
+      pinnedMetrics: {},
+      needsSectorWithoutValve: false,
+      nodeErrors: [],
+      needsSectorWithValve: false,
+      repair: null,
+      needsFaultyDevice: false,
       conflictos,
       resumen: [],
     };
   }
 
   const claims = new Map<string, TelemetryClaim>();
+  const pinnedClaims = new Map<string, TelemetryClaim>();
+  let needsSectorWithoutValve = false;
+  const nodeErrors: NodeErrorPlan[] = [];
+  let needsSectorWithValve = false;
+  let repair: { detail: string } | null = null;
+  let needsFaultyDevice = false;
   const notes: string[] = [];
   let weather: Partial<SimulatedWeather> | null = null;
   let diagnostico: DiagnosisPlan | null = null;
   let silenceZone = false;
   let pulses = 1;
+  let manualLock: { reason: string } | null = null;
 
   for (const scenario of selected) {
     const patch = scenario.apply(ctx);
@@ -143,6 +175,15 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     diagnostico = patch.diagnosis ?? diagnostico;
     silenceZone = silenceZone || (patch.silenceZone ?? false);
     pulses = Math.max(pulses, patch.pulses ?? 1);
+    manualLock = patch.manualLock ?? manualLock;
+    for (const [metric, claim] of Object.entries(patch.pinnedReadings ?? {})) {
+      pinnedClaims.set(metric, claim);
+    }
+    needsSectorWithoutValve = needsSectorWithoutValve || (patch.needsSectorWithoutValve ?? false);
+    if (patch.nodeError) nodeErrors.push(patch.nodeError);
+    needsSectorWithValve = needsSectorWithValve || (patch.needsSectorWithValve ?? false);
+    repair = patch.repair ?? repair;
+    needsFaultyDevice = needsFaultyDevice || (patch.needsFaultyDevice ?? false);
     notes.push(...(patch.notes ?? []));
   }
 
@@ -152,7 +193,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
 
   const needsCooldownReset = selected.some((s) => s.needsCooldownReset);
   // A line about a metric another scenario overrode is not shown: the preview says what is actually sent.
-  const resumen = [...[...claims.values()].map((c) => c.note), ...notes];
+  const resumen = [...[...claims.values()].map((c) => c.note), ...[...pinnedClaims.values()].map((c) => c.note), ...notes];
   if (needsCooldownReset) {
     resumen.push('Cooldowns → 0 en modo demo antes de disparar el pulso.');
   }
@@ -164,6 +205,13 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     needsCooldownReset,
     silenceZone,
     pulses,
+    manualLock,
+    pinnedMetrics: Object.fromEntries([...pinnedClaims].map(([metric, claim]) => [metric, claim.value])),
+    needsSectorWithoutValve,
+    nodeErrors,
+    needsSectorWithValve,
+    repair,
+    needsFaultyDevice,
     conflictos,
     resumen,
   };

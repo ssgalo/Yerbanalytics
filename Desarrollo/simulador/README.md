@@ -195,6 +195,65 @@ dashboard. La zona sigue muda hasta pulsar «Volver a responder» (`PUT /api/sil
 Los controles de la pieza `EscalamientoNodo` (apagar, bypass `safe-state`, cooldown `retry-offline`) están en
 Telemetría → Control de reglas.
 
+**Bloqueo manual (S-01).** El escenario `LOCK` (accionable sobre `ManualLockRule`) publica el sustrato seco de R-01 y
+pide `manualLock`: antes del pulso crea un bloqueo por `POST /backend/api/bloqueos`, sobre toda la zona o sobre un
+sector (selector «Alcance del bloqueo»). El pulso con motor no debe ordenar riego y la traza del sector muestra el
+bloqueo como causa. El bloqueo queda vigente hasta que se lo levanta en «Bloqueos vigentes» (`DELETE
+/backend/api/bloqueos/{id}`); si ya había uno sobre ese alcance se usa ese. No se puede combinar con R-04 ni con
+«Nodo sin respuesta»: la causa de que no se riegue sería ambigua. La cuenta de rol Servicio necesita
+`bloqueos.ver` y `bloqueos.gestionar` (vienen en la matriz por defecto; en una base ya sembrada, correr
+`migracion-permisos-bloqueo.sql` del backend).
+
+**Lecturas fijadas.** La respuesta a un `LEER_AHORA` es la lectura con la que decide el motor, y la emisión automática la
+arma al azar: una lectura que el escenario publicó antes del pulso queda pisada por ella. Por eso un escenario puede pedir
+`pinnedReadings`: métricas que viajan en **cada** respuesta de la zona destino (`PUT /api/pinned-readings/{zona}`, en memoria,
+siempre arranca vacío) hasta pulsar «Soltar» en «Lecturas fijadas». No se publican como una lectura suelta: tienen que estar en
+la respuesta al pulso. Los valores **no se recortan** (ni el servidor ni los campos de las tarjetas de sensor), así que también se
+puede cargar a mano una lectura imposible en *Envío de lecturas*. Los dos escenarios siguientes la usan, y **ambos necesitan la
+emisión automática activa** (con la emisión apagada nadie contesta el pulso).
+
+**Lectura inválida (S-03).** El escenario `INVALID_READING` (accionable sobre `ReadingValidationGuard`) fija `humSus` = el
+máximo del catálogo (`seguridad.rango-hum-max`) + 12 (112 % con los valores de fábrica): el pulso, la relectura y las siguientes son
+todas inválidas y se ve el flujo entero. El backend pide hasta `seguridad.relecturas-invalidas` relecturas, descarta esa métrica en
+el ciclo (R-01…R-06 quedan «sin dato») y deja un `WARNING` «Lectura inválida en Humedad de sustrato». El `CRITICAL` aparece si la
+métrica vuelve a fallar en el **ciclo de lectura siguiente** (por defecto, 4 h después; dos pulsos del mismo ciclo cuentan como
+uno). No se combina con R-01…R-04, el bloqueo manual, el nodo mudo ni «Hardware incompleto». Los controles de la pieza
+`ReadingValidationGuard` (apagar, bypass `retries`) están en Telemetría → Control de reglas.
+
+**Hardware incompleto (S-04).** El escenario `INCOMPLETE_HARDWARE` (accionable sobre `IncompleteHardwareRule`) fija el sustrato
+seco de R-01 y le pide a la zona destino **un sector sin electroválvula registrada**: el pulso debe abortarle el riego con
+«hardware incompleto» (sin alerta) mientras los sectores que sí la tienen riegan. **El simulador no da de baja ninguna válvula**:
+el registro de hardware no tiene esa operación y él sólo lo lee (`GET /backend/api/hardware`); busca los sectores que ya no tienen
+la suya (el `data.sql` de desarrollo equipa pocos, así que suelen sobrar) y los lista en la vista previa; su traza se mira en
+Motor de reglas → Inspector. Si la zona no tiene ninguno, o el backend rechaza la lectura, el panel lo dice y no deja ejecutar. Necesita
+que la cuenta de rol Servicio tenga `hardware.ver` (viene en la matriz por defecto; en una base ya sembrada, correr
+`migracion-permisos-hardware-servicio.sql` del backend). No se combina con R-02, R-04, el bloqueo manual, el nodo mudo ni
+«Lectura inválida»: la causa de que no se riegue sería ambigua. Los controles de la regla (apagar, bypass `hardware`) están en
+Telemetría → Control de reglas.
+
+**Fallas del nodo (S-05).** El ESP32 real detecta una falla, corta el actuador por su cuenta y la publica **una vez** en
+`nursery/zone/{zona}/errores`; el backend marca el dispositivo como averiado y lo saca de lo autónomo hasta que alguien registra la
+reparación. El simulador publica ese mismo mensaje en el broker (`POST /api/node-errors` de su servidor, que arma el payload del
+contrato con `buildNodeError`): **no simula el hardware** detrás (el caudalímetro no existe todavía), sólo el aviso. Son cuatro
+escenarios:
+
+| Escenario | Qué hace | Qué se ve |
+|---|---|---|
+| `FAULT_NO_FLOW` «Sin caudal» | Publica `SIN_CAUDAL` en el sector elegido (uno de la zona **con** su electroválvula registrada) con el sustrato seco fijado | «Falla hidráulica» en Hardware, alerta `CRITICAL` que pide **riego manual**, y el pulso no riega ese sector (tampoco R-02) |
+| `FAULT_OVERFLOW` «Caudal excesivo» | Publica `CAUDAL_EXCESIVO` (180 L/h) con el sustrato húmedo fijado | Lo mismo, pero la alerta **no** pide riego manual |
+| `FAULT_SHADE_LIMIT` «Falla de mediasombra» | Publica `MEDIASOMBRA_FIN_DE_CARRERA` (final de «cerrada») sin sector | «Falla mecánica en mediasombra» en toda la zona, alerta `CRITICAL` que pide cubrir a mano; `ShadingRule` deja de mover la malla |
+| `REPAIR` «Reparación» | Registra la reparación (`POST /backend/api/hardware/{id}/reparacion`) de **todos** los dispositivos averiados de la zona | La falla se levanta, queda el evento «Reparación» en el historial y el siguiente pulso vuelve a regar el sector |
+
+Antes del pulso el panel espera (hasta unos 4 s) a que el registro de hardware muestre la marca; si no aparece avisa con «⚠» y sigue:
+es justo lo que se ve con el receptor de errores apagado. **El simulador nunca marca ni limpia una falla por su cuenta**: publica el
+aviso o usa el endpoint público de reparación, el mismo que el dashboard. Necesita que la cuenta de rol Servicio tenga `hardware.ver`
+y `hardware.reparar` (vienen en la matriz por defecto; en una base ya sembrada, correr `migracion-permisos-hardware-servicio.sql` y
+`migracion-permisos-hardware-reparar.sql` del backend). Las fallas de caudal necesitan la emisión automática activa (el sustrato viaja
+en la respuesta al pulso). No se combinan con R-02, R-04, el bloqueo manual, el nodo mudo, «Lectura inválida» ni «Hardware incompleto»
+(la falla de la mediasombra, sólo con el bloqueo, el nodo mudo y «Hardware incompleto»); «Sin caudal» y «Caudal excesivo» entre sí
+tampoco, ni ninguna falla con la reparación. Los controles de las piezas (apagar el receptor `HardwareFaultService`, bypass `fault` de
+`HydraulicFaultRule` y `ShadeFaultRule`) están en Telemetría → Control de reglas.
+
 ---
 
 ## Qué endpoints del sistema usa
@@ -209,6 +268,7 @@ Ninguno es del simulador. Todos son superficie **pública** de la plataforma:
 | `GET /api/capturas/ordenes/{id}` | idem |
 | `GET /api/camara/dispositivos`, `POST /api/camara/vinculacion` | el backoffice |
 | `POST /api/diagnosticos` | el servicio de inferencia |
+| `GET /api/hardware`, `POST /api/hardware/{id}/reparacion` | el panel de Hardware del dashboard (la reparación la registra quien arregla el equipo) |
 | `GET/PUT /api/demo/rules`, `POST/DELETE /api/demo/weather`, `GET/PUT /api/demo/weather/offline`, `GET/PUT /api/demo/telemetry-source` | sólo existen con el backend en modo demo (en producción dan 404) |
 
 Por eso el recorrido que se ensaya acá es literalmente el que va a correr solo cuando exista el
@@ -230,13 +290,14 @@ simulador/
 │   ├── contract.ts    espejo de contrato.h (claves y unidades del nodo)
 │   ├── mqtt.ts        publicador al broker
 │   ├── store.ts       sensores simulados, persistidos en data/
-│   ├── emission.ts    emisión automática y zonas silenciadas
+│   ├── emission.ts    emisión automática, zonas silenciadas y lecturas fijadas
 │   ├── api.ts         API interna (/api/**)
 │   ├── proxy.ts       proxy al backend (/backend/**)
 │   └── backend-session.ts  sesión de la cuenta de servicio ante el backend
 ├── src/             UI React, con estilos propios
 │   ├── scenarios/     un escenario por regla (cómo se la acciona) y su registro
 │   ├── pulseChain.ts  encadena N pulsos de sensado esperando que termine cada uno
+│   ├── hardwareCoverage.ts  qué sectores de una zona no tienen electroválvula registrada (sólo lee el registro)
 │   └── ruleConditions.ts  umbrales, conflictos y combinación de los escenarios elegidos
 └── data/            estado local (no se versiona)
 ```

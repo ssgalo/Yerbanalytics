@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Regla de seguridad por antigüedad de telemetría (HU-02 CA-03/04).
  *
- * <p><b>Prioridad:</b> 1 (segunda en correr, después de {@link ManualLockRule}).
+ * <p><b>Prioridad:</b> 3 (después de {@link ManualLockRule}, {@link IncompleteHardwareRule} y {@link HydraulicFaultRule}).
  *
  * <p><b>Condición:</b> la última lectura de la macro-zona ({@code zona.lastReadingTime}) es más
  * vieja que {@code seguridad.antiguedad-max-lectura} (catálogo de parámetros), o no hay lectura
@@ -46,7 +46,7 @@ import java.util.List;
 @Component
 public class StaleSensorRule implements Rule {
 
-    private static final int PRIORITY = 1;
+    private static final int PRIORITY = 3;
     private static final String NAME = "StaleSensorRule";
 
     @Override

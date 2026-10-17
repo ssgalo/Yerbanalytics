@@ -71,6 +71,8 @@ export interface RawDispositivo {
   senal: number | null;
   ultimoUpdate: number | null;
   falla: string | null;
+  /** Epoch ms en que se marcó la falla; `null` si está sano. */
+  fallaDesde: number | null;
 }
 
 const MIN = 60 * 1000;
@@ -99,18 +101,25 @@ export function buildFleet(now: number = Date.now()): RawDispositivo[] {
     // MZ-3-010: incompleto (faltan bomba y mediasombra).
     act('DEV-109', 'EV-3-010', ELECTROVALVULA, 'MZ-3-010', null),
     // MZ-5-042: completo pero con la electroválvula averiada (HU-21 CA-04).
-    act('DEV-110', 'EV-5-042', ELECTROVALVULA, 'MZ-5-042', 'Falla Hidráulica'),
+    act('DEV-110', 'EV-5-042', ELECTROVALVULA, 'MZ-5-042', 'SIN_CAUDAL', now - 2 * HOUR),
     act('DEV-111', 'BP-5-042', BOMBA, 'MZ-5-042', null),
     act('DEV-112', 'MS-5-042', MEDIASOMBRA, 'MZ-5-042', null),
   ];
 }
 
 function nodo(id: string, serial: string, zonaId: string, bateria: number, senal: number, ultimoUpdate: number): RawDispositivo {
-  return { id, serial, tipo: NODO_TESTIGO, zonaId, sectorId: null, bateria, senal, ultimoUpdate, falla: null };
+  return { id, serial, tipo: NODO_TESTIGO, zonaId, sectorId: null, bateria, senal, ultimoUpdate, falla: null, fallaDesde: null };
 }
 
-function act(id: string, serial: string, tipo: string, sectorId: string, falla: string | null): RawDispositivo {
-  return { id, serial, tipo, zonaId: null, sectorId, bateria: null, senal: null, ultimoUpdate: null, falla };
+function act(
+  id: string,
+  serial: string,
+  tipo: string,
+  sectorId: string,
+  falla: string | null,
+  fallaDesde: number | null = null,
+): RawDispositivo {
+  return { id, serial, tipo, zonaId: null, sectorId, bateria: null, senal: null, ultimoUpdate: null, falla, fallaDesde };
 }
 
 /** Deriva el estado operativo (la falla manda; el nodo testigo usa el watchdog). */
@@ -169,6 +178,7 @@ export function toDispositivo(r: RawDispositivo, now: number = Date.now()): Disp
     estadoInk: color.ink,
     bateriaBaja: r.bateria !== null && r.bateria < BATERIA_MIN,
     falla: r.falla,
+    fallaDesde: r.falla ? r.fallaDesde : null,
   };
 }
 
@@ -256,6 +266,7 @@ export function altaDispositivo(fleet: RawDispositivo[], nuevo: NuevoDispositivo
     senal: null,
     ultimoUpdate: null,
     falla: null,
+    fallaDesde: null,
   };
   fleet.push(raw);
   return raw;
@@ -272,7 +283,29 @@ export function recambioDispositivo(fleet: RawDispositivo[], id: string, nuevo: 
   }
   raw.serial = nuevoSerial;
   raw.falla = null;
+  raw.fallaDesde = null;
   raw.bateria = null;
   raw.senal = null;
   raw.ultimoUpdate = null;
+}
+
+/**
+ * Registra la reparación de un dispositivo averiado (S-05, HU-21 CA-04): levanta la falla, igual que el backend. Reparar la
+ * mediasombra levanta la marca de la malla de toda la macro-zona. El detalle es obligatorio.
+ */
+export function repararDispositivo(fleet: RawDispositivo[], id: string, detalle: string): void {
+  if (!detalle.trim()) throw new Error('El detalle de la reparación es obligatorio.');
+  const raw = fleet.find((d) => d.id === id);
+  if (!raw) throw new Error(`El dispositivo «${id}» no existe.`);
+  if (!raw.falla) throw new Error(`El dispositivo «${id}» no tiene una falla registrada.`);
+
+  const zona = raw.sectorId ? zonaIdDe(raw.sectorId) : null;
+  const reparados =
+    raw.tipo === MEDIASOMBRA && zona
+      ? fleet.filter((d) => d.tipo === MEDIASOMBRA && d.falla && d.sectorId && zonaIdDe(d.sectorId) === zona)
+      : [raw];
+  for (const d of reparados) {
+    d.falla = null;
+    d.fallaDesde = null;
+  }
 }

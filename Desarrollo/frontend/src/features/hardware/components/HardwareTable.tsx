@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { describirFalla, desdeCuando } from '@/lib/fallas';
 import type { Dispositivo } from '@/types/domain';
 import styles from '../Hardware.module.css';
 
@@ -9,6 +10,8 @@ interface HardwareTableProps {
   dispositivos: Dispositivo[];
   /** Sin esto (rol sin `hardware.gestionar`) no se ofrece el recambio. */
   onRecambiar?: (device: Dispositivo) => void;
+  /** Sin esto (rol sin `hardware.reparar`) no se ofrece registrar la reparación de un dispositivo averiado (S-05). */
+  onReparar?: (device: Dispositivo) => void;
 }
 
 /** Color de la barra de batería según el nivel. */
@@ -18,7 +21,7 @@ function batteryColor(pct: number): string {
   return 'var(--ok)';
 }
 
-export function HardwareTable({ dispositivos, onRecambiar }: HardwareTableProps) {
+export function HardwareTable({ dispositivos, onRecambiar, onReparar }: HardwareTableProps) {
   return (
     <Card className={styles.tableCard}>
       <table className={styles.table}>
@@ -78,15 +81,22 @@ export function HardwareTable({ dispositivos, onRecambiar }: HardwareTableProps)
                         Batería Baja
                       </Badge>
                     )}
-                    {d.falla && <span className={styles.fallaText}>{d.falla}</span>}
+                    {d.falla && <FallaTexto falla={d.falla} fallaDesde={d.fallaDesde} />}
                   </div>
                 </td>
                 <td>
-                  {recambiable && onRecambiar && (
-                    <button type="button" className={styles.btnLink} onClick={() => onRecambiar(d)}>
-                      Recambiar
-                    </button>
-                  )}
+                  <div className={styles.acciones}>
+                    {d.falla && onReparar && (
+                      <button type="button" className={styles.btnLink} onClick={() => onReparar(d)}>
+                        Registrar reparación
+                      </button>
+                    )}
+                    {recambiable && onRecambiar && (
+                      <button type="button" className={styles.btnLink} onClick={() => onRecambiar(d)}>
+                        Recambiar
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
@@ -94,5 +104,18 @@ export function HardwareTable({ dispositivos, onRecambiar }: HardwareTableProps)
         </tbody>
       </table>
     </Card>
+  );
+}
+
+/** La falla marcada, traducida del código del contrato, y desde cuándo (S-05). */
+function FallaTexto({ falla, fallaDesde }: { falla: string; fallaDesde: number | null }) {
+  const { titulo, detalle } = describirFalla(falla);
+  const desde = desdeCuando(fallaDesde);
+  return (
+    <span className={styles.fallaText}>
+      <span>{titulo}</span>
+      {detalle && <> · {detalle}</>}
+      {desde && <span className={styles.fallaDesde}> · {desde}</span>}
+    </span>
   );
 }

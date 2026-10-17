@@ -114,10 +114,10 @@ class FueraDeVentanaRiegoRuleTest {
     }
 
     @Test
-    @DisplayName("metadatos: RIEGO, prioridad 6, ventana + los dos umbrales compartidos")
+    @DisplayName("metadatos: RIEGO, prioridad 7, ventana + los dos umbrales compartidos")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(6);
+        assertThat(rule.priority()).isEqualTo(8);
         assertThat(rule.parametros()).containsExactlyInAnyOrder(ParametrosRiego.VENTANA_NORMAL,
                 ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());

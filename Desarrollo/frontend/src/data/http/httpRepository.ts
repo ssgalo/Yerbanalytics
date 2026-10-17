@@ -9,6 +9,7 @@
 import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { ManualLockError } from '@/data/manualLockError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { PlanRustificacionError } from '@/data/planRustificacionError';
 import { HORARIO_MEDIASOMBRA_DEFAULT } from '@/lib/planRustificacion';
@@ -30,6 +31,8 @@ import type {
   NuevoDispositivo,
   OrigenEvaluacion,
   ParametrosSecuencia,
+  ManualLock,
+  NewManualLock,
   Pasada,
   Secuencia,
   TipoSecuencia,
@@ -180,6 +183,40 @@ export class HttpRepository implements DataRepository {
     return (await res.json()) as PlanRustificacion;
   }
 
+  async getManualLocks(): Promise<ManualLock[]> {
+    const res = await apiFetch(`${this.baseUrl}/bloqueos?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener los bloqueos manuales`);
+    }
+    return (await res.json()) as ManualLock[];
+  }
+
+  async activateManualLock(lock: NewManualLock): Promise<ManualLock> {
+    const res = await apiFetch(`${this.baseUrl}/bloqueos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lock),
+    });
+    await this.rechazoDeBloqueo(res, 'bloquear');
+    return (await res.json()) as ManualLock;
+  }
+
+  async releaseManualLock(id: number): Promise<void> {
+    const res = await apiFetch(`${this.baseUrl}/bloqueos/${id}`, { method: 'DELETE' });
+    await this.rechazoDeBloqueo(res, 'reanudar');
+  }
+
+  /** 400, 404 y 409 del bloqueo traen { error } y son rechazos esperables, no una falla. */
+  private async rechazoDeBloqueo(res: Response, accion: string): Promise<void> {
+    if (res.status === 400 || res.status === 404 || res.status === 409) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new ManualLockError(err?.error ?? `No se pudo ${accion} la actuación autónoma.`);
+    }
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al ${accion} la actuación autónoma`);
+    }
+  }
+
   async getHardware(): Promise<HardwareData> {
     const res = await apiFetch(`${this.baseUrl}/hardware?t=${Date.now()}`);
     if (!res.ok) {
@@ -194,6 +231,20 @@ export class HttpRepository implements DataRepository {
 
   async replaceDevice(id: string, device: NuevoDispositivo): Promise<HardwareData> {
     return this.mutateDevice('PUT', `${this.baseUrl}/hardware/${encodeURIComponent(id)}`, device);
+  }
+
+  async registerRepair(id: string, detalle: string): Promise<HardwareData> {
+    const res = await apiFetch(`${this.baseUrl}/hardware/${encodeURIComponent(id)}/reparacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ detalle }),
+    });
+    if (!res.ok) {
+      // 400 (sin detalle o dispositivo inexistente) y 409 (sin falla registrada) traen { error } con el motivo.
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al registrar la reparación`);
+    }
+    return (await res.json()) as HardwareData;
   }
 
   /** POST/PUT compartidos: el backend devuelve la flota actualizada o { error } (HU-18 CA-03). */

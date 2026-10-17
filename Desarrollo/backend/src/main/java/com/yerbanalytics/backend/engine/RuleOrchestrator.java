@@ -97,6 +97,7 @@ public class RuleOrchestrator {
         String abortAll = null;
         String abortRiego = null;
         String abortInsumo = null;
+        String abortMediasombra = null;
         boolean diagnosticoNuevo = ctx.diagnosticoNuevo();
         boolean usoDiagnostico = false;
 
@@ -122,6 +123,10 @@ public class RuleOrchestrator {
             }
             if (branch == RuleBranch.INSUMO && abortInsumo != null) {
                 trazas.add(omitida(rule, EstadoRegla.OMITIDA_RAMA_BLOQUEADA, abortInsumo));
+                continue;
+            }
+            if (branch == RuleBranch.MEDIASOMBRA && abortMediasombra != null) {
+                trazas.add(omitida(rule, EstadoRegla.OMITIDA_RAMA_BLOQUEADA, abortMediasombra));
                 continue;
             }
 
@@ -161,6 +166,10 @@ public class RuleOrchestrator {
                     log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_INSUMO — rama INSUMO detenida.",
                             sectorId, rule.name(), branch);
                     abortInsumo = abortInsumo != null ? abortInsumo : rule.name();
+                } else if (type == ActionType.ABORT_MEDIASOMBRA) {
+                    log.debug("Sector {}: regla '{}' (rama {}) emitió ABORT_MEDIASOMBRA — rama MEDIASOMBRA detenida.",
+                            sectorId, rule.name(), branch);
+                    abortMediasombra = abortMediasombra != null ? abortMediasombra : rule.name();
                 }
             }
         }

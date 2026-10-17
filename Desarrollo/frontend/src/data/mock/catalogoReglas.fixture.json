@@ -8,10 +8,24 @@
       "parametros": []
     },
     {
+      "id": "IncompleteHardwareRule",
+      "label": "🧰 Hardware incompleto (S-04)",
+      "rama": "GLOBAL",
+      "prioridad": 1,
+      "parametros": []
+    },
+    {
+      "id": "HydraulicFaultRule",
+      "label": "🚰 Falla hidráulica (S-05)",
+      "rama": "GLOBAL",
+      "prioridad": 2,
+      "parametros": []
+    },
+    {
       "id": "StaleSensorRule",
       "label": "📵 Sensor sin datos recientes",
       "rama": "GLOBAL",
-      "prioridad": 1,
+      "prioridad": 3,
       "parametros": [
         "seguridad.antiguedad-max-lectura"
       ]
@@ -20,7 +34,7 @@
       "id": "SustratoSaturadoRule",
       "label": "💧 Sustrato saturado (R-04)",
       "rama": "RIEGO",
-      "prioridad": 2,
+      "prioridad": 4,
       "parametros": [
         "riego.saturacion-bloqueo",
         "riego.saturacion-alerta"
@@ -30,7 +44,7 @@
       "id": "CicloLecturaRiegoRule",
       "label": "🔁 Un riego por ciclo de lectura",
       "rama": "RIEGO",
-      "prioridad": 3,
+      "prioridad": 5,
       "parametros": [
         "riego.umbral-critico"
       ]
@@ -39,7 +53,7 @@
       "id": "DeficitCriticoRule",
       "label": "🚨 Déficit hídrico crítico (R-02)",
       "rama": "RIEGO",
-      "prioridad": 4,
+      "prioridad": 6,
       "parametros": [
         "riego.umbral-critico",
         "riego.volumen-max-evento",
@@ -51,7 +65,7 @@
       "id": "DailyDoseLimitRule",
       "label": "🛑 Límite de dosis diaria",
       "rama": "INSUMO",
-      "prioridad": 5,
+      "prioridad": 7,
       "parametros": [
         "insumo.max-dosis-24h"
       ]
@@ -60,7 +74,7 @@
       "id": "FueraDeVentanaRiegoRule",
       "label": "🌙 Riego fuera de ventana horaria (R-05)",
       "rama": "RIEGO",
-      "prioridad": 6,
+      "prioridad": 8,
       "parametros": [
         "riego.ventana-normal",
         "riego.umbral-humedad",
@@ -71,7 +85,7 @@
       "id": "PausaTrasAplicacionRule",
       "label": "⏸️ Pausa tras una aplicación (R-06)",
       "rama": "RIEGO",
-      "prioridad": 7,
+      "prioridad": 9,
       "parametros": [
         "riego.pausa-tras-aplicacion",
         "riego.umbral-humedad",
@@ -82,7 +96,7 @@
       "id": "PosponerPorLluviaRule",
       "label": "🌧️ Posponer por lluvia (R-03)",
       "rama": "RIEGO",
-      "prioridad": 8,
+      "prioridad": 10,
       "parametros": [
         "riego.lluvia-probabilidad",
         "riego.lluvia-mm",
@@ -95,7 +109,7 @@
       "id": "RiegoPorDeficitRule",
       "label": "💦 Riego por déficit hídrico (R-01)",
       "rama": "RIEGO",
-      "prioridad": 10,
+      "prioridad": 11,
       "parametros": [
         "riego.umbral-humedad",
         "riego.umbral-critico",
@@ -109,16 +123,23 @@
       "id": "SupplyRule",
       "label": "🧪 Dosificación de insumo",
       "rama": "INSUMO",
-      "prioridad": 11,
+      "prioridad": 12,
       "parametros": [
         "diagnostico.confianza-minima"
       ]
     },
     {
+      "id": "ShadeFaultRule",
+      "label": "⚙️ Falla mecánica en mediasombra (S-05)",
+      "rama": "MEDIASOMBRA",
+      "prioridad": 13,
+      "parametros": []
+    },
+    {
       "id": "ShadingRule",
       "label": "⛅ Control de mediasombra",
       "rama": "MEDIASOMBRA",
-      "prioridad": 12,
+      "prioridad": 14,
       "parametros": [
         "mediasombra.uv-umbral",
         "mediasombra.apertura-proteccion-uv",
@@ -129,7 +150,7 @@
       "id": "FollowUpRule",
       "label": "⏱️ Seguimiento post-acción",
       "rama": "SEGUIMIENTO",
-      "prioridad": 20,
+      "prioridad": 21,
       "parametros": []
     }
   ],
@@ -156,6 +177,226 @@
       "updatedTs": null
     },
     {
+      "clave": "seguridad.rango-hum-min",
+      "etiqueta": "Humedad: mínimo posible",
+      "descripcion": "Una humedad (de sustrato o ambiental) por debajo de este valor no es física: la lectura se considera inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "0",
+      "fabrica": "0",
+      "min": 0.0,
+      "max": 50.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-hum-max",
+      "etiqueta": "Humedad: máximo posible",
+      "descripcion": "Una humedad (de sustrato o ambiental) por encima de este valor no es física: la lectura se considera inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "100",
+      "fabrica": "100",
+      "min": 50.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-temp-min",
+      "etiqueta": "Temperatura: mínimo posible",
+      "descripcion": "Una temperatura (del aire o del sustrato) por debajo de este valor se considera una lectura inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "°C",
+      "valor": "-10",
+      "fabrica": "-10",
+      "min": -40.0,
+      "max": 25.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-temp-max",
+      "etiqueta": "Temperatura: máximo posible",
+      "descripcion": "Una temperatura (del aire o del sustrato) por encima de este valor se considera una lectura inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "°C",
+      "valor": "60",
+      "fabrica": "60",
+      "min": 25.0,
+      "max": 85.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-ph-min",
+      "etiqueta": "pH: mínimo posible",
+      "descripcion": "Un pH del sustrato por debajo de este valor se considera una lectura inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "",
+      "valor": "3",
+      "fabrica": "3",
+      "min": 0.0,
+      "max": 7.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-ph-max",
+      "etiqueta": "pH: máximo posible",
+      "descripcion": "Un pH del sustrato por encima de este valor se considera una lectura inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "",
+      "valor": "9",
+      "fabrica": "9",
+      "min": 7.0,
+      "max": 14.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-ce-min",
+      "etiqueta": "Conductividad: mínimo posible",
+      "descripcion": "Una conductividad eléctrica por debajo de este valor se considera una lectura inválida. Se compara ya convertida a dS/m.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "dS/m",
+      "valor": "0",
+      "fabrica": "0",
+      "min": 0.0,
+      "max": 5.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-ce-max",
+      "etiqueta": "Conductividad: máximo posible",
+      "descripcion": "Una conductividad eléctrica por encima de este valor se considera una lectura inválida. Se compara ya convertida a dS/m.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "dS/m",
+      "valor": "10",
+      "fabrica": "10",
+      "min": 5.0,
+      "max": 20.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-luz-min",
+      "etiqueta": "Luz: mínimo posible",
+      "descripcion": "Un porcentaje de luz (sensor LDR) por debajo de este valor se considera una lectura inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "0",
+      "fabrica": "0",
+      "min": 0.0,
+      "max": 50.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.rango-luz-max",
+      "etiqueta": "Luz: máximo posible",
+      "descripcion": "Un porcentaje de luz (sensor LDR) por encima de este valor se considera una lectura inválida.",
+      "familia": "SEGURIDAD",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "100",
+      "fabrica": "100",
+      "min": 50.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguridad.relecturas-invalidas",
+      "etiqueta": "Relecturas ante un valor inválido",
+      "descripcion": "Veces que se vuelve a pedir la lectura, enseguida, cuando una métrica llega fuera de rango. Si todas fallan, esa métrica se descarta en el ciclo.",
+      "familia": "SEGURIDAD",
+      "tipo": "ENTERO",
+      "unidad": "relecturas",
+      "valor": "2",
+      "fabrica": "2",
+      "min": 1.0,
+      "max": 5.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §4 S-03",
+      "modificado": false,
+      "usadoPor": [
+        "ReadingValidationGuard"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
       "clave": "riego.umbral-humedad",
       "etiqueta": "Umbral de riego (humedad de sustrato)",
       "descripcion": "Por debajo de esta humedad de sustrato el sector necesita riego.",
@@ -171,6 +412,7 @@
       "modificado": false,
       "usadoPor": [
         "FueraDeVentanaRiegoRule",
+        "HardwareFaultService",
         "PausaTrasAplicacionRule",
         "PosponerPorLluviaRule",
         "RiegoPorDeficitRule"

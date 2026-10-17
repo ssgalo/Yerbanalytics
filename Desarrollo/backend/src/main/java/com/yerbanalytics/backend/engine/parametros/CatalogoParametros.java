@@ -62,8 +62,28 @@ public class CatalogoParametros {
         this(definicionesReales(), restriccionesReales(), consumidores);
     }
 
-    /** Restricciones cruzadas de las familias reales (riego: {@code reglas_v2} §11 y límite de la válvula). */
+    /**
+     * Restricciones cruzadas de las familias reales: riego ({@code reglas_v2} §11 y límite de la válvula) y los
+     * rangos físicos de S-03 (el mínimo de cada magnitud, menor que su máximo).
+     */
     static List<RestriccionCruzada> restriccionesReales() {
+        List<RestriccionCruzada> restricciones = new ArrayList<>(restriccionesDeRiego());
+        restricciones.add(rangoFisico("humedad", ParametrosSeguridad.RANGO_HUM_MIN, ParametrosSeguridad.RANGO_HUM_MAX));
+        restricciones.add(rangoFisico("temperatura", ParametrosSeguridad.RANGO_TEMP_MIN, ParametrosSeguridad.RANGO_TEMP_MAX));
+        restricciones.add(rangoFisico("pH", ParametrosSeguridad.RANGO_PH_MIN, ParametrosSeguridad.RANGO_PH_MAX));
+        restricciones.add(rangoFisico("conductividad", ParametrosSeguridad.RANGO_CE_MIN, ParametrosSeguridad.RANGO_CE_MAX));
+        restricciones.add(rangoFisico("luz", ParametrosSeguridad.RANGO_LUZ_MIN, ParametrosSeguridad.RANGO_LUZ_MAX));
+        return List.copyOf(restricciones);
+    }
+
+    private static RestriccionCruzada rangoFisico(String magnitud, DefinicionParametro min, DefinicionParametro max) {
+        return new RestriccionCruzada(
+                List.of(min.clave(), max.clave()),
+                v -> v.numero(min.clave()) < v.numero(max.clave()),
+                "El mínimo de " + magnitud + " debe ser menor que el máximo.");
+    }
+
+    private static List<RestriccionCruzada> restriccionesDeRiego() {
         return List.of(
                 new RestriccionCruzada(
                         List.of("riego.umbral-critico", "riego.umbral-humedad"),

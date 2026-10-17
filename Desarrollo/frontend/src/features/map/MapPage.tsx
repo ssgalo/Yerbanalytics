@@ -5,7 +5,7 @@
    `?zona=` no hay contexto que mostrar y se vuelve ahí. Por eso adentro
    no hay selector de zonas, sólo "Volver".
 
-   Tres tarjetas: sectores, valores sensados y rustificación. La forma
+   Cuatro tarjetas: sectores, valores sensados, rustificación y bloqueo manual. La forma
    de la grilla decide la disposición: una macro-zona más ancha que alta
    apila las tarjetas a todo el ancho; una más alta que ancha deja los
    sectores a la izquierda, el sensado a la derecha y la rustificación
@@ -19,6 +19,7 @@ import { cx } from '@/components/ui/estado';
 import { SectorsCard } from './components/SectorsCard';
 import { SensingCard } from './components/SensingCard';
 import { HardeningCard } from './components/HardeningCard';
+import { ManualLockCard } from '@/features/manual-lock/ManualLockCard';
 import styles from './MapPage.module.css';
 
 export function MapPage() {
@@ -60,6 +61,7 @@ export function MapPage() {
         />
         <SensingCard className={styles.sensing} zona={zona} wide={wide} />
         <HardeningCard className={styles.hardening} zona={zona} />
+        <ManualLockCard className={styles.lock} zonaId={zona.id} label={`la macro-zona ${zona.id}`} />
       </div>
     </div>
   );

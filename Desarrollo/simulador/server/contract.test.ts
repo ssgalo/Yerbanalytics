@@ -1,7 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VALVE_MAX_DURATION_SEC, valveDurationWarning } from './contract.ts';
+import { VALVE_MAX_DURATION_SEC, toContractUnits, valveDurationWarning } from './contract.ts';
 import * as c from './contract.ts';
+
+// The backend is the one that rejects an impossible reading (S-03): the simulator must be able to publish one.
+test('toContractUnits does not clip impossible values, it only converts the conductivity', () => {
+  assert.deepEqual(
+    toContractUnits({ humSus: 112, temp: -40, phSuelo: 14, ce: 12, uv: 180 }),
+    { humSus: 112, temp: -40, phSuelo: 14, ce: 12000, uv: 180 },
+  );
+});
 
 test('the valve maximum mirrors the contract (1200 s)', () => {
   assert.equal(VALVE_MAX_DURATION_SEC, 1200);
@@ -134,4 +142,42 @@ test('the demo telemetry topic is never matched by the productive wildcard', () 
   const productive = /^nursery\/zone\/[^/]+\/telemetry$/;
   assert.ok(productive.test(c.telemetryTopic('MZ-1')));
   assert.ok(!productive.test(c.demoTelemetryTopic('MZ-1')));
+});
+
+test('the node errors topic and types mirror contrato.h (S-05)', async () => {
+  const c = await import('./contract.ts');
+  assert.equal(c.errorsTopic('MZ-1'), 'nursery/zone/MZ-1/errores');
+  assert.deepEqual([...c.NODE_ERROR_TYPES], ['SIN_CAUDAL', 'CAUDAL_EXCESIVO', 'MEDIASOMBRA_FIN_DE_CARRERA']);
+  assert.deepEqual([...c.SHADE_LIMIT_SWITCHES], ['CERRADA', 'ABIERTA']);
+});
+
+test('a flow error carries the sector and the measured flow', async () => {
+  const { buildNodeError } = await import('./contract.ts');
+  assert.deepEqual(
+    buildNodeError({ nodo: 'SIM-MZ-1', sector: 'MZ-1-012', tipo: 'SIN_CAUDAL', valor: 0 }, 1_760_000_000_000),
+    { nodo: 'SIM-MZ-1', sector: 'MZ-1-012', tipo: 'SIN_CAUDAL', valor: 0, timestamp: 1_760_000_000_000 },
+  );
+});
+
+test('the shade error has no sector: the mesh belongs to the macro-zone', async () => {
+  const { buildNodeError } = await import('./contract.ts');
+  const error = buildNodeError(
+    { nodo: 'SIM-MZ-1', sector: 'MZ-1-012', tipo: 'MEDIASOMBRA_FIN_DE_CARRERA', valor: 'CERRADA' },
+    1_760_000_000_000,
+  );
+  assert.equal(error.sector, '');
+  assert.equal(error.valor, 'CERRADA');
+});
+
+test('the contrato.h firmware declares the same error types and topic', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { NODE_ERROR_TYPES } = await import('./contract.ts');
+  let header: string;
+  try {
+    header = await readFile(new URL('../../embebido/comun/contrato.h', import.meta.url), 'utf8');
+  } catch {
+    return; // the firmware is not in this checkout
+  }
+  for (const type of NODE_ERROR_TYPES) assert.ok(header.includes(`"${type}"`), `contrato.h declares ${type}`);
+  assert.ok(header.includes('nursery/zone/%s/errores'));
 });

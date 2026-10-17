@@ -100,6 +100,18 @@ struct Ack {
 };
 
 // ----------------------------------------------------------------------------
+//  Error del nodo (contrato.h, sección "Errores del nodo", S-05)
+// ----------------------------------------------------------------------------
+//  Una falla que el nodo detectó y ya cortó por su cuenta. Se publica UNA vez por evento.
+struct ErrorNodo {
+  char  tipo[32];           // ERROR_SIN_CAUDAL | ERROR_CAUDAL_EXCESIVO | ERROR_MEDIASOMBRA_FIN_DE_CARRERA
+  int   sector;             // 1 o 2 en los de caudal; 0 en el de la mediasombra (es de la macro-zona)
+  bool  valorNumerico;      // true: 'caudal' (L/h); false: 'valor' (qué final de carrera falló)
+  float caudal;             // L/h medidos (sólo si valorNumerico)
+  char  valor[16];          // "CERRADA" | "ABIERTA" (sólo si !valorNumerico)
+};
+
+// ----------------------------------------------------------------------------
 //  Riel de la cámara (contrato.h, sección "Riel")
 // ----------------------------------------------------------------------------
 enum class AccionRiel { NINGUNA, IR_A, HOME };
@@ -133,6 +145,7 @@ struct SistemaColas {
   QueueHandle_t ack;          // Ack                (actuación/callback -> red)
   QueueHandle_t comandoRiel;  // ComandoRiel, largo 1 (callback -> riel; xQueueOverwrite: el último gana)
   QueueHandle_t eventoRiel;   // EventoRiel         (riel -> red)
+  QueueHandle_t error;        // ErrorNodo          (actuación -> red); nullptr en el nodo sensor
 };
 
 #endif  // TIPOS_H

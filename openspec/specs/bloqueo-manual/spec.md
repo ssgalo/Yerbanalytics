@@ -1,8 +1,15 @@
 # bloqueo-manual
 
 > **Estado de implementación:**
-> - ✅ **Motor (backend):** `BloqueoManualEntity`, `BloqueoManualRepository`, `BloqueoManualRule` están implementados. `NurseryService` y `NurseryWatchdog` consultan el repositorio en cada ciclo.
-> - ❌ **REST API:** No existe `BloqueoController`. Los endpoints `GET/POST/DELETE /api/bloqueos` y el registro de bloqueos en historial son **pendientes de implementación**.
+> - ✅ **Motor (backend):** `ManualLockEntity`, `ManualLockRepository`, `ManualLockRule`. `NurseryService` y `DespachoRiego` consultan el repositorio.
+> - ✅ **REST API** (`add-bloqueo-manual`): `ManualLockController` + `ManualLockService`. `GET/POST /api/bloqueos` y `DELETE /api/bloqueos/{id}`.
+> - **Desvíos respecto del texto original, decididos al implementar:**
+>   - Un bloqueo de **sector** se guarda con `zonaId = null` (la respuesta informa la zona). El motor y el despacho tratan
+>     cualquier bloqueo con `zonaId` como bloqueo de toda la zona: guardar los dos bloquearía la zona entera.
+>   - Quién activa sale de la **sesión**, no del cuerpo (`activadoPor` ya no se envía).
+>   - Activar y reanudar dejan una **alerta `INFO`** en el historial (no un evento de tipo `BloqueoManual`).
+>   - Un segundo bloqueo sobre el mismo alcance es `409`.
+>   - Activar cierra válvulas y bombas del alcance y cancela el riego encolado; reanudar no repone nada.
 
 ## Purpose
 

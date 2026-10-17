@@ -130,6 +130,38 @@ public class MqttConfig {
                 .get();
     }
 
+    // -------------------------------------------------------------------------
+    // Inbound de los errores del nodo: fallas que el ESP32 detecta y publica una vez por evento
+    // (nursery/zone/{zona}/errores, S-05)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Adaptador propio, como el del riel y el de los acks: el camino de la telemetría queda idéntico. Su clientId
+     * lleva sufijo {@code -errores} para no colisionar sesiones en el broker.
+     */
+    @Bean(name = "mqttErrorChannel")
+    public MessageChannel mqttErrorChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MqttPahoMessageDrivenChannelAdapter errorInboundAdapter(MqttPahoClientFactory factory) {
+        MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
+                clientId + "-errores", factory, ContratoNodo.TOPIC_ERRORS_SUBSCRIPTION);
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        adapter.setOutputChannel(mqttErrorChannel());
+        return adapter;
+    }
+
+    @Bean
+    public IntegrationFlow mqttErrorFlow() {
+        return IntegrationFlow.from(mqttErrorChannel())
+                .handle("nodeErrorReceiver", "processMessage")
+                .get();
+    }
+
     /**
      * Segunda suscripción al <strong>mismo</strong> tópico de telemetría que la ingesta, con su propio
      * cliente ({@code -lectura}): así la telemetría que alimenta al motor queda byte a byte igual y la

@@ -25,7 +25,7 @@ import java.util.List;
 /**
  * Controls the shade netting (mediasombra) based on the hardening plan and UV radiation (HU-08).
  *
- * <p><b>Priority:</b> 12 — executor, runs after irrigation and supply rules.
+ * <p><b>Priority:</b> 14 — executor, runs after irrigation and supply rules.
  *
  * <p><b>Primary condition — Hardening plan:</b> if a stage plan exists and the sector's
  * current opening differs from the prescribed opening for the current day of the cycle,
@@ -45,7 +45,7 @@ import java.util.List;
 public class ShadingRule implements Rule {
 
     private static final Logger log = LoggerFactory.getLogger(ShadingRule.class);
-    private static final int PRIORITY = 12;
+    private static final int PRIORITY = 14;
     private static final String NAME = "ShadingRule";
 
     private final RustificacionEtapaRepository hardeningStageRepository;

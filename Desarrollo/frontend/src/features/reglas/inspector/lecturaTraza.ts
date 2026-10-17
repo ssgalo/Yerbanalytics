@@ -68,6 +68,7 @@ const QUE_HACE: Record<string, string> = {
 const QUE_CORTA: Record<string, string> = {
   ABORT_RIEGO: 'la rama de riego',
   ABORT_INSUMO: 'la rama de insumos',
+  ABORT_MEDIASOMBRA: 'la rama de mediasombra',
   ABORT_ALL: 'todo el motor',
 };
 

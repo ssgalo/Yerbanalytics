@@ -36,7 +36,7 @@ const regla = (t: TrazaEvaluacion, id: string): TrazaRegla => {
 };
 
 describe('evaluarMotor · forma de la traza', () => {
-  it('trae las 13 reglas, en orden de prioridad, con el origen y el sector', () => {
+  it('trae las 16 reglas, en orden de prioridad, con el origen y el sector', () => {
     const t = evaluarMotor(catalogo, base);
 
     expect(t.reglas.map((r) => r.ruleId)).toEqual(catalogo.reglas.map((r) => r.id));
@@ -44,7 +44,7 @@ describe('evaluarMotor · forma de la traza', () => {
     expect(t.zonaId).toBe('MZ-1');
     expect(t.origen).toBe('TELEMETRIA');
     expect(t.ts).toBe(base.ts);
-    expect(t.reglas).toHaveLength(13);
+    expect(t.reglas).toHaveLength(16);
   });
 
   it('es determinística', () => {
@@ -464,5 +464,26 @@ describe('evaluarMotor · diagnóstico nuevo', () => {
   it('con un diagnóstico nuevo la dosificación se evalúa', () => {
     expect(regla(evaluarMotor(catalogo, { ...critico, diagnosticoNuevo: true }), 'SupplyRule').estado).toBe('EVALUADA');
     expect(regla(evaluarMotor(catalogo, critico), 'SupplyRule').estado).toBe('EVALUADA');
+  });
+});
+
+describe('evaluarMotor · reglas de falla de hardware (S-05)', () => {
+  it('la demo no tiene dispositivos averiados: las dos reglas confirman que la cadena sigue', () => {
+    const t = evaluarMotor(catalogo, base);
+
+    for (const id of ['HydraulicFaultRule', 'ShadeFaultRule']) {
+      const r = t.reglas.find((x) => x.ruleId === id)!;
+      expect(r.estado).toBe('EVALUADA');
+      expect(r.acciones.map((a) => a.tipo)).toEqual(['NOOP_INFO']);
+      expect(r.comparaciones).toHaveLength(1);
+      expect(r.comparaciones[0].resultado).toBe('CUMPLE');
+    }
+  });
+
+  it('la falla hidráulica corre antes que las reglas de riego y la de la malla antes que la que la mueve', () => {
+    const orden = evaluarMotor(catalogo, base).reglas.map((r) => r.ruleId);
+
+    expect(orden.indexOf('HydraulicFaultRule')).toBeLessThan(orden.indexOf('DeficitCriticoRule'));
+    expect(orden.indexOf('ShadeFaultRule')).toBeLessThan(orden.indexOf('ShadingRule'));
   });
 });

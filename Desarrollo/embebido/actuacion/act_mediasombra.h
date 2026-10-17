@@ -30,6 +30,19 @@ bool comenzar(const Comando& cmd, Ack& ack);
 // 'out' (llamar en bucle hasta que devuelva false).
 bool atender(Ack& out);
 
+// Estado real de los dos finales de carrera de la malla (S-05). Con ambos activos a la vez, o ninguno, el cableado o
+// los sensores están mal; el firmware lo informa en el log del error.
+struct EstadoFinesDeCarrera {
+  bool cerrada;   // la malla está desenrollada: cubre
+  bool abierta;   // la malla está enrollada: deja pasar el sol
+};
+EstadoFinesDeCarrera estadoFines();
+
+// Si hay una falla del final de carrera que todavía no se informó por el tópico de errores, devuelve true y deja en
+// 'valor' (>= 8 bytes) cuál falló: VALOR_FIN_CERRADA (la malla no llegó a cerrar) o VALOR_FIN_ABIERTA (no llegó a abrir).
+// Se informa UNA vez por evento: no se repite hasta que un movimiento termina bien.
+bool tomarFallaPendiente(char* valor, size_t n);
+
 }  // namespace act_mediasombra
 
 #endif  // ACT_MEDIASOMBRA_H
