@@ -161,8 +161,14 @@ function leerReglasDelBackend(): Record<string, string> {
   return fuentes;
 }
 
-/** Consumidores de parámetros que no son reglas (hoy sólo el despacho de riego): también entran en `usadoPor`. */
-const ARCHIVO_DESPACHO = resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java');
+/**
+ * Consumidores de parámetros que no son reglas (el despacho de riego y la purga del historial de lecturas): también
+ * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
+ */
+const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
+  DespachoRiego: resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java'),
+  PurgaLecturas: resolve(DIR_ENGINE, '..', 'lecturas', 'PurgaLecturas.java'),
+};
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
   const constantes = new Map([
@@ -198,9 +204,12 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));
     const fuentes = leerReglasDelBackend();
     const delBackend = parametrosPorRegla(fuentes, constantes);
-    const despacho = existsSync(ARCHIVO_DESPACHO)
-      ? parametrosPorRegla({ DespachoRiego: readFileSync(ARCHIVO_DESPACHO, 'utf8') }, constantes).DespachoRiego
-      : [];
+    const fuentesNoRegla = Object.fromEntries(
+      Object.entries(CONSUMIDORES_QUE_NO_SON_REGLA)
+        .filter(([, archivo]) => existsSync(archivo))
+        .map(([id, archivo]) => [id, readFileSync(archivo, 'utf8')]),
+    );
+    const noRegla = parametrosPorRegla(fuentesNoRegla, constantes);
 
     it('el fixture tiene exactamente las reglas del backend, con su prioridad', () => {
       const prioridades = Object.fromEntries(
@@ -218,10 +227,12 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
       }
     });
 
-    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y el despacho) del backend', () => {
+    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y los demás consumidores) del backend', () => {
       for (const p of catalogo.parametros) {
         const esperado = catalogo.reglas.filter((r) => delBackend[r.id].includes(p.clave)).map((r) => r.id);
-        if (despacho.includes(p.clave)) esperado.push('DespachoRiego');
+        for (const [id, claves] of Object.entries(noRegla)) {
+          if (claves.includes(p.clave)) esperado.push(id);
+        }
         expect({ clave: p.clave, usadoPor: [...p.usadoPor].sort() }).toEqual({
           clave: p.clave,
           usadoPor: esperado.sort(),
