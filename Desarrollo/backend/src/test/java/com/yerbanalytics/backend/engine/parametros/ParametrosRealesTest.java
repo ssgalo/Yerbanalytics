@@ -40,6 +40,7 @@ class ParametrosRealesTest {
             Map.entry("riego.umbral-humedad", 45.0),                 // reglas_v2 §11 (era 42, idealMin de humSus)
             Map.entry("riego.lluvia-probabilidad", 70.0),            // reglas_v2 §11 (era 60)
             Map.entry("insumo.max-dosis-24h", 1.0),                  // DailyDoseLimitRule:80
+            Map.entry("insumo.dosis-ml", 10.0),                      // INSUMO_SEG_POR_DEFECTO 10 s del firmware, a 1 s por ml
             Map.entry("mediasombra.uv-umbral", 7.0),                 // uv-threshold
             Map.entry("mediasombra.apertura-proteccion-uv", 30.0),   // ShadingRule:90
             Map.entry("mediasombra.apertura-maxima", 100.0),         // configuracion_operativa
@@ -130,6 +131,17 @@ class ParametrosRealesTest {
         assertThat(d.min()).isEqualTo(50.0);
         assertThat(d.max()).isEqualTo(95.0);
         assertThat(d.refSpec()).contains("reglas_v2");
+    }
+
+    @Test
+    void laDosisDeInsumoVaDe1a50MlComoElTopeDelFirmware() {
+        DefinicionParametro d = catalogo.definicion("insumo.dosis-ml").orElseThrow();
+
+        assertThat(d.familia()).isEqualTo(FamiliaParametro.INSUMO);
+        assertThat(d.tipo()).isEqualTo(TipoParametro.ENTERO);
+        assertThat(d.unidad()).isEqualTo("ml");
+        assertThat(d.min()).isEqualTo(1.0);
+        assertThat(d.max()).isEqualTo((double) com.yerbanalytics.backend.mqtt.ContratoNodo.BOMBA_ML_MAX);
     }
 
     @Test

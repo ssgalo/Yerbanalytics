@@ -165,6 +165,7 @@ describe('filtrarParametros (vista por parámetro)', () => {
       'diagnostico.confianza-minima',
     ]);
     expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'SupplyRule' }).map((p) => p.clave)).toEqual([
+      'insumo.dosis-ml',
       'diagnostico.confianza-minima',
     ]);
   });

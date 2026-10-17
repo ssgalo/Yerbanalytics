@@ -81,6 +81,14 @@ test('a pump ON without parameters runs the firmware default', async () => {
   assert.equal(r.ack.detalle.durationSec, INPUT_DEFAULT_SEC);
 });
 
+test('a pump ON with ml (the dose the backend decides) runs ml x seconds-per-ml and echoes the ml', async () => {
+  const { simulatedAck, INPUT_SEC_PER_ML } = await import('./contract.ts');
+  const r = simulatedAck({ commandId: 'p2', actuador: 'pump', accion: 'ON', parametros: { ml: 10 } });
+  assert.equal(r.delayMs, 10 * INPUT_SEC_PER_ML * 1000);
+  assert.equal(r.ack.status, 'SUCCESS');
+  assert.equal(r.ack.detalle.ml, 10);
+});
+
 test('a shade SET is acked with the reached opening (two states)', async () => {
   const { simulatedAck } = await import('./contract.ts');
   assert.equal(simulatedAck({ commandId: 's1', actuador: 'shade', accion: 'SET', parametros: { targetPct: 70 } }).ack.detalle.targetPct, 100);

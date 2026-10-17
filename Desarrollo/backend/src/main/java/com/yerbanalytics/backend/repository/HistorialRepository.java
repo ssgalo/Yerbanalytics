@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface HistorialRepository extends JpaRepository<HistorialEventoEntity, String> {
@@ -129,4 +130,13 @@ public interface HistorialRepository extends JpaRepository<HistorialEventoEntity
               AND h.ts >= :desde
             """)
     List<HistorialEventoEntity> riegosDesde(@Param("desde") long desde);
+
+    /**
+     * Eventos de un tipo y regla desde {@code desde}: con los "RiegoCortado" el despacho descarta, al reconstruir
+     * tras un reinicio, los riegos que ya se cortaron.
+     */
+    List<HistorialEventoEntity> findByTipoAndReglaAndTsGreaterThanEqual(String tipo, String regla, long desde);
+
+    /** La última fila de un tipo para un sector (p. ej. la última dosis de insumo), o vacío si no hay. */
+    Optional<HistorialEventoEntity> findFirstBySectorIdAndTipoOrderByTsDesc(String sectorId, String tipo);
 }

@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
+import com.yerbanalytics.backend.engine.parametros.ParametrosInsumo;
 import com.yerbanalytics.backend.engine.rules.SupplyRule;
 import com.yerbanalytics.backend.engine.traza.Comparacion;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -79,7 +80,7 @@ class SupplyRuleTest {
 
     @Test
     void declaraLaConfianzaMinimaDelDiagnostico() {
-        assertThat(rule.parametros()).containsExactly(ParametrosDiagnostico.CONFIANZA_MINIMA);
+        assertThat(rule.parametros()).containsExactly(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosInsumo.DOSIS_ML);
     }
 
     @Test
@@ -127,5 +128,20 @@ class SupplyRuleTest {
                 ev(rule, java.util.Map.of(ParametrosDiagnostico.CONFIANZA_MINIMA, "95")));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);
+    }
+
+    @Test
+    void laOrdenDeBombaLlevaLaDosisDelCatalogo() {
+        List<RuleAction> acciones = evaluar(rule, con("critical", 90.0));
+
+        assertThat(acciones.get(0).detalle()).isEqualTo(new DetalleInsumo(10));
+    }
+
+    @Test
+    void laDosisSaleDelCatalogoYNoDeUnaConstante() {
+        List<RuleAction> acciones = rule.evaluate(con("critical", 90.0),
+                ev(rule, java.util.Map.of(ParametrosInsumo.DOSIS_ML, "25")));
+
+        assertThat(acciones.get(0).detalle()).isEqualTo(new DetalleInsumo(25));
     }
 }

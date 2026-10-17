@@ -125,7 +125,8 @@
       "rama": "INSUMO",
       "prioridad": 12,
       "parametros": [
-        "diagnostico.confianza-minima"
+        "diagnostico.confianza-minima",
+        "insumo.dosis-ml"
       ]
     },
     {
@@ -730,6 +731,26 @@
       "modificado": false,
       "usadoPor": [
         "DailyDoseLimitRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.dosis-ml",
+      "etiqueta": "Dosis de insumo por aplicación",
+      "descripcion": "Mililitros que dosifica la bomba peristáltica en cada aplicación. El backend se lo manda al nodo en el comando; el firmware no acepta más de 50 ml por comando.",
+      "familia": "INSUMO",
+      "tipo": "ENTERO",
+      "unidad": "ml",
+      "valor": "10",
+      "fabrica": "10",
+      "min": 1.0,
+      "max": 50.0,
+      "decimales": 0,
+      "refSpec": "add-dosificacion-base (parcial); firmware LIMITE_BOMBA_ML_MAX",
+      "modificado": false,
+      "usadoPor": [
+        "SupplyRule"
       ],
       "updatedBy": null,
       "updatedTs": null

@@ -141,7 +141,7 @@ class ZoneSafeStateTest {
     void ordersAreWatchedByTheFollowUp() {
         SeguimientoComandosService followUp = new SeguimientoComandosService(
                 mock(HistorialService.class), mock(ZonaRepository.class), mock(HardwareFaultService.class),
-                Clock.systemUTC(), 90_000L);
+                Clock.systemUTC(), 90_000L, mock(org.springframework.context.ApplicationEventPublisher.class));
         ComandoActuadorPublisher real = new ComandoActuadorPublisher(
                 mock(MqttCommandGateway.class), new ObjectMapper(), followUp);
         ZoneSafeState withFollowUp = new ZoneSafeState(sectors, new ActuatorShutdown(devices, real));

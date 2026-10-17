@@ -7,7 +7,9 @@ import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleRiego;
+import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
@@ -130,8 +132,52 @@ public class HistorialService {
         historialRepository.save(e);
     }
 
+    /** Regla con la que queda en el historial un riego que se cortó antes de tiempo (ver {@link #registrarCorteRiego}). */
+    public static final String REGLA_RIEGO_CORTADO = "RiegoCortado";
+
+    /**
+     * Deja constancia de que el riego de un sector se cortó antes de tiempo (OFF manual, protección del nodo): una
+     * alerta INFO como las demás, pero con el {@code sectorId} real. Es lo que lee {@code DespachoRiego} al
+     * reconstruir, tras un reinicio, qué válvulas siguen abiertas: un riego anterior a este corte no cuenta.
+     */
+    public void registrarCorteRiego(String zonaId, String zonaName, String sectorId, long ts) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(sectorId);
+        e.setZonaId(zonaId);
+        e.setZonaName(zonaName != null ? zonaName : zonaId);
+        e.setTipo("Alerta");
+        e.setTs(ts);
+        e.setRegla(REGLA_RIEGO_CORTADO);
+        e.setAlerta(NivelAlerta.INFO.name());
+        e.setLectura("El nodo informó que el riego del sector " + sectorId + " se cortó (ack cancelado).");
+        e.setDecision("Riego cortado antes de tiempo: algo cerró la válvula fuera del backend (comando manual o protección del nodo).");
+        e.setAccion("El sector deja de figurar como regando y vuelve a poder regarse.");
+        e.setRes("Informativo");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra una dosificación de insumo de {@code ml} mililitros. Guarda la duración de la bomba
+     * ({@code ml × BOMBA_INSUMO_MS_POR_ML}) para que {@code SupplyDoseService} sepa cuándo la dosis ya terminó
+     * aunque el nodo no mande el ack.
+     */
+    public void registrarInsumo(SectorEntity s, int ml) {
+        HistorialEventoEntity e = armarInsumo(s);
+        e.setDuracionSeg((int) Math.ceil(ml * ContratoNodo.BOMBA_INSUMO_MS_POR_ML / 1000.0));
+        e.setDecision(e.getDecision() + " Dosis: " + ml + " ml.");
+        historialRepository.save(e);
+    }
+
     /** Registra una dosificación de insumo, con seguimiento de la métrica afectada. */
     public void registrarInsumo(SectorEntity s) {
+        historialRepository.save(armarInsumo(s));
+    }
+
+    private HistorialEventoEntity armarInsumo(SectorEntity s) {
         Double humSus = currentMetric(s, "humSus");
         double hum = humSus != null ? humSus : 0.0;
         Double conf = s.getDiagnosisConf();
@@ -141,7 +187,7 @@ public class HistorialService {
         e.setDecision("Confianza sobre el umbral: el motor habilita la dosificación localizada.");
         e.setAccion("Bomba peristáltica inyectando insumo en la línea del sector.");
         withSeguimiento(e, hum);
-        historialRepository.save(e);
+        return e;
     }
 
     private HistorialEventoEntity base(SectorEntity s, String tipo, String res) {
