@@ -2,7 +2,7 @@
 
 ## Estado verificado
 - No existe regla ni servicio de nutrición. La CE llega como métrica de la zona (`ce`, µS/cm → persistida en dS/m).
-- Verificado: no hay historial de lecturas. N-02 usa `HistorialLecturas.media(zona, "ce", 24 h, soloPulso=true)` de
+- Verificado: no hay historial de lecturas. N-02 usa `ReadingHistory.average(zone, ReadingMetric.CE, window)` (24 h, `onlyPulse()`) de
   `add-historial-lecturas`, que es prerrequisito.
 
 ## Decisiones

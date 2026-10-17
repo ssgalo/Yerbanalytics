@@ -6,7 +6,7 @@ aplicarla, la hora del nodo y el origen de la lectura.
 
 #### Scenario: Lectura completa
 - **WHEN** MZ-1 envía una lectura con las diez métricas
-- **THEN** se guarda una fila con esos valores y origen `PULSO` si respondía a un pulso
+- **THEN** se guarda una fila con esos valores y origen `PULSE` si respondía a un pulso
 
 #### Scenario: Lectura parcial
 - **WHEN** MZ-1 envía sólo humedad de sustrato y la temperatura vigente era 24 °C
@@ -41,7 +41,7 @@ ventana de tiempo, con filtro opcional por franja horaria local, devolviendo "si
 - **THEN** el conteo permite a la regla registrar "sin dato"
 
 ### Requirement: Retención del historial
-El sistema SHALL conservar las lecturas durante `lecturas.retencion-dias` (fábrica 14 días) y SHALL borrar las más viejas
+El sistema SHALL conservar las lecturas durante `readings.retention-days` (fábrica 14 días) y SHALL borrar las más viejas
 con una tarea diaria.
 
 #### Scenario: Purga

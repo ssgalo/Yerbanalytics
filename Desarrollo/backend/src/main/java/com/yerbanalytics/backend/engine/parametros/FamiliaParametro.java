@@ -6,5 +6,6 @@ public enum FamiliaParametro {
     RIEGO,
     INSUMO,
     MEDIASOMBRA,
-    DIAGNOSTICO
+    DIAGNOSTICO,
+    READINGS
 }

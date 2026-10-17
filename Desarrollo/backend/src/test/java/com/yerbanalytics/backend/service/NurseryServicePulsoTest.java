@@ -73,6 +73,7 @@ class NurseryServicePulsoTest {
         sectorRepository = mock(SectorRepository.class);
         actionExecutor = mock(ActionExecutor.class);
         pulsos = mock(PulsoSensadoService.class);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(PulsoSensadoService.PulseResponse.NONE);
         escalamiento = mock(EscalamientoNodoService.class);
         DespachoRiego despacho = mock(DespachoRiego.class);
         when(despacho.finRiegoEnCurso(any())).thenReturn(null);
@@ -113,7 +114,7 @@ class NurseryServicePulsoTest {
                 mock(HistorialService.class), configuracion, mock(HardwareService.class),
                 mock(TopologiaLayoutRepository.class), orchestrator, actionExecutor, mock(WeatherService.class),
                 mock(ManualLockRepository.class), mock(DiagnosticoService.class), new TrazaEvaluacionStore(),
-                mock(HistorialRepository.class), despacho, pulsos, escalamiento, RELOJ, 20);
+                mock(HistorialRepository.class), despacho, pulsos, escalamiento, mock(com.yerbanalytics.backend.readings.ReadingRecorder.class), RELOJ, 20);
     }
 
     private void telemetria() {
@@ -124,7 +125,7 @@ class NurseryServicePulsoTest {
     @Test
     @DisplayName("fuera de un pulso con motor: persiste la lectura y el estado de los sectores, sin motor")
     void sinPulsoConMotor_noEvalua() {
-        when(pulsos.respondePulso(anyString(), anyLong())).thenReturn(false);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(PulsoSensadoService.PulseResponse.NONE);
         sector.setStatus("critical");
 
         telemetria();
@@ -140,7 +141,7 @@ class NurseryServicePulsoTest {
     @Test
     @DisplayName("la lectura no toca el diagnóstico del sector")
     void laLecturaNoPisaElDiagnostico() {
-        when(pulsos.respondePulso(anyString(), anyLong())).thenReturn(true);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(new PulsoSensadoService.PulseResponse(true, true));
 
         telemetria();
 
@@ -152,7 +153,7 @@ class NurseryServicePulsoTest {
     @Test
     @DisplayName("primer pulso con un diagnóstico nuevo lo usa y lo marca; el siguiente lo omite")
     void diagnosticoNuevoSeUsaUnaVez() {
-        when(pulsos.respondePulso(anyString(), anyLong())).thenReturn(true);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(new PulsoSensadoService.PulseResponse(true, true));
         sector.setDiagnosisTs(AHORA.toEpochMilli() - 3_600_000L);
 
         telemetria();
@@ -166,7 +167,7 @@ class NurseryServicePulsoTest {
     @Test
     @DisplayName("sin diagnóstico nuevo, la regla de diagnóstico no corre y no se marca nada")
     void sinDiagnosticoNuevo_noMarca() {
-        when(pulsos.respondePulso(anyString(), anyLong())).thenReturn(true);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(new PulsoSensadoService.PulseResponse(true, true));
 
         telemetria();
 

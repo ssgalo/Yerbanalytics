@@ -144,25 +144,40 @@ public class PulsoSensadoService {
         return Optional.ofNullable(enCurso).map(e -> e.pulso);
     }
 
+    /** Lo que significa una telemetría para el pulso en curso: si lo responde y si corresponde ejecutar el motor. */
+    public record PulseResponse(boolean responded, boolean runsEngine) {
+        /** No responde a ningún pulso (no hay uno, es anterior al pedido o la zona ya respondió). */
+        public static final PulseResponse NONE = new PulseResponse(false, false);
+    }
+
     /**
      * La telemetría de {@code zonaId} recibida a {@code recepcionMs}, ¿responde al pulso en curso? Si es la primera
      * de esa zona desde el pedido, la marca como respondida (atómicamente: dos telemetrías simultáneas no responden
-     * las dos) y devuelve si corresponde ejecutar el motor. Una telemetría anterior al pedido, una segunda respuesta
-     * o una fuera de pulso devuelven {@code false}.
+     * las dos) y dice si corresponde ejecutar el motor. Una telemetría anterior al pedido, una segunda respuesta
+     * o una fuera de pulso devuelven {@link PulseResponse#NONE}.
+     *
+     * <p>Distingue "respondió a un pulso sin motor" de "no respondió a ninguno", que {@link #respondePulso} no puede:
+     * el historial de lecturas necesita saberlo para marcar su origen. Es una sola operación porque marcar la
+     * respuesta tiene efecto: consultar dos veces haría que la segunda dijera que no.
      */
-    public synchronized boolean respondePulso(String zonaId, long recepcionMs) {
+    public synchronized PulseResponse recordResponse(String zonaId, long recepcionMs) {
         if (enCurso == null || recepcionMs < enCurso.pulso.pedidoEn()) {
-            return false;
+            return PulseResponse.NONE;
         }
         if (enCurso.pendientes.remove(zonaId) == null) {
-            return false;
+            return PulseResponse.NONE;
         }
         boolean motor = enCurso.pulso.ejecutaMotor();
         if (enCurso.pendientes.isEmpty()) {
             log.info("Pulso {}: respondieron todas las zonas.", enCurso.pulso.id());
             enCurso = null;
         }
-        return motor;
+        return new PulseResponse(true, motor);
+    }
+
+    /** Sólo si hay que ejecutar el motor; ver {@link #recordResponse} para la respuesta completa. */
+    public boolean respondePulso(String zonaId, long recepcionMs) {
+        return recordResponse(zonaId, recepcionMs).runsEngine();
     }
 
     /**

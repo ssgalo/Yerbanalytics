@@ -26,7 +26,7 @@ export const DESCRIPCION_RAMA: Record<RamaRegla, string> = {
 };
 
 /**
- * Consumidores de parámetros que no son reglas (hoy el despacho de riego): el backend los lista en
+ * Consumidores de parámetros que no son reglas (el despacho de riego y la purga del historial de lecturas): el backend los lista en
  * `usadoPor` junto a las reglas. Se muestran en su propio grupo de la pestaña Parámetros.
  */
 export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string; rama: RamaRegla }> = {
@@ -34,6 +34,11 @@ export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string;
     titulo: 'Ejecución del riego',
     descripcion: 'Cómo se reparten los riegos ordenados entre los sectores de una macro-zona',
     rama: 'RIEGO',
+  },
+  ReadingPurge: {
+    titulo: 'Historial de lecturas',
+    descripcion: 'Cuánto tiempo se conservan las lecturas de cada macro-zona que consultan las reglas',
+    rama: 'GLOBAL',
   },
 };
 

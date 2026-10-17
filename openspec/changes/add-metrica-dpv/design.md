@@ -13,7 +13,7 @@
 humedad está fuera de 0–100 (no inventa un valor). Redondeo a 0,01 kPa al persistir; el cálculo interno no redondea.
 
 ### D-2 — Dónde se persiste
-Columna `dpv` (+ `dpv_ts`) en la zona, junto a las otras 10 métricas, y la columna `dpv` de `lectura_zona` (`add-historial-lecturas`).
+Columna `dpv` (+ `dpv_ts`) en la zona, junto a las otras 10 métricas, y la columna `dpv` de `zone_reading` (`add-historial-lecturas`).
 Se calcula al ingerir cada lectura (no al pedirla), porque las reglas lo leen del `RuleContext`.
 Si la lectura no trae temperatura **o** humedad ambiental, el DPV queda con su valor anterior y su
 `dpv_ts` viejo: las reglas ya comparan frescura por métrica (D-3 de `add-seguridad-lectura-hardware`).
@@ -25,7 +25,7 @@ Es informativo (`afectaEstado: false`), igual que las 5 de la sonda de suelo: no
 Los umbrales de las reglas (0,3 y 2,0) se declaran en el catálogo de cada regla que los use, no acá.
 
 ### D-4 — Consulta para reglas
-Se usa `HistorialLecturas` (`ultimas(zona, n, soloPulso)` y `maximo(zona, "dpv", desde)`) de `add-historial-lecturas`; no se crea un
+Se usa `ReadingHistory` (`latest(zone, n, onlyPulse)` y `max(zone, ReadingMetric.DPV, window)`) de `add-historial-lecturas`; no se crea un
 `DpvHistorial` propio. Sin lecturas suficientes ⇒ lista corta y la regla registra `SIN_DATO`.
 
 ### D-5 — Frontend

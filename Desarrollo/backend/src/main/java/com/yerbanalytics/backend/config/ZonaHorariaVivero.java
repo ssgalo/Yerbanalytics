@@ -9,7 +9,10 @@ import java.time.ZoneId;
  */
 public final class ZonaHorariaVivero {
 
-    public static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
+    /** El identificador, para donde se necesita una constante (p. ej. {@code @Scheduled(zone = ...)}). */
+    public static final String ID = "America/Argentina/Buenos_Aires";
+
+    public static final ZoneId ZONA = ZoneId.of(ID);
 
     private ZonaHorariaVivero() {
     }

@@ -9,7 +9,7 @@ F-S2 requiere `add-mediasombra-v2`.
 - [ ] 0.3 Confirmar que `add-historial-lecturas` y `ZoneRuleEngine` (de `add-mediasombra-v2`) están integrados.
 
 ## 1. Historial de lecturas
-- [ ] 1.1 Test de integración: `HistorialLecturas.maximo/media` por ventana y franja horaria (10–16 h) con los valores que usa F-S1/F-S3.
+- [ ] 1.1 Test de integración: `ReadingHistory.max/average` por ventana y franja horaria (10–16 h) con los valores que usa F-S1/F-S3.
 
 ## 2. Parámetros
 - [ ] 2.1 Test y catálogo (D-7) con restricciones cruzadas; frontend.

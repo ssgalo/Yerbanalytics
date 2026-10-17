@@ -149,6 +149,52 @@ class PulsoSensadoServiceTest {
         assertThat(service.respondePulso("MZ-1", ms(0))).isFalse();
     }
 
+    // --- recordResponse (la respuesta completa: si respondió y si ejecuta el motor) ---
+
+    @Test
+    @DisplayName("un pulso con motor: la primera respuesta responde y ejecuta el motor")
+    void recordResponse_withEngine() {
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+
+        var r = service.recordResponse("MZ-1", ms(2));
+
+        assertThat(r.responded()).isTrue();
+        assertThat(r.runsEngine()).isTrue();
+    }
+
+    @Test
+    @DisplayName("un pulso sin motor: la primera respuesta responde pero NO ejecuta el motor")
+    void recordResponse_withoutEngineStillAnswersThePulse() {
+        service.iniciar(OrigenPulso.MANUAL, false);
+
+        var r = service.recordResponse("MZ-1", ms(2));
+
+        assertThat(r.responded()).isTrue();
+        assertThat(r.runsEngine()).isFalse();
+    }
+
+    @Test
+    @DisplayName("fuera de un pulso, la second respuesta de la zona o una anterior al pedido no responden")
+    void recordResponse_nothingToAnswer() {
+        assertThat(service.recordResponse("MZ-1", ms(0)).responded()).isFalse();
+
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+        assertThat(service.recordResponse("MZ-1", ms(-5)).responded()).isFalse();
+        assertThat(service.recordResponse("MZ-1", ms(1)).responded()).isTrue();
+        var second = service.recordResponse("MZ-1", ms(5));
+        assertThat(second.responded()).isFalse();
+        assertThat(second.runsEngine()).isFalse();
+    }
+
+    @Test
+    @DisplayName("recordResponse y respondePulso comparten la marca: la zona responde una sola vez")
+    void recordResponse_andRespondePulsoShareTheMark() {
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+
+        assertThat(service.respondePulso("MZ-1", ms(1))).isTrue();
+        assertThat(service.recordResponse("MZ-1", ms(2)).responded()).isFalse();
+    }
+
     @Test
     void elPulsoTerminaCuandoRespondenTodasLasZonas() {
         service.iniciar(OrigenPulso.PROGRAMADO, true);

@@ -31,7 +31,7 @@ cae ≥ umbral).
 A los `efectividad.verificacion-min` (30 min, 15–60) del cierre del riego del **sector del nodo testigo**, el servicio
 publica `LEER_AHORA` a la MZ y marca ese pedido como **verificación**: la lectura que llega se usa para el evento y
 **no** pasa por el motor (principio 7). Mecanismo: banderín `verificacionPendiente(zona)` que `NurseryService.updateTelemetry` consulta para fijar
-`ejecutaMotor = false` y origen `OTRA` en el historial de lecturas.
+`ejecutaMotor = false` y origen `OTHER` en el historial de lecturas.
 **Sector del nodo testigo (cambio de alcance):** no se puede identificar (verificado). Se agrega `sectorId` opcional al nodo testigo en el registro de
 hardware (v2 §12.10, "posición del nodo testigo"). Mientras no esté cargado, E-01 evalúa **cualquier riego** de la MZ (aproximación documentada en la traza).
 

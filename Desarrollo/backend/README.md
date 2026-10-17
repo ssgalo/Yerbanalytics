@@ -734,6 +734,34 @@ sin cámara conectada) deja una alerta `WARNING` de la macro-zona del recorrido 
 el dashboard muestra la pestaña. Se guarda en `preferencia_dashboard` (fila única), que crea
 Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de pasada no dependen de él.
 
+## Historial de lecturas
+
+Casi todas las reglas de nutrición y de hongos/plagas/estrés de `reglas_v2` miran el **pasado** de las lecturas
+(CE media de 24 h, humedad media de 48 h, DPV en 2 lecturas seguidas, luz máxima entre las 10 y las 16 h…). La zona sólo
+guarda la última lectura (`*Raw`), así que cada lectura aceptada se anota además en la tabla `zone_reading`.
+
+- **Qué se guarda.** Una fila por lectura aceptada de una macro-zona: las diez métricas **tal como quedan en la zona
+  después de aplicarla** (también las que no vinieron, con su valor vigente; una que nunca se reportó queda nula, no en
+  cero), la hora del nodo, la de recepción y el `origen`. `ce` en dS/m, igual que la zona. `dpv` queda nulo hasta
+  `add-metrica-dpv`. Una lectura anterior a la última guardada (buffer offline del nodo) no entra.
+- **Origen.** `PULSE` = respondió a un pulso de sensado, con o sin motor; `OTHER` = envío manual, verificación de
+  efectividad, secuencia LECTURA, arranque del nodo. Se decide con `PulsoSensadoService.recordResponse`, que a
+  diferencia de `respondePulso` distingue "respondió a un pulso sin motor" de "no respondió a ninguno".
+- **Misma transacción.** `ReadingRecorder` corre dentro de `NurseryService.updateTelemetry`: si falla el guardado, la
+  lectura de la zona tampoco se aplica (mejor eso que una serie con huecos que rompa en silencio "2 lecturas seguidas").
+- **Consultas** (`readings/ReadingHistory`, la única puerta para todas las reglas): `latest(zone, n, onlyPulse)` y
+  `max`/`min`/`average`/`count(zone, ReadingMetric, ReadingWindow)`. La `ReadingWindow` lleva el rango de
+  tiempo, una franja horaria local opcional (la lectura de la hora de fin todavía entra, como en la ventana de riego) y
+  si cuentan sólo las lecturas de pulso. Las medias de "N lecturas" usan `onlyPulse()`; los máximos y medias de una
+  ventana temporal (48 h, 72 h) cuentan todas. **Sin dato no es cero**: sin lecturas los agregados devuelven vacío y el
+  conteo 0, y es la regla la que registra `SIN_DATO` (con menos lecturas de las que exige, igual).
+- **Retención.** Parámetro `readings.retention-days` del catálogo (familia `READINGS`, fábrica 14, rango 3–90, editable
+  por `PUT /api/rules/parametros`). `ReadingPurge` borra lo anterior todos los días a las 03:30 hora del vivero.
+- **Migración.** Ninguna: la tabla la crea Hibernate. Un clon existente arranca con la serie vacía y las reglas dan
+  `SIN_DATO` hasta juntar lecturas; no se reconstruye el pasado.
+- La telemetría que publica el simulador alimenta la serie igual que la de un nodo real (hay un test con el JSON del
+  contrato). Esto no es una regla: no tiene control de demo.
+
 ## Control de reglas desde el simulador (`/api/demo/**`)
 
 Sólo existen con `yerbanalytics.demo.enabled=true`; en producción dan `404` y no hay ningún rastro de

@@ -90,8 +90,9 @@ function leerEnumsDelBackend(): EntradaEnum[] {
   const re =
     /(\w+)\(\s*"([^"]+)",\s*"(?:[^"\\]|\\.)*",\s*"(?:[^"\\]|\\.)*",\s*TipoParametro\.(\w+),\s*"([^"]*)",\s*"([^"]*)",\s*(null|[\d.]+),\s*(null|[\d.]+),\s*(\d+),\s*"(?:[^"\\]|\\.)*"\)/g;
   const out: EntradaEnum[] = [];
-  for (const f of readdirSync(DIR_PARAMETROS).filter((n) => /^Parametros\w+\.java$/.test(n))) {
+  for (const f of readdirSync(DIR_PARAMETROS).filter((n) => n.endsWith('.java'))) {
     const src = readFileSync(resolve(DIR_PARAMETROS, f), 'utf8');
+    if (!/enum \w+ implements DefinicionParametro/.test(src)) continue;
     for (const m of src.matchAll(re)) {
       out.push({
         constante: `${f.replace('.java', '')}.${m[1]}`,
@@ -147,7 +148,7 @@ export function parametrosPorRegla(
   const out: Record<string, string[]> = {};
   for (const [ruleId, src] of Object.entries(fuentes)) {
     const m = /List<DefinicionParametro>\s+parametros\(\)\s*\{\s*return\s+List\.of\(([^;]*)\);/.exec(src);
-    const refs = m ? [...m[1].matchAll(/(Parametros\w+\.\w+)/g)].map((r) => r[1]) : [];
+    const refs = m ? [...m[1].matchAll(/([A-Z]\w*\.[A-Z][A-Z0-9_]*)/g)].map((r) => r[1]) : [];
     out[ruleId] = refs.map((r) => constantes.get(r) ?? `<constante desconocida ${r}>`);
   }
   return out;
@@ -161,8 +162,14 @@ function leerReglasDelBackend(): Record<string, string> {
   return fuentes;
 }
 
-/** Consumidores de parámetros que no son reglas (hoy sólo el despacho de riego): también entran en `usadoPor`. */
-const ARCHIVO_DESPACHO = resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java');
+/**
+ * Consumidores de parámetros que no son reglas (el despacho de riego y la purga del historial de lecturas): también
+ * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
+ */
+const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
+  DespachoRiego: resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java'),
+  ReadingPurge: resolve(DIR_ENGINE, '..', 'readings', 'ReadingPurge.java'),
+};
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
   const constantes = new Map([
@@ -198,9 +205,12 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));
     const fuentes = leerReglasDelBackend();
     const delBackend = parametrosPorRegla(fuentes, constantes);
-    const despacho = existsSync(ARCHIVO_DESPACHO)
-      ? parametrosPorRegla({ DespachoRiego: readFileSync(ARCHIVO_DESPACHO, 'utf8') }, constantes).DespachoRiego
-      : [];
+    const fuentesNoRegla = Object.fromEntries(
+      Object.entries(CONSUMIDORES_QUE_NO_SON_REGLA)
+        .filter(([, archivo]) => existsSync(archivo))
+        .map(([id, archivo]) => [id, readFileSync(archivo, 'utf8')]),
+    );
+    const noRegla = parametrosPorRegla(fuentesNoRegla, constantes);
 
     it('el fixture tiene exactamente las reglas del backend, con su prioridad', () => {
       const prioridades = Object.fromEntries(
@@ -218,10 +228,12 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
       }
     });
 
-    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y el despacho) del backend', () => {
+    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y los demás consumidores) del backend', () => {
       for (const p of catalogo.parametros) {
         const esperado = catalogo.reglas.filter((r) => delBackend[r.id].includes(p.clave)).map((r) => r.id);
-        if (despacho.includes(p.clave)) esperado.push('DespachoRiego');
+        for (const [id, claves] of Object.entries(noRegla)) {
+          if (claves.includes(p.clave)) esperado.push(id);
+        }
         expect({ clave: p.clave, usadoPor: [...p.usadoPor].sort() }).toEqual({
           clave: p.clave,
           usadoPor: esperado.sort(),

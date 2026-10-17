@@ -174,7 +174,7 @@ class RiegoIntegracionTest {
                 configuracion, mock(HardwareService.class), mock(TopologiaLayoutRepository.class), orquestador,
                 executor, clima, bloqueosDelNodo,
                 mock(DiagnosticoService.class), trazas, historialRepository, despacho,
-                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), reloj, 20);
+                PulsosDePrueba.conMotor(), mock(EscalamientoNodoService.class), mock(com.yerbanalytics.backend.readings.ReadingRecorder.class), reloj, 20);
     }
 
     private static String id(int n) {
