@@ -55,6 +55,10 @@ export interface RuleConditionResult {
   /** Diagnosis to register BEFORE the pulse; null if no selected rule needs one. */
   diagnostico: DiagnosisPlan | null;
   needsCooldownReset: boolean;
+  /** The target zone must stop answering LEER_AHORA, and no telemetry is published for it. */
+  silenceZone: boolean;
+  /** Sensing pulses to request, one after the other (at least one). */
+  pulses: number;
   conflictos: string[];
   resumen: string[];
 }
@@ -109,13 +113,24 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
   const conflictos = detectConflicts(selected, ctx);
   const telemetria: Record<string, number> = { ...HEALTHY_TELEMETRY };
   if (conflictos.length > 0) {
-    return { telemetria, clima: null, diagnostico: null, needsCooldownReset: false, conflictos, resumen: [] };
+    return {
+      telemetria,
+      clima: null,
+      diagnostico: null,
+      needsCooldownReset: false,
+      silenceZone: false,
+      pulses: 1,
+      conflictos,
+      resumen: [],
+    };
   }
 
   const claims = new Map<string, TelemetryClaim>();
   const notes: string[] = [];
   let weather: Partial<SimulatedWeather> | null = null;
   let diagnostico: DiagnosisPlan | null = null;
+  let silenceZone = false;
+  let pulses = 1;
 
   for (const scenario of selected) {
     const patch = scenario.apply(ctx);
@@ -126,6 +141,8 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       weather = { ...(weather ?? {}), ...patch.weather };
     }
     diagnostico = patch.diagnosis ?? diagnostico;
+    silenceZone = silenceZone || (patch.silenceZone ?? false);
+    pulses = Math.max(pulses, patch.pulses ?? 1);
     notes.push(...(patch.notes ?? []));
   }
 
@@ -145,6 +162,8 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     clima: weather ? { ...MILD_WEATHER, ...weather } : null,
     diagnostico,
     needsCooldownReset,
+    silenceZone,
+    pulses,
     conflictos,
     resumen,
   };

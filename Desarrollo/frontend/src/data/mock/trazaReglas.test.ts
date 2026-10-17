@@ -413,14 +413,14 @@ describe('evaluarMotor · insumo y mediasombra', () => {
     expect(r.comparaciones[1]).toMatchObject({
       clave: 'diagnostico.confianza-minima',
       recibido: 90,
-      umbral: 85,
+      umbral: 70,
       resultado: 'CUMPLE',
     });
     expect(r.acciones[0].tipo).toBe('ACTIVAR_BOMBA');
   });
 
   it('diagnóstico poco confiable: no dosifica', () => {
-    const r = regla(evaluarMotor(catalogo, { ...base, estadoSector: 'critical', confianza: 70 }), 'SupplyRule');
+    const r = regla(evaluarMotor(catalogo, { ...base, estadoSector: 'critical', confianza: 65 }), 'SupplyRule');
 
     expect(r.comparaciones[1].resultado).toBe('NO_CUMPLE');
     expect(r.acciones[0].tipo).toBe('NOOP_INFO');

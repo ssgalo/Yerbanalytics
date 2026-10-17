@@ -99,7 +99,7 @@ class CatalogoParametrosServiceTest {
         lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
 
         service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
-                operativaRepository, new com.yerbanalytics.backend.config.PulsoProperties());
+                operativaRepository);
     }
 
     private void override(String clave, String valor) {
@@ -161,6 +161,23 @@ class CatalogoParametrosServiceTest {
         assertThat(p.valor()).isEqualTo("50");
         assertThat(p.modificado()).isTrue();
         assertThat(p.updatedBy()).isEqualTo("Ana");
+    }
+
+    @Test
+    void guardar_laConfianzaMinimaRechazaMasDe95PorCiento() {
+        assertThatThrownBy(() -> service.guardar(List.of(cambio("diagnostico.confianza-minima", "97")), "Ana"))
+                .isInstanceOfSatisfying(ParametrosInvalidosException.class, ex ->
+                        assertThat(ex.getErrores()).extracting(ErrorParametro::clave)
+                                .containsExactly("diagnostico.confianza-minima"));
+
+        assertThat(tabla).isEmpty();
+    }
+
+    @Test
+    void vigentes_unaConfianzaMinimaEditadaPorElAgronomoNoSePisaConLaFabricaNueva() {
+        override("diagnostico.confianza-minima", "80");
+
+        assertThat(service.vigentes().numero("diagnostico.confianza-minima")).isEqualTo(80.0);
     }
 
     @Test
@@ -469,6 +486,17 @@ class CatalogoParametrosServiceTest {
         pullInterval(120);
 
         assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
+    }
+
+    @Test
+    void vigentes_laVentanaDeRespuestaSaleDeLosParametrosDeSensado() {
+        pullInterval(240);
+        override("sensado.espera-respuesta", "120");
+        override("sensado.reintentos", "3");
+        override("sensado.espera-reintento", "2");
+
+        // 240 min + 120 s + 3 reintentos × 2 min (120 s cada uno)
+        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(240 * 60 + 120 + 3 * 120);
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService.OrigenPulso;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService.PulsoEnCursoException;
 import com.yerbanalytics.backend.service.ConfiguracionService;
+import com.yerbanalytics.backend.service.EscalamientoNodoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class SensingSchedulerTest {
 
     private RelojDePrueba reloj;
     private PulsoSensadoService pulsos;
+    private EscalamientoNodoService escalamiento;
     private ConfiguracionService configuracion;
     private TaskScheduler taskScheduler;
     private SensingScheduler scheduler;
@@ -44,10 +46,11 @@ class SensingSchedulerTest {
     void setUp() {
         reloj = new RelojDePrueba(local("2026-10-03T10:00:00"));
         pulsos = mock(PulsoSensadoService.class);
+        escalamiento = mock(EscalamientoNodoService.class);
         configuracion = mock(ConfiguracionService.class);
         taskScheduler = mock(TaskScheduler.class);
         intervalo(240);
-        scheduler = new SensingScheduler(pulsos, configuracion, taskScheduler, new PulsoProperties(), reloj);
+        scheduler = new SensingScheduler(pulsos, escalamiento, configuracion, taskScheduler, new PulsoProperties(), reloj);
     }
 
     private void intervalo(Integer minutos) {
@@ -125,6 +128,27 @@ class SensingSchedulerTest {
         avanzarHasta("2026-10-03T14:00:00");
         when(pulsos.iniciar(any(), anyBoolean())).thenThrow(new IllegalStateException("db caída"));
         doThrow(new IllegalStateException("broker caído")).when(pulsos).revisarReintentos();
+
+        assertThatCode(scheduler::tick).doesNotThrowAnyException();
+
+        verify(pulsos).revisarReintentos();
+    }
+
+    @Test
+    @DisplayName("cada tick le pide al escalamiento que reintente las zonas fuera de servicio")
+    void tickRetriesOfflineNodes() {
+        scheduler.start();
+
+        scheduler.tick();
+
+        verify(escalamiento).retryOfflineNodes();
+    }
+
+    @Test
+    @DisplayName("si el reintento de los nodos caídos falla, el tick igual avanza los reintentos del pulso")
+    void tickIsolatesTheOfflineRetry() {
+        scheduler.start();
+        doThrow(new IllegalStateException("base caída")).when(escalamiento).retryOfflineNodes();
 
         assertThatCode(scheduler::tick).doesNotThrowAnyException();
 

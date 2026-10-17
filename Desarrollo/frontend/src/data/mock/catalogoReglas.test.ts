@@ -51,6 +51,13 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
     }
   });
 
+  it('la confianza mínima del diagnóstico es 70 % de fábrica y se edita entre 50 y 95 (reglas_v2 §11)', () => {
+    const p = catalogo.parametros.find((x) => x.clave === 'diagnostico.confianza-minima');
+    expect(p).toMatchObject({ fabrica: '70', min: 50, max: 95 });
+    expect(parametroError(p!, '97')).not.toBeNull();
+    expect(parametroError(p!, '95')).toBeNull();
+  });
+
   it('el valor de fábrica es válido para su propia definición y no está modificado', () => {
     for (const p of catalogo.parametros) {
       expect(parametroError(p, p.fabrica)).toBeNull();
@@ -163,12 +170,15 @@ function leerReglasDelBackend(): Record<string, string> {
 }
 
 /**
- * Consumidores de parámetros que no son reglas (el despacho de riego y la purga del historial de lecturas): también
+ * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado y el
+ * escalamiento del nodo): también
  * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   DespachoRiego: resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java'),
   ReadingPurge: resolve(DIR_ENGINE, '..', 'readings', 'ReadingPurge.java'),
+  PulsoSensado: resolve(DIR_ENGINE, '..', 'sensing', 'PulsoSensadoService.java'),
+  EscalamientoNodo: resolve(DIR_ENGINE, '..', 'service', 'EscalamientoNodoService.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {

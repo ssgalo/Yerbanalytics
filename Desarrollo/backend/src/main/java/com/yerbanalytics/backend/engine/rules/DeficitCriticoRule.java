@@ -30,10 +30,12 @@ import java.util.List;
  * aunque después se corte la rama; además esas tres compuertas sólo actúan cuando aplica R-01, o sea que
  * con déficit crítico registran "no aplica".
  *
- * <p><b>Tope (design D9.2):</b> v2 limita R-02 a un riego cada 12 h por sector sólo cuando S-06 bloqueó la
- * macro-zona. Sin S-06, un sensor roto que marca "seco" dispararía R-02 en cada ciclo (6 L × 6 al día en
- * 10 L de sustrato): el tope se aplica SIEMPRE, con {@code riego.exceptuado-bloqueo}. Con el tope vencido
- * emite {@code ABORT_RIEGO} citándolo.
+ * <p><b>Tope (design D9.2) — desviación deliberada de {@code reglas_v2}:</b> la v2 limita R-02 a un riego cada
+ * 12 h por sector sólo cuando S-06 bloqueó la macro-zona. S-06 todavía no existe (lo trae
+ * {@code add-efectividad-y-s06}) y sin ella un sensor roto que marca "seco" dispararía R-02 en cada ciclo
+ * (6 L × 6 al día en 10 L de sustrato): el tope se aplica SIEMPRE, con {@code riego.exceptuado-bloqueo}. Con el
+ * tope vencido emite {@code ABORT_RIEGO} citándolo. Cuando exista S-06 hay que reevaluarlo (tarea del cambio
+ * {@code add-efectividad-y-s06}); mientras tanto la decisión (a) de {@code align-reglas-existentes-v2} lo deja así.
  */
 @Component
 public class DeficitCriticoRule implements Rule {

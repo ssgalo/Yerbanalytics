@@ -179,6 +179,25 @@ class RiegoOrquestacionTest {
     }
 
     @Test
+    @DisplayName("pulso programado y pulso manual con motor en el mismo ciclo: un solo riego por sector")
+    void dosPulsosConMotorEnElMismoCicloRiegaUnaSolaVez() {
+        // Primer pulso (programado, 10:05): el sector está en déficit y se ordena el riego.
+        ResultadoEvaluacion primero = evaluar(RiegoCtx.a("10:05").humedad(40.0).inicioCiclo("10:00"));
+        assertThat(de(primero, ActionType.ACTIVAR_VALVULA)).hasSize(1);
+
+        // Segundo pulso (manual, 10:40): el despacho ya regó a las 10:12 y la humedad sigue baja (la lectura es de
+        // UN nodo para 100 sectores). Sin la guarda de ciclo se regaría de nuevo dentro del mismo ciclo.
+        ResultadoEvaluacion segundo = evaluar(RiegoCtx.a("10:40").humedad(40.0).inicioCiclo("10:00").ultimoRiego("10:12"));
+        assertThat(de(segundo, ActionType.ACTIVAR_VALVULA)).isEmpty();
+        assertThat(de(segundo, ActionType.ABORT_RIEGO)).extracting(RuleAction::ruleName)
+                .containsExactly("CicloLecturaRiegoRule");
+
+        // El ciclo siguiente (14:00) vuelve a regar: la guarda sólo vale dentro del ciclo.
+        ResultadoEvaluacion siguiente = evaluar(RiegoCtx.a("14:00").humedad(40.0).inicioCiclo("14:00").ultimoRiego("10:12"));
+        assertThat(de(siguiente, ActionType.ACTIVAR_VALVULA)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("R-01 regó a las 10:12 y a las 13:30 la humedad es 30: R-02 riega (la regla de ciclo no la frena)")
     void r02RiegaAunqueR01YaRegoEnElCiclo() {
         ResultadoEvaluacion r = evaluar(RiegoCtx.a("13:30").humedad(30.0).inicioCiclo("10:00").ultimoRiego("10:12"));

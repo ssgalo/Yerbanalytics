@@ -179,8 +179,8 @@ const SCENARIOS: Scenario[] = [
   },
   {
     tipo: 'Insumo',
-    lectura: 'Posible plaga foliar detectada (confianza 82%).',
-    decision: 'Confianza bajo el umbral del 85%: no se inyecta químico.',
+    lectura: 'Posible plaga foliar detectada (confianza 64%).',
+    decision: 'Confianza bajo el umbral del 70%: no se inyecta químico.',
     accion: 'Dosificación bloqueada · solicitada validación visual humana.',
     res: 'Abortada',
     sev: '—',

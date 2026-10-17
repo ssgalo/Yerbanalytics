@@ -49,6 +49,16 @@ Corré `src/main/resources/migracion-diagnostico-detecciones.sql` (antes o despu
 versión nueva; es idempotente). No se pierde nada. Para volver a la versión anterior, primero
 `UPDATE diagnostico SET conf = 0 WHERE conf IS NULL`: el backend viejo lee `conf` en un `double`.
 
+### Migración manual pendiente · confianza mínima 70 %
+
+`diagnostico.confianza-minima` pasó de 85 a **70 %** de fábrica y su rango de 50–100 a **50–95 %**
+(`reglas_v2` §1.3 y §11). Una base que estaba en la fábrica vieja no tiene fila en `parametro_regla` y
+toma el 70 sola; un valor que alguien editó (p. ej. 80) se respeta. Lo único que queda mal son los
+valores de 96 a 100, que el rango nuevo no admite: el catálogo los ignora y cae a la fábrica.
+
+Corré `src/main/resources/migracion-confianza-70.sql` (idempotente, antes o después de arrancar) para
+borrarlos. No se pierde nada más.
+
 ### Migración manual pendiente · pulso de sensado y pasada diaria
 
 El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso
@@ -379,9 +389,12 @@ backend caído no se recupera.
   Pide a todas las zonas y sólo se usa por API: Demo Expo usa la secuencia `LECTURA` con `ejecutarMotor`,
   que emite un pulso con motor sólo de su zona (ver "Secuencias"). No corre las franjas. Un programado
   que encuentra uno en curso se omite (queda en el log).
-- **Reintentos** (`yerbanalytics.pulso.*`): a una zona pendiente se le reenvía el pedido cada
-  `reintento-seg` (60) hasta `intentos` (3); vencido el último plazo queda sin respuesta en ese pulso y
-  no se evalúa. El pulso no toma `GuardiaHardware`: si el ESP32 está moviendo el riel, lo cubren los
+- **Reintentos** (parámetros `sensado.*` del catálogo, editables en Motor de reglas → Parámetros): a una
+  zona pendiente se le reenvía el pedido tras `sensado.espera-respuesta` (60 s) y después cada
+  `sensado.espera-reintento` (1 min), hasta `sensado.reintentos` (2) reintentos; vencido el último plazo
+  queda sin respuesta en ese pulso y no se evalúa. Un cambio guardado rige en el tick siguiente. Se
+  quitaron `yerbanalytics.pulso.reintento-seg` e `intentos` de `application.properties` (queda sólo
+  `tick-ms`): si alguien los fijaba por variable de entorno, ahora se ignoran. El pulso no toma `GuardiaHardware`: si el ESP32 está moviendo el riel, lo cubren los
   reintentos.
 - **Escalamiento** (`EscalamientoNodoService`): cada pulso sin respuesta suma uno a
   `zona.pulsos_sin_respuesta` y deja una alerta de la zona (regla `PulsoSensado`): `WARNING`, `WARNING`
@@ -389,8 +402,16 @@ backend caído no se recupera.
   Hardware: 0 operativo, 1-2 señal intermitente, ≥ 3 fuera de servicio). Desde el cuarto, sin alertas.
   Cualquier telemetría vuelve la cuenta a 0 (alerta `INFO` si estaba fuera de servicio). La cuenta está
   en la base: sobrevive a un reinicio.
-- **Umbral de lectura vieja**: `max(piso, intervalo × 60 + reintento-seg × intentos)` (14 580 s con los
-  valores de fábrica). Sólo protege al riego (`StaleSensorRule`, revalidación del despacho); ya no decide
+- **Estado seguro** (S-02): al cruzar el tercero se ordena **una sola vez** `valve OFF`, `pump OFF` y
+  `shade SET {targetPct: 0}` a los equipos **registrados** en los sectores de la zona (`ZoneSafeState`, por el
+  mismo `ComandoActuadorPublisher`, así que `SeguimientoComandosService` vigila cada ack). La alerta
+  `CRITICAL` dice cuántas órdenes salieron. No se revierte cuando el nodo vuelve: decide el motor con la
+  lectura nueva (que llega en el siguiente pulso). Una zona sin equipos registrados no recibe órdenes.
+- **Reintento con el nodo caído**: mientras `pulsos_sin_respuesta ≥ 3`, cada tick del planificador pide
+  `LEER_AHORA` a la zona si pasaron `sensado.reintento-fuera-servicio` minutos (15) del último pedido
+  (`EscalamientoNodoService.retryOfflineNodes`). Si responde, la telemetría limpia la cuenta y deja el `INFO`.
+- **Umbral de lectura vieja**: `max(piso, intervalo × 60 + espera-respuesta + reintentos × espera-reintento × 60)`
+  (14 580 s con los valores de fábrica). Sólo protege al riego (`StaleSensorRule`, revalidación del despacho); ya no decide
   si un nodo está fuera de servicio.
 - **Diagnóstico nuevo.** Una regla que declara `usaDiagnostico()` (hoy `SupplyRule`) sólo corre si el
   sector tiene un diagnóstico que no usó: `sector.diagnosis_ts` (lo escribe el alta con el `creadoEn`)
@@ -419,7 +440,9 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
 - Un sector recibe a lo sumo **un riego común por ciclo de lectura** (franjas de
   `intervaloSensadoMinutos`, acotado a 60-360 min, ancladas a las 02:00).
 - El déficit crítico (R-02) riega a cualquier hora con el volumen máximo, con un tope de 1 riego cada
-  12 h por sector.
+  12 h por sector. **Desviación deliberada de `reglas_v2`:** la v2 aplica ese tope sólo cuando S-06 bloqueó
+  la macro-zona; como S-06 todavía no existe, se aplica siempre para que un sensor roto no dispare R-02 en
+  cada ciclo. Se reevalúa en `add-efectividad-y-s06`.
 - Una ronda encolada **se completa** aunque la humedad se recupere: sólo la retira una cancelación de
   seguridad (saturación, bloqueo manual; ventana cerrada o pausa por aplicación, para el riego común) o
   la revalidación del despacho (lluvia pronosticada después de decidir, ya regó en el ciclo). El sensor
@@ -593,7 +616,7 @@ bandas de severidad por estado anómalo, en cantidad de hojas, y orden de critic
   de entorno del servicio de inferencia.
 
 > **`SupplyRule` compara ahora el score promedio × 100.** El motor no se tocó en este cambio:
-> `SupplyRule` sigue leyendo `sector.diagnosis_conf` contra `diagnostico.confianza-minima` (85 %), pero
+> `SupplyRule` sigue leyendo `sector.diagnosis_conf` contra `diagnostico.confianza-minima` (70 %), pero
 > ese número dejó de ser "la confianza del diagnóstico" y pasó a ser el score promedio de las
 > detecciones del estado elegido, que con bandas de confianza por clase no es comparable entre
 > clases. Un No concluyente llega con `conf` nulo y la regla lo trata como "sin dato". La regla

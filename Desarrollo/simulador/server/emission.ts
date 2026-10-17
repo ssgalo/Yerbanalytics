@@ -23,6 +23,12 @@ const LOW_BATTERY_ZONE = 2;
 
 let active = false;
 
+/**
+ * Zones that do not answer LEER_AHORA: a node that went silent. In memory, like `active`: it always starts
+ * empty, so launching the simulator never leaves a zone mute from a previous session.
+ */
+const silenced = new Set<string>();
+
 /** Collaborators, replaceable in tests (see setDependencies). Defaults are the real ones. */
 interface Dependencies {
   publish: (zoneId: string, payload: TelemetryPayload) => Promise<void>;
@@ -83,6 +89,7 @@ async function emitZone(i: number): Promise<void> {
 async function emitRound(): Promise<void> {
   const zones = await currentMacroZones();
   for (let i = 1; i <= zones; i++) {
+    if (silenced.has(`MZ-${i}`)) continue;
     try {
       await emitZone(i);
     } catch (e) {
@@ -99,6 +106,10 @@ async function emitRound(): Promise<void> {
  */
 export async function answerReadNow(zonaId: string): Promise<void> {
   if (!active) return;
+  if (silenced.has(zonaId)) {
+    console.log(`[simulator] LEER_AHORA zone=${zonaId} ignored (zone silenced)`);
+    return;
+  }
   const index = macroZoneIndex(zonaId);
   if (index === null || index > (await currentMacroZones())) return;
   try {
@@ -107,6 +118,20 @@ export async function answerReadNow(zonaId: string): Promise<void> {
   } catch (e) {
     console.error(`[simulator] LEER_AHORA ${zonaId}: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+/** Makes a zone stop (or resume) answering LEER_AHORA. Idempotent. */
+export function setSilenced(zonaId: string, on: boolean): void {
+  if (on) silenced.add(zonaId);
+  else silenced.delete(zonaId);
+}
+
+export function isSilenced(zonaId: string): boolean {
+  return silenced.has(zonaId);
+}
+
+export function silencedZones(): string[] {
+  return [...silenced];
 }
 
 export function isActive(): boolean {

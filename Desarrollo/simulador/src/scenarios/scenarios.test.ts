@@ -81,7 +81,7 @@ test('R-01 or R-03 together with R-04 also reset the cooldowns', () => {
 test('the registry keeps the order and keys of the original catalog', () => {
   assert.deepEqual(
     SCENARIOS.map((s) => s.key),
-    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY'],
+    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE'],
   );
 });
 
@@ -116,6 +116,39 @@ test('R-02 and R-04 are reported once, whatever the selection order, and nothing
 
 test('compatible rules report no conflict', () => {
   assert.deepEqual(calculateConditions(['R02', 'R03'], thresholds).conflictos, []);
+});
+
+/* ------------------------------------------------------------------ nodo sin respuesta (S-02) */
+
+test('the node-offline scenario silences the zone and asks for the three pulses that declare it down', () => {
+  const result = calculateConditions(['NODE_OFFLINE'], thresholds);
+  assert.equal(result.silenceZone, true);
+  assert.equal(result.pulses, 3);
+  assert.equal(result.needsCooldownReset, false);
+  assert.equal(result.diagnostico, null);
+  assert.equal(result.clima, null);
+  assert.match(result.resumen.join(' | '), /deja de responder/);
+});
+
+test('without it nothing is silenced and a single pulse is asked for', () => {
+  const result = calculateConditions(['R01'], thresholds);
+  assert.equal(result.silenceZone, false);
+  assert.equal(result.pulses, 1);
+});
+
+test('a silent node cannot make any other rule fire: every other scenario conflicts with it', () => {
+  for (const other of SCENARIOS.filter((s) => s.key !== 'NODE_OFFLINE')) {
+    for (const selected of [[other.key, 'NODE_OFFLINE'], ['NODE_OFFLINE', other.key]]) {
+      const result = calculateConditions(selected, thresholds);
+      assert.equal(result.conflictos.length, 1, `${selected.join('+')}`);
+      assert.equal(result.silenceZone, false, 'with a conflict nothing is applied');
+    }
+  }
+});
+
+test('the node-offline scenario exercises the escalation piece of the backend', () => {
+  const scenario = SCENARIOS.find((s) => s.key === 'NODE_OFFLINE');
+  assert.deepEqual(scenario?.backendRules, ['EscalamientoNodo']);
 });
 
 /* ------------------------------------------------------------------ resumen */

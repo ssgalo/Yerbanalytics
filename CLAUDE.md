@@ -93,7 +93,9 @@ hardware real.
   backend pide lectura a todas las macro-zonas y el motor decide con la primera respuesta de cada una.
   **Es el único momento en que decide el motor**: no hay barrido, y cualquier otra lectura sólo
   actualiza valores. Tres pulsos seguidos sin respuesta ponen el nodo fuera de servicio
-  (`WARNING`, `WARNING`, `CRITICAL`). También se pide a mano (`POST /api/pulsos`, con o sin motor).
+  (`WARNING`, `WARNING`, `CRITICAL`) y la MZ pasa a **estado seguro** (riego cerrado, bombas detenidas,
+  mediasombra cerrada); con el nodo caído se le vuelve a pedir lectura cada 15 min. Los plazos y reintentos de la
+  lectura son parámetros `sensado.*` del catálogo. También se pide a mano (`POST /api/pulsos`, con o sin motor).
 - **Diagnóstico nuevo**: las reglas que usan el diagnóstico de IA (hoy la de insumo) actúan una vez
   por diagnóstico; queda marcado como usado en el sector. La telemetría no toca el diagnóstico.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
@@ -241,7 +243,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay seis scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay siete scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -253,6 +255,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   `intervalo_evaluacion_minutos`, que reemplazó el pulso de sensado.
 > - `resources/migracion-diagnostico-detecciones.sql` — quita el `NOT NULL` de `diagnostico.conf`
 >   (un No concluyente no tiene score).
+> - `resources/migracion-confianza-70.sql` — borra las confianzas mínimas guardadas por encima de 95 %,
+>   que el rango nuevo (50–95 %, fábrica 70 %) no admite.
 >
 > Detalle en el README del backend.
 

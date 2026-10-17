@@ -25,6 +25,12 @@ import java.util.List;
  * <p>Note: the threshold in the snapshot is the effective one, {@code max(floor, pulse interval + response window)}
  * (see {@code SensingCadence}); the catalog parameter is only its floor.
  *
+ * <p><b>Relación con reglas_v2 S-02:</b> la v2 pide que, sin lectura válida, no corran las reglas que dependen de
+ * sensores. Esta regla es esa guarda para el riego y sólo corta el riego ({@code ABORT_RIEGO}): la rama de
+ * mediasombra sigue, M-01 por horario y M-02 con el pronóstico (test {@code StaleSensorMediasombraTest}). Que un
+ * nodo esté fuera de servicio no sale de acá sino de la cuenta de pulsos sin respuesta
+ * ({@code EscalamientoNodoService}).
+ *
  * <p>Además compara la antigüedad de la <b>humedad de sustrato</b> ({@code zona.humSusTs}) contra el
  * mismo parámetro: una sonda caída deja la zona "fresca" con la humedad congelada.
  *

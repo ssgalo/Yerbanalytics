@@ -25,10 +25,18 @@ public final class SensingCadence {
     }
 
     /**
+     * Time a zone has to answer a sensing pulse, retries included: the first wait plus one wait per retry.
+     * With the factory values (60 s, 2 retries, 1 min) it is 180 s.
+     */
+    public static double responseWindowSeconds(double responseWaitSeconds, int retries, double retryWaitMinutes) {
+        return responseWaitSeconds + retries * retryWaitMinutes * 60.0;
+    }
+
+    /**
      * Effective stale threshold: the catalog floor, or one pulse interval plus the response window (the time a
      * zone has to answer, retries included) if that is larger.
      */
-    public static double staleThresholdSeconds(double floorSeconds, int intervalMinutes, int windowSeconds) {
+    public static double staleThresholdSeconds(double floorSeconds, int intervalMinutes, double windowSeconds) {
         return Math.max(floorSeconds, intervalMinutes * 60.0 + windowSeconds);
     }
 }

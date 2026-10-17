@@ -1,6 +1,10 @@
 package com.yerbanalytics.backend.sensing;
 
-import com.yerbanalytics.backend.config.PulsoProperties;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
+import com.yerbanalytics.backend.engine.parametros.SensingParameters;
+import com.yerbanalytics.backend.engine.parametros.ValorParametro;
 import com.yerbanalytics.backend.engine.riego.RelojDePrueba;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher.Resultado;
@@ -15,7 +19,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +49,7 @@ class PulsoSensadoServiceTest {
     private ZonaRepository zonas;
     private ComandoZonaPublisher publisher;
     private EscalamientoNodoService escalamiento;
+    private CatalogoParametrosService parametros;
     private RelojDePrueba reloj;
     private PulsoSensadoService service;
 
@@ -51,10 +58,19 @@ class PulsoSensadoServiceTest {
         zonas = mock(ZonaRepository.class);
         publisher = mock(ComandoZonaPublisher.class);
         escalamiento = mock(EscalamientoNodoService.class);
+        parametros = mock(CatalogoParametrosService.class);
+        when(parametros.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
         reloj = new RelojDePrueba(T);
         when(zonas.findAllIds()).thenReturn(List.of("MZ-1", "MZ-2", "MZ-3"));
         when(publisher.leerAhora(anyString())).thenReturn(new Resultado(true, "c", null));
-        service = new PulsoSensadoService(zonas, publisher, escalamiento, new PulsoProperties(), reloj);
+        service = new PulsoSensadoService(zonas, publisher, escalamiento, parametros, reloj);
+    }
+
+    /** Los valores de fábrica con algunos parámetros de sensado cambiados. */
+    private void conSensado(Map<SensingParameters, Double> cambios) {
+        Map<String, ValorParametro> valores = new HashMap<>(new CatalogoParametros(List.of()).fabricas().valores());
+        cambios.forEach((p, v) -> valores.put(p.clave(), new ValorParametro.Numero(v)));
+        when(parametros.vigentes()).thenReturn(ParametrosVigentes.de(valores));
     }
 
     private long ms(int segundosDesdeT) {
@@ -298,6 +314,67 @@ class PulsoSensadoServiceTest {
         assertThat(service.enCurso()).isFalse();
         // Una telemetría tardía ya no responde a ese pulso.
         assertThat(service.respondePulso("MZ-3", ms(185))).isFalse();
+    }
+
+    @Test
+    @DisplayName("sensado.reintentos: con 3 reintentos la zona recibe 4 pedidos antes de quedar sin respuesta")
+    void masReintentosSonMasPedidos() {
+        conSensado(Map.of(SensingParameters.RETRIES, 3.0));
+        when(zonas.findAllIds()).thenReturn(List.of("MZ-1"));
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+
+        for (int i = 0; i < 3; i++) {
+            avanzar(60);
+            service.revisarReintentos();
+        }
+        verify(publisher, times(4)).leerAhora("MZ-1");
+        verify(escalamiento, never()).registrarSinRespuesta(anyString());
+
+        avanzar(60);
+        service.revisarReintentos();
+
+        verify(publisher, times(4)).leerAhora("MZ-1");
+        verify(escalamiento).registrarSinRespuesta("MZ-1");
+    }
+
+    @Test
+    @DisplayName("sensado.reintentos: con 1 reintento la zona se da por sin respuesta a los 2 minutos")
+    void menosReintentosCierranAntes() {
+        conSensado(Map.of(SensingParameters.RETRIES, 1.0));
+        when(zonas.findAllIds()).thenReturn(List.of("MZ-1"));
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+
+        avanzar(60);
+        service.revisarReintentos();
+        avanzar(60);
+        service.revisarReintentos();
+
+        verify(publisher, times(2)).leerAhora("MZ-1");
+        verify(escalamiento).registrarSinRespuesta("MZ-1");
+    }
+
+    @Test
+    @DisplayName("sensado.espera-respuesta rige el primer plazo y sensado.espera-reintento los siguientes")
+    void cadaPlazoTieneSuParametro() {
+        conSensado(Map.of(SensingParameters.RESPONSE_WAIT, 30.0, SensingParameters.RETRY_WAIT, 2.0));
+        when(zonas.findAllIds()).thenReturn(List.of("MZ-1"));
+        service.iniciar(OrigenPulso.PROGRAMADO, true);
+        clearInvocations(publisher);
+
+        avanzar(29);
+        service.revisarReintentos();
+        verifyNoInteractions(publisher);
+        avanzar(1);
+        service.revisarReintentos();        // 30 s: primer reintento
+        verify(publisher, times(1)).leerAhora("MZ-1");
+
+        clearInvocations(publisher);
+        avanzar(119);
+        service.revisarReintentos();
+        verifyNoInteractions(publisher);
+        avanzar(1);
+        service.revisarReintentos();        // 2 min después: segundo reintento
+        verify(publisher, times(1)).leerAhora("MZ-1");
     }
 
     @Test

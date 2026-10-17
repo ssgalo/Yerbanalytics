@@ -19,9 +19,11 @@ import java.util.List;
  * Protección contra el riego en bucle: un sector recibe a lo sumo un riego por ciclo de lectura, y
  * ninguno mientras tiene uno en curso (design D5 de implement-reglas-riego).
  *
- * <p>{@code reglas_v2} se protege con la cadencia (una lectura cada 4 h, una decisión por lectura). El
- * nodo real publica cada 30 s, así que sin esta regla R-01 volvería a regar el sector apenas cierra la
- * válvula: la humedad sale de UN nodo testigo que puede estar en un sector que todavía no se regó.
+ * <p>{@code reglas_v2} se protege con la cadencia: una decisión por lectura, una lectura cada 4 h. Pero dentro de
+ * un mismo ciclo de lectura puede haber más de un pulso con motor (un {@code POST /api/pulsos} manual después del
+ * programado, o la secuencia {@code LECTURA} con motor de Demo Expo). Sin esta regla R-01 volvería a regar el
+ * sector con el segundo pulso: la humedad sale de UN nodo testigo para 100 sectores y, en el momento del segundo
+ * pulso, puede seguir baja porque el nodo está en un sector que todavía no se regó.
  *
  * <p><b>Prioridad 3</b>, después de R-04 (la saturación se evalúa siempre, también recién regado) y antes de todas las reglas que riegan. Tiene DOS guardas y no valen lo mismo:
  * <ul>

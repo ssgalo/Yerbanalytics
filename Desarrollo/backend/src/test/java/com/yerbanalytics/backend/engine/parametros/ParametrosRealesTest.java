@@ -33,7 +33,11 @@ class ParametrosRealesTest {
             Map.entry("mediasombra.apertura-proteccion-uv", 30.0),   // ShadingRule:90
             Map.entry("mediasombra.apertura-maxima", 100.0),         // configuracion_operativa
             Map.entry("readings.retention-days", 14.0),              // add-historial-lecturas D-4
-            Map.entry("diagnostico.confianza-minima", 85.0));        // SupplyRule:34 / capturas.confianza-minima
+            Map.entry("sensado.espera-respuesta", 60.0),             // reglas_v2 §11 Telemetría
+            Map.entry("sensado.reintentos", 2.0),
+            Map.entry("sensado.espera-reintento", 1.0),
+            Map.entry("sensado.reintento-fuera-servicio", 15.0),
+            Map.entry("diagnostico.confianza-minima", 70.0));        // reglas_v2 §1.3 y §11 (era 85)
 
     /** Las claves nuevas de riego v2 (tabla D8): tipo, unidad, fábrica, mínimo, máximo y decimales. */
     private record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica,
@@ -58,6 +62,36 @@ class ParametrosRealesTest {
     void cadaFabricaCoincideConElValorActual() {
         VALORES_DE_HOY.forEach((clave, esperado) ->
                 assertThat(catalogo.fabricas().numero(clave)).as(clave).isEqualTo(esperado));
+    }
+
+    @Test
+    void losParametrosDeSensadoSonLosDeReglasV2Seccion11() {
+        record Esperado(String clave, String unidad, String fabrica, double min, double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("sensado.espera-respuesta", "s", "60", 10, 300),
+                new Esperado("sensado.reintentos", "reintentos", "2", 1, 5),
+                new Esperado("sensado.espera-reintento", "min", "1", 1, 10),
+                new Esperado("sensado.reintento-fuera-servicio", "min", "15", 5, 60));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(FamiliaParametro.SENSADO);
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(TipoParametro.ENTERO);
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2");
+        }
+    }
+
+    @Test
+    void laConfianzaMinimaDelDiagnosticoVaDe50a95PorCiento() {
+        DefinicionParametro d = catalogo.definicion("diagnostico.confianza-minima").orElseThrow();
+
+        assertThat(d.min()).isEqualTo(50.0);
+        assertThat(d.max()).isEqualTo(95.0);
+        assertThat(d.refSpec()).contains("reglas_v2");
     }
 
     @Test
