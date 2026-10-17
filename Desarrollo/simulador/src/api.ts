@@ -247,6 +247,23 @@ export async function clearSimulatedWeather(): Promise<void> {
   await check(res, 'eliminar el clima simulado');
 }
 
+/** Whether the "no forecast" mode is on (the backend answers as if Open-Meteo were down). */
+export async function getOfflineForecast(): Promise<boolean> {
+  const res = await fetch(`${BACKEND}/api/demo/weather/offline`);
+  const body = await json<{ on: boolean }>(res, 'consultar el modo sin pronóstico');
+  return body.on;
+}
+
+export async function setOfflineForecast(on: boolean): Promise<boolean> {
+  const res = await fetch(`${BACKEND}/api/demo/weather/offline`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ on }),
+  });
+  const body = await json<{ on: boolean }>(res, 'cambiar el modo sin pronóstico');
+  return body.on;
+}
+
 /** Triggers a manual sensing pulse with the rule engine. 409 if one is already in progress. */
 export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void> {
   const res = await fetch(`${BACKEND}/api/pulsos`, {

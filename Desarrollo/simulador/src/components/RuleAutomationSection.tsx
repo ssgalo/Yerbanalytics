@@ -15,13 +15,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
-import type { ParametroRegla, SectorRef, SimulatedSensor } from '../types';
-import {
-  buildThresholds,
-  calculateConditions,
-  RULE_CATALOG,
-  type RuleKey,
-} from '../ruleConditions';
+import type { DemoRule, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
+import { buildThresholds, calculateConditions } from '../ruleConditions';
+import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
 interface Props {
   sensors: SimulatedSensor[];
@@ -34,7 +30,8 @@ type ExecutionState = 'idle' | 'running' | 'ok' | 'conflict' | 'error';
 export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) {
   const [parametros, setParametros] = useState<ParametroRegla[]>([]);
   const [loadingParams, setLoadingParams] = useState(true);
-  const [selectedRules, setSelectedRules] = useState<Set<RuleKey>>(new Set());
+  const [withoutScenario, setWithoutScenario] = useState<DemoRule[]>([]);
+  const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set());
   const [targetSerial, setTargetSerial] = useState('');
   const [execState, setExecState] = useState<ExecutionState>('idle');
   const [execLog, setExecLog] = useState<string[]>([]);
@@ -64,9 +61,18 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     void loadParams();
   }, [loadParams]);
 
+  // Backend rules the simulator cannot arm: they can be switched off in the rules panel, nothing more.
+  useEffect(() => {
+    if (!demoEnabled) return;
+    api
+      .getDemoRules()
+      .then((rules) => setWithoutScenario(rulesWithoutScenario(rules)))
+      .catch(() => setWithoutScenario([]));
+  }, [demoEnabled]);
+
   const thresholds = buildThresholds(parametros);
 
-  const toggleRule = (key: RuleKey) => {
+  const toggleRule = (key: string) => {
     setSelectedRules((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -194,7 +200,7 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
 
         {/* Rule checkboxes */}
         <div className="ruleList">
-          {RULE_CATALOG.map((rule) => (
+          {SCENARIOS.map((rule) => (
             <label key={rule.key} className="ruleRow ruleToggle" style={{ display: 'flex', gap: 10, cursor: 'pointer', padding: '8px 12px' }}>
               <input
                 type="checkbox"
@@ -208,6 +214,25 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
             </label>
           ))}
         </div>
+
+        {withoutScenario.length > 0 && (
+          <details style={{ marginTop: 12 }}>
+            <summary className="muted">Reglas sin escenario ({withoutScenario.length})</summary>
+            <div className="ruleList" style={{ marginTop: 8 }}>
+              {withoutScenario.map((rule) => (
+                <div
+                  key={rule.name}
+                  className="ruleRow ruleDisabled"
+                  style={{ padding: '8px 12px' }}
+                  title="El simulador no sabe armar las condiciones de esta regla. Se puede apagar desde Telemetría → Control de reglas."
+                >
+                  <div className="ruleLabel">{rule.label}</div>
+                  <div className="ruleMeta">sin escenario · {rule.branch}</div>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
 
         {/* Conflict warnings */}
         {conditions && conditions.conflictos.length > 0 && (

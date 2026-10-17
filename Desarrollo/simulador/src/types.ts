@@ -149,13 +149,29 @@ export interface DemoRuleUpdate {
   bypassed?: string[];
 }
 
-/** Simulated weather forecast. */
+/** One hourly mark to override on the simulated forecast. Absent fields keep the flat value. */
+export interface SimulatedWeatherHour {
+  /** Hour of the day (0-23, nursery local time); the mark that ENDS that hour, so 13 = 12:00-13:00. */
+  hora: number;
+  probLluviaPct?: number;
+  precipMm?: number;
+  tempC?: number;
+}
+
+/**
+ * Simulated weather forecast. The five base fields describe the current hour and are repeated, flat,
+ * in the next 24 hourly marks; `uvMaxDia` and `horas` refine that.
+ */
 export interface SimulatedWeather {
   tempC: number;
   humedadRelPct: number;
   probLluviaPct: number;
+  /** Millimetres per hour. */
   precipMm: number;
   uvIndex: number;
+  /** Maximum UV of the day; the backend uses `uvIndex` if absent. */
+  uvMaxDia?: number;
+  horas?: SimulatedWeatherHour[];
 }
 
 /* ----------------------------------------------------------------

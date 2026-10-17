@@ -6,11 +6,20 @@
    engine fires the selected rules. The orchestration (zeroing cooldowns, calling the
    weather endpoint, publishing MQTT) lives in the component.
 
-   It is the only place that knows the mapping between rule names and their telemetry
-   requirements. If a rule's condition changes, only this file changes.
+   It knows NOTHING about any particular rule: each rule's conditions live in its own
+   scenario (`scenarios/`). This file only resolves thresholds, detects conflicts between
+   the selected scenarios and merges what each one asks for.
    ============================================================ */
-import type { NewDiagnosis, ParametroRegla, SimulatedWeather } from './types';
+import { SCENARIOS } from './scenarios';
+import type { DiagnosisPlan, RuleScenario, ScenarioContext, TelemetryClaim, ThresholdMap } from './scenarios/types';
+import type { ParametroRegla, SimulatedWeather } from './types';
 
+export type { DiagnosisPlan, ThresholdMap } from './scenarios/types';
+
+/**
+ * Factory values of `reglas_v2` §11, used when the backend catalog does not answer.
+ * They only matter in that case: with the backend up, `buildThresholds` reads its current values.
+ */
 export const DEFAULT_THRESHOLDS: Record<string, number> = {
   'riego.umbral-humedad': 45,
   'riego.umbral-critico': 35,
@@ -19,91 +28,8 @@ export const DEFAULT_THRESHOLDS: Record<string, number> = {
   'riego.lluvia-probabilidad': 70,
   'riego.lluvia-mm': 5,
   'mediasombra.uv-umbral': 7,
-  'diagnostico.confianza-minima': 85,
+  'diagnostico.confianza-minima': 70,
 };
-
-/**
- * Air temperature (°C) beyond the seeded critical range (crit 11-35). Air temperature is a
- * state-driving metric that no irrigation rule reads, so forcing it critical does not
- * collide with the humidity the water rules need.
- */
-const CRITICAL_AIR_TEMP = 40;
-
-export type RuleKey = 'R01' | 'R02' | 'R04' | 'R03' | 'SHADING' | 'SUPPLY';
-
-export interface RuleInfo {
-  key: RuleKey;
-  label: string;
-  description: string;
-  branch: string;
-  /** Needs cooldown reset in demo mode to fire immediately. */
-  needsCooldown: boolean;
-  /** Decides with the sector's AI diagnosis, so one must exist (and be new) beforehand. */
-  needsDiagnosis: boolean;
-}
-
-export const RULE_CATALOG: RuleInfo[] = [
-  {
-    key: 'R01',
-    label: 'Riego por déficit hídrico (R-01)',
-    description: 'Humedad entre el umbral crítico y el umbral de riego',
-    branch: 'RIEGO',
-    needsCooldown: true,
-    needsDiagnosis: false,
-  },
-  {
-    key: 'R02',
-    label: 'Déficit hídrico crítico (R-02)',
-    description: 'Humedad bajo el umbral crítico — riego urgente',
-    branch: 'RIEGO',
-    needsCooldown: true,
-    needsDiagnosis: false,
-  },
-  {
-    key: 'R04',
-    label: 'Sustrato saturado (R-04)',
-    description: 'Humedad sobre el umbral de saturación — bloquea el riego',
-    branch: 'RIEGO',
-    needsCooldown: false,
-    needsDiagnosis: false,
-  },
-  {
-    key: 'R03',
-    label: 'Posponer por lluvia inminente (R-03)',
-    description: 'Condición de riego + alta probabilidad de lluvia',
-    branch: 'RIEGO',
-    needsCooldown: true,
-    needsDiagnosis: false,
-  },
-  {
-    key: 'SHADING',
-    label: 'Mediasombra por pico UV',
-    description: 'Índice UV por encima del umbral — despliega la mediasombra',
-    branch: 'MEDIASOMBRA',
-    needsCooldown: false,
-    needsDiagnosis: false,
-  },
-  {
-    key: 'SUPPLY',
-    label: 'Dosificación de insumo',
-    description: 'Diagnóstico IA crítico pendiente de actuar — requiere un diagnóstico previo',
-    branch: 'INSUMO',
-    needsCooldown: false,
-    needsDiagnosis: true,
-  },
-];
-
-export interface ThresholdMap {
-  umbralHumedad: number;
-  umbralCritico: number;
-  saturacionBloqueo: number;
-  saturacionAlerta: number;
-  lluviaProbabilidad: number;
-  lluviaMm: number;
-  uvUmbral: number;
-  /** Minimum diagnosis confidence (%) for SupplyRule to dose. */
-  confianzaMinima: number;
-}
 
 export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
   const get = (key: string): number => {
@@ -123,9 +49,6 @@ export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
   };
 }
 
-/** What the AI diagnosis must say for the rule to act; the sector and capture are resolved at dispatch. */
-export type DiagnosisPlan = Pick<NewDiagnosis, 'estado' | 'sev' | 'confidence' | 'conf'>;
-
 export interface RuleConditionResult {
   telemetria: Record<string, number>;
   clima: SimulatedWeather | null;
@@ -136,108 +59,93 @@ export interface RuleConditionResult {
   resumen: string[];
 }
 
-/** Midpoint rounded to one decimal. */
-function mid(a: number, b: number): number {
-  return Math.round((a + b) / 2 * 10) / 10;
+/** A healthy nursery: what every metric reads when no selected rule asks for something else. */
+const HEALTHY_TELEMETRY: Readonly<Record<string, number>> = {
+  humSus: 55,
+  humAmb: 72,
+  temp: 23,
+  uv: 50,
+  tempSuelo: 20,
+  ce: 1.4,
+  phSuelo: 5.5,
+  n: 150,
+  p: 45,
+  k: 180,
+};
+
+/** A mild day: the weather fields no selected scenario sets. */
+const MILD_WEATHER: Readonly<SimulatedWeather> = {
+  tempC: 32,
+  humedadRelPct: 45,
+  probLluviaPct: 5,
+  precipMm: 0,
+  uvIndex: 5,
+};
+
+/** Each incompatible pair once, with the message of the scenario that declared it. */
+function detectConflicts(selected: RuleScenario[], ctx: ScenarioContext): string[] {
+  const messages: string[] = [];
+  for (const a of selected) {
+    for (const conflict of a.conflicts ?? []) {
+      if (selected.some((b) => b.key === conflict.with)) {
+        messages.push(conflict.reason(ctx));
+      }
+    }
+  }
+  return messages;
 }
 
 /**
  * Given the selected rules and resolved thresholds, returns the telemetry payload and
  * climate conditions needed to make those rules fire. Detects mutually-exclusive combos
- * (e.g. R-02 low humidity vs. R-04 high humidity) and puts them in `conflictos`.
+ * (e.g. R-02 low humidity vs. R-04 high humidity): with a conflict nothing is applied and
+ * `conflictos` says why.
  */
-export function calculateConditions(
-  selectedRules: RuleKey[],
-  thresholds: ThresholdMap,
-): RuleConditionResult {
-  const conflictos: string[] = [];
-  const resumen: string[] = [];
+export function calculateConditions(selectedKeys: string[], thresholds: ThresholdMap): RuleConditionResult {
+  const ctx: ScenarioContext = { thresholds };
+  // Applying in `applyOrder` makes the scenario with the higher order win when two claim the same metric.
+  const selected = SCENARIOS.filter((s) => selectedKeys.includes(s.key)).sort((a, b) => a.applyOrder - b.applyOrder);
 
-  // Conflict detection: rules with incompatible humidity requirements.
-  const wantsLow = selectedRules.includes('R02');
-  const wantsHigh = selectedRules.includes('R04');
-  if (wantsLow && wantsHigh) {
-    conflictos.push(
-      `R-02 requiere humSus < ${thresholds.umbralCritico}% y R-04 requiere humSus ≥ ${thresholds.saturacionBloqueo}%. Son excluyentes; ejecutalas por separado.`,
-    );
+  const conflictos = detectConflicts(selected, ctx);
+  const telemetria: Record<string, number> = { ...HEALTHY_TELEMETRY };
+  if (conflictos.length > 0) {
+    return { telemetria, clima: null, diagnostico: null, needsCooldownReset: false, conflictos, resumen: [] };
   }
 
-  // Base: a healthy nursery.
-  const telemetria: Record<string, number> = {
-    humSus: 55,
-    humAmb: 72,
-    temp: 23,
-    uv: 50,
-    tempSuelo: 20,
-    ce: 1.4,
-    phSuelo: 5.5,
-    n: 150,
-    p: 45,
-    k: 180,
-  };
-
-  let clima: SimulatedWeather | null = null;
+  const claims = new Map<string, TelemetryClaim>();
+  const notes: string[] = [];
+  let weather: Partial<SimulatedWeather> | null = null;
   let diagnostico: DiagnosisPlan | null = null;
-  let needsCooldownReset = false;
 
-  // Determine the humidity value required.
-  if (selectedRules.includes('R02') && !wantsHigh) {
-    const h = Math.max(5, thresholds.umbralCritico - 7);
-    telemetria.humSus = h;
-    needsCooldownReset = true;
-    resumen.push(`humSus = ${h}% (< umbral crítico ${thresholds.umbralCritico}%)`);
-  } else if (selectedRules.includes('R04') && !wantsLow) {
-    const h = Math.min(98, thresholds.saturacionBloqueo + 5);
-    telemetria.humSus = h;
-    resumen.push(`humSus = ${h}% (≥ saturación ${thresholds.saturacionBloqueo}%)`);
-  } else if (selectedRules.includes('R01') || selectedRules.includes('R03')) {
-    const h = mid(thresholds.umbralCritico, thresholds.umbralHumedad);
-    telemetria.humSus = h;
-    needsCooldownReset = true;
-    resumen.push(`humSus = ${h}% (entre ${thresholds.umbralCritico}% y ${thresholds.umbralHumedad}%)`);
-  }
-
-  // Weather for R-03 (rain) and ShadingRule (UV).
-  if (selectedRules.includes('R03')) {
-    clima = {
-      tempC: 18,
-      humedadRelPct: 88,
-      probLluviaPct: Math.min(100, thresholds.lluviaProbabilidad + 10),
-      precipMm: thresholds.lluviaMm + 3,
-      uvIndex: 2,
-    };
-    resumen.push(
-      `clima: prob. lluvia = ${clima.probLluviaPct}%, precipMm = ${clima.precipMm} (umbral: ${thresholds.lluviaMm})`,
-    );
-  }
-
-  if (selectedRules.includes('SHADING')) {
-    const uv = thresholds.uvUmbral + 1;
-    if (clima) {
-      clima = { ...clima, uvIndex: uv };
-    } else {
-      clima = { tempC: 32, humedadRelPct: 45, probLluviaPct: 5, precipMm: 0, uvIndex: uv };
+  for (const scenario of selected) {
+    const patch = scenario.apply(ctx);
+    for (const [metric, claim] of Object.entries(patch.telemetry ?? {})) {
+      claims.set(metric, claim);
     }
-    resumen.push(`clima: uvIndex = ${uv} (umbral: ${thresholds.uvUmbral})`);
+    if (patch.weather) {
+      weather = { ...(weather ?? {}), ...patch.weather };
+    }
+    diagnostico = patch.diagnosis ?? diagnostico;
+    notes.push(...(patch.notes ?? []));
   }
 
-  if (selectedRules.some((key) => RULE_CATALOG.find((r) => r.key === key)?.needsDiagnosis)) {
-    // The diagnosis is born before the pulse: the rule only acts once per NEW diagnosis, and
-    // the pulse is the only moment the engine decides. Score above the minimum confidence.
-    const conf = Math.min(100, thresholds.confianzaMinima + 5);
-    // SupplyRule only doses in a CRITICAL sector, and that state comes from the sensed metrics,
-    // not from the diagnosis: without this the sector stays healthy/warning and the rule idles.
-    telemetria.temp = CRITICAL_AIR_TEMP;
-    resumen.push(`temp = ${CRITICAL_AIR_TEMP} °C (estado crítico: la dosificación solo actúa en crítico)`);
-    diagnostico = { estado: 'Clorosis', sev: 'Alta', confidence: 'Alta', conf };
-    resumen.push(
-      `diagnóstico IA previo: ${diagnostico.estado} · severidad ${diagnostico.sev} · conf. ${conf}% (mínimo ${thresholds.confianzaMinima}%)`,
-    );
-  }
+  claims.forEach((claim, metric) => {
+    telemetria[metric] = claim.value;
+  });
 
+  const needsCooldownReset = selected.some((s) => s.needsCooldownReset);
+  // A line about a metric another scenario overrode is not shown: the preview says what is actually sent.
+  const resumen = [...[...claims.values()].map((c) => c.note), ...notes];
   if (needsCooldownReset) {
     resumen.push('Cooldowns → 0 en modo demo antes de disparar el pulso.');
   }
 
-  return { telemetria, clima, diagnostico, needsCooldownReset, conflictos, resumen };
+  return {
+    telemetria,
+    clima: weather ? { ...MILD_WEATHER, ...weather } : null,
+    diagnostico,
+    needsCooldownReset,
+    conflictos,
+    resumen,
+  };
 }
