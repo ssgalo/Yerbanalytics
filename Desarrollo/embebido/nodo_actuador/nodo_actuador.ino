@@ -8,7 +8,7 @@
 //  buffer offline.
 //
 //  Tareas FreeRTOS:
-//    - task_red       : WiFi/MQTT, publica los acks y los eventos del riel.
+//    - task_red       : WiFi/MQTT, publica los acks, los eventos del riel y los errores del nodo (S-05).
 //    - task_actuacion : consume comandos, acciona -> cola_ack.
 //    - riel           : consume comandos del riel, mueve el carro -> cola_evento_riel.
 //
@@ -35,6 +35,7 @@ static SistemaColas sys;
 
 static char topicComando[CANT_SECTORES + 1][96];   // índice 1 y 2
 static char topicAck[CANT_SECTORES + 1][96];
+static char topicErrores[96];
 
 // ----------------------------------------------------------------------------
 //  Callback MQTT: parsea y encola (no ejecuta ni publica acá).
@@ -114,6 +115,28 @@ static void publicarEventosRiel(bool mqttOk)
   }
 }
 
+// Publica los errores del nodo (S-05) en orden. Uno que no se pudo publicar queda primero en la cola y se reintenta en la
+// próxima vuelta (p.ej. al reconectar): la falla se informa una sola vez, no puede perderse.
+static void publicarErrores(bool mqttOk)
+{
+  ErrorNodo e;
+  while (mqttOk && xQueuePeek(sys.error, &e, 0) == pdTRUE)
+  {
+    char mac[18];
+    net_wifi::obtenerMac(mac, sizeof(mac));
+    const char *sectorId = (e.sector >= 1 && e.sector <= CANT_SECTORES) ? contratoSectorId(e.sector) : "";
+    char buf[192];
+    size_t escritos = util_json::serializarError(e, mac, sectorId, (uint32_t)(millis() / 1000), buf, sizeof(buf));
+    buf[escritos] = '\0';
+    if (!net_mqtt::publicar(topicErrores, buf, QOS_ERROR))
+    {
+      break;
+    }
+    xQueueReceive(sys.error, &e, 0);
+    Serial.printf("[main] Error del nodo publicado: %s\n", buf);
+  }
+}
+
 // ----------------------------------------------------------------------------
 //  task_red: conectividad + publicación de acks y eventos del riel
 // ----------------------------------------------------------------------------
@@ -134,6 +157,9 @@ static void taskRed(void *pv)
 
     // Eventos del riel.
     publicarEventosRiel(mqttOk);
+
+    // Errores del nodo (S-05).
+    publicarErrores(mqttOk);
 
     vTaskDelay(pdMS_TO_TICKS(100));
   }
@@ -157,6 +183,7 @@ void setup()
     contratoTopicComando(topicComando[s], sizeof(topicComando[s]), s);
     contratoTopicAck(topicAck[s], sizeof(topicAck[s]), s);
   }
+  contratoTopicErrores(topicErrores, sizeof(topicErrores));
 
   // Recursos FreeRTOS (este nodo consume comandos y produce acks y eventos del riel).
   sys.telemetria = nullptr;
@@ -164,6 +191,7 @@ void setup()
   sys.ack = xQueueCreate(10, sizeof(Ack));
   sys.comandoRiel = xQueueCreate(1, sizeof(ComandoRiel));
   sys.eventoRiel = xQueueCreate(8, sizeof(EventoRiel));
+  sys.error = xQueueCreate(4, sizeof(ErrorNodo));
 
   // Infraestructura común + suscripciones.
   net_wifi::iniciar();
