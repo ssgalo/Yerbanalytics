@@ -944,6 +944,19 @@ simulación. Los usa el simulador (`Desarrollo/simulador/`), nunca el dashboard.
   0–23 del vivero) afinan una marca. `PUT /api/demo/weather/offline {"on": true}` hace que el servicio
   responda "sin pronóstico" como si Open-Meteo estuviera caída; `DELETE /api/demo/weather` limpia ambos.
 
+### Fuente de telemetría (`/api/demo/telemetry-source`)
+
+Con el modo demo, el simulador publica su telemetría en un tópico **aparte**, `nursery/demo/zone/{zona}/telemetry`
+(el comodín productivo `nursery/zone/+/telemetry` nunca lo alcanza), así que no compite con el ESP32 real.
+`GET`/`PUT /api/demo/telemetry-source` (`{"source":"REAL_NODE"|"SIMULATOR"}`, por defecto `REAL_NODE`, en memoria:
+un reinicio vuelve al nodo real) elige cuál procesa el backend: con `SIMULATOR` sólo la del tópico de demo, con
+`REAL_NODE` sólo la real; la descartada no se persiste ni cuenta como respuesta del pulso ni de la lectura de Demo
+Expo. Lo demás no cambia: `LEER_AHORA` y los comandos a los actuadores siguen en los tópicos del ESP32 (los
+actuadores reales se mueven) y el ACK es el de siempre. Todo vive en el paquete `demo/` con
+`@ConditionalOnProperty(yerbanalytics.demo.enabled=true)`: con el modo demo apagado no hay suscripción, endpoint (404)
+ni bean. El código productivo sólo conoce la interfaz neutra `mqtt/TelemetryAdmission` (`ALL` sin demo), igual que
+`RuleOverrides`. Spec: `openspec/changes/add-demo-telemetry-source/`.
+
 ## Secuencias de la Demo Expo
 
 Una **secuencia** es un guion corto contra el actuador de un sector, con cada paso visible: **riego**

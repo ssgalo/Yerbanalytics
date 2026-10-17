@@ -339,6 +339,25 @@ export async function setOfflineForecast(on: boolean): Promise<boolean> {
   return body.on;
 }
 
+/** Which telemetry the backend reads in demo mode: the real ESP32 node or this simulator. */
+export type TelemetrySource = 'REAL_NODE' | 'SIMULATOR';
+
+export async function getTelemetrySource(): Promise<TelemetrySource> {
+  const res = await fetch(`${BACKEND}/api/demo/telemetry-source`);
+  const body = await json<{ source: TelemetrySource }>(res, 'consultar la fuente de telemetría');
+  return body.source;
+}
+
+export async function setTelemetrySource(source: TelemetrySource): Promise<TelemetrySource> {
+  const res = await fetch(`${BACKEND}/api/demo/telemetry-source`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source }),
+  });
+  const body = await json<{ source: TelemetrySource }>(res, 'cambiar la fuente de telemetría');
+  return body.source;
+}
+
 /** Triggers a manual sensing pulse with the rule engine. 409 if one is already in progress. */
 export async function triggerSensingPulse(ejecutarMotor: boolean): Promise<void> {
   const res = await fetch(`${BACKEND}/api/pulsos`, {

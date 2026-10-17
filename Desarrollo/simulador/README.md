@@ -60,6 +60,10 @@ simulador (punto ámbar, con el motivo).
   cooldowns (*Telemetría → Control de reglas*), inyecta clima (con marcas horarias, UV máximo del día y
   un modo "sin pronóstico") y arma las condiciones para que una regla dispare en el siguiente pulso
   (*Automatización*). Ver "Cómo agregar el escenario de una regla".
+- **Fuente de telemetría** — con el backend en modo demo, **toda** la telemetría del simulador sale por
+  `nursery/demo/zone/{id}/telemetry` (tópico aparte del ESP32, sin carrera) y un interruptor en *Telemetría*
+  ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
+  actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a
   mano el diagnóstico que devolvería el modelo.
 
@@ -265,7 +269,7 @@ Ninguno es del simulador. Todos son superficie **pública** de la plataforma:
 | `GET /api/camara/dispositivos`, `POST /api/camara/vinculacion` | el backoffice |
 | `POST /api/diagnosticos` | el servicio de inferencia |
 | `GET /api/hardware`, `POST /api/hardware/{id}/reparacion` | el panel de Hardware del dashboard (la reparación la registra quien arregla el equipo) |
-| `GET/PUT /api/demo/rules`, `POST/DELETE /api/demo/weather`, `GET/PUT /api/demo/weather/offline` | sólo existen con el backend en modo demo (en producción dan 404) |
+| `GET/PUT /api/demo/rules`, `POST/DELETE /api/demo/weather`, `GET/PUT /api/demo/weather/offline`, `GET/PUT /api/demo/telemetry-source` | sólo existen con el backend en modo demo (en producción dan 404) |
 
 Por eso el recorrido que se ensaya acá es literalmente el que va a correr solo cuando exista el
 modelo. **El simulador no toca `/api/camara/v1/**`**: ese es el contrato del dispositivo de
