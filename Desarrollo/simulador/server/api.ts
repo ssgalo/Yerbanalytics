@@ -188,6 +188,29 @@ api.get('/silenced-zones', (_req, res) => {
   res.json(emission.silencedZones());
 });
 
+// ------------------------------------------------------------------
+// Faulty sensors: a metric stuck on a value in every reading (scenario "Lectura inválida")
+// ------------------------------------------------------------------
+
+api.get('/faulty-sensors', (_req, res) => {
+  res.json(emission.faultyMetrics());
+});
+
+/**
+ * Sticks the zone's sensor on the given metrics (UI units), or repairs it when none come. Values are NOT range-checked:
+ * that is the point, the backend is the one that has to reject an impossible reading.
+ */
+api.put('/faulty-sensors/:zonaId', (req, res) => {
+  const { metrics } = (req.body ?? {}) as { metrics?: Record<string, unknown> | null };
+  const stuck: emission.FaultyMetrics = {};
+  for (const key of METRIC_KEYS) {
+    const value = optionalNumber(metrics?.[key], key);
+    if (value !== undefined) stuck[key] = value;
+  }
+  emission.setFaultyMetrics(req.params.zonaId, stuck);
+  res.json(emission.faultyMetrics());
+});
+
 api.put('/silenced-zones/:zonaId', (req, res) => {
   const { silenced } = (req.body ?? {}) as { silenced?: unknown };
   if (typeof silenced !== 'boolean') {

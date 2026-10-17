@@ -12,7 +12,9 @@
      6. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
 
    The "node without answer" scenario is the exception: it silences the target zone instead of
-   publishing telemetry, so the pulses find no answer.
+   publishing telemetry, so the pulses find no answer. The "invalid reading" scenario sticks a metric of the
+   target sensor on an impossible value (`faultySensor`): the pulse and every reread carry it, so the backend's
+   reread-and-discard flow (S-03) happens inside the pulse.
 
    No backend modifications: everything goes through existing public endpoints.
    ============================================================ */
@@ -42,6 +44,7 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const [execLog, setExecLog] = useState<string[]>([]);
   const [execError, setExecError] = useState<string | null>(null);
   const [silencedZones, setSilencedZones] = useState<string[]>([]);
+  const [faultySensors, setFaultySensors] = useState<api.FaultySensors>({});
   const [manualLocks, setManualLocks] = useState<ManualLock[]>([]);
   // '' = lock the whole zone; otherwise the id of one of its sectors.
   const [lockSectorId, setLockSectorId] = useState('');
@@ -49,6 +52,11 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   // Zones the simulator keeps mute: they stay that way until released, so they are shown after the run.
   useEffect(() => {
     api.getSilencedZones().then(setSilencedZones).catch(() => setSilencedZones([]));
+  }, []);
+
+  // Sensors stuck on a value: the scenario sets them and they stay until repaired, so they are listed after the run.
+  useEffect(() => {
+    api.getFaultySensors().then(setFaultySensors).catch(() => setFaultySensors({}));
   }, []);
 
   // Manual locks in force: the scenario creates them and they stay until lifted, so they are listed here.
@@ -60,6 +68,14 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     try {
       await api.releaseManualLock(id);
       setManualLocks(await api.getManualLocks());
+    } catch (e) {
+      setExecError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const repairSensor = async (zonaId: string) => {
+    try {
+      setFaultySensors(await api.setFaultySensor(zonaId, {}));
     } catch (e) {
       setExecError(e instanceof Error ? e.message : String(e));
     }
@@ -167,6 +183,18 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         log.push(`✓ Telemetría publicada para ${targetSensor.zonaId} (humSus: ${conditions.telemetria.humSus}%)`);
       }
       setExecLog([...log]);
+
+      // Step 3b: a stuck sensor goes in after the healthy reading and before the pulse, so the pulse's answer and
+      // each reread carry the impossible value.
+      if (Object.keys(conditions.faultyMetrics).length > 0) {
+        setFaultySensors(await api.setFaultySensor(targetSensor.zonaId, conditions.faultyMetrics));
+        log.push(
+          `✓ El sensor de ${targetSensor.zonaId} queda trabado en ${Object.entries(conditions.faultyMetrics)
+            .map(([metric, value]) => `${metric} = ${value}`)
+            .join(', ')}`,
+        );
+        setExecLog([...log]);
+      }
 
       // Step 4: register the prior diagnosis. It must exist before the pulse: that is the only
       // moment the engine decides, and the rule acts once per new diagnosis.
@@ -317,6 +345,25 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
                 <span>{zonaId} no contesta LEER_AHORA</span>
                 <button type="button" onClick={() => void releaseZone(zonaId)}>
                   Volver a responder
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {Object.keys(faultySensors).length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <p className="sectionTitle" style={{ marginBottom: 6 }}>Sensores con falla</p>
+            {Object.entries(faultySensors).map(([zonaId, metrics]) => (
+              <div key={zonaId} className="row" style={{ alignItems: 'center', gap: 12 }}>
+                <span>
+                  {zonaId} manda siempre{' '}
+                  {Object.entries(metrics)
+                    .map(([metric, value]) => `${metric} = ${value}`)
+                    .join(', ')}
+                </span>
+                <button type="button" onClick={() => void repairSensor(zonaId)}>
+                  Reparar sensor
                 </button>
               </div>
             ))}

@@ -11,7 +11,7 @@
    backend used, including the low-battery macro-zone, which exists to exercise the
    "Batería Baja" alert (HU-21 CA-02).
    ============================================================ */
-import { macroZoneIndex, type ContractMetrics, type TelemetryPayload } from './contract.ts';
+import { macroZoneIndex, toContractUnits, type ContractMetrics, type MetricKey, type TelemetryPayload } from './contract.ts';
 import { publish } from './mqtt.ts';
 import { fetchFromBackend } from './proxy.ts';
 
@@ -28,6 +28,16 @@ let active = false;
  * empty, so launching the simulator never leaves a zone mute from a previous session.
  */
 const silenced = new Set<string>();
+
+/** A reading in UI units (`ce` in dS/m): the metrics a faulty sensor is stuck on. */
+export type FaultyMetrics = Partial<Record<MetricKey, number>>;
+
+/**
+ * Sensors stuck on a value (scenario "Lectura inválida"): macro-zone → the metrics every reading of that zone carries
+ * over the random ones, however many times the backend asks again. In memory, like `silenced`: it always starts empty.
+ * Values are kept in UI units (what the operator typed) and converted to contract units when published.
+ */
+const faulty = new Map<string, FaultyMetrics>();
 
 /** Collaborators, replaceable in tests (see setDependencies). Defaults are the real ones. */
 interface Dependencies {
@@ -80,7 +90,7 @@ async function emitZone(i: number): Promise<void> {
     battery: i === LOW_BATTERY_ZONE ? Math.floor(around(12, 8)) : Math.floor(around(70, 30)),
     signal: Math.floor(-55 - Math.random() * 35), // dBm: -55 to -89
     timestamp: Date.now(),
-    metrics: randomMetrics(),
+    metrics: { ...randomMetrics(), ...toContractUnits(faulty.get(`MZ-${i}`) ?? {}) },
   };
   await deps.publish(`MZ-${i}`, payload);
 }
@@ -124,6 +134,20 @@ export async function answerReadNow(zonaId: string): Promise<void> {
 export function setSilenced(zonaId: string, on: boolean): void {
   if (on) silenced.add(zonaId);
   else silenced.delete(zonaId);
+}
+
+/**
+ * Sticks the sensor of a zone on `metrics` (UI units) until it is repaired: every reading it publishes carries them.
+ * Replaces the previous fault of the zone; `null` or an empty set repairs it. Idempotent.
+ */
+export function setFaultyMetrics(zonaId: string, metrics: FaultyMetrics | null): void {
+  if (metrics === null || Object.keys(metrics).length === 0) faulty.delete(zonaId);
+  else faulty.set(zonaId, { ...metrics });
+}
+
+/** Faulty sensors by zone, in UI units. */
+export function faultyMetrics(): Record<string, FaultyMetrics> {
+  return Object.fromEntries([...faulty].map(([zone, metrics]) => [zone, { ...metrics }]));
 }
 
 export function isSilenced(zonaId: string): boolean {

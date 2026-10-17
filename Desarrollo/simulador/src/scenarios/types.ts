@@ -18,6 +18,10 @@ export interface ThresholdMap {
   uvUmbral: number;
   /** Minimum diagnosis confidence (%) for the diagnosis-driven rules to act. */
   confianzaMinima: number;
+  /** Physical upper limit of a humidity reading (%): above it the backend discards the reading (S-03). */
+  humedadMaxima: number;
+  /** Rereads the backend asks for after an out-of-range value, before discarding the metric (S-03). */
+  relecturasInvalidas: number;
 }
 
 /** What the AI diagnosis must say for the rule to act; the sector and capture are resolved at dispatch. */
@@ -52,6 +56,11 @@ export interface ScenarioPatch {
   pulses?: number;
   /** A manual lock to create BEFORE the pulse, over the target zone (or the sector the operator picks). */
   manualLock?: { reason: string };
+  /**
+   * Metrics the target zone's sensor gets stuck on: every reading it publishes (the answer to the pulse and to each
+   * reread) carries them, until the operator repairs the sensor. They are NOT published as a reading of their own.
+   */
+  faultySensor?: Record<string, TelemetryClaim>;
 }
 
 export interface ScenarioConflict {

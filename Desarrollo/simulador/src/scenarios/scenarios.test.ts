@@ -81,7 +81,7 @@ test('R-01 or R-03 together with R-04 also reset the cooldowns', () => {
 test('the registry keeps the order and keys of the original catalog', () => {
   assert.deepEqual(
     SCENARIOS.map((s) => s.key),
-    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK'],
+    ['R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING'],
   );
 });
 
@@ -188,6 +188,65 @@ test('a lock cannot be shown next to saturated soil or a silent node: the cause 
 test('the lock scenario coexists with the dry-soil rules', () => {
   for (const other of ['R01', 'R02']) {
     assert.equal(calculateConditions([other, 'LOCK'], thresholds).conflictos.length, 0, other);
+  }
+});
+
+/* ------------------------------------------------------------------ lectura inválida (S-03) */
+
+test('the invalid-reading scenario sticks the soil humidity above the physical limit, without publishing it', () => {
+  const result = calculateConditions(['INVALID_READING'], thresholds);
+  // 112 % with the factory limit of 100 %: the value of the v2 example.
+  assert.deepEqual(result.faultyMetrics, { humSus: 112 });
+  assert.ok(result.faultyMetrics.humSus > thresholds.humedadMaxima);
+  // The healthy reading goes out as always; the fault only rides on the answers to LEER_AHORA of the pulse, so the
+  // whole reread-and-discard flow happens inside the pulse the engine decides on.
+  assert.equal(result.telemetria.humSus, 55);
+  assert.equal(result.pulses, 1);
+  assert.equal(result.needsCooldownReset, false);
+  assert.equal(result.silenceZone, false);
+  assert.equal(result.manualLock, null);
+  assert.equal(result.clima, null);
+  assert.equal(result.diagnostico, null);
+  assert.match(result.resumen.join(' | '), /112/);
+  assert.match(result.resumen.join(' | '), /emisión automática/);
+});
+
+test('the impossible value follows the catalog limit instead of a loose number', () => {
+  const strict = { ...thresholds, humedadMaxima: 90 };
+  assert.equal(calculateConditions(['INVALID_READING'], strict).faultyMetrics.humSus, 102);
+});
+
+test('without it no sensor is stuck', () => {
+  assert.deepEqual(calculateConditions(['R01'], thresholds).faultyMetrics, {});
+});
+
+test('the physical limit and the rereads come from the backend catalog, with the v2 values as fallback', () => {
+  assert.equal(DEFAULT_THRESHOLDS['seguridad.rango-hum-max'], 100);
+  assert.equal(DEFAULT_THRESHOLDS['seguridad.relecturas-invalidas'], 2);
+  assert.equal(buildThresholds([]).humedadMaxima, 100);
+  assert.equal(buildThresholds([]).relecturasInvalidas, 2);
+});
+
+test('the invalid-reading scenario exercises ReadingValidationGuard and needs no prior diagnosis', () => {
+  const scenario = SCENARIOS.find((s) => s.key === 'INVALID_READING');
+  assert.deepEqual(scenario?.backendRules, ['ReadingValidationGuard']);
+  assert.equal(scenario?.needsDiagnosis, false);
+  assert.equal(scenario?.branch, 'GLOBAL');
+});
+
+test('a stuck humidity sensor cannot be mixed with anything that needs the soil humidity or an answering node', () => {
+  for (const other of ['R01', 'R02', 'R03', 'R04', 'LOCK', 'NODE_OFFLINE']) {
+    for (const selected of [[other, 'INVALID_READING'], ['INVALID_READING', other]]) {
+      const result = calculateConditions(selected, thresholds);
+      assert.equal(result.conflictos.length, 1, selected.join('+'));
+      assert.deepEqual(result.faultyMetrics, {}, 'with a conflict nothing is applied');
+    }
+  }
+});
+
+test('a stuck humidity sensor coexists with the shading and the diagnosis-driven rules', () => {
+  for (const other of ['SHADING', 'SUPPLY']) {
+    assert.equal(calculateConditions([other, 'INVALID_READING'], thresholds).conflictos.length, 0, other);
   }
 });
 

@@ -126,6 +126,26 @@ export async function setZoneSilenced(zonaId: string, silenced: boolean): Promis
   return json(res, 'cambiar si la zona responde la lectura');
 }
 
+/** Sensors stuck on a value, by macro-zone: the metrics (UI units) every reading of that zone carries. */
+export type FaultySensors = Record<string, Record<string, number>>;
+
+export async function getFaultySensors(): Promise<FaultySensors> {
+  return json(await fetch('/api/faulty-sensors'), 'consultar los sensores con falla');
+}
+
+/**
+ * Sticks the sensor of a zone on `metrics` (UI units) so every reading it publishes carries them, or repairs it when
+ * `metrics` is empty. The values are not range-checked on purpose: the backend is the one that has to reject them.
+ */
+export async function setFaultySensor(zonaId: string, metrics: Record<string, number>): Promise<FaultySensors> {
+  const res = await fetch(`/api/faulty-sensors/${encodeURIComponent(zonaId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metrics }),
+  });
+  return json(res, 'cambiar el sensor con falla');
+}
+
 /* ----------------------------------------------------------------
    The platform's public API (through the proxy)
    ---------------------------------------------------------------- */

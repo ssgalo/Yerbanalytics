@@ -2,10 +2,12 @@ import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   answerReadNow,
+  faultyMetrics,
   isActive,
   isSilenced,
   setActive,
   setDependencies,
+  setFaultyMetrics,
   setSilenced,
   silencedZones,
 } from './emission.ts';
@@ -32,6 +34,7 @@ afterEach(() => {
   setActive(false);
   setDependencies();
   silencedZones().forEach((zone) => setSilenced(zone, false));
+  Object.keys(faultyMetrics()).forEach((zone) => setFaultyMetrics(zone, null));
 });
 
 test('a LEER_AHORA for a known macro-zone is answered with exactly one reading for that zone', async () => {
@@ -86,6 +89,89 @@ test('silencing is idempotent and reported', () => {
   setSilenced('MZ-1', false);
   setSilenced('MZ-1', false);
   assert.deepEqual(silencedZones(), []);
+});
+
+/* ------------------------------------------------------------------ faulty sensor (S-03) */
+
+test('a faulty metric rides on every answer to LEER_AHORA, however many times the backend asks again', async () => {
+  setActive(true);
+  await settle();
+  published.length = 0;
+  setFaultyMetrics('MZ-2', { humSus: 112 });
+  for (let i = 0; i < 5; i++) await answerReadNow('MZ-2');
+  assert.equal(published.length, 5);
+  for (const p of published) assert.equal(p.payload.metrics.humSus, 112);
+});
+
+test('the rest of the reading stays a normal random one', async () => {
+  setActive(true);
+  await settle();
+  published.length = 0;
+  setFaultyMetrics('MZ-2', { humSus: 112 });
+  await answerReadNow('MZ-2');
+  const m = published[0].payload.metrics;
+  assert.ok(m.temp !== undefined && m.temp >= 17 && m.temp <= 28, 'temp is still random');
+  assert.ok(m.phSuelo !== undefined && m.phSuelo >= 4.8 && m.phSuelo <= 6.2, 'pH is still random');
+});
+
+test('only the faulty zone is affected', async () => {
+  setActive(true);
+  await settle();
+  published.length = 0;
+  setFaultyMetrics('MZ-2', { humSus: 112 });
+  await answerReadNow('MZ-1');
+  assert.ok((published[0].payload.metrics.humSus ?? 0) <= 63, 'MZ-1 reads a normal humidity');
+});
+
+test('the boot round carries the fault too', async () => {
+  setFaultyMetrics('MZ-3', { humSus: 130 });
+  setActive(true);
+  await settle();
+  const mz3 = published.find((p) => p.zoneId === 'MZ-3');
+  assert.equal(mz3?.payload.metrics.humSus, 130);
+});
+
+test('the fault is given in UI units: a conductivity in dS/m travels in µS/cm', async () => {
+  setActive(true);
+  await settle();
+  published.length = 0;
+  setFaultyMetrics('MZ-1', { ce: 12 });
+  await answerReadNow('MZ-1');
+  assert.equal(published[0].payload.metrics.ce, 12000);
+});
+
+test('repairing the sensor brings back normal readings', async () => {
+  setActive(true);
+  await settle();
+  published.length = 0;
+  setFaultyMetrics('MZ-2', { humSus: 112 });
+  setFaultyMetrics('MZ-2', null);
+  await answerReadNow('MZ-2');
+  assert.ok((published[0].payload.metrics.humSus ?? 0) <= 63);
+  assert.deepEqual(faultyMetrics(), {});
+});
+
+test('an empty set of metrics is the same as repairing it', () => {
+  setFaultyMetrics('MZ-2', { humSus: 112 });
+  setFaultyMetrics('MZ-2', {});
+  assert.deepEqual(faultyMetrics(), {});
+});
+
+test('faults are reported by zone, in UI units, and replacing one drops the previous metrics', () => {
+  setFaultyMetrics('MZ-2', { humSus: 112, temp: 90 });
+  setFaultyMetrics('MZ-2', { phSuelo: 11 });
+  setFaultyMetrics('MZ-1', { ce: 12 });
+  assert.deepEqual(faultyMetrics(), { 'MZ-2': { phSuelo: 11 }, 'MZ-1': { ce: 12 } });
+});
+
+test('a fault does not make a silenced zone answer', async () => {
+  setActive(true);
+  await settle();
+  published.length = 0;
+  setFaultyMetrics('MZ-2', { humSus: 112 });
+  setSilenced('MZ-2', true);
+  await answerReadNow('MZ-2');
+  assert.equal(published.length, 0);
 });
 
 test('a LEER_AHORA for an unknown zone is ignored', async () => {
