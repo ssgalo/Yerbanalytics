@@ -119,6 +119,10 @@ public final class MapaPermisos {
         // Pulso de sensado manual ("Leer ahora" / "Leer y ejecutar motor"): se opera desde Demo Expo.
         permiso(r, post, "/api/pulsos", Permiso.PASADAS_OPERAR);
 
+        permiso(r, get, "/api/bloqueos", Permiso.BLOQUEOS_VER);
+        permiso(r, post, "/api/bloqueos", Permiso.BLOQUEOS_GESTIONAR);
+        permiso(r, HttpMethod.DELETE, "/api/bloqueos/**", Permiso.BLOQUEOS_GESTIONAR);
+
         // Demo (solo existe cuando yerbanalytics.demo.enabled=true; en producción los controllers no se registran)
         permiso(r, null, "/api/demo/**", Permiso.SIMULACION_GESTIONAR);
 

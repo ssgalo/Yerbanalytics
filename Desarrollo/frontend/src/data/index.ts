@@ -12,6 +12,7 @@ import { MockSeguridadRepository } from './mock/mockSeguridadRepository';
 export type { DataRepository } from './repository';
 export type { SeguridadRepository } from './seguridadRepository';
 export { ParametrosInvalidosError } from './parametrosError';
+export { ManualLockError } from './manualLockError';
 export { PasadaRechazadaError } from './pasadaError';
 export { PlanRustificacionError } from './planRustificacionError';
 export {

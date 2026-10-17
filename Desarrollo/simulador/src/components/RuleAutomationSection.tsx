@@ -8,7 +8,8 @@
      2. Injects simulated weather when needed (R-03 / ShadingRule).
      3. Publishes the calculated MQTT telemetry for the target sensor.
      4. Registers the prior AI diagnosis (SupplyRule only acts on a NEW one).
-     5. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
+     5. Creates the manual lock the "Bloqueo manual" scenario asks for (before the pulse).
+     6. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
 
    The "node without answer" scenario is the exception: it silences the target zone instead of
    publishing telemetry, so the pulses find no answer.
@@ -18,7 +19,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
-import type { DemoRule, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
+import type { DemoRule, ManualLock, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
 import { buildThresholds, calculateConditions } from '../ruleConditions';
 import { runPulses } from '../pulseChain';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
@@ -41,11 +42,28 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const [execLog, setExecLog] = useState<string[]>([]);
   const [execError, setExecError] = useState<string | null>(null);
   const [silencedZones, setSilencedZones] = useState<string[]>([]);
+  const [manualLocks, setManualLocks] = useState<ManualLock[]>([]);
+  // '' = lock the whole zone; otherwise the id of one of its sectors.
+  const [lockSectorId, setLockSectorId] = useState('');
 
   // Zones the simulator keeps mute: they stay that way until released, so they are shown after the run.
   useEffect(() => {
     api.getSilencedZones().then(setSilencedZones).catch(() => setSilencedZones([]));
   }, []);
+
+  // Manual locks in force: the scenario creates them and they stay until lifted, so they are listed here.
+  useEffect(() => {
+    api.getManualLocks().then(setManualLocks).catch(() => setManualLocks([]));
+  }, []);
+
+  const liftLock = async (id: number) => {
+    try {
+      await api.releaseManualLock(id);
+      setManualLocks(await api.getManualLocks());
+    } catch (e) {
+      setExecError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const releaseZone = async (zonaId: string) => {
     try {
@@ -107,6 +125,9 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   // The diagnosis is per sector, the sensing per zone: the first sector of the target zone stands in.
   const diagnosisSector = sectors.find((s) => s.zonaId === targetSensor?.zonaId);
   const missingDiagnosisSector = conditions?.diagnostico != null && !diagnosisSector;
+  const zoneSectors = sectors.filter((s) => s.zonaId === targetSensor?.zonaId);
+  // A sector picked for a previous zone is not valid for this one.
+  const lockSector = zoneSectors.find((s) => s.id === lockSectorId);
 
   const execute = async () => {
     if (!targetSensor || !conditions || selectedRules.size === 0) return;
@@ -161,7 +182,27 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         setExecLog([...log]);
       }
 
-      // Step 5: trigger the sensing pulse(s) with motor. A chain waits for each pulse to end before asking
+      // Step 5: the manual lock goes in before the pulse: that is the only moment the engine decides, and
+      // the point is to see it NOT irrigate. An existing lock on the same scope is fine (409): it already does the job.
+      if (conditions.manualLock) {
+        const scope = lockSector ? `el sector ${lockSector.id}` : `la zona ${targetSensor.zonaId}`;
+        try {
+          const created = await api.createManualLock({
+            zonaId: targetSensor.zonaId,
+            ...(lockSector && { sectorId: lockSector.id }),
+            motivo: conditions.manualLock.reason,
+          });
+          log.push(`✓ Bloqueo manual #${created.id} creado sobre ${scope}`);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (!msg.toLowerCase().includes('ya tiene un bloqueo')) throw e;
+          log.push(`✓ ${scope} ya estaba bloqueada: se usa ese bloqueo`);
+        }
+        setManualLocks(await api.getManualLocks());
+        setExecLog([...log]);
+      }
+
+      // Step 6: trigger the sensing pulse(s) with motor. A chain waits for each pulse to end before asking
       // for the next, because the backend runs one at a time.
       await runPulses(conditions.pulses, {
         trigger: () => api.triggerSensingPulse(true),
@@ -282,6 +323,22 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           </div>
         )}
 
+        {manualLocks.length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <p className="sectionTitle" style={{ marginBottom: 6 }}>Bloqueos vigentes</p>
+            {manualLocks.map((l) => (
+              <div key={l.id} className="row" style={{ alignItems: 'center', gap: 12 }}>
+                <span>
+                  {l.sectorId ? `Sector ${l.sectorId}` : `Zona ${l.zonaId}`} · {l.motivo} ({l.activadoPor})
+                </span>
+                <button type="button" onClick={() => void liftLock(l.id)}>
+                  Levantar bloqueo
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Conflict warnings */}
         {conditions && conditions.conflictos.length > 0 && (
           <div className="errorMsg" style={{ marginTop: 12 }}>
@@ -295,6 +352,22 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           <div className="errorMsg" style={{ marginTop: 12 }}>
             La zona {targetSensor?.zonaId} no tiene sectores en la topología vigente: no hay dónde
             registrar el diagnóstico que necesita la dosificación.
+          </div>
+        )}
+
+        {conditions?.manualLock && (
+          <div className="row" style={{ marginTop: 12 }}>
+            <label className="field">
+              <span className="label">Alcance del bloqueo</span>
+              <select value={lockSector?.id ?? ''} onChange={(e) => setLockSectorId(e.target.value)}>
+                <option value="">Toda la zona {targetSensor?.zonaId}</option>
+                {zoneSectors.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Sólo el sector {s.id}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         )}
 

@@ -50,6 +50,8 @@ export interface ScenarioPatch {
   silenceZone?: boolean;
   /** Sensing pulses to request, one after the other. Defaults to one. */
   pulses?: number;
+  /** A manual lock to create BEFORE the pulse, over the target zone (or the sector the operator picks). */
+  manualLock?: { reason: string };
 }
 
 export interface ScenarioConflict {

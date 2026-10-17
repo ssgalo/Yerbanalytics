@@ -243,7 +243,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay siete scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay ocho scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -257,6 +257,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   (un No concluyente no tiene score).
 > - `resources/migracion-confianza-70.sql` — borra las confianzas mínimas guardadas por encima de 95 %,
 >   que el rango nuevo (50–95 %, fábrica 70 %) no admite.
+> - `resources/migracion-permisos-bloqueo.sql` — agrega `bloqueos.ver`/`bloqueos.gestionar` a la matriz de una
+>   base ya sembrada (la matriz sólo se siembra si está vacía).
 >
 > Detalle en el README del backend.
 
@@ -277,6 +279,9 @@ cd Desarrollo/backend
 - `POST /api/pulsos {ejecutarMotor}` → pulso de sensado manual de todas las zonas, sólo por API; `409` si hay
   uno en curso. En Demo Expo, la lectura con motor es la secuencia `LECTURA` con `ejecutarMotor` (sólo la zona
   de la secuencia). Ver "Pulso de sensado" en el README del backend.
+- `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{id}` → bloqueo manual de la actuación autónoma por sector o
+  macro-zona (S-01): al activar cierra válvulas y bombas y cancela el riego encolado; reanudar no repone nada.
+  Un bloqueo es de un sector o de una zona, nunca de los dos. Ver "Bloqueo manual" en el README del backend.
 - `POST /api/auth/login`, `GET /api/auth/perfil`, `POST /api/auth/actividad|logout`,
   `PUT /api/auth/clave` → sesión. `/api/usuarios/**`, `/api/roles/**`, `/api/seguridad/politica`,
   `GET /api/auditoria` → gestión de seguridad (HU-01 / HU-20). Ver "Autenticación y permisos" en

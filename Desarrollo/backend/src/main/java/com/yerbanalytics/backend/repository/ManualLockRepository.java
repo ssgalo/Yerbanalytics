@@ -29,5 +29,8 @@ public interface ManualLockRepository extends JpaRepository<ManualLockEntity, Lo
      * in memory as two sets.
      */
     List<ManualLockEntity> findByActiveTrue();
+
+    /** Active locks, newest first (what the dashboard lists). */
+    List<ManualLockEntity> findByActiveTrueOrderByActivatedAtDesc();
 }
 

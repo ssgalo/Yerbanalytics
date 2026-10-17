@@ -49,6 +49,14 @@ Corré `src/main/resources/migracion-diagnostico-detecciones.sql` (antes o despu
 versión nueva; es idempotente). No se pierde nada. Para volver a la versión anterior, primero
 `UPDATE diagnostico SET conf = 0 WHERE conf IS NULL`: el backend viejo lee `conf` en un `double`.
 
+### Migración manual pendiente · permisos del bloqueo manual
+
+`bloqueos.ver` y `bloqueos.gestionar` son permisos nuevos y la matriz se siembra **sólo si `rol_permiso` está
+vacía**: una base anterior no los tiene y nadie (salvo quien edite la matriz) podría ver ni gestionar bloqueos.
+Corré `src/main/resources/migracion-permisos-bloqueo.sql` (idempotente, antes o después de arrancar) para
+agregar los de la matriz por defecto. No toca lo que el Administrador editó. Se aplican al reiniciar el backend
+(la matriz vive en memoria).
+
 ### Migración manual pendiente · confianza mínima 70 %
 
 `diagnostico.confianza-minima` pasó de 85 a **70 %** de fábrica y su rango de 50–100 a **50–95 %**
@@ -263,6 +271,7 @@ ninguna rama para ellos: son usuarios como cualquier otro.
 | `GET /api/capturas/**` / `POST /api/capturas/ordenes` | `capturas.ver` / `capturas.ordenar` |
 | `/api/camara/vinculacion`, `/api/camara/dispositivos/**` | `camara.gestionar` |
 | `GET` / `POST /api/pasadas/**` | `pasadas.ver` / `pasadas.operar` |
+| `GET` / `POST`,`DELETE /api/bloqueos/**` | `bloqueos.ver` / `bloqueos.gestionar` |
 | `/api/usuarios/**`, `/api/roles/**`, `/api/seguridad/politica` | `usuarios.gestionar` |
 | `GET /api/auditoria/**` | `auditoria.ver` |
 | `/api/auth/perfil`, `/actividad`, `/logout`, `/clave` | sólo sesión |
@@ -756,6 +765,31 @@ sin cámara conectada) deja una alerta `WARNING` de la macro-zona del recorrido 
 `GET`/`PUT /api/configuracion/demo-expo` (`{"visible": true|false}`; `400` si falta `visible`) decide si
 el dashboard muestra la pestaña. Se guarda en `preferencia_dashboard` (fila única), que crea
 Hibernate: no hay migración manual. Sólo oculta la pestaña; los endpoints de pasada no dependen de él.
+
+## Bloqueo manual (`/api/bloqueos`, HU-19 · reglas_v2 S-01)
+
+Suspende la actuación autónoma sobre un **sector** o una **macro-zona**. Se crea y se reanuda; no se edita.
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /api/bloqueos?zona=&sector=` | Vigentes, del más nuevo al más viejo. `zona` incluye los de sus sectores |
+| `POST /api/bloqueos {zonaId, sectorId?, motivo}` | Bloquea. `201`; `400` sin zona o motivo, o alcance inexistente; `409` si ya está bloqueado |
+| `DELETE /api/bloqueos/{id}` | Reanuda (desactiva, no borra: se conserva quién y cuándo). `204`; `404` si no existe o ya se reanudó |
+
+- **Quién bloquea sale de la sesión**, no del cuerpo.
+- **Un bloqueo es de un sector o de una zona, nunca de los dos.** `NurseryService` y `DespachoRiego` tratan cualquier
+  bloqueo con `zonaId` como bloqueo de toda la zona, así que uno de sector se guarda con `zonaId = null` (la respuesta
+  sí informa su zona). No guardar los dos: bloquearía toda la zona.
+- **Al activar** (`ManualLockService`): se cancela el riego encolado del alcance y se ordena cerrar las válvulas y
+  detener las bombas registradas (`ActuatorShutdown`, el mismo mecanismo del estado seguro de la zona). La
+  **mediasombra no se mueve**: queda como está. Si el broker o el historial fallan, el bloqueo ya está guardado.
+- **Al reanudar** no se repone nada: decide la próxima lectura.
+- Cada activación y reanudación deja una **alerta `INFO`** en el historial (usuario, alcance y motivo), atribuida a
+  `ManualLockRule`.
+- `ManualLockRule` (prioridad 0, `ABORT_ALL`) corta la cadena del sector, y con ella a `ShadingRule`: el bloqueo de una
+  zona llega a cada uno de sus sectores. Cuando exista la evaluación por zona (`add-mediasombra-v2`), M-01/M-02 deben
+  consultar el bloqueo de la zona (`ManualLockShadingTest` fija el comportamiento).
+- Desde el simulador: apagar la regla, el bypass `lock` y el escenario «Bloqueo manual» (README del simulador).
 
 ## Historial de lecturas
 

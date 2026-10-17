@@ -9,6 +9,7 @@ vigente; se retira en el 7.
 - [ ] 0.3 Confirmar D-5 (varias ventanas por etapa) con el equipo. **Es un cambio de alcance que sí se hace** (bloque 5), pero cambia un contrato del front ya construido.
 
 ## 1. Pronóstico (se resuelve en `add-control-demo-reglas` §2)
+- [ ] 0.4 **Bloqueo manual (S-01, `add-bloqueo-manual` D-2):** la evaluación por macro-zona (`ZoneRuleEngine`, M-01/M-02) debe respetar el bloqueo de la zona: con un bloqueo vigente (de la zona, o de un sector si la regla mueve por sector) la mediasombra no recibe órdenes. Hoy lo cumple `ShadingRule` porque `ManualLockRule` corta la cadena de cada sector; `ManualLockShadingTest` fija ese comportamiento y hay que extenderlo a la regla por zona (consultar `ManualLockRepository` por `zonaId` sin sector).
 - [ ] 1.1 `add-control-demo-reglas` ya dejó `WeatherForecast.PronosticoHora.tempC()` (temperatura por marca horaria) y `WeatherForecast.uvMaxDia()`. No hay un método `temperaturaHora(...)`: si M-02 lo necesita, se agrega acá sobre `horas()`. Verificar con un test lo que M-02 lee y seguir.
 - [ ] 1.2 `OpenMeteoWeatherClient` ya completa la temperatura por hora (`temperature_2m`) y calcula `uvMaxDia` como el máximo de `uv_index` del día local de hoy (no pide `uv_index_max`). Confirmar que alcanza para M-02.
 

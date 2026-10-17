@@ -191,6 +191,15 @@ dashboard. La zona sigue muda hasta pulsar «Volver a responder» (`PUT /api/sil
 Los controles de la pieza `EscalamientoNodo` (apagar, bypass `safe-state`, cooldown `retry-offline`) están en
 Telemetría → Control de reglas.
 
+**Bloqueo manual (S-01).** El escenario `LOCK` (accionable sobre `ManualLockRule`) publica el sustrato seco de R-01 y
+pide `manualLock`: antes del pulso crea un bloqueo por `POST /backend/api/bloqueos`, sobre toda la zona o sobre un
+sector (selector «Alcance del bloqueo»). El pulso con motor no debe ordenar riego y la traza del sector muestra el
+bloqueo como causa. El bloqueo queda vigente hasta que se lo levanta en «Bloqueos vigentes» (`DELETE
+/backend/api/bloqueos/{id}`); si ya había uno sobre ese alcance se usa ese. No se puede combinar con R-04 ni con
+«Nodo sin respuesta»: la causa de que no se riegue sería ambigua. La cuenta de rol Servicio necesita
+`bloqueos.ver` y `bloqueos.gestionar` (vienen en la matriz por defecto; en una base ya sembrada, correr
+`migracion-permisos-bloqueo.sql` del backend).
+
 ---
 
 ## Qué endpoints del sistema usa

@@ -17,14 +17,15 @@ class PermisoTest {
     void laMatrizPorDefectoEsLaDeLaSpec() {
         assertThat(Permiso.matrizPorDefecto(Rol.ADMINISTRADOR)).containsExactlyInAnyOrder(Permiso.values());
         assertThat(codigos(Rol.OPERARIO)).containsExactlyInAnyOrder(
-                "vivero.ver", "diagnosticos.ver", "historial.ver", "capturas.ver", "pasadas.ver");
+                "vivero.ver", "diagnosticos.ver", "historial.ver", "capturas.ver", "pasadas.ver",
+                "bloqueos.ver", "bloqueos.gestionar");
         assertThat(codigos(Rol.SERVICIO)).containsExactlyInAnyOrder("vivero.ver", "topologia.ver", "capturas.ver",
                 "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar",
-                "simulacion.gestionar");
-        assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar")
+                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar");
+        assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar", "bloqueos.ver", "bloqueos.gestionar")
                 .doesNotContain("auditoria.ver", "pasadas.operar", "usuarios.gestionar");
-        assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver")
-                .doesNotContain("auditoria.ver", "reglas.editar");
+        assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver")
+                .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar");
     }
 
     @Test

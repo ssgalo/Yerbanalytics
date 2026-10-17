@@ -50,7 +50,7 @@ class EscalamientoNodoServiceTest {
         zonas = mock(ZonaRepository.class);
         historial = mock(HistorialService.class);
         safeState = mock(ZoneSafeState.class);
-        when(safeState.order(anyString())).thenReturn(new ZoneSafeState.Result(3, 0));
+        when(safeState.order(anyString())).thenReturn(new ActuatorShutdown.Result(3, 0));
         service = nuevoServicio(Clock.fixed(Instant.parse("2026-10-14T13:00:00Z"), ZoneOffset.UTC));
         mz3 = new ZonaEntity();
         mz3.setId("MZ-3");

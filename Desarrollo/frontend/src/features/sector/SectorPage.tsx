@@ -1,9 +1,9 @@
 /* ============================================================
    Página de detalle de sector.
 
-   Tres tarjetas: el último diagnóstico de IA (izquierda), el
+   Cuatro tarjetas: el último diagnóstico de IA (izquierda), el
    seguimiento post-acción (derecha) y el historial de acciones del
-   sector (abajo, a todo el ancho). Los valores sensados son de la
+   sector y el bloqueo manual (abajo, a todo el ancho). Los valores sensados son de la
    macro-zona (un nodo testigo por MZ) y viven en su panel.
    ============================================================ */
 import { useMemo } from 'react';
@@ -17,6 +17,7 @@ import type { HistoryEntry } from '@/types/domain';
 import { DiagnosisCard } from './components/DiagnosisCard';
 import { PostActionCard } from './components/PostActionCard';
 import { SectorHistory } from './components/SectorHistory';
+import { ManualLockCard } from '@/features/manual-lock/ManualLockCard';
 
 import styles from './SectorPage.module.css';
 
@@ -101,6 +102,9 @@ export function SectorPage() {
           isOffline={sector.status === 'offline'}
         />
         <PostActionCard evo={detail.evo} />
+        <div className={styles.full}>
+          <ManualLockCard zonaId={zona?.id ?? sector.zona} sectorId={sector.id} label={`el sector ${sector.id}`} />
+        </div>
         <div className={styles.full}>
           <SectorHistory hist={realHistory} />
         </div>
