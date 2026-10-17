@@ -63,15 +63,15 @@ class SupplyRuleTest {
 
     @Test
     void criticoConConfianzaIgualAlUmbral_dosifica() {
-        List<RuleAction> acciones = evaluar(rule, con("critical", 85.0));
+        List<RuleAction> acciones = evaluar(rule, con("critical", 70.0));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ACTIVAR_BOMBA);
-        assertThat(acciones.get(0).motivo()).contains("Clorosis").contains("85");
+        assertThat(acciones.get(0).motivo()).contains("Clorosis").contains("70");
     }
 
     @Test
     void criticoConConfianzaBajoElUmbral_noDosifica() {
-        List<RuleAction> acciones = evaluar(rule, con("critical", 84.9));
+        List<RuleAction> acciones = evaluar(rule, con("critical", 69.9));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);
         assertThat(acciones.get(0).motivo()).contains("No se dosifica");
@@ -97,7 +97,7 @@ class SupplyRuleTest {
         Comparacion conf = ev.comparaciones().get(1);
         assertThat(conf.configurable()).isTrue();
         assertThat(conf.operador()).isEqualTo(Operador.GE);
-        assertThat(conf.umbral()).isEqualTo(85.0);
+        assertThat(conf.umbral()).isEqualTo(70.0);
         assertThat(conf.clave()).isEqualTo("diagnostico.confianza-minima");
     }
 

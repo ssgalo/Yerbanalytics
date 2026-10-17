@@ -13,7 +13,7 @@ public enum ParametrosDiagnostico implements DefinicionParametro {
     CONFIANZA_MINIMA("diagnostico.confianza-minima",
             "Confianza mínima del diagnóstico",
             "Un diagnóstico de IA con confianza menor a esta no es concluyente y no dispara dosificación.",
-            TipoParametro.NUMERO, "%", "85", 50.0, 100.0, 0, "motor-reglas: SupplyRule; HU-04 CA-03");
+            TipoParametro.NUMERO, "%", "70", 50.0, 95.0, 0, "reglas_v2 §1.3 y §11; HU-04 CA-03");
 
     private final String clave;
     private final String etiqueta;

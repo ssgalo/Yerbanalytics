@@ -6,15 +6,15 @@ Rama: `feat/reglas-v2-align`.
 ## 0. Decisiones previas
 - [ ] 0.1 Confirmar con el equipo D-2 (tope de R-02), D-3 (guarda de ciclo) y D-6 (escalamiento por pulso).
       Sin respuesta se aplica el default del diseño.
-- [ ] 0.2 Leer `CicloLecturaRiegoRule` completa y `SensingCadence` (no verificado en la auditoría).
+- [x] 0.2 Leer `CicloLecturaRiegoRule` completa y `SensingCadence` (no verificado en la auditoría).
 
 ## 1. Confianza mínima 70 %
-- [ ] 1.1 Test: `CatalogoParametros` siembra 70 con rango 50–95; 97 se rechaza.
-- [ ] 1.2 Cambiar fábrica y rango en `ParametrosDiagnostico.CONFIANZA_MINIMA`.
-- [ ] 1.3 Test: una fila existente con valor distinto no se pisa.
-- [ ] 1.4 `resources/migracion-confianza-70.sql` y entrada en el README del backend (lista de migraciones).
-- [ ] 1.5 Frontend: el rango sale del catálogo; test de que Parámetros muestra 50–95. Sin valores sueltos.
-- [ ] 1.6 Actualizar `servicio-inferencia/README.md` y `env.example` si citan 85 %.
+- [x] 1.1 Test: `CatalogoParametros` siembra 70 con rango 50–95; 97 se rechaza.
+- [x] 1.2 Cambiar fábrica y rango en `ParametrosDiagnostico.CONFIANZA_MINIMA`.
+- [x] 1.3 Test: una fila existente con valor distinto no se pisa.
+- [x] 1.4 `resources/migracion-confianza-70.sql` y entrada en el README del backend (lista de migraciones).
+- [x] 1.5 Frontend: el rango sale del catálogo; test de que Parámetros muestra 50–95. Sin valores sueltos.
+- [x] 1.6 Actualizar `servicio-inferencia/README.md` y `env.example` si citan 85 %.
 
 ## 2. Parámetros de sensado en el catálogo
 - [ ] 2.1 Test: cuatro claves nuevas, fábrica y rango de la tabla del diseño.

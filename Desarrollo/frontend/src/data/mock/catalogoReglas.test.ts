@@ -51,6 +51,13 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
     }
   });
 
+  it('la confianza mínima del diagnóstico es 70 % de fábrica y se edita entre 50 y 95 (reglas_v2 §11)', () => {
+    const p = catalogo.parametros.find((x) => x.clave === 'diagnostico.confianza-minima');
+    expect(p).toMatchObject({ fabrica: '70', min: 50, max: 95 });
+    expect(parametroError(p!, '97')).not.toBeNull();
+    expect(parametroError(p!, '95')).toBeNull();
+  });
+
   it('el valor de fábrica es válido para su propia definición y no está modificado', () => {
     for (const p of catalogo.parametros) {
       expect(parametroError(p, p.fabrica)).toBeNull();

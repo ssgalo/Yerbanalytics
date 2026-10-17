@@ -164,6 +164,23 @@ class CatalogoParametrosServiceTest {
     }
 
     @Test
+    void guardar_laConfianzaMinimaRechazaMasDe95PorCiento() {
+        assertThatThrownBy(() -> service.guardar(List.of(cambio("diagnostico.confianza-minima", "97")), "Ana"))
+                .isInstanceOfSatisfying(ParametrosInvalidosException.class, ex ->
+                        assertThat(ex.getErrores()).extracting(ErrorParametro::clave)
+                                .containsExactly("diagnostico.confianza-minima"));
+
+        assertThat(tabla).isEmpty();
+    }
+
+    @Test
+    void vigentes_unaConfianzaMinimaEditadaPorElAgronomoNoSePisaConLaFabricaNueva() {
+        override("diagnostico.confianza-minima", "80");
+
+        assertThat(service.vigentes().numero("diagnostico.confianza-minima")).isEqualTo(80.0);
+    }
+
+    @Test
     void guardar_normalizaAlFormatoCanonico() {
         service.guardar(List.of(cambio("riego.umbral-humedad", " 50.0 ")), "Ana");
 

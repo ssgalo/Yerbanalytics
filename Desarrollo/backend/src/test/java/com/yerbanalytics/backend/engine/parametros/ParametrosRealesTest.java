@@ -33,7 +33,7 @@ class ParametrosRealesTest {
             Map.entry("mediasombra.apertura-proteccion-uv", 30.0),   // ShadingRule:90
             Map.entry("mediasombra.apertura-maxima", 100.0),         // configuracion_operativa
             Map.entry("readings.retention-days", 14.0),              // add-historial-lecturas D-4
-            Map.entry("diagnostico.confianza-minima", 85.0));        // SupplyRule:34 / capturas.confianza-minima
+            Map.entry("diagnostico.confianza-minima", 70.0));        // reglas_v2 §1.3 y §11 (era 85)
 
     /** Las claves nuevas de riego v2 (tabla D8): tipo, unidad, fábrica, mínimo, máximo y decimales. */
     private record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica,
@@ -58,6 +58,15 @@ class ParametrosRealesTest {
     void cadaFabricaCoincideConElValorActual() {
         VALORES_DE_HOY.forEach((clave, esperado) ->
                 assertThat(catalogo.fabricas().numero(clave)).as(clave).isEqualTo(esperado));
+    }
+
+    @Test
+    void laConfianzaMinimaDelDiagnosticoVaDe50a95PorCiento() {
+        DefinicionParametro d = catalogo.definicion("diagnostico.confianza-minima").orElseThrow();
+
+        assertThat(d.min()).isEqualTo(50.0);
+        assertThat(d.max()).isEqualTo(95.0);
+        assertThat(d.refSpec()).contains("reglas_v2");
     }
 
     @Test

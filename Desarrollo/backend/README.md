@@ -49,6 +49,16 @@ Corré `src/main/resources/migracion-diagnostico-detecciones.sql` (antes o despu
 versión nueva; es idempotente). No se pierde nada. Para volver a la versión anterior, primero
 `UPDATE diagnostico SET conf = 0 WHERE conf IS NULL`: el backend viejo lee `conf` en un `double`.
 
+### Migración manual pendiente · confianza mínima 70 %
+
+`diagnostico.confianza-minima` pasó de 85 a **70 %** de fábrica y su rango de 50–100 a **50–95 %**
+(`reglas_v2` §1.3 y §11). Una base que estaba en la fábrica vieja no tiene fila en `parametro_regla` y
+toma el 70 sola; un valor que alguien editó (p. ej. 80) se respeta. Lo único que queda mal son los
+valores de 96 a 100, que el rango nuevo no admite: el catálogo los ignora y cae a la fábrica.
+
+Corré `src/main/resources/migracion-confianza-70.sql` (idempotente, antes o después de arrancar) para
+borrarlos. No se pierde nada más.
+
 ### Migración manual pendiente · pulso de sensado y pasada diaria
 
 El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso
@@ -593,7 +603,7 @@ bandas de severidad por estado anómalo, en cantidad de hojas, y orden de critic
   de entorno del servicio de inferencia.
 
 > **`SupplyRule` compara ahora el score promedio × 100.** El motor no se tocó en este cambio:
-> `SupplyRule` sigue leyendo `sector.diagnosis_conf` contra `diagnostico.confianza-minima` (85 %), pero
+> `SupplyRule` sigue leyendo `sector.diagnosis_conf` contra `diagnostico.confianza-minima` (70 %), pero
 > ese número dejó de ser "la confianza del diagnóstico" y pasó a ser el score promedio de las
 > detecciones del estado elegido, que con bandas de confianza por clase no es comparable entre
 > clases. Un No concluyente llega con `conf` nulo y la regla lo trata como "sin dato". La regla
