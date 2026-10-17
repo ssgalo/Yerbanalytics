@@ -34,7 +34,8 @@ import java.util.List;
  * @param humRel         humedad relativa en %
  * @param forecastSlots  slots horarios futuros para el widget de previsión
  * @param horas          marcas horarias desde la hora actual hasta +24 h (hora local del vivero), con
- *                       probabilidad y milímetros; vacía si el pronóstico no las trae
+ *                       probabilidad, milímetros y temperatura; vacía si el pronóstico no las trae
+ * @param uvMaxDia       UV máximo previsto para el día de hoy (hora local del vivero); {@code null} si no se conoce
  */
 public record WeatherForecast(
         double probLluviaPct,
@@ -44,12 +45,19 @@ public record WeatherForecast(
         String cond,
         double humRel,
         List<ForecastSlotRaw> forecastSlots,
-        List<PronosticoHora> horas
+        List<PronosticoHora> horas,
+        Double uvMaxDia
 ) {
+    /** Constructor sin UV máximo del día: mantiene la firma de antes de que se agregara. */
+    public WeatherForecast(double probLluviaPct, double uvIndex, Instant timestamp, double tempC, String cond,
+                           double humRel, List<ForecastSlotRaw> forecastSlots, List<PronosticoHora> horas) {
+        this(probLluviaPct, uvIndex, timestamp, tempC, cond, humRel, forecastSlots, horas, null);
+    }
+
     /** Constructor sin horas: mantiene la firma de antes de los milímetros (widget y mediasombra). */
     public WeatherForecast(double probLluviaPct, double uvIndex, Instant timestamp, double tempC, String cond,
                            double humRel, List<ForecastSlotRaw> forecastSlots) {
-        this(probLluviaPct, uvIndex, timestamp, tempC, cond, humRel, forecastSlots, List.of());
+        this(probLluviaPct, uvIndex, timestamp, tempC, cond, humRel, forecastSlots, List.of(), null);
     }
 
     /**
@@ -111,8 +119,15 @@ public record WeatherForecast(
      * @param hora           marca en hora local del vivero (fin de la hora que describe)
      * @param probLluviaPct  probabilidad de precipitación en % (0–100); {@code null} si la API no trajo el dato
      * @param precipitacionMm precipitación prevista en milímetros; {@code null} si la API no trajo el dato
+     * @param tempC          temperatura del aire prevista en °C; {@code null} si la API no trajo el dato
      */
-    public record PronosticoHora(LocalDateTime hora, Double probLluviaPct, Double precipitacionMm) {}
+    public record PronosticoHora(LocalDateTime hora, Double probLluviaPct, Double precipitacionMm, Double tempC) {
+
+        /** Sin temperatura: la marca de antes de que se agregara ese dato. */
+        public PronosticoHora(LocalDateTime hora, Double probLluviaPct, Double precipitacionMm) {
+            this(hora, probLluviaPct, precipitacionMm, null);
+        }
+    }
 
     /**
      * Lluvia prevista en una ventana de horas.

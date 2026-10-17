@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -78,6 +79,8 @@ public class WeatherService {
     private final AtomicReference<WeatherForecast> cache = new AtomicReference<>(null);
     /** Pronóstico ficticio inyectado en modo demo. Tiene prioridad sobre la cache y la API. */
     private final AtomicReference<WeatherForecast> mockForecast = new AtomicReference<>(null);
+    /** Modo demo "sin pronóstico": las consultas responden {@code null} aunque haya mock o cache. */
+    private final AtomicBoolean offlineSimulado = new AtomicBoolean(false);
     /** Cuándo (epoch ms) falló por última vez una consulta completa; {@link #SIN_FALLO} si no hay fallo vigente. */
     private final AtomicLong ultimoFalloMs = new AtomicLong(SIN_FALLO);
     /** El refresco en vuelo (identidad, no valor), o {@code null}. Un refresco colgado se reemplaza pasado {@link #REFRESCO_MAX}. */
@@ -127,10 +130,24 @@ public class WeatherService {
                 forecast.probLluviaPct(), forecast.uvIndex());
     }
 
-    /** Limpia el pronóstico ficticio; los métodos de consulta vuelven a usar la API. */
+    /** Limpia el pronóstico ficticio y el modo sin pronóstico; los métodos de consulta vuelven a usar la API. */
     public void clearMockForecast() {
         mockForecast.set(null);
+        offlineSimulado.set(false);
         log.info("WeatherService: pronóstico ficticio eliminado.");
+    }
+
+    /**
+     * Modo demo "sin pronóstico": mientras esté activo {@link #getForecast()} y {@link #getForecastSinEspera()}
+     * devuelven {@code null}, como si Open-Meteo no respondiera (O-01). Gana sobre un pronóstico ficticio.
+     */
+    public void setOfflineSimulated(boolean offline) {
+        offlineSimulado.set(offline);
+        log.info("WeatherService: modo sin pronóstico simulado {}.", offline ? "activado" : "desactivado");
+    }
+
+    public boolean isOfflineSimulated() {
+        return offlineSimulado.get();
     }
 
     /** Pronóstico ficticio activo, o {@code null} si no hay ninguno. */
@@ -147,6 +164,9 @@ public class WeatherService {
      *         responder (el motor opera en modo degradado) o falló hace menos de {@code failureCacheTtlMs}.
      */
     public WeatherForecast getForecast() {
+        if (offlineSimulado.get()) {
+            return null;
+        }
         WeatherForecast mock = mockForecast.get();
         if (mock != null) {
             log.debug("WeatherService: retornando pronóstico ficticio (modo demo).");
@@ -173,6 +193,9 @@ public class WeatherService {
      * la traza muestra la comparación sin dato (O-01).
      */
     public WeatherForecast getForecastSinEspera() {
+        if (offlineSimulado.get()) {
+            return null;
+        }
         WeatherForecast mock = mockForecast.get();
         if (mock != null) {
             return mock;
