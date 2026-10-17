@@ -16,6 +16,7 @@ import com.yerbanalytics.backend.model.LecturaZonaEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
+import com.yerbanalytics.backend.mqtt.MqttTelemetryReceiver;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.LecturaZonaRepository;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -182,5 +185,24 @@ class NurseryServiceLecturasTest {
                 new MqttTelemetryPayload.MetricsPayload(38.0, null, null, null, null, null, null, null, null, null))))
                 .isInstanceOf(IllegalStateException.class);
         verify(zonaRepository, never()).save(zona);
+    }
+
+    @Test
+    @DisplayName("el JSON del contrato (como lo publica el simulador) llega por el receptor MQTT hasta la serie")
+    void elPayloadDelContratoAlimentaLaSerie() {
+        String json = "{\"mac\":\"AA:BB:CC\",\"battery\":88,\"signal\":-61,\"timestamp\":" + AHORA.toEpochMilli()
+                + ",\"metrics\":{\"humSus\":41.5,\"humAmb\":70,\"temp\":23.5,\"tempSuelo\":19,\"uv\":52,"
+                + "\"ce\":1200,\"phSuelo\":5.4,\"n\":150,\"p\":45,\"k\":180,\"salinidad\":600}}";
+        Message<String> mensaje = MessageBuilder.withPayload(json)
+                .setHeader("mqtt_receivedTopic", "nursery/zone/MZ-1/telemetry").build();
+
+        new MqttTelemetryReceiver(service).processMessage(mensaje);
+
+        LecturaZonaEntity fila = guardada();
+        assertThat(fila.getZonaId()).isEqualTo("MZ-1");
+        assertThat(fila.getHumSus()).isEqualTo(41.5);
+        assertThat(fila.getUv()).isEqualTo(52.0);
+        assertThat(fila.getCe()).as("1200 µS/cm = 1,2 dS/m").isEqualTo(1.2);
+        assertThat(fila.getK()).isEqualTo(180.0);
     }
 }

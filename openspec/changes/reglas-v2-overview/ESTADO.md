@@ -8,7 +8,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | Id | Cambio | Estado | Rama / PR | Depende de | Notas |
 |---|---|---|---|---|---|
 | **C** | `add-control-demo-reglas` | ✅ | `feat/reglas-v2-control-demo` | — | `DemoControllable`, clima simulado completo (24 marcas, UV máximo, modo offline), escenarios en el simulador. Backend: 18 tests ya fallaban en `develop` (`DiagnosticoControllerTest`, `NurseryControllerTest`) |
-| **H** | `add-historial-lecturas` | ⬜ | — | — | Prerrequisito de 4, 7, 8 y 9 |
+| **H** | `add-historial-lecturas` | ✅ | `feat/reglas-v2-historial-lecturas` | — | Tabla `lectura_zona`, `HistorialLecturas`, `RegistroLecturas`, `PurgaLecturas`; parámetro `lecturas.retencion-dias`. Habilita 4, 7, 8 y 9 |
 | 0 | `align-reglas-existentes-v2` | ⬜ | — | C | S-02, confianza 70 %, R-02, guarda de ciclo |
 | 1 | `add-bloqueo-manual` | ⬜ | — | C | S-01 |
 | 2 | `add-seguridad-lectura-hardware` | ⬜ | — | C | S-03, S-04 |
@@ -47,6 +47,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | Pieza | Estado |
 |---|---|
 | Toda pieza de decisión es `DemoControllable` y aparece en `GET /api/demo/rules` | ✅ |
+| Historial de lecturas por zona (`lectura_zona`) y su servicio de consultas | ✅ |
 | Clima simulado con marcas horarias, `uvMaxDia` y temperatura por hora | ✅ |
 | Modo "sin pronóstico" (`PUT /api/demo/weather/offline`) | ✅ |
 | Escenarios por regla en el simulador (`src/scenarios/`) | ✅ (6 reglas actuales migradas) |

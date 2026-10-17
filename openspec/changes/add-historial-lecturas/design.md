@@ -26,8 +26,7 @@ sumando filas parciales.
 `origen ∈ {PULSO, OTRA}`. `PULSO` = respondió a un pulso (con o sin motor). `OTRA` = lectura manual, verificación de
 E-01, secuencia LECTURA, arranque del nodo. Las reglas de "N lecturas seguidas" / "media de 6 lecturas" cuentan sólo `PULSO`
 (una lectura extra de verificación no debe correr la media ni "completar" dos lecturas seguidas). Los máximos/medias de
-ventana temporal (48 h, 72 h) cuentan **todas**. *Requiere ver `pulsos.respondePulso` para decidir si responde también a pulsos sin motor; hoy
-devuelve sólo los de con-motor: se agrega un método hermano `respondeAlgunPulso`.*
+ventana temporal (48 h, 72 h) cuentan **todas**. *Implementado como `PulsoSensadoService.registrarRespuesta`, que devuelve `(respondio, ejecutaMotor)` en una sola operación: marcar la respuesta tiene efecto, así que un método "hermano" que consultara aparte haría que la segunda llamada dijera que no. `respondePulso` queda como delegador.*
 
 ### D-3 — Consultas
 `HistorialLecturas`:
