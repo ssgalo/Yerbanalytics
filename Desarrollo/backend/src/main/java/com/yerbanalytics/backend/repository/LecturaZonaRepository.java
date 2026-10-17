@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -27,6 +28,7 @@ public interface LecturaZonaRepository extends JpaRepository<LecturaZonaEntity, 
     List<LecturaZonaEntity> findByZonaIdAndTsBetweenOrderByTsAsc(String zonaId, long desde, long hasta);
 
     /** Borra las anteriores al corte (epoch ms) y devuelve cuántas. */
+    @Transactional
     @Modifying
     @Query("delete from LecturaZonaEntity l where l.ts < :corte")
     int deleteByTsLessThan(@Param("corte") long corte);

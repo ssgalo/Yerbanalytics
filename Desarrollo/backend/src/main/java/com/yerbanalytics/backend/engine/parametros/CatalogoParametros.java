@@ -38,7 +38,8 @@ public class CatalogoParametros {
                 ParametrosRiego.values(),
                 ParametrosInsumo.values(),
                 ParametrosMediasombra.values(),
-                ParametrosDiagnostico.values()}) {
+                ParametrosDiagnostico.values(),
+                ParametrosLecturas.values()}) {
             todas.addAll(List.of(familia));
         }
         return todas;
