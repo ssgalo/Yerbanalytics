@@ -84,10 +84,10 @@ class PausaTrasAplicacionRuleTest {
     }
 
     @Test
-    @DisplayName("metadatos: RIEGO, prioridad 7")
+    @DisplayName("metadatos: RIEGO, prioridad 8")
     void metadatos() {
         assertThat(rule.branch()).isEqualTo(RuleBranch.RIEGO);
-        assertThat(rule.priority()).isEqualTo(7);
+        assertThat(rule.priority()).isEqualTo(8);
         assertThat(rule.parametros()).containsExactlyInAnyOrder(ParametrosRiego.PAUSA_TRAS_APLICACION,
                 ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());

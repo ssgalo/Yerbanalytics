@@ -130,6 +130,41 @@ class RuleOrchestratorTrazaTest {
     }
 
     @Test
+    void ramaDeMediasombraBloqueada_omiteLasDeMediasombraYDejaCorrerRiegoEInsumo() {
+        Rule hardware = new ReglaFalsa("Hardware", 1, RuleBranch.GLOBAL, ActionType.ABORT_MEDIASOMBRA);
+        Rule sombra = new ReglaFalsa("Sombra", 20, RuleBranch.MEDIASOMBRA, ActionType.MOVER_MEDIASOMBRA);
+        Rule riego = new ReglaFalsa("Riego", 10, RuleBranch.RIEGO, ActionType.ACTIVAR_VALVULA);
+        Rule dosis = new ReglaFalsa("Dosis", 12, RuleBranch.INSUMO, ActionType.ACTIVAR_BOMBA);
+
+        ResultadoEvaluacion r = evaluar(hardware, sombra, riego, dosis);
+
+        assertThat(de(r, "Sombra").estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
+        assertThat(de(r, "Sombra").bloqueadaPor()).isEqualTo("Hardware");
+        assertThat(((ReglaFalsa) sombra).llamadas).isEmpty();
+        assertThat(de(r, "Riego").estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(de(r, "Dosis").estado()).isEqualTo(EstadoRegla.EVALUADA);
+    }
+
+    @Test
+    void unaReglaGlobalPuedeCortarVariasRamasALaVezSinCortarTodo() {
+        Rule hardware = new ReglaFalsa("Hardware", 1, RuleBranch.GLOBAL,
+                ActionType.ABORT_RIEGO, ActionType.ABORT_INSUMO, ActionType.ABORT_MEDIASOMBRA);
+        Rule sombra = new ReglaFalsa("Sombra", 20, RuleBranch.MEDIASOMBRA, ActionType.MOVER_MEDIASOMBRA);
+        Rule riego = new ReglaFalsa("Riego", 10, RuleBranch.RIEGO, ActionType.ACTIVAR_VALVULA);
+        Rule dosis = new ReglaFalsa("Dosis", 12, RuleBranch.INSUMO, ActionType.ACTIVAR_BOMBA);
+        Rule global = new ReglaFalsa("Global", 30, RuleBranch.GLOBAL, ActionType.NOOP_INFO);
+
+        ResultadoEvaluacion r = evaluar(hardware, sombra, riego, dosis, global);
+
+        for (String omitida : List.of("Sombra", "Riego", "Dosis")) {
+            assertThat(de(r, omitida).estado()).as(omitida).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
+            assertThat(de(r, omitida).bloqueadaPor()).as(omitida).isEqualTo("Hardware");
+        }
+        // Ninguna de las tres es ABORT_ALL: lo global sigue corriendo.
+        assertThat(de(r, "Global").estado()).isEqualTo(EstadoRegla.EVALUADA);
+    }
+
+    @Test
     void abortAll_dejaElRestoNoAlcanzada() {
         Rule bloqueo = new ReglaFalsa("Bloqueo", 1, RuleBranch.GLOBAL, ActionType.ABORT_ALL);
         Rule riego = new ReglaFalsa("Riego", 10, RuleBranch.RIEGO, ActionType.ACTIVAR_VALVULA);

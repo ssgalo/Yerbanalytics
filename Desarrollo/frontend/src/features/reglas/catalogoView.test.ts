@@ -69,7 +69,7 @@ describe('filtrarReglas', () => {
 
   it('sin filtros devuelve todas', () => {
     const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, sinFiltros)).toHaveLength(13);
+    expect(filtrarReglas(c, sinFiltros)).toHaveLength(14);
   });
 
   it('busca por nombre de regla o de alguno de sus parámetros, sin importar tildes ni mayúsculas', () => {
@@ -173,19 +173,34 @@ describe('agruparPorConsumidor', () => {
   it('agrupa los parámetros que lee algo que no es una regla, cada uno bajo su consumidor', () => {
     const grupos = agruparPorConsumidor(catalogoDeFabrica());
 
-    expect(grupos).toHaveLength(4);
-    expect(grupos[0]).toMatchObject({ id: 'DespachoRiego', titulo: 'Ejecución del riego' });
-    expect(grupos[0].parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
-    expect(grupos[1]).toMatchObject({ id: 'ReadingPurge', titulo: 'Historial de lecturas' });
-    expect(grupos[1].parametros.map((p) => p.clave)).toEqual(['readings.retention-days']);
-    expect(grupos[2]).toMatchObject({ id: 'PulsoSensado', titulo: 'Lectura de los nodos' });
-    expect(grupos[2].parametros.map((p) => p.clave)).toEqual([
+    expect(grupos).toHaveLength(5);
+    // Salen en el orden del catálogo: los de seguridad (S-03) primero.
+    expect(grupos[0]).toMatchObject({ id: 'ReadingValidationGuard', titulo: 'Lectura inválida' });
+    expect(grupos[0].parametros.map((p) => p.clave)).toEqual([
+      'seguridad.rango-hum-min',
+      'seguridad.rango-hum-max',
+      'seguridad.rango-temp-min',
+      'seguridad.rango-temp-max',
+      'seguridad.rango-ph-min',
+      'seguridad.rango-ph-max',
+      'seguridad.rango-ce-min',
+      'seguridad.rango-ce-max',
+      'seguridad.rango-luz-min',
+      'seguridad.rango-luz-max',
+      'seguridad.relecturas-invalidas',
+    ]);
+    expect(grupos[1]).toMatchObject({ id: 'DespachoRiego', titulo: 'Ejecución del riego' });
+    expect(grupos[1].parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
+    expect(grupos[2]).toMatchObject({ id: 'ReadingPurge', titulo: 'Historial de lecturas' });
+    expect(grupos[2].parametros.map((p) => p.clave)).toEqual(['readings.retention-days']);
+    expect(grupos[3]).toMatchObject({ id: 'PulsoSensado', titulo: 'Lectura de los nodos' });
+    expect(grupos[3].parametros.map((p) => p.clave)).toEqual([
       'sensado.espera-respuesta',
       'sensado.reintentos',
       'sensado.espera-reintento',
     ]);
-    expect(grupos[3]).toMatchObject({ id: 'EscalamientoNodo', titulo: 'Nodo sin respuesta' });
-    expect(grupos[3].parametros.map((p) => p.clave)).toEqual(['sensado.reintento-fuera-servicio']);
+    expect(grupos[4]).toMatchObject({ id: 'EscalamientoNodo', titulo: 'Nodo sin respuesta' });
+    expect(grupos[4].parametros.map((p) => p.clave)).toEqual(['sensado.reintento-fuera-servicio']);
   });
 
   it('los que el despacho revalida pero ya son de una regla se editan bajo la regla: no se repiten en el grupo', () => {
@@ -193,7 +208,8 @@ describe('agruparPorConsumidor', () => {
     const ventana = c.parametros.find((p) => p.clave === 'riego.ventana-normal')!;
 
     expect(ventana.usadoPor).toContain('DespachoRiego');
-    expect(agruparPorConsumidor(c)[0].parametros.map((p) => p.clave)).not.toContain('riego.ventana-normal');
+    const despacho = agruparPorConsumidor(c).find((g) => g.id === 'DespachoRiego')!;
+    expect(despacho.parametros.map((p) => p.clave)).not.toContain('riego.ventana-normal');
   });
 
   it('un parámetro que usan sólo reglas no genera grupo', () => {
@@ -202,7 +218,8 @@ describe('agruparPorConsumidor', () => {
       (p) =>
         p.clave !== 'riego.sectores-simultaneos' &&
         p.clave !== 'readings.retention-days' &&
-        !p.clave.startsWith('sensado.'),
+        !p.clave.startsWith('sensado.') &&
+        !p.usadoPor.includes('ReadingValidationGuard'),
     );
 
     expect(agruparPorConsumidor(c)).toEqual([]);

@@ -91,7 +91,7 @@ class NurseryServiceReadingsTest {
                 mock(TopologiaLayoutRepository.class), orchestrator, mock(ActionExecutor.class),
                 mock(WeatherService.class), mock(ManualLockRepository.class), mock(DiagnosticoService.class),
                 new TrazaEvaluacionStore(), mock(HistorialRepository.class), mock(DespachoRiego.class), pulses,
-                mock(EscalamientoNodoService.class), recorder, CLOCK, 20);
+                mock(EscalamientoNodoService.class), recorder, ReadingGuardsDePrueba.aceptaTodo(), CLOCK, 20);
     }
 
     private static MqttTelemetryPayload payload(long ts, MqttTelemetryPayload.MetricsPayload metrics) {

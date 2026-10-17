@@ -46,6 +46,7 @@ describe('clasificarRegla', () => {
     expect(clasificarRegla(regla(['POSTPONE_RIEGO']))).toBe('pospuso');
     expect(clasificarRegla(regla(['ABORT_RIEGO']))).toBe('bloqueo');
     expect(clasificarRegla(regla(['ABORT_INSUMO']))).toBe('bloqueo');
+    expect(clasificarRegla(regla(['ABORT_MEDIASOMBRA']))).toBe('bloqueo');
     expect(clasificarRegla(regla(['ABORT_ALL']))).toBe('bloqueo');
   });
 

@@ -11,7 +11,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -55,6 +57,21 @@ class ReglasArquitecturaTest {
             }
         }
         assertThat(encontrados).containsExactly("ShadingRule(String)");
+    }
+
+    @Test
+    void lasPrioridadesSonUnicasYElHardwareVaEntreElBloqueoYLaFrescura() throws Exception {
+        Map<String, Integer> prioridades = new HashMap<>();
+        for (Class<?> c : reglas()) {
+            Field f = c.getDeclaredField("PRIORITY");
+            f.setAccessible(true);
+            prioridades.put(c.getSimpleName(), f.getInt(null));
+        }
+
+        // Un empate dejaría el orden de dos reglas librado al de la inyección de Spring.
+        assertThat(prioridades.values()).as(prioridades.toString()).doesNotHaveDuplicates();
+        assertThat(prioridades.get("ManualLockRule")).isLessThan(prioridades.get("IncompleteHardwareRule"));
+        assertThat(prioridades.get("IncompleteHardwareRule")).isLessThan(prioridades.get("StaleSensorRule"));
     }
 
     @Test

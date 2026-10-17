@@ -204,9 +204,9 @@ class ShadingAndFollowUpRuleTest {
     }
 
     @Test
-    @DisplayName("FollowUpRule: prioridad es 20 (la última)")
-    void seguimientoRule_prioridad20() {
+    @DisplayName("FollowUpRule: prioridad es 21 (la última)")
+    void seguimientoRule_prioridad21() {
         FollowUpRule rule = new FollowUpRule(historialService);
-        assertThat(rule.priority()).isEqualTo(20);
+        assertThat(rule.priority()).isEqualTo(21);
     }
 }

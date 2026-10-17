@@ -94,7 +94,8 @@ describe('MockRepository · esquema del DAG', () => {
     const par = (s: string, t: string) => edges.some((e) => e.source === s && e.target === t);
 
     expect(par('start', 'ManualLockRule')).toBe(true);
-    expect(par('ManualLockRule', 'StaleSensorRule')).toBe(true);
+    expect(par('ManualLockRule', 'IncompleteHardwareRule')).toBe(true);
+    expect(par('IncompleteHardwareRule', 'StaleSensorRule')).toBe(true);
     // La rama de riego, en el orden en que corre el motor.
     expect(par('StaleSensorRule', 'SustratoSaturadoRule')).toBe(true);
     expect(par('SustratoSaturadoRule', 'CicloLecturaRiegoRule')).toBe(true);

@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VALVE_MAX_DURATION_SEC, valveDurationWarning } from './contract.ts';
+import { VALVE_MAX_DURATION_SEC, toContractUnits, valveDurationWarning } from './contract.ts';
+
+// The backend is the one that rejects an impossible reading (S-03): the simulator must be able to publish one.
+test('toContractUnits does not clip impossible values, it only converts the conductivity', () => {
+  assert.deepEqual(
+    toContractUnits({ humSus: 112, temp: -40, phSuelo: 14, ce: 12, uv: 180 }),
+    { humSus: 112, temp: -40, phSuelo: 14, ce: 12000, uv: 180 },
+  );
+});
 
 test('the valve maximum mirrors the contract (1200 s)', () => {
   assert.equal(VALVE_MAX_DURATION_SEC, 1200);

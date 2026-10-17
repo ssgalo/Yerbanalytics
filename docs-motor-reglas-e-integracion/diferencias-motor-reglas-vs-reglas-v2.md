@@ -9,6 +9,11 @@
 > - El backend escucha el ACK de los actuadores (`mqtt/AckActuadorReceiver.java`, `service/SeguimientoComandosService.java`): alerta en el historial si el nodo informa una falla o no contesta a tiempo. Por eso S-05 pasa de Ausente a Parcial (§1, §3 y §4).
 > - El firmware modular se portó al ESP32-S3 del prototipo y se compiló: `act_valvula` y `act_bomba` ya no existen (los reemplaza `actuacion/act_riego`, que no bloquea la tarea de actuación) y la mediasombra tiene dos estados. Se corrigieron las afirmaciones sobre el firmware.
 > - Las citas `archivo:línea` del resto del documento siguen siendo las del 03/10/2026 y pueden no coincidir con el código actual (en particular las de `mqtt/MqttConfig.java`).
+>
+> **Actualización parcial del 17/10/2026** (`add-seguridad-lectura-hardware`):
+> - **S-03 y S-04 pasan de Ausente a Implementada** (§1, §3 y §4). S-03 vive en la ingesta (`readings/ReadingValidationGuard`, `ReadingValidator`, `InvalidReadingEscalation`; rangos `seguridad.rango-*` y `seguridad.relecturas-invalidas` en el catálogo) y S-04 es `IncompleteHardwareRule`, que lee la cobertura de hardware que el motor arma una vez por zona (`engine/HardwareCoverage`).
+> - **Prioridades:** la regla nueva es la **1** y las reglas que eran 1…20 pasaron a 2…21 (R-04 = 3, ciclo = 4, R-02 = 5, R-05 = 7, R-06 = 8, R-03 = 9, R-01 = 11, `SupplyRule` = 12, `ShadingRule` = 13, `FollowUpRule` = 21). Los números de prioridad que siguen más abajo son los anteriores.
+> - **`ABORT_MEDIASOMBRA`** es una acción bloqueante nueva: corta las reglas de la rama MEDIASOMBRA. Donde más abajo dice que MEDIASOMBRA sólo se detiene con `ABORT_ALL`, hoy también se detiene con ésa.
 
 Abreviaturas de ruta: `engine/` = `…/backend/engine/`; `rules/` = `…/backend/engine/rules/`; `riego/` = `…/backend/engine/riego/`; `param/` = `…/backend/engine/parametros/`; `traza/` = `…/backend/engine/traza/`; `service/` = `…/backend/service/`; `res/` = `Desarrollo/backend/src/main/resources/`.
 
@@ -23,7 +28,7 @@ Abreviaturas de ruta: `engine/` = `…/backend/engine/`; `rules/` = `…/backend
 - **Cada evaluación deja una traza** (qué recibió cada regla, contra qué umbral, qué decidió), en memoria y por origen (telemetría o barrido). El dashboard la muestra en la sección "Motor de reglas" (pestañas Parámetros e Inspector). El Registro de Inacción en el historial se escribe **sólo cuando cambia la decisión** del sector (`engine/ActionExecutor.java:187-216`).
 - **Mediasombra: modelo distinto y sin cambios de fondo.** Sigue siendo un % de apertura por sector, con plan por día de ciclo (sólo si hay `sowing-date-iso`, vacío por defecto) y una protección por UV pronosticado ≥ 7 que fija la apertura en 30 % (`rules/ShadingRule.java:90-148`). Con la etapa 1 del plan (20 %), un pico UV **abre** a 30 % (ver 4.3).
 - **Nutrición y reglas por diagnóstico (N, F) siguen sin existir como tales.** Una única `SupplyRule` activa la bomba si el sector está en estado `critical` y la confianza es ≥ 85 % (`diagnostico.confianza-minima`). El comando de la bomba sigue saliendo con `parametros = {}` (`engine/ActionExecutor.java:130`). El diagnóstico sigue pudiendo ser sintético (`service/NurseryService.java:548-566`).
-- **Seguridad: S-01 parcial, S-02 distinta, S-05 parcial, S-06 parcial; S-03 y S-04 no existen.** `StaleSensorRule` ahora también bloquea con la humedad de sustrato congelada y su umbral es 90 s. Tampoco existe ningún camino que cree un bloqueo manual.
+- **Seguridad: S-01 parcial, S-02 distinta, S-05 parcial, S-06 parcial; S-03 y S-04 implementadas (`add-seguridad-lectura-hardware`).** `StaleSensorRule` ahora también bloquea con la humedad de sustrato congelada y su umbral es 90 s. Tampoco existe ningún camino que cree un bloqueo manual.
 - **Telemetría y evaluación siguen siendo push + barrido.** El backend nunca pide la lectura (`mqtt/MqttConfig.java:51-60`: la suscripción de telemetría; la otra, desde 70, es la de los eventos del riel y no es del motor). El motor corre con cada mensaje (para los 100 sectores de la zona) y cada 5 min por el barrido, que no riega ni toca la cola. El doc supone pedido cada 4 h.
 - **El código tiene lógica que el doc no define:** guarda de ciclo de lectura, cola y revalidación al despachar, tope de R-02 sin S-06, bloqueo por humedad congelada, `DailyDoseLimitRule` (1 dosis cada 24 h), diagnóstico sintético, orquestación en ramas y los endpoints `/api/rules/*`. Ver punto 5.
 
@@ -31,10 +36,10 @@ Abreviaturas de ruta: `engine/` = `…/backend/engine/`; `rules/` = `…/backend
 
 | Estado | Cantidad | Reglas |
 |---|---|---|
-| Implementada | 4 | R-04, R-05, O-01, O-04 |
+| Implementada | 6 | R-04, R-05, O-01, O-04, S-03, S-04 |
 | Parcial | 11 | S-01, S-05, S-06, R-01, R-02, R-03, R-06, P-D1, P-D2, O-02, O-05 |
 | Distinta | 7 | S-02, M-01, M-02, F-C2, F-F1, F-P1, E-01 |
-| Ausente | 18 | S-03, S-04, N-01, N-02, F-C1, F-F2, F-S1, F-S2, F-S3, F-04, F-05, F-06, P-D3, P-D4, P-D5, E-02, E-03, O-03 |
+| Ausente | 16 | N-01, N-02, F-C1, F-F2, F-S1, F-S2, F-S3, F-04, F-05, F-06, P-D3, P-D4, P-D5, E-02, E-03, O-03 |
 
 Reglas del código sin equivalente en el doc: `CicloLecturaRiegoRule` y `DailyDoseLimitRule` (reglas completas); además, `FollowUpRule` y los comportamientos de ejecución (cola, despacho, revalidación). Ver punto 5.
 
@@ -110,8 +115,8 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 |---|---|---|---|---|
 | S-01 | Bloqueo manual | Parcial | `ManualLockRule` | `ABORT_ALL` con cancelación de la cola y descarte en el despacho (`rules/ManualLockRule.java:59-67`, `riego/DespachoRiego.java:379-383`), pero nada crea ni reanuda bloqueos, no se cierran actuadores abiertos ni se emite INFO |
 | S-02 | Nodo sin respuesta | Distinta | `StaleSensorRule` | `ABORT_RIEGO` si la lectura o la humedad tienen más de 90 s (`rules/StaleSensorRule.java:64-93`) y el despacho **pausa** la ronda hasta que vuelva el nodo; sin pedido, reintentos, escalado 1/3-2/3-3/3 ni estado seguro (malla, bombas) |
-| S-03 | Lectura inválida | Ausente | — | No hay validación de rango físico ni reintento (`service/NurseryService.java:488-507`) |
-| S-04 | Hardware incompleto | Ausente | — | Ninguna regla consulta el mapeo de actuadores (`engine/RuleContext.java:20-49`) |
+| S-03 | Lectura inválida | Implementada | `ReadingValidationGuard` (no es una regla de la cadena) | Rango físico por métrica al ingerir (CE ya en dS/m), hasta `seguridad.relecturas-invalidas` relecturas inmediatas, descarte de esa métrica en el ciclo (R-01…R-06 la leen como sin dato) y alerta WARNING → CRITICAL por ciclo consecutivo |
+| S-04 | Hardware incompleto | Implementada | `IncompleteHardwareRule` | Aborta riego (sin electroválvula o sin nodo testigo), insumo (sin bomba) o mediasombra (zona sin ninguna) según falte, sin alerta nueva; nunca `ABORT_ALL` |
 | S-05 | Falla reportada por ESP32 | Parcial | — (`SeguimientoComandosService`, no es una regla) | El ERROR del ACK (p. ej. `falla_mecanica` de la mediasombra) y la falta de ACK dejan una alerta en el historial; no marca el sector ni la malla como falla ni los saca de la automatización, y sin caudalímetro no hay fallas hidráulicas |
 | S-06 | Acción sin efectividad | Parcial | `HistorialService` (no es regla) | Se marca `bloqueoRepeticion` (`service/HistorialService.java:290`) pero ninguna regla lo lee; el tope de 12 h de R-02 sí se aplica, siempre |
 | R-01 | Riego por déficit | Parcial | `RiegoPorDeficitRule` | Condición y fórmula coinciden; sin alerta INFO, registra al abrir (no al terminar) y suma la guarda de un riego por sector y ciclo (4.2) |
@@ -177,11 +182,11 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 
 **S-03 Lectura inválida**
 - Doc: rangos físicos (humedad 0-100, temperatura −10…60, pH 3-9, CE 0-10, luz 0-100), reintento inmediato hasta 2 veces, descarte de la métrica y WARNING/CRITICAL (§4).
-- Código: `updateTelemetry` asigna los valores del payload sin validar rango (`service/NurseryService.java:488-507`). La única conversión es CE µS/cm → dS/m (502). `ConfiguracionService.validar` sólo valida la configuración de umbrales. Ausente.
+- Código: `updateTelemetry` pasa la lectura (en unidades canónicas, `ReadingMetrics`) por `ReadingValidationGuard` antes de escribir en la zona. Una métrica fuera de rango pide `LEER_AHORA` enseguida (una vez por lectura) hasta `seguridad.relecturas-invalidas`; si una relectura corrige, se usa y no hay alerta; si todas fallan, esa métrica se descarta en el ciclo y `InvalidReadingEscalation` deja el WARNING (CRITICAL si falló también el ciclo anterior). Una lectura que espera su relectura no consume el pulso. N, P y K no tienen rango en la v2. Implementada.
 
 **S-04 Hardware incompleto**
 - Doc: no ejecutar si falta mapear un actuador (HU-18 CA-04) (§4).
-- Código: `RuleContext` no incluye información de hardware (`engine/RuleContext.java:20-49`) y ninguna regla ni el despacho consultan `HardwareService`. Ausente.
+- Código: `NurseryService` pide a `HardwareService.coverageOf` (dos consultas por zona) qué tiene mapeado cada sector y lo pone en `RuleContext.hardware`; `IncompleteHardwareRule` (prioridad 1) corta sólo la rama a la que le falta algo. Un dispositivo con falla cuenta como mapeado (eso es de S-05). Implementada. Efecto a conocer: un sector sin su electroválvula registrada deja de regarse de forma autónoma.
 
 **S-05 Falla reportada por el ESP32**
 - Doc: tópico propio de errores (`SIN_CAUDAL`, `CAUDAL_EXCESIVO`, `MEDIASOMBRA_FIN_DE_CARRERA`); marca sector/malla como falla y los saca de la automatización hasta registrar la reparación (§4, §13).

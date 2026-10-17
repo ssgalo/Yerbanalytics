@@ -57,6 +57,14 @@ Corré `src/main/resources/migracion-permisos-bloqueo.sql` (idempotente, antes o
 agregar los de la matriz por defecto. No toca lo que el Administrador editó. Se aplican al reiniciar el backend
 (la matriz vive en memoria).
 
+### Migración manual pendiente · permiso de lectura del hardware para el rol Servicio
+
+El simulador (cuenta de rol Servicio) consulta qué sectores ya no tienen electroválvula registrada para armar su escenario
+«Hardware incompleto» (S-04), así que el rol Servicio recibe `hardware.ver` en la matriz por defecto (sólo lectura:
+`hardware.gestionar` no se le da). La matriz se siembra **sólo si `rol_permiso` está vacía**: una base anterior no lo tiene.
+Corré `src/main/resources/migracion-permisos-hardware-servicio.sql` (idempotente, antes o después de arrancar). Se aplica
+al reiniciar el backend (la matriz vive en memoria). Las tablas nuevas de este cambio (`invalid_reading`) las crea Hibernate.
+
 ### Migración manual pendiente · confianza mínima 70 %
 
 `diagnostico.confianza-minima` pasó de 85 a **70 %** de fábrica y su rango de 50–100 a **50–95 %**
@@ -790,6 +798,56 @@ Suspende la actuación autónoma sobre un **sector** o una **macro-zona**. Se cr
   zona llega a cada uno de sus sectores. Cuando exista la evaluación por zona (`add-mediasombra-v2`), M-01/M-02 deben
   consultar el bloqueo de la zona (`ManualLockShadingTest` fija el comportamiento).
 - Desde el simulador: apagar la regla, el bypass `lock` y el escenario «Bloqueo manual» (README del simulador).
+
+## Lectura inválida (S-03) y hardware incompleto (S-04)
+
+Dos guardas de seguridad de `reglas_v2` §4 que frenan lo autónomo antes de que decida el riego, el insumo o la malla.
+
+### S-03 · una lectura fuera del rango físico no es una lectura
+
+`NurseryService.updateTelemetry` pasa cada lectura por `ReadingValidationGuard` **antes** de escribir en la zona. La lectura
+se arma como `ReadingMetrics` (unidades canónicas: la CE ya en dS/m) y `ReadingValidator` (puro) compara cada métrica con su
+rango del catálogo (`seguridad.rango-hum|temp|ph|ce|luz-min|max`; bordes incluidos; N, P y K no tienen rango). Lo que no cumple:
+
+1. **Relectura.** Se pide `LEER_AHORA` enseguida, hasta `seguridad.relecturas-invalidas` veces (2 de fábrica), **una sola vez
+   por lectura** aunque haya varias métricas inválidas. La métrica no entra a la zona: queda el último valor bueno.
+   Una lectura que espera su relectura **no consume el pulso** (no es la respuesta definitiva): el motor decide cuando
+   llega la que corrige o la que ya agotó las relecturas.
+2. **Corrige.** Si una relectura llega válida se usa y no hay alerta; el contador de esa métrica se reinicia.
+3. **Descarte.** Si la lectura y todas sus relecturas son inválidas, esa métrica se descarta en el ciclo: el `RuleContext` la
+   marca (`isMetricValid`) y las reglas de riego la leen como **sin dato** por `RiegoRuleSupport.humedad` (traza
+   `SIN_DATO`, no actúan); las demás métricas siguen. El dashboard conserva el último valor bueno.
+4. **Alerta** (`InvalidReadingEscalation`, tabla `invalid_reading`): el primer ciclo con la métrica descartada es un
+   `WARNING` «Lectura inválida en [métrica]»; si vuelve a fallar en el ciclo de lectura siguiente, `CRITICAL` «Sensor de
+   [métrica] con falla: revisar», y sigue siéndolo mientras dure la racha. Dos descartes en el mismo ciclo cuentan como uno.
+   Una lectura válida reinicia la cuenta.
+
+- El contador de relecturas es por (zona, métrica, ciclo) y vive en memoria; la racha vive en la base y sobrevive a un reinicio.
+- Desde el simulador: apagar la pieza `ReadingValidationGuard` (acepta cualquier valor), el bypass `retries` (no pide
+  relecturas) y el escenario «Lectura inválida».
+- El guard es consumidor de parámetros y depende con `@Lazy` del catálogo **y** del servicio de configuración (éste depende
+  del catálogo): sin eso el contexto no arranca (`ReadingValidationGuardWiringTest`).
+
+### S-04 · sin el actuador mapeado no se actúa
+
+`HardwareService.coverageOf(zona, sectores)` arma, con dos consultas por zona, qué tiene registrado cada sector
+(`HardwareCoverage`: electroválvula, bomba, nodo testigo de la zona y si la zona tiene alguna mediasombra) y
+`NurseryService` la pone en `RuleContext.hardware`. `IncompleteHardwareRule` (prioridad **1**, entre el bloqueo manual y la
+frescura) corta sólo lo que falta, sin alertas:
+
+| Falta | Se aborta |
+|---|---|
+| electroválvula del sector, o nodo testigo de la zona | `ABORT_RIEGO` |
+| bomba peristáltica del sector | `ABORT_INSUMO` |
+| ninguna mediasombra en la zona | `ABORT_MEDIASOMBRA` (acción nueva: omite las reglas de esa rama) |
+
+Nunca `ABORT_ALL`: un sector sin bomba sí se riega. «Mapeado» no es «sano»: un dispositivo con falla cuenta (eso es de S-05).
+Una regla de la cadena no puede tener prioridad fraccionaria, así que las demás subieron una (`ReglasArquitecturaTest` exige
+prioridades únicas).
+
+> **Efecto operativo.** Un sector sin su electroválvula registrada **deja de regarse de forma autónoma** (HU-18 CA-04). El
+> `data.sql` de desarrollo sólo equipa unos pocos sectores y regenerar la topología borra todos los dispositivos: para ver
+> actuar al motor, registrá el hardware o usá el bypass `hardware` del simulador (Telemetría → Control de reglas).
 
 ## Historial de lecturas
 

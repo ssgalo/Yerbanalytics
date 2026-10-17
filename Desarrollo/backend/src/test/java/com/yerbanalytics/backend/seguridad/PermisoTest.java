@@ -21,11 +21,17 @@ class PermisoTest {
                 "bloqueos.ver", "bloqueos.gestionar");
         assertThat(codigos(Rol.SERVICIO)).containsExactlyInAnyOrder("vivero.ver", "topologia.ver", "capturas.ver",
                 "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar",
-                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar");
+                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar", "hardware.ver");
         assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar", "bloqueos.ver", "bloqueos.gestionar")
                 .doesNotContain("auditoria.ver", "pasadas.operar", "usuarios.gestionar");
         assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver")
                 .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar");
+    }
+
+    @Test
+    void elRolServicioSoloLeeElHardwareNuncaLoGestiona() {
+        // El simulador consulta qué sectores tienen su electroválvula registrada (escenario S-04); no registra ni recambia nada.
+        assertThat(codigos(Rol.SERVICIO)).contains("hardware.ver").doesNotContain("hardware.gestionar");
     }
 
     @Test

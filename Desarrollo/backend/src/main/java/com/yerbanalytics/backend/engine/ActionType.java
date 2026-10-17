@@ -38,6 +38,9 @@ public enum ActionType {
     /** Abortar la dosificación de insumo. */
     ABORT_INSUMO,
 
+    /** Abortar el control de la mediasombra (la evaluación de las reglas de la rama MEDIASOMBRA se detiene). */
+    ABORT_MEDIASOMBRA,
+
     /**
      * Abortar toda actuación del ciclo para este sector.
      * Ninguna regla ejecutora posterior será evaluada.
@@ -60,7 +63,7 @@ public enum ActionType {
 
     /** @return true si esta acción debe detener la cadena de evaluación. */
     public boolean isBlocking() {
-        return this == ABORT_RIEGO || this == ABORT_INSUMO || this == ABORT_ALL
+        return this == ABORT_RIEGO || this == ABORT_INSUMO || this == ABORT_MEDIASOMBRA || this == ABORT_ALL
                 || this == POSTPONE_RIEGO;
     }
 }

@@ -12,7 +12,10 @@
      6. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
 
    The "node without answer" scenario is the exception: it silences the target zone instead of
-   publishing telemetry, so the pulses find no answer.
+   publishing telemetry, so the pulses find no answer. The "invalid reading" scenario sticks a metric of the
+   target sensor on an impossible value (`pinnedReadings`): the pulse and every reread carry it, so the backend's
+   reread-and-discard flow (S-03) happens inside the pulse. The "incomplete hardware" scenario pins dry soil and reads
+   the hardware registry (never edits it) to tell which sectors of the zone have no electrovalve (S-04).
 
    No backend modifications: everything goes through existing public endpoints.
    ============================================================ */
@@ -21,6 +24,7 @@ import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
 import type { DemoRule, ManualLock, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
 import { buildThresholds, calculateConditions } from '../ruleConditions';
+import { sectorsWithoutValve, type HardwareDevice } from '../hardwareCoverage';
 import { runPulses } from '../pulseChain';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
@@ -42,6 +46,10 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const [execLog, setExecLog] = useState<string[]>([]);
   const [execError, setExecError] = useState<string | null>(null);
   const [silencedZones, setSilencedZones] = useState<string[]>([]);
+  const [pinnedReadings, setPinnedReadings] = useState<api.PinnedReadings>({});
+  // Hardware registry (read-only): only loaded when the scenario that needs it is selected.
+  const [devices, setDevices] = useState<HardwareDevice[] | null>(null);
+  const [hardwareError, setHardwareError] = useState<string | null>(null);
   const [manualLocks, setManualLocks] = useState<ManualLock[]>([]);
   // '' = lock the whole zone; otherwise the id of one of its sectors.
   const [lockSectorId, setLockSectorId] = useState('');
@@ -49,6 +57,11 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   // Zones the simulator keeps mute: they stay that way until released, so they are shown after the run.
   useEffect(() => {
     api.getSilencedZones().then(setSilencedZones).catch(() => setSilencedZones([]));
+  }, []);
+
+  // Pinned readings: the scenario sets them and they stay until the zone is released, so they are listed after the run.
+  useEffect(() => {
+    api.getPinnedReadings().then(setPinnedReadings).catch(() => setPinnedReadings({}));
   }, []);
 
   // Manual locks in force: the scenario creates them and they stay until lifted, so they are listed here.
@@ -60,6 +73,14 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     try {
       await api.releaseManualLock(id);
       setManualLocks(await api.getManualLocks());
+    } catch (e) {
+      setExecError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const releasePinned = async (zonaId: string) => {
+    try {
+      setPinnedReadings(await api.pinReadings(zonaId, {}));
     } catch (e) {
       setExecError(e instanceof Error ? e.message : String(e));
     }
@@ -121,6 +142,22 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     ? calculateConditions([...selectedRules], thresholds)
     : null;
 
+  const needsSectorWithoutValve = conditions?.needsSectorWithoutValve ?? false;
+
+  const loadDevices = useCallback(async () => {
+    try {
+      setDevices(await api.getHardwareDevices());
+      setHardwareError(null);
+    } catch (e) {
+      setDevices(null);
+      setHardwareError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (needsSectorWithoutValve) void loadDevices();
+  }, [needsSectorWithoutValve, loadDevices]);
+
   const targetSensor = sensors.find((s) => s.serial === targetSerial);
   // The diagnosis is per sector, the sensing per zone: the first sector of the target zone stands in.
   const diagnosisSector = sectors.find((s) => s.zonaId === targetSensor?.zonaId);
@@ -128,6 +165,10 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
   const zoneSectors = sectors.filter((s) => s.zonaId === targetSensor?.zonaId);
   // A sector picked for a previous zone is not valid for this one.
   const lockSector = zoneSectors.find((s) => s.id === lockSectorId);
+  // Sectors of the target zone that have no electrovalve registered: where the S-04 abort shows up.
+  const uncoveredSectors = needsSectorWithoutValve && devices ? sectorsWithoutValve(zoneSectors, devices) : [];
+  const hardwareUnreadable = needsSectorWithoutValve && devices === null && hardwareError !== null;
+  const noSectorWithoutValve = needsSectorWithoutValve && devices !== null && uncoveredSectors.length === 0;
 
   const execute = async () => {
     if (!targetSensor || !conditions || selectedRules.size === 0) return;
@@ -167,6 +208,33 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         log.push(`✓ Telemetría publicada para ${targetSensor.zonaId} (humSus: ${conditions.telemetria.humSus}%)`);
       }
       setExecLog([...log]);
+
+      // Step 3b: pinned readings go in after the healthy reading and before the pulse, so the pulse's answer (the one the
+      // engine decides on) and each reread carry them.
+      if (Object.keys(conditions.pinnedMetrics).length > 0) {
+        setPinnedReadings(await api.pinReadings(targetSensor.zonaId, conditions.pinnedMetrics));
+        log.push(
+          `✓ ${targetSensor.zonaId} contesta siempre ${Object.entries(conditions.pinnedMetrics)
+            .map(([metric, value]) => `${metric} = ${value}`)
+            .join(', ')}`,
+        );
+        setExecLog([...log]);
+      }
+
+      // Step 3c: S-04 needs a sector with no valve. The registry is read again: it may have changed since it loaded.
+      if (conditions.needsSectorWithoutValve) {
+        const uncovered = sectorsWithoutValve(zoneSectors, await api.getHardwareDevices());
+        if (uncovered.length === 0) {
+          throw new Error(`Todos los sectores de ${targetSensor.zonaId} tienen su electroválvula registrada: no hay dónde mostrar el aborto.`);
+        }
+        log.push(
+          `✓ ${uncovered.length} sectores de ${targetSensor.zonaId} sin electroválvula registrada (${uncovered
+            .slice(0, 5)
+            .map((s) => s.id)
+            .join(', ')}${uncovered.length > 5 ? '…' : ''}): el pulso debe abortarles el riego`,
+        );
+        setExecLog([...log]);
+      }
 
       // Step 4: register the prior diagnosis. It must exist before the pulse: that is the only
       // moment the engine decides, and the rule acts once per new diagnosis.
@@ -238,6 +306,9 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     conditions !== null &&
     conditions.conflictos.length === 0 &&
     !missingDiagnosisSector &&
+    !hardwareUnreadable &&
+    !noSectorWithoutValve &&
+    (!needsSectorWithoutValve || devices !== null) &&
     execState !== 'running';
 
   return (
@@ -323,6 +394,25 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           </div>
         )}
 
+        {Object.keys(pinnedReadings).length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <p className="sectionTitle" style={{ marginBottom: 6 }}>Lecturas fijadas</p>
+            {Object.entries(pinnedReadings).map(([zonaId, metrics]) => (
+              <div key={zonaId} className="row" style={{ alignItems: 'center', gap: 12 }}>
+                <span>
+                  {zonaId} contesta siempre{' '}
+                  {Object.entries(metrics)
+                    .map(([metric, value]) => `${metric} = ${value}`)
+                    .join(', ')}
+                </span>
+                <button type="button" onClick={() => void releasePinned(zonaId)}>
+                  Soltar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {manualLocks.length > 0 && (
           <div className="card" style={{ marginTop: 12 }}>
             <p className="sectionTitle" style={{ marginBottom: 6 }}>Bloqueos vigentes</p>
@@ -352,6 +442,35 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           <div className="errorMsg" style={{ marginTop: 12 }}>
             La zona {targetSensor?.zonaId} no tiene sectores en la topología vigente: no hay dónde
             registrar el diagnóstico que necesita la dosificación.
+          </div>
+        )}
+
+        {hardwareUnreadable && (
+          <div className="errorMsg" style={{ marginTop: 12 }}>
+            No se pudo leer el registro de hardware ({hardwareError}). El rol Servicio del simulador necesita
+            `hardware.ver`: en una base ya sembrada, corré `migracion-permisos-hardware-servicio.sql` del backend.
+          </div>
+        )}
+
+        {noSectorWithoutValve && (
+          <div className="errorMsg" style={{ marginTop: 12 }}>
+            Todos los sectores de {targetSensor?.zonaId} tienen su electroválvula registrada: no hay un sector donde
+            mostrar el aborto. Elegí otra zona.
+          </div>
+        )}
+
+        {uncoveredSectors.length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <p className="sectionTitle" style={{ marginBottom: 6 }}>
+              Sectores de {targetSensor?.zonaId} sin electroválvula registrada ({uncoveredSectors.length})
+            </p>
+            <p style={{ margin: 0, fontSize: 13 }}>
+              {uncoveredSectors
+                .slice(0, 8)
+                .map((s) => s.id)
+                .join(', ')}
+              {uncoveredSectors.length > 8 && ` y ${uncoveredSectors.length - 8} más`}. El pulso debe abortarles el riego.
+            </p>
           </div>
         )}
 

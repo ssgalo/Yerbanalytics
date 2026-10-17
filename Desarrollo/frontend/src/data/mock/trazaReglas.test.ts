@@ -36,7 +36,7 @@ const regla = (t: TrazaEvaluacion, id: string): TrazaRegla => {
 };
 
 describe('evaluarMotor · forma de la traza', () => {
-  it('trae las 13 reglas, en orden de prioridad, con el origen y el sector', () => {
+  it('trae las 14 reglas, en orden de prioridad, con el origen y el sector', () => {
     const t = evaluarMotor(catalogo, base);
 
     expect(t.reglas.map((r) => r.ruleId)).toEqual(catalogo.reglas.map((r) => r.id));
@@ -44,7 +44,7 @@ describe('evaluarMotor · forma de la traza', () => {
     expect(t.zonaId).toBe('MZ-1');
     expect(t.origen).toBe('TELEMETRIA');
     expect(t.ts).toBe(base.ts);
-    expect(t.reglas).toHaveLength(13);
+    expect(t.reglas).toHaveLength(14);
   });
 
   it('es determinística', () => {

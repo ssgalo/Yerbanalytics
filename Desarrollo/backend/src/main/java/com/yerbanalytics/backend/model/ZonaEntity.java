@@ -136,4 +136,26 @@ public class ZonaEntity {
             default -> null;
         };
     }
+
+    /**
+     * Escribe el valor crudo de una métrica por su clave del contrato (la inversa de {@link #raw}), en la unidad
+     * canónica de la zona. No toca {@link #humSusTs}: esa marca la pone la ingesta sólo cuando la humedad entró.
+     *
+     * @throws IllegalArgumentException si la clave no es una de las diez métricas
+     */
+    public void setRaw(String metricKey, Double value) {
+        switch (metricKey == null ? "" : metricKey) {
+            case "humSus" -> humSusRaw = value;
+            case "humAmb" -> humAmbRaw = value;
+            case "temp" -> tempRaw = value;
+            case "tempSuelo" -> tempSueloRaw = value;
+            case "uv" -> uvRaw = value;
+            case "ce" -> ceRaw = value;
+            case "phSuelo" -> phSueloRaw = value;
+            case "n" -> nRaw = value;
+            case "p" -> pRaw = value;
+            case "k" -> kRaw = value;
+            default -> throw new IllegalArgumentException("Métrica desconocida: " + metricKey);
+        }
+    }
 }
