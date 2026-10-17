@@ -6,6 +6,7 @@ import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { SecuenciaRechazadaError } from '@/data/secuenciaError';
+import { ManualLockError } from '@/data/manualLockError';
 import { PlanRustificacionError } from '@/data/planRustificacionError';
 import type {
   ActionRecord,
@@ -27,6 +28,8 @@ import type {
   TipoSecuencia,
   TopologiaVivero,
   TrazaEvaluacion,
+  ManualLock,
+  NewManualLock,
   NuevoPlanRustificacion,
   PlanRustificacion,
 } from '@/types/domain';
@@ -77,6 +80,8 @@ export class MockRepository implements DataRepository {
   private disposicionOverride: DisposicionTopologia | null = null;
   /** Planes de rustificación por macro-zona (el último de cada una); null = sin sembrar todavía. */
   private planes: Map<string, PlanRustificacion> | null = null;
+  private manualLocks: ManualLock[] = [];
+  private nextLockId = 1;
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
 
@@ -239,6 +244,37 @@ export class MockRepository implements DataRepository {
     const cancelado: PlanRustificacion = { ...actual, estado: 'cancelado', canceladoEn: Date.now() };
     this.planesDemo().set(zonaId, cancelado);
     return structuredClone(cancelado);
+  }
+
+  async getManualLocks(): Promise<ManualLock[]> {
+    return structuredClone(this.manualLocks);
+  }
+
+  async activateManualLock(lock: NewManualLock): Promise<ManualLock> {
+    const motivo = lock.motivo.trim();
+    if (!motivo) throw new ManualLockError('El motivo del bloqueo es obligatorio.');
+    const sectorId = lock.sectorId ?? null;
+    const alcance = sectorId ? `El sector ${sectorId}` : `La macro-zona ${lock.zonaId}`;
+    if (this.manualLocks.some((l) => l.zonaId === lock.zonaId && l.sectorId === sectorId)) {
+      throw new ManualLockError(`${alcance} ya tiene un bloqueo vigente.`);
+    }
+    const creado: ManualLock = {
+      id: this.nextLockId++,
+      zonaId: lock.zonaId,
+      sectorId,
+      activadoPor: 'Usuario de la demo',
+      activadoTs: Date.now(),
+      motivo,
+    };
+    this.manualLocks = [creado, ...this.manualLocks];
+    return structuredClone(creado);
+  }
+
+  async releaseManualLock(id: number): Promise<void> {
+    if (!this.manualLocks.some((l) => l.id === id)) {
+      throw new ManualLockError(`No hay un bloqueo vigente con id ${id}.`);
+    }
+    this.manualLocks = this.manualLocks.filter((l) => l.id !== id);
   }
 
   private fleet(): RawDispositivo[] {

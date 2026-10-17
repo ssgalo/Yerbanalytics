@@ -26,7 +26,7 @@ export const NOMBRE_ROL: Record<Rol, string> = {
   SERVICIO: 'Servicio',
 };
 
-/** El catálogo de 20 permisos, en el orden del backend (ya viene agrupado). */
+/** El catálogo de 22 permisos, en el orden del backend (ya viene agrupado). */
 export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'vivero.ver', grupo: 'Vivero', descripcion: 'Panel general, detalle de macro-zona y de sector', lectura: null },
   { codigo: 'diagnosticos.ver', grupo: 'Diagnósticos', descripcion: 'Diagnósticos de IA y su consulta', lectura: null },
@@ -45,6 +45,8 @@ export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'camara.gestionar', grupo: 'Captura', descripcion: 'Vinculación, listado y revocación de dispositivos de captura', lectura: null },
   { codigo: 'pasadas.ver', grupo: 'Pasadas del riel', descripcion: 'Estado de la pasada del riel', lectura: null },
   { codigo: 'pasadas.operar', grupo: 'Pasadas del riel', descripcion: 'Iniciar y cancelar la pasada', lectura: 'pasadas.ver' },
+  { codigo: 'bloqueos.ver', grupo: 'Bloqueo manual', descripcion: 'Ver los bloqueos manuales vigentes', lectura: null },
+  { codigo: 'bloqueos.gestionar', grupo: 'Bloqueo manual', descripcion: 'Bloquear y reanudar la actuación autónoma', lectura: 'bloqueos.ver' },
   { codigo: 'simulacion.gestionar', grupo: 'Simulación', descripcion: 'Controlar reglas, cooldowns y clima en modo demo', lectura: null },
   { codigo: 'usuarios.gestionar', grupo: 'Seguridad', descripcion: 'Usuarios, matriz de permisos y política de sesión', lectura: null },
   { codigo: 'auditoria.ver', grupo: 'Seguridad', descripcion: 'Registro de auditoría de seguridad', lectura: null },
@@ -61,14 +63,23 @@ const TODOS_LOS_VER: Permiso[] = [
   'topologia.ver',
   'capturas.ver',
   'pasadas.ver',
+  'bloqueos.ver',
 ];
 
 /** La matriz que siembra el backend en una base vacía. */
 export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
   ADMINISTRADOR: CATALOGO_PERMISOS.map((p) => p.codigo),
-  INGENIERO_AGRONOMO: [...TODOS_LOS_VER, 'configuracion.editar', 'reglas.editar'],
+  INGENIERO_AGRONOMO: [...TODOS_LOS_VER, 'configuracion.editar', 'reglas.editar', 'bloqueos.gestionar'],
   PRODUCTOR_VIVERISTA: [...TODOS_LOS_VER, 'pasadas.operar'],
-  OPERARIO: ['vivero.ver', 'diagnosticos.ver', 'historial.ver', 'capturas.ver', 'pasadas.ver'],
+  OPERARIO: [
+    'vivero.ver',
+    'diagnosticos.ver',
+    'historial.ver',
+    'capturas.ver',
+    'pasadas.ver',
+    'bloqueos.ver',
+    'bloqueos.gestionar',
+  ],
   SERVICIO: [
     'vivero.ver',
     'topologia.ver',
@@ -77,6 +88,8 @@ export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
     'diagnosticos.ver',
     'diagnosticos.registrar',
     'camara.gestionar',
+    'bloqueos.ver',
+    'bloqueos.gestionar',
     'simulacion.gestionar',
   ],
 };
