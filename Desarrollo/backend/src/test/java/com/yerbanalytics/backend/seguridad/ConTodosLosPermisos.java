@@ -19,6 +19,6 @@ import java.lang.annotation.Target;
         "configuracion.ver", "configuracion.editar", "reglas.ver", "reglas.editar",
         "hardware.ver", "hardware.gestionar", "topologia.ver", "topologia.gestionar",
         "capturas.ver", "capturas.ordenar", "camara.gestionar", "pasadas.ver", "pasadas.operar",
-        "demo-expo.configurar", "simulacion.gestionar", "usuarios.gestionar", "auditoria.ver"})
+        "bloqueos.ver", "bloqueos.gestionar", "demo-expo.configurar", "simulacion.gestionar", "usuarios.gestionar", "auditoria.ver"})
 public @interface ConTodosLosPermisos {
 }

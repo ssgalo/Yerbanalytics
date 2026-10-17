@@ -39,6 +39,8 @@ public enum Permiso {
     CAMARA_GESTIONAR("camara.gestionar", "Captura", "Vincular, listar y revocar dispositivos de captura", null),
     PASADAS_VER("pasadas.ver", "Pasadas del riel", "Ver el estado de la pasada del riel", null),
     PASADAS_OPERAR("pasadas.operar", "Pasadas del riel", "Iniciar y cancelar la pasada del riel", PASADAS_VER),
+    BLOQUEOS_VER("bloqueos.ver", "Bloqueo manual", "Ver los bloqueos manuales vigentes", null),
+    BLOQUEOS_GESTIONAR("bloqueos.gestionar", "Bloqueo manual", "Bloquear y reanudar la actuación autónoma", BLOQUEOS_VER),
     DEMO_EXPO_CONFIGURAR("demo-expo.configurar", "Demo Expo", "Mostrar u ocultar la pestaña Demo Expo", null),
     SIMULACION_GESTIONAR("simulacion.gestionar", "Simulación", "Controlar reglas, cooldowns y clima en modo demo", null),
     USUARIOS_GESTIONAR("usuarios.gestionar", "Seguridad", "Usuarios, matriz de permisos y política de sesión", null),
@@ -58,7 +60,7 @@ public enum Permiso {
      * sólo tiene el Administrador.
      */
     private static final Set<Permiso> LECTURAS = EnumSet.of(VIVERO_VER, DIAGNOSTICOS_VER, HISTORIAL_VER,
-            CONFIGURACION_VER, REGLAS_VER, HARDWARE_VER, TOPOLOGIA_VER, CAPTURAS_VER, PASADAS_VER);
+            CONFIGURACION_VER, REGLAS_VER, HARDWARE_VER, TOPOLOGIA_VER, CAPTURAS_VER, PASADAS_VER, BLOQUEOS_VER);
 
     private final String codigo;
     private final String grupo;
@@ -100,9 +102,10 @@ public enum Permiso {
     public static Set<Permiso> matrizPorDefecto(Rol rol) {
         return switch (rol) {
             case ADMINISTRADOR -> EnumSet.allOf(Permiso.class);
-            case INGENIERO_AGRONOMO -> con(LECTURAS, CONFIGURACION_EDITAR, REGLAS_EDITAR);
+            case INGENIERO_AGRONOMO -> con(LECTURAS, CONFIGURACION_EDITAR, REGLAS_EDITAR, BLOQUEOS_GESTIONAR);
             case PRODUCTOR_VIVERISTA -> con(LECTURAS, PASADAS_OPERAR);
-            case OPERARIO -> EnumSet.of(VIVERO_VER, DIAGNOSTICOS_VER, HISTORIAL_VER, CAPTURAS_VER, PASADAS_VER);
+            case OPERARIO -> EnumSet.of(VIVERO_VER, DIAGNOSTICOS_VER, HISTORIAL_VER, CAPTURAS_VER, PASADAS_VER,
+                    BLOQUEOS_VER, BLOQUEOS_GESTIONAR);
             case SERVICIO -> EnumSet.of(VIVERO_VER, TOPOLOGIA_VER, CAPTURAS_VER, CAPTURAS_ORDENAR,
                     DIAGNOSTICOS_VER, DIAGNOSTICOS_REGISTRAR, CAMARA_GESTIONAR, SIMULACION_GESTIONAR);
         };

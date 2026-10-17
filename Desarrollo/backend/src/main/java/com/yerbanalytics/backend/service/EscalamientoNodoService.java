@@ -216,7 +216,7 @@ public class EscalamientoNodoService implements ConsumidorParametros, DemoContro
             return "No se ordenó el estado seguro: la guarda está desactivada.";
         }
         try {
-            ZoneSafeState.Result r = safeState.order(zonaId);
+            ActuatorShutdown.Result r = safeState.order(zonaId);
             if (r.commands() == 0 && r.failed() == 0) {
                 return "No hay actuadores registrados en la zona a los que ordenarles el estado seguro.";
             }
