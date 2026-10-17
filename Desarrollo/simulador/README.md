@@ -64,6 +64,13 @@ simulador (punto ámbar, con el motivo).
   `nursery/demo/zone/{id}/telemetry` (tópico aparte del ESP32, sin carrera) y un interruptor en *Telemetría*
   ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
   actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
+- **Happy path de la demo** (pestaña *Demo Expo*, junto a la pasada del riel y las secuencias) — un botón que evalúa
+  riego, insumo y mediasombra **de a una carga por vez** (tres pulsos con motor, en ese orden) sobre el primer sector de la primera macro-zona. Antes de cada pulso deja encendidas sólo las reglas ejecutoras del paso (estado de demo, restaurado al terminar); espera a que la carga anterior TERMINE (válvulas de la zona sin «Regando»/«En cola»; bomba sin «Dosificando»; plazo = duración esperada + 120 s, con aviso si se agota) y suma 5 s antes de la siguiente. Así el ESP32 no arranca todas las cargas juntas. Con la fuente
+  en **Simulador** genera todo: lectura (`humSus` entre el umbral crítico y el de riego, `temp` crítica), diagnóstico de
+  IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
+  R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
+  el diagnóstico de una pasada del riel previa, y avisa si no hay uno utilizable. Al final lee la traza del Inspector y
+  muestra, por regla, si actuó y por qué. Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING.
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a
   mano el diagnóstico que devolvería el modelo.
 
@@ -296,6 +303,7 @@ simulador/
 │   └── backend-session.ts  sesión de la cuenta de servicio ante el backend
 ├── src/             UI React, con estilos propios
 │   ├── scenarios/     un escenario por regla (cómo se la acciona) y su registro
+│   ├── happyPath.ts   decisión y orquestación del happy path de la Demo Expo (modo simulador / ESP32 real)
 │   ├── pulseChain.ts  encadena N pulsos de sensado esperando que termine cada uno
 │   ├── hardwareCoverage.ts  qué sectores de una zona no tienen electroválvula registrada (sólo lee el registro)
 │   └── ruleConditions.ts  umbrales, conflictos y combinación de los escenarios elegidos

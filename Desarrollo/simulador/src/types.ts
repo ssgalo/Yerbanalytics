@@ -315,3 +315,30 @@ export interface ManualLock {
   activadoTs: number;
   motivo: string;
 }
+
+/* ----------------------------------------------------------------
+   Rule engine trace (GET /api/rules/evaluaciones/{sectorId}) — only what the happy path reads
+   ---------------------------------------------------------------- */
+
+export interface TracedAction {
+  tipo: string;
+  motivo: string;
+}
+
+export interface TracedRule {
+  ruleId: string;
+  /** Rule branch as the backend names it (`RIEGO`, `INSUMO`, `MEDIASOMBRA`…). */
+  rama: string;
+  estado: string;
+  acciones: TracedAction[];
+  bloqueadaPor: string | null;
+  error: string | null;
+}
+
+export interface EvaluationTrace {
+  sectorId: string;
+  zonaId: string;
+  /** Instant of the evaluation: ISO string, or epoch number depending on the backend's serializer. */
+  ts: string | number;
+  reglas: TracedRule[];
+}

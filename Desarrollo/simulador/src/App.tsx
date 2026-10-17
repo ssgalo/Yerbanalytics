@@ -138,7 +138,7 @@ export function App() {
           </Section>
         )}
 
-        {activeTab === 'demo-expo' && <DemoExpoSection />}
+        {activeTab === 'demo-expo' && <DemoExpoSection sectors={sectors} sensors={sensors} />}
       </main>
     </div>
   );
