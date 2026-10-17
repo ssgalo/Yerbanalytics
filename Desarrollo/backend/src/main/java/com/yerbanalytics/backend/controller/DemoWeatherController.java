@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.controller;
 
+import com.yerbanalytics.backend.dto.SimulatedOfflineDto;
 import com.yerbanalytics.backend.dto.SimulatedWeatherInputDto;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
@@ -9,12 +10,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
-import java.util.List;
+import java.time.Clock;
 import java.util.Map;
 
 /**
@@ -24,7 +25,9 @@ import java.util.Map;
  *
  * <p>While a mock forecast is active, every call to {@link WeatherService#getForecast()} and
  * {@link WeatherService#getForecastSinEspera()} returns it without hitting Open-Meteo. This
- * lets the operator trigger {@code PosponerPorLluviaRule} and {@code ShadingRule} on demand.
+ * lets the operator trigger the rules that read the forecast on demand. The forecast it builds carries 24 hourly
+ * marks (rain probability, mm and temperature) and the day's maximum UV, so rules that look at a window see it.
+ * {@code /offline} simulates the absence of a forecast.
  */
 @RestController
 @RequestMapping("/api/demo/weather")
@@ -32,9 +35,11 @@ import java.util.Map;
 public class DemoWeatherController {
 
     private final WeatherService weatherService;
+    private final Clock reloj;
 
-    public DemoWeatherController(WeatherService weatherService) {
+    public DemoWeatherController(WeatherService weatherService, Clock reloj) {
         this.weatherService = weatherService;
+        this.reloj = reloj;
     }
 
     /** Returns the currently active simulated forecast, or 204 if none is set. */
@@ -50,19 +55,25 @@ public class DemoWeatherController {
     /** Injects a simulated forecast; replaces any previous one. */
     @PostMapping
     public ResponseEntity<Map<String, Object>> set(@Valid @RequestBody SimulatedWeatherInputDto input) {
-        WeatherForecast forecast = new WeatherForecast(
-                input.probLluviaPct(),
-                input.uvIndex(),
-                Instant.now(),
-                input.tempC(),
-                "Simulado",
-                input.humedadRelPct(),
-                List.of());
+        WeatherForecast forecast = input.toSpec().toForecast(reloj);
         weatherService.setMockForecast(forecast);
         return ResponseEntity.ok(toMap(forecast));
     }
 
-    /** Removes the simulated forecast; the service reverts to Open-Meteo. */
+    /** Whether the "no forecast" mode is on. */
+    @GetMapping("/offline")
+    public SimulatedOfflineDto offline() {
+        return new SimulatedOfflineDto(weatherService.isOfflineSimulated());
+    }
+
+    /** Turns the "no forecast" mode on or off: the service answers {@code null} as if Open-Meteo were down. */
+    @PutMapping("/offline")
+    public SimulatedOfflineDto setOffline(@Valid @RequestBody SimulatedOfflineDto body) {
+        weatherService.setOfflineSimulated(body.on());
+        return body;
+    }
+
+    /** Removes the simulated forecast and the "no forecast" mode; the service reverts to Open-Meteo. */
     @DeleteMapping
     public ResponseEntity<Void> clear() {
         weatherService.clearMockForecast();
@@ -75,6 +86,7 @@ public class DemoWeatherController {
                 "humedadRelPct", f.humRel(),
                 "probLluviaPct", f.probLluviaPct(),
                 "uvIndex", f.uvIndex(),
+                "uvMaxDia", f.uvMaxDia(),
                 "cond", f.cond(),
                 "timestamp", f.timestamp().toEpochMilli());
     }

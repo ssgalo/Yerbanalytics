@@ -9,8 +9,8 @@ vigente; se retira en el 7.
 - [ ] 0.3 Confirmar D-5 (varias ventanas por etapa) con el equipo. **Es un cambio de alcance que sí se hace** (bloque 5), pero cambia un contrato del front ya construido.
 
 ## 1. Pronóstico (se resuelve en `add-control-demo-reglas` §2)
-- [ ] 1.1 Si `add-control-demo-reglas` ya está integrado, verificar con un test que `WeatherForecast.temperaturaHora` y `uvMaxDia` devuelven lo esperado y seguir. Si no, hacer este bloque primero allá.
-- [ ] 1.2 `OpenMeteoWeatherClient` pide `temperature_2m` y `uv_index_max` con `timezone` (también en `add-control-demo-reglas`).
+- [ ] 1.1 `add-control-demo-reglas` ya dejó `WeatherForecast.PronosticoHora.tempC()` (temperatura por marca horaria) y `WeatherForecast.uvMaxDia()`. No hay un método `temperaturaHora(...)`: si M-02 lo necesita, se agrega acá sobre `horas()`. Verificar con un test lo que M-02 lee y seguir.
+- [ ] 1.2 `OpenMeteoWeatherClient` ya completa la temperatura por hora (`temperature_2m`) y calcula `uvMaxDia` como el máximo de `uv_index` del día local de hoy (no pide `uv_index_max`). Confirmar que alcanza para M-02.
 
 ## 2. Núcleo de decisión (puro)
 - [ ] 2.1 Test (tabla): `HorarioMediasombra` — perfil de crecimiento y etapas con una y dos ventanas, incluidos bordes.

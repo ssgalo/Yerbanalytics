@@ -189,11 +189,13 @@ public class OpenMeteoWeatherClient implements WeatherClient {
                 if (idx >= precipProb.size()) break;
                 LocalDateTime marca = parseMarca(timeList, idx);
                 if (marca == null) break;
-                horas.add(new WeatherForecast.PronosticoHora(marca, valorONull(precipProb, idx), valorONull(precipMm, idx)));
+                horas.add(new WeatherForecast.PronosticoHora(marca, valorONull(precipProb, idx), valorONull(precipMm, idx),
+                        valorONull(tempList, idx)));
             }
+            Double uvMaxDia = uvMaximoDelDia(timeList, uvList, currentIdx);
 
             log.debug("WeatherClient: temp={}°C cond={} lluvia={}% UV={}", tempC, cond, prob, uv);
-            return new WeatherForecast(prob, uv, reloj.instant(), tempC, cond, humRel, slots, horas);
+            return new WeatherForecast(prob, uv, reloj.instant(), tempC, cond, humRel, slots, horas, uvMaxDia);
 
         } catch (RestClientException e) {
             log.warn("WeatherClient: error de red al consultar Open-Meteo: {}", e.getMessage());
@@ -248,6 +250,24 @@ public class OpenMeteoWeatherClient implements WeatherClient {
             }
         }
         return "+" + offset + " h";
+    }
+
+    /**
+     * UV máximo de las marcas que caen en el mismo día local que la hora actual, o {@code null} si ninguna trae el
+     * dato. Con la hora actual fuera de la lista (índice 0 por defecto) toma el día de la primera marca.
+     */
+    private static Double uvMaximoDelDia(List<String> times, List<Number> uvList, int currentIdx) {
+        LocalDateTime actual = parseMarca(times, currentIdx);
+        if (actual == null) return null;
+        Double max = null;
+        for (int i = 0; i < uvList.size(); i++) {
+            LocalDateTime marca = parseMarca(times, i);
+            Double uv = valorONull(uvList, i);
+            if (marca != null && uv != null && marca.toLocalDate().equals(actual.toLocalDate())) {
+                max = max == null ? uv : Math.max(max, uv);
+            }
+        }
+        return max;
     }
 
     /** El valor del índice, o {@code null} si la lista o el dato faltan: "sin dato" no es "0" (seco). */

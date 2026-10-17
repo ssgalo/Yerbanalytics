@@ -8,6 +8,8 @@ documentación. Cada cambio se implementa en **su propia rama**, que sale de est
 > "Implementada" = existe la clase o el servicio y hace lo que dice la v2; "parcial" = existe pero difiere. Lo verificado y lo que
 > sigue abierto de cada cambio está en su `design.md`, sección *Estado verificado*, y en el bloque `0. Previo` de su `tasks.md`.
 
+> **Qué está hecho y qué falta:** `ESTADO.md` (se actualiza en el PR de cada cambio).
+
 ## Convenciones comunes a todos los cambios
 
 - **Rama de implementación:** `feat/reglas-v2-<slug>` (el `<slug>` es el nombre del cambio sin `add-`/`align-`),
@@ -39,6 +41,7 @@ Requisito del equipo: *cada regla nueva se puede apagar y accionar desde el simu
 5. **El backend no conoce al simulador:** ni endpoint, ni entidad, ni rama de código propia.
 
 Cada cambio tiene su bloque *Control desde el simulador* en `tasks.md` y su `specs/…-control-demo/spec.md` con las claves exactas.
+**Esta lista se exige en la revisión de cada PR**: sin las cinco condiciones, la regla no se integra. Cómo se implementa cada punto: `Desarrollo/simulador/README.md` ("Cómo agregar el escenario de una regla") y `DemoControllable` en el backend.
 
 ## Los cambios (14)
 

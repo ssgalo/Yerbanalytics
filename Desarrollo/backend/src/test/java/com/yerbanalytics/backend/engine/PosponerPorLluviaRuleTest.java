@@ -165,4 +165,16 @@ class PosponerPorLluviaRuleTest {
                 ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.UMBRAL_CRITICO);
         assertThat(rule.label()).isNotBlank().isNotEqualTo(rule.name());
     }
+
+    @Test
+    @DisplayName("con el clima del simulador (80 %, 8 mm) y h 40 → pospone: el simulador puede accionar R-03")
+    void conElClimaSimuladoPospone() {
+        var reloj = java.time.Clock.fixed(RiegoCtx.instante("10:05"), com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA);
+        WeatherForecast simulado = new com.yerbanalytics.backend.engine.weather.SimulatedForecastSpec(
+                28.0, 60.0, 80.0, 8.0, 5.0, null, null).toForecast(reloj);
+
+        List<RuleAction> acciones = rule.evaluate(ctx(40.0, simulado), ev(rule));
+
+        assertThat(tipos(acciones)).containsExactlyInAnyOrder(ActionType.POSTPONE_RIEGO, ActionType.ALERTA);
+    }
 }

@@ -205,4 +205,27 @@ class OpenMeteoWeatherClientTest {
         assertThat(ReflectionTestUtils.getField(f, "connectTimeout")).isEqualTo(3_000);
         assertThat(ReflectionTestUtils.getField(f, "readTimeout")).isEqualTo(5_000);
     }
+
+    @Test
+    void cadaMarcaHorariaTraeSuTemperatura() {
+        server.expect(requestTo(containsString("/forecast")))
+                .andRespond(withSuccess(respuesta(true), MediaType.APPLICATION_JSON));
+
+        WeatherForecast f = client.fetch();
+
+        // temperature_2m = 20 + índice; la marca actual es el índice 10.
+        assertThat(f.horas().get(0).tempC()).isEqualTo(30.0);
+        assertThat(f.horas().get(3).tempC()).isEqualTo(33.0);
+    }
+
+    @Test
+    void uvMaxDiaEsElMaximoDelDiaLocalDeHoy() {
+        server.expect(requestTo(containsString("/forecast")))
+                .andRespond(withSuccess(respuesta(true), MediaType.APPLICATION_JSON));
+
+        WeatherForecast f = client.fetch();
+
+        // uv_index = 20 + índice; el 3/10 va del índice 0 al 23: el máximo es 43 (no el del 4/10).
+        assertThat(f.uvMaxDia()).isEqualTo(43.0);
+    }
 }
