@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -110,5 +111,90 @@ class SupplyDoseServiceTest {
         servicio.closeExpired();
 
         verify(sectores).cambiarBomba("MZ-1-001", "Dosificando", "En espera");
+    }
+
+    // ------------------------------------------------------------------ add-cola-actuadores-nodo (D-10)
+
+    private static ActuatorProgress progreso(String sectorId, ActuatorProgress.Phase fase, long atMs, long esperaMs) {
+        return new ActuatorProgress("MZ-1", sectorId, "pump", "p-1", fase, atMs, esperaMs);
+    }
+
+    @Test
+    @DisplayName("con la dosis en la cola del nodo la bomba figura En cola mientras la base diga Dosificando")
+    void enColaSeMuestraEnCola() {
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.QUEUED, T0, 30_000L));
+
+        assertThat(servicio.estadoBomba("MZ-1-001", "Dosificando")).isEqualTo("En cola");
+        assertThat(servicio.estadoBomba("MZ-1-001", "En espera")).as("sólo pisa el Dosificando").isEqualTo("En espera");
+        assertThat(servicio.estadoBomba("MZ-1-002", "Dosificando")).as("otro sector, sin fase").isEqualTo("Dosificando");
+    }
+
+    @Test
+    @DisplayName("con iniciado figura Dosificando")
+    void iniciadoSeMuestraDosificando() {
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.QUEUED, T0, 30_000L));
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.STARTED, T0 + 30_000L, 0L));
+
+        assertThat(servicio.estadoBomba("MZ-1-001", "Dosificando")).isEqualTo("Dosificando");
+    }
+
+    @Test
+    @DisplayName("iniciado: el respaldo por tiempo cuenta desde el arranque y no desde la orden")
+    void iniciadoCierraPorTiempoDesdeElArranque() {
+        when(sectores.findByActuadorPump("Dosificando")).thenReturn(List.of(dosificando("MZ-1-001")));
+        ultimaDosis("MZ-1-001", T0, 10);
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.STARTED, T0 + 40_000L, 0L));
+
+        when(reloj.millis()).thenReturn(T0 + 40_000L + 10_000L + MARGEN_MS - 1);
+        servicio.closeExpired();
+        verify(sectores, never()).cambiarBomba(anyString(), anyString(), anyString());
+
+        when(reloj.millis()).thenReturn(T0 + 40_000L + 10_000L + MARGEN_MS);
+        servicio.closeExpired();
+        verify(sectores).cambiarBomba("MZ-1-001", "Dosificando", "En espera");
+    }
+
+    @Test
+    @DisplayName("en cola: el plazo suma la espera máxima")
+    void enColaCierraPorTiempoConLaEspera() {
+        when(sectores.findByActuadorPump("Dosificando")).thenReturn(List.of(dosificando("MZ-1-001")));
+        ultimaDosis("MZ-1-001", T0, 10);
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.QUEUED, T0, 30_000L));
+
+        when(reloj.millis()).thenReturn(T0 + 30_000L + 10_000L + MARGEN_MS - 1);
+        servicio.closeExpired();
+        verify(sectores, never()).cambiarBomba(anyString(), anyString(), anyString());
+
+        when(reloj.millis()).thenReturn(T0 + 30_000L + 10_000L + MARGEN_MS);
+        servicio.closeExpired();
+        verify(sectores).cambiarBomba("MZ-1-001", "Dosificando", "En espera");
+    }
+
+    @Test
+    @DisplayName("el ack final limpia la fase en memoria")
+    void elFinalLimpiaLaFase() {
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.QUEUED, T0, 30_000L));
+
+        servicio.onActuatorStopped(new ActuatorStopped("MZ-1", "MZ-1-001", "pump", "p-1", "ok"));
+
+        assertThat(servicio.estadoBomba("MZ-1-001", "Dosificando")).isEqualTo("Dosificando");
+    }
+
+    @Test
+    @DisplayName("el progreso de la válvula o de la malla no toca la bomba")
+    void soloElProgresoDeLaBombaCuenta() {
+        servicio.onActuatorProgress(new ActuatorProgress("MZ-1", "MZ-1-001", "valve", "v-1",
+                ActuatorProgress.Phase.QUEUED, T0, 30_000L));
+
+        assertThat(servicio.estadoBomba("MZ-1-001", "Dosificando")).isEqualTo("Dosificando");
+    }
+
+    @Test
+    @DisplayName("una fase En cola anterior a la última orden de dosis es de una dosis vieja (reemplazada) y se ignora")
+    void unaFaseVieja_NoMuestraEnCola() {
+        servicio.onActuatorProgress(progreso("MZ-1-001", ActuatorProgress.Phase.QUEUED, T0, 30_000L));
+        ultimaDosis("MZ-1-001", T0 + 5_000L, 10);   // se ordenó otra dosis después: la vieja terminó con 'reemplazado'
+
+        assertThat(servicio.estadoBomba("MZ-1-001", "Dosificando")).isEqualTo("Dosificando");
     }
 }

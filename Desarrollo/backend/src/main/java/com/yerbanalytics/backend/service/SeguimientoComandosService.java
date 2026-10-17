@@ -30,6 +30,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li><b>Envío:</b> {@code ComandoActuadorPublisher} registra cada comando publicado con su plazo:
  *       la duración pedida ({@code durationSec}, si la hay) más {@code yerbanalytics.actuadores.ack-margen-ms}.</li>
+ *   <li><b>Ack intermedio {@code EN_CURSO}</b> (add-cola-actuadores-nodo): el comando sigue pendiente y su plazo se
+ *       recalcula desde el arranque ({@code en_cola}: espera máxima + duración + margen; {@code iniciado}: duración +
+ *       margen, desde la recepción) y se publica un {@link ActuatorProgress}. Sólo un ack final resuelve el comando;
+ *       un status desconocido se loguea y no resuelve. Sin intermedios (firmware viejo) rige el plazo de siempre.</li>
  *   <li><b>Ack SUCCESS:</b> se cierra el seguimiento.</li>
  *   <li><b>Ack ERROR:</b> si es una falla (p. ej. {@code falla_mecanica}, comando rechazado) queda una
  *       alerta en el historial de la macro-zona; {@code reemplazado} y {@code cancelado} son esperables
@@ -68,7 +72,7 @@ public class SeguimientoComandosService {
     private static final int MAX_RESUELTOS = 500;
 
     /** Un comando publicado que todavía no tiene ack. */
-    record Pendiente(String commandId, String zonaId, String sectorId, String actuador, long venceMs) {
+    record Pendiente(String commandId, String zonaId, String sectorId, String actuador, long duracionMs, long venceMs) {
     }
 
     private final Map<String, Pendiente> pendientes = new ConcurrentHashMap<>();
@@ -120,7 +124,7 @@ public class SeguimientoComandosService {
         if (ml instanceof Number n && n.doubleValue() > 0) {
             duracionMs = Math.max(duracionMs, (long) (n.doubleValue() * ContratoNodo.BOMBA_INSUMO_MS_POR_ML));
         }
-        pendientes.put(commandId, new Pendiente(commandId, zonaId, sectorId, actuador,
+        pendientes.put(commandId, new Pendiente(commandId, zonaId, sectorId, actuador, duracionMs,
                 reloj.millis() + duracionMs + margenMs));
     }
 
@@ -129,6 +133,16 @@ public class SeguimientoComandosService {
         String zonaId = ack.zonaId();
         String sectorId = ack.sectorId();
         String commandId = ack.commandId();
+        if (ack.esIntermedio()) {
+            registrarIntermedio(ack);
+            return;
+        }
+        // Sólo un final (SUCCESS/ERROR) resuelve el comando: un status que no se conoce se loguea y lo deja pendiente.
+        if (!ContratoNodo.ACK_SUCCESS.equals(ack.status()) && !ContratoNodo.ACK_ERROR.equals(ack.status())) {
+            log.warn("Sector {}: ack con status desconocido '{}' (commandId {}), se ignora.",
+                    sectorId, ack.status(), commandId);
+            return;
+        }
         if (commandId != null && !resueltos.add(commandId)) {
             log.debug("Sector {}: ack repetido o tardío de {}, se ignora.", sectorId, commandId);
             return;
@@ -140,11 +154,6 @@ public class SeguimientoComandosService {
         if (ContratoNodo.ACK_SUCCESS.equals(ack.status())) {
             log.info("Sector {}: el nodo confirmó {} ({}).", sectorId, nombre(actuador), tipo);
             avisarSiTerminoLaBomba(zonaId, sectorId, actuador, commandId, tipo);
-            return;
-        }
-        if (!ContratoNodo.ACK_ERROR.equals(ack.status())) {
-            log.warn("Sector {}: ack con status desconocido '{}' (commandId {}), se ignora.",
-                    sectorId, ack.status(), commandId);
             return;
         }
         if (ContratoNodo.ACK_TIPO_REEMPLAZADO.equals(tipo) || ContratoNodo.ACK_TIPO_CANCELADO.equals(tipo)) {
@@ -171,6 +180,50 @@ public class SeguimientoComandosService {
         } else {
             alertar(zonaId, NivelAlerta.WARNING, REGLA_FALLA, "Sector " + sectorId + ": "
                     + "el nodo no pudo ejecutar " + nombre(actuador) + " (" + (tipo != null ? tipo : "sin detalle") + ").");
+        }
+    }
+
+    /**
+     * Un ack intermedio ({@code EN_CURSO}): el comando sigue pendiente y su plazo se recalcula desde lo que informó el
+     * nodo. {@code en_cola}: espera máxima + duración + margen. {@code iniciado}: duración + margen. Siempre desde la hora
+     * de recepción (el ack no lleva hora y el reloj del nodo puede no estar sincronizado). De un comando ya resuelto o
+     * desconocido se ignora: sin pendiente no se sabe de qué actuador es.
+     */
+    private void registrarIntermedio(AckActuador ack) {
+        String commandId = ack.commandId();
+        Pendiente p = commandId != null ? pendientes.get(commandId) : null;
+        if (p == null) {
+            log.debug("Sector {}: ack intermedio de {} que no está pendiente, se ignora.", ack.sectorId(), commandId);
+            return;
+        }
+        long ahora = reloj.millis();
+        ActuatorProgress.Phase fase;
+        long esperaMs = 0;
+        long vence;
+        if (ContratoNodo.ACK_TIPO_EN_COLA.equals(ack.tipoDetalle())) {
+            fase = ActuatorProgress.Phase.QUEUED;
+            esperaMs = ack.esperaMaxSec() * 1000L;
+            vence = esperaMs > 0 ? ahora + esperaMs + p.duracionMs() + margenMs : p.venceMs();
+        } else if (ContratoNodo.ACK_TIPO_INICIADO.equals(ack.tipoDetalle())) {
+            fase = ActuatorProgress.Phase.STARTED;
+            vence = ahora + p.duracionMs() + margenMs;
+        } else {
+            log.warn("Sector {}: ack EN_CURSO con detalle '{}' desconocido (commandId {}), se ignora.",
+                    ack.sectorId(), ack.tipoDetalle(), commandId);
+            return;
+        }
+        // replace: si el vencimiento o un final se llevó el comando en el medio, no se lo vuelve a poner.
+        if (!pendientes.replace(commandId, p, new Pendiente(p.commandId(), p.zonaId(), p.sectorId(), p.actuador(),
+                p.duracionMs(), vence))) {
+            return;
+        }
+        log.info("Sector {}: {} {} en el nodo.", ack.sectorId(), nombre(p.actuador()),
+                fase == ActuatorProgress.Phase.QUEUED ? "espera turno" : "arrancó");
+        try {
+            eventos.publishEvent(new ActuatorProgress(ack.zonaId(), ack.sectorId(), p.actuador(), commandId, fase,
+                    ahora, esperaMs));
+        } catch (RuntimeException e) {
+            log.error("Sector {}: falló al avisar el progreso de {} ({}).", ack.sectorId(), nombre(p.actuador()), fase, e);
         }
     }
 

@@ -92,6 +92,23 @@ public final class ContratoNodo {
     /** {@code status} de un ack: la acción no se pudo hacer o no terminó; {@code detalle.tipo} dice por qué. */
     public static final String ACK_ERROR = "ERROR";
 
+    /**
+     * {@code status} de un ack INTERMEDIO (add-cola-actuadores-nodo): el comando sigue en el nodo, que lo tiene en cola
+     * ({@link #ACK_TIPO_EN_COLA}) o acaba de arrancarlo ({@link #ACK_TIPO_INICIADO}). No cierra el comando: el final
+     * sigue siendo {@link #ACK_SUCCESS} o {@link #ACK_ERROR}. Espeja {@code STATUS_EN_CURSO} de {@code contrato.h}.
+     */
+    public static final String ACK_EN_CURSO = "EN_CURSO";
+    /** {@code detalle.tipo} de EN_CURSO: la carga espera su turno (lleva {@code posicion} y {@code esperaMaxSec}). */
+    public static final String ACK_TIPO_EN_COLA = "en_cola";
+    /** {@code detalle.tipo} de EN_CURSO: la carga arrancó de verdad (lleva la duración efectiva). */
+    public static final String ACK_TIPO_INICIADO = "iniciado";
+    /** {@code detalle.tipo} de un ERROR: la cola de cargas del nodo no tenía lugar. */
+    public static final String ACK_TIPO_COLA_LLENA = "cola_llena";
+    /** Clave de {@code parametros} de un {@code shade SET}: con {@link #PRIORIDAD_INMEDIATA} el nodo no la hace esperar. */
+    public static final String PARAM_PRIORIDAD = "prioridad";
+    /** Valor de {@link #PARAM_PRIORIDAD}: lo manda sólo el estado seguro (ActuatorShutdown). */
+    public static final String PRIORIDAD_INMEDIATA = "INMEDIATA";
+
     /** {@code detalle.tipo} de un ERROR que no es una falla: llegó otro comando para lo mismo antes de terminar. */
     public static final String ACK_TIPO_REEMPLAZADO = "reemplazado";
     /** {@code detalle.tipo} de un ERROR que no es una falla: llegó un OFF. */

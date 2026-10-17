@@ -492,6 +492,25 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
   nuevo lo tomó). Si el sector no figuraba regando (un OFF de una secuencia de Demo Expo o del estado seguro) no
   se registra nada. Un `cancelado` sin comando pendiente (se perdió en un reinicio) no se puede atribuir a la
   válvula y no cierra nada: el riego vence solo por tiempo.
+- **Cola de cargas del nodo y ACK intermedios** (`add-cola-actuadores-nodo`). El nodo ejecuta a lo sumo
+  `MAX_CARGAS_SIMULTANEAS` cargas a la vez (1 por defecto: la fuente del prototipo no banca el pico de riego + insumo +
+  mediasombra juntos) y encola el resto, así que el backend sigue mandando todo en un pulso. Para saber cuándo una
+  carga espera y cuándo arranca, el nodo publica ACK intermedios `EN_CURSO` (`detalle.tipo` `en_cola` con `posicion` y
+  `esperaMaxSec`, o `iniciado`). `SeguimientoComandosService` los usa así: **sólo un final (`SUCCESS`/`ERROR`)
+  resuelve el comando**; un `EN_CURSO` lo mantiene pendiente y recalcula su plazo desde la hora de recepción
+  (`en_cola`: espera máxima + duración + `ack-margen-ms`; `iniciado`: duración + margen), y publica un
+  `ActuatorProgress` (`QUEUED`/`STARTED`). De ahí: `DespachoRiego` muestra la válvula **«En cola»** mientras el nodo la
+  tiene encolada (sigue ocupando el cupo de la zona: el comando ya salió) y «Regando» desde `iniciado`, contando la
+  duración desde el arranque; `SupplyDoseService` hace lo mismo con la bomba («En cola» en el snapshot mientras la base
+  diga `Dosificando`, que es lo que impide ordenar otra dosis; la fase vive en memoria) y `SecuenciaService` no confunde
+  un intermedio con el fin de un paso (recalcula su plazo). Sin intermedios (firmware viejo, sketch de la expo) todo
+  funciona como antes. Los intermedios de un comando ya resuelto o desconocido se ignoran. `ActuatorShutdown` (estado
+  seguro S-02, bloqueo manual) publica los `OFF` primero y la mediasombra al final con `prioridad: "INMEDIATA"`: es la
+  única orden que el nodo no hace esperar. Tras un reinicio del backend lo que estaba en la cola del nodo se reconstruye
+  del historial (puede cerrarse antes de tiempo; su ACK final llega como desconocido).
+- **Orden de despliegue: backend antes que firmware.** Un backend viejo con el firmware nuevo descarta el ACK final
+  (tomaba el `EN_CURSO` por un status desconocido y daba el comando por resuelto) y las secuencias de Demo Expo lo
+  tratan como error; un backend nuevo con el firmware viejo funciona igual que siempre.
 
 > **No operar con plantines reales sin E-01 y S-06.** Un sensor de humedad trabado en un valor seco
 > plausible haría regar en cada ciclo de lectura de la ventana (~20 L por día y por sector con el 40 %

@@ -263,4 +263,32 @@ class NurseryServiceRiegoTest {
 
         assertThat(data.zonas().get(0).sectors()).allSatisfy(s -> assertThat(s.actuadores().valve()).isEqualTo("Cerrada"));
     }
+
+    @Test
+    @DisplayName("el snapshot toma el estado de la bomba de SupplyDoseService (En cola mientras el nodo la tiene encolada)")
+    void snapshotUsaElEstadoDeLaBomba() {
+        SupplyDoseService dosis = mock(SupplyDoseService.class);
+        when(dosis.estadoBomba(eq("MZ-1-001"), any())).thenReturn("En cola");
+        when(dosis.estadoBomba(eq("MZ-1-002"), any())).thenAnswer(i -> i.getArgument(1));
+        when(dosis.estadoBomba(eq("MZ-1-003"), any())).thenAnswer(i -> i.getArgument(1));
+        service.setSupplyDose(dosis);
+        zona.setLastReadingTime(AHORA.toEpochMilli() - 1_000L);
+        zona.getSectors().forEach(s -> s.setActuadorPump("Dosificando"));
+
+        NurseryData data = service.getSnapshot();
+
+        var sectores = data.zonas().get(0).sectors();
+        assertThat(sectores).extracting(s -> s.actuadores().pump()).containsExactly("En cola", "Dosificando", "Dosificando");
+    }
+
+    @Test
+    @DisplayName("sin SupplyDoseService la bomba figura como está guardada")
+    void sinServicioDeDosisLaBombaEsLaGuardada() {
+        zona.setLastReadingTime(AHORA.toEpochMilli() - 1_000L);
+        zona.getSectors().forEach(s -> s.setActuadorPump("En espera"));
+
+        NurseryData data = service.getSnapshot();
+
+        assertThat(data.zonas().get(0).sectors()).allSatisfy(s -> assertThat(s.actuadores().pump()).isEqualTo("En espera"));
+    }
 }

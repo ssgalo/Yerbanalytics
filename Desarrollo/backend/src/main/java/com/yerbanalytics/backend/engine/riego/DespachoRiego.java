@@ -30,6 +30,7 @@ import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import com.yerbanalytics.backend.repository.ZonaRepository;
 import com.yerbanalytics.backend.service.ConfiguracionService;
+import com.yerbanalytics.backend.service.ActuatorProgress;
 import com.yerbanalytics.backend.service.ActuatorStopped;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
@@ -122,7 +123,15 @@ public class DespachoRiego implements ConsumidorParametros {
      * Riego en curso de un sector: de qué zona es, cuándo se da por cerrado y con qué comando se abrió
      * ({@code null} si se reconstruyó del historial, que no lo guarda).
      */
-    private record Curso(String zonaId, long finMs, String commandId) {
+    private record Curso(String zonaId, long finMs, String commandId, long duracionMs, Fase fase) {
+    }
+
+    /**
+     * Qué se sabe del comando en el nodo (add-cola-actuadores-nodo): {@code SENT} recién publicado (o sin intermedios:
+     * firmware viejo, reconstruido del historial), {@code QUEUED} el nodo lo tiene en su cola, {@code STARTED} arrancó.
+     */
+    private enum Fase {
+        SENT, QUEUED, STARTED
     }
 
     private final ColaRiego cola;
@@ -235,7 +244,9 @@ public class DespachoRiego implements ConsumidorParametros {
         asegurarReconstruido();
         Curso c = enCurso.get(sectorId);
         if (c != null && c.finMs() > reloj.millis()) {
-            return "Regando";
+            // El nodo serializa las cargas: mientras tiene este riego esperando turno no está abierto, y para quien mira
+            // es lo mismo que esperar en la cola del despacho.
+            return c.fase() == Fase.QUEUED ? "En cola" : "Regando";
         }
         return cola.contiene(sectorId) ? "En cola" : "Cerrada";
     }
@@ -289,6 +300,33 @@ public class DespachoRiego implements ConsumidorParametros {
             log.error("Sector {}: el riego se cerró en memoria pero no se pudo dejar la huella en el historial; "
                     + "un reinicio lo volvería a dar por abierto hasta que venza.", evento.sectorId(), e);
         }
+    }
+
+    /**
+     * El nodo avisó cómo va un riego (ACK intermedio, ver {@link ActuatorProgress}): {@code en_cola} lo muestra "En
+     * cola" y alarga el respaldo por tiempo a {@code recepción + espera máxima + duración + 5 s}; {@code iniciado} lo
+     * muestra "Regando" y lo cuenta desde el arranque: {@code recepción + duración + 5 s}. Sólo del comando que abrió
+     * el riego vigente: uno viejo (o de otro actuador) no lo toca, igual que el {@code cancelado} tardío. Sin
+     * intermedios (firmware viejo) el riego sigue derivándose de {@code ts + duración + 5 s}.
+     *
+     * <p>Sin {@code synchronized}, por la misma razón que {@link #onActuatorStopped}.
+     */
+    @EventListener
+    public void onActuatorProgress(ActuatorProgress evento) {
+        if (!"valve".equals(evento.actuator())) {
+            return;
+        }
+        Curso c = enCurso.get(evento.sectorId());
+        if (c == null || c.commandId() == null || !c.commandId().equals(evento.commandId())) {
+            return;
+        }
+        Curso nuevo = switch (evento.phase()) {
+            case QUEUED -> new Curso(c.zonaId(), evento.atMs() + evento.maxWaitMs() + c.duracionMs() + MARGEN_MS,
+                    c.commandId(), c.duracionMs(), Fase.QUEUED);
+            case STARTED -> new Curso(c.zonaId(), evento.atMs() + c.duracionMs() + MARGEN_MS,
+                    c.commandId(), c.duracionMs(), Fase.STARTED);
+        };
+        enCurso.replace(evento.sectorId(), c, nuevo);
     }
 
     /**
@@ -495,7 +533,8 @@ public class DespachoRiego implements ConsumidorParametros {
             }
             // La válvula ya abrió: se marca en curso ANTES de escribir el historial. Si el registro falla, el
             // sector sigue "regando" en memoria y no se vuelve a publicar, y el ciclo recuerda el riego.
-            enCurso.put(s.sectorId(), new Curso(zonaId, ahora + d.duracionSeg() * 1000L + MARGEN_MS, r.commandId()));
+            enCurso.put(s.sectorId(), new Curso(zonaId, ahora + d.duracionSeg() * 1000L + MARGEN_MS, r.commandId(),
+                    d.duracionSeg() * 1000L, Fase.SENT));
             ultimoRiego.merge(s.sectorId(), ahora, Math::max);
             if (s.esDeficitCritico()) {
                 ultimoRiegoCritico.merge(s.sectorId(), ahora, Math::max);
@@ -747,7 +786,7 @@ public class DespachoRiego implements ConsumidorParametros {
                 long fin = e.getTs() + e.getDuracionSeg() * 1000L + MARGEN_MS;
                 Long corte = cortes.get(e.getSectorId());
                 if (fin > ahora && (corte == null || e.getTs() > corte)) {
-                    enCurso.merge(e.getSectorId(), new Curso(e.getZonaId(), fin, null),
+                    enCurso.merge(e.getSectorId(), new Curso(e.getZonaId(), fin, null, e.getDuracionSeg() * 1000L, Fase.SENT),
                             (a, b) -> a.finMs() >= b.finMs() ? a : b);
                 }
             }

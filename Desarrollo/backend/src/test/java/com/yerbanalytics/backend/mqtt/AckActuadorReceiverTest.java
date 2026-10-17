@@ -112,4 +112,21 @@ class AckActuadorReceiverTest {
 
         verify(secuencias).registrarAck(any());
     }
+
+    @Test
+    void unEnCursoLlegaAAmbosConsumidoresConSuDetalle() {
+        receiver.processMessage(mensaje(
+                "{\"commandId\":\"abc\",\"status\":\"EN_CURSO\",\"detalle\":{\"tipo\":\"en_cola\",\"posicion\":2,\"esperaMaxSec\":45}}",
+                TOPICO));
+
+        ArgumentCaptor<AckActuador> deSecuencias = ArgumentCaptor.forClass(AckActuador.class);
+        ArgumentCaptor<AckActuador> deSeguimiento = ArgumentCaptor.forClass(AckActuador.class);
+        verify(secuencias).registrarAck(deSecuencias.capture());
+        verify(seguimiento).registrarAck(deSeguimiento.capture());
+        assertThat(deSeguimiento.getValue()).isEqualTo(deSecuencias.getValue());
+        AckActuador ack = deSeguimiento.getValue();
+        assertThat(ack.esIntermedio()).isTrue();
+        assertThat(ack.tipoDetalle()).isEqualTo("en_cola");
+        assertThat(ack.esperaMaxSec()).isEqualTo(45L);
+    }
 }
