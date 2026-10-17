@@ -19,7 +19,7 @@ public enum ParametrosSeguridad implements DefinicionParametro {
 
     ANTIGUEDAD_MAX_LECTURA("seguridad.antiguedad-max-lectura",
             "Antigüedad máxima de la lectura",
-            "Si la última lectura de la zona es más vieja que esto, se considera que el sensor dejó de reportar y se bloquea la evaluación. La fábrica son 3 intervalos de publicación del nodo (30 s).",
+            "Si la última lectura de la zona es más vieja que esto, se considera que el sensor dejó de reportar y se bloquea la evaluación. Es sólo el piso: el umbral que usa el motor es el mayor entre este valor y un intervalo de sensado más la ventana de respuesta del pulso (4 h y 3 min con los valores de fábrica).",
             TipoParametro.ENTERO, "s", "90", 10.0, 600.0, 0, "motor-reglas: StaleSensorRule");
 
     private final String clave;

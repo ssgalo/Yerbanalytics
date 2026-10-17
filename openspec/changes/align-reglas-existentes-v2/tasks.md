@@ -4,7 +4,7 @@
 Rama: `feat/reglas-v2-align`.
 
 ## 0. Decisiones previas
-- [ ] 0.1 Confirmar con el equipo D-2 (tope de R-02), D-3 (guarda de ciclo) y D-6 (escalamiento por pulso).
+- [ ] 0.1 (PENDIENTE: sin respuesta del equipo se implementaron los defaults D-2 a, D-3 mantener, D-6 por pulso) Confirmar con el equipo D-2 (tope de R-02), D-3 (guarda de ciclo) y D-6 (escalamiento por pulso).
       Sin respuesta se aplica el default del diseño.
 - [x] 0.2 Leer `CicloLecturaRiegoRule` completa y `SensingCadence` (no verificado en la auditoría).
 
@@ -38,9 +38,9 @@ Rama: `feat/reglas-v2-align`.
 - [x] 5.3 Si D-2 = (a): anotar la desviación en la cabecera de `DeficitCriticoRule` y en el README.
 
 ## 6. Cierre
-- [ ] 6.1 Textos con "85 %" o reglas v1 en trazas y comentarios.
-- [ ] 6.2 `./mvnw test`, `npm test && npm run lint` verdes.
-- [ ] 6.3 Actualizar CLAUDE.md §6 (migraciones manuales) y marcar el cambio en el índice.
+- [x] 6.1 Textos con "85 %" o reglas v1 en trazas y comentarios.
+- [x] 6.2 `./mvnw test`, `npm test && npm run lint` verdes.
+- [x] 6.3 Actualizar CLAUDE.md §6 (migraciones manuales) y marcar el cambio en el índice.
 
 ## 7. Control desde el simulador (requiere `add-control-demo-reglas`)
 - [x] 7.1 `EscalamientoNodoService` implementa `DemoControllable` (apagado, bypass `safe-state`, cooldown `retry-offline`); test de cada uno.

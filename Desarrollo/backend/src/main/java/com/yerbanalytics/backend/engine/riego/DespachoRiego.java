@@ -72,10 +72,10 @@ import java.util.stream.Collectors;
  * ({@link PrecondicionesRiego}) que las reglas:
  * <ul>
  *   <li><b>PAUSA</b> (no abre ninguna válvula y CONSERVA la ronda): la lectura o la humedad de la zona no están
- *       vigentes (mismo parámetro y misma definición que {@code StaleSensorRule}) o falta la humedad. El nodo
- *       publica cada 30 s y el umbral es 90 s: dos mensajes perdidos no pueden tirar una ronda cuyo testigo ya
- *       se regó (la humedad subió, R-01 y R-02 no vuelven a aplicar y los sectores pendientes quedarían sin agua).
- *       Se retoma sola cuando hay lectura vigente.</li>
+ *       vigentes (mismo parámetro y misma definición que {@code StaleSensorRule}) o falta la humedad. El umbral
+ *       efectivo es más de un intervalo de pulso (4 h con los valores de fábrica), así que un pulso perdido no
+ *       puede tirar una ronda cuyo testigo ya se regó (la humedad subió, R-01 y R-02 no vuelven a aplicar y los
+ *       sectores pendientes quedarían sin agua). Se retoma sola cuando hay lectura vigente.</li>
  *   <li><b>VENCIMIENTO</b>: una solicitud es válida durante el ciclo de lectura en que se pidió y el siguiente, y
  *       vence al empezar el tercero ({@link CicloLectura#vencida}); sin esto una pausa larga dejaría solicitudes
  *       eternas o rondas viejas que se riegan horas después. Al vencer se descarta con una alerta WARNING por zona.</li>

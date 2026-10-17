@@ -137,7 +137,7 @@
     {
       "clave": "seguridad.antiguedad-max-lectura",
       "etiqueta": "Antigüedad máxima de la lectura",
-      "descripcion": "Si la última lectura de la zona es más vieja que esto, se considera que el sensor dejó de reportar y se bloquea la evaluación. La fábrica son 3 intervalos de publicación del nodo (30 s).",
+      "descripcion": "Si la última lectura de la zona es más vieja que esto, se considera que el sensor dejó de reportar y se bloquea la evaluación. Es sólo el piso: el umbral que usa el motor es el mayor entre este valor y un intervalo de sensado más la ventana de respuesta del pulso (4 h y 3 min con los valores de fábrica).",
       "familia": "SEGURIDAD",
       "tipo": "ENTERO",
       "unidad": "s",

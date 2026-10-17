@@ -190,7 +190,7 @@ public class HistorialService {
      * Registra una inacción deliberada del motor de reglas (Registro de Inacción).
      *
      * <p>Cuando el motor evalúa un sector y decide conscientemente NO actuar
-     * (ej. "no riego porque va a llover", "no dosificación porque confianza < 85%"),
+     * (ej. "no riego porque va a llover", "no dosificación porque confianza < 70%"),
      * este método persiste el motivo en el historial. Permite que el usuario vea
      * por qué el sistema no actuó, distinguiéndolo de un fallo o desconexión.
      *
