@@ -1,11 +1,16 @@
 package com.yerbanalytics.backend.engine.parametros;
 
-import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
-/** Parámetros de la rama de insumos. */
+/**
+ * Parámetros de la rama de insumos: la dosis, los intervalos y las precondiciones de una aplicación (reglas_v2 §8).
+ *
+ * <p>El máximo de las dosis (50 ml) es el tope que acepta el firmware por comando ({@code LIMITE_BOMBA_ML_MAX},
+ * {@code ContratoNodo.BOMBA_ML_MAX}). Va como literal porque el frontend lee este archivo para no desalinearse; que
+ * coincida con el contrato lo verifica {@code ParametrosRealesTest}.
+ */
 @Getter
 @Accessors(fluent = true)
 @AllArgsConstructor
@@ -19,12 +24,12 @@ public enum ParametrosInsumo implements DefinicionParametro {
     FERTILIZER_DOSE("insumo.dosis-fertilizante",
             "Dosis de fertilizante por aplicación",
             "Mililitros de fertilizante por aplicación. El backend se lo manda al nodo en el comando y el firmware corta solo; no acepta más de 50 ml por comando.",
-            TipoParametro.ENTERO, "ml", "10", 1.0, (double) ContratoNodo.BOMBA_ML_MAX, 0,
+            TipoParametro.ENTERO, "ml", "10", 1.0, 50.0, 0,
             "reglas_v2 §8.1 (acotada por el firmware: LIMITE_BOMBA_ML_MAX)"),
     FUNGICIDE_DOSE("insumo.dosis-fitosanitario",
             "Dosis de fitosanitario por aplicación",
             "Mililitros de fitosanitario por aplicación. El backend se lo manda al nodo en el comando y el firmware corta solo; no acepta más de 50 ml por comando.",
-            TipoParametro.ENTERO, "ml", "10", 1.0, (double) ContratoNodo.BOMBA_ML_MAX, 0,
+            TipoParametro.ENTERO, "ml", "10", 1.0, 50.0, 0,
             "reglas_v2 §8.1 (acotada por el firmware: LIMITE_BOMBA_ML_MAX)"),
     FERTILIZER_INTERVAL("insumo.intervalo-fertilizante",
             "Intervalo mínimo entre fertilizaciones",
