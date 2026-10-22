@@ -125,6 +125,10 @@ public final class MapaPermisos {
         permiso(r, post, "/api/bloqueos", Permiso.BLOQUEOS_GESTIONAR);
         permiso(r, HttpMethod.DELETE, "/api/bloqueos/**", Permiso.BLOQUEOS_GESTIONAR);
 
+        // Tanques de insumo: el stock lo carga quien repone el producto.
+        permiso(r, get, "/api/tanques", Permiso.INSUMOS_VER);
+        permiso(r, post, "/api/tanques/**", Permiso.INSUMOS_GESTIONAR);
+
         // Demo (solo existe cuando yerbanalytics.demo.enabled=true; en producción los controllers no se registran)
         permiso(r, null, "/api/demo/**", Permiso.SIMULACION_GESTIONAR);
 
