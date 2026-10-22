@@ -19,6 +19,7 @@ import { StateGlyph } from '@/components/ui/StateGlyph';
 import { TONO, cx } from '@/components/ui/estado';
 import { fmtNum } from '@/components/ui/rango';
 import { MetricModal } from './MetricModal';
+import { VaporDeficitRow } from './VaporDeficitRow';
 import panel from './Panel.module.css';
 import styles from './SensingCard.module.css';
 
@@ -112,6 +113,10 @@ export function SensingCard({ zona, wide, className }: SensingCardProps) {
             </ul>
           </section>
         ))}
+        {/* Derivada de la temperatura y la humedad ambiental: no se sensa, y tampoco cambia el estado */}
+        <section className={styles.group} aria-label="Derivada, informativa">
+          <VaporDeficitRow dpv={lectura.dpv} />
+        </section>
       </div>
 
       {openMetric && (

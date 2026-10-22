@@ -153,3 +153,13 @@
     grid-row: 2;
   }
 }
+
+/* Fila informativa sin acción (DPV): mismo ritmo que las demás, sin el aspecto de botón ni la barra de rango */
+.rowStatic {
+  grid-template-columns: minmax(0, 1fr) auto;
+  cursor: default;
+}
+
+.rowStatic:hover {
+  background: none;
+}
