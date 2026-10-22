@@ -71,6 +71,10 @@ simulador (punto ámbar, con el motivo).
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
   el diagnóstico de una pasada del riel previa, y avisa si no hay uno utilizable. Al final lee la traza del Inspector y
   muestra, por regla, si actuó y por qué. Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING.
+- **Abrir / cerrar mediasombra** (pestaña *Demo Expo*, tarjeta de *Secuencias*) — dos botones de un clic y una sola
+  acción: *Abrir* enrolla (`targetPct` 100) y *Cerrar* despliega (`targetPct` 0). Pasan por la API de secuencias del
+  backend (`MEDIASOMBRA_ABRIR` / `MEDIASOMBRA_CERRAR`), no por un publish directo, así el seguimiento de comandos y el
+  estado del backend los ven. Se deshabilitan mientras corre otra secuencia o una pasada.
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a
   mano el diagnóstico que devolvería el modelo.
 
