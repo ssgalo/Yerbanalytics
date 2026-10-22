@@ -235,6 +235,19 @@ class NurseryServiceReadingsTest {
     }
 
     @Test
+    @DisplayName("la telemetría del simulador con 38 °C y 25 % de humedad ambiental da un DPV de 4,97 kPa (calor seco)")
+    void simulatorTelemetryYieldsTheExpectedDpv() {
+        String json = "{\"mac\":\"AA:BB:CC\",\"battery\":88,\"signal\":-61,\"timestamp\":" + NOW.toEpochMilli()
+                + ",\"metrics\":{\"humAmb\":25,\"temp\":38}}";
+        Message<String> message = MessageBuilder.withPayload(json)
+                .setHeader("mqtt_receivedTopic", "nursery/zone/MZ-1/telemetry").build();
+
+        new MqttTelemetryReceiver(service).processMessage(message);
+
+        assertThat(saved().getDpv()).isEqualTo(4.97);
+    }
+
+    @Test
     @DisplayName("el JSON del contrato (como lo publica el simulador) llega por el receptor MQTT hasta la serie")
     void theContractPayloadFeedsTheSeries() {
         String json = "{\"mac\":\"AA:BB:CC\",\"battery\":88,\"signal\":-61,\"timestamp\":" + NOW.toEpochMilli()
