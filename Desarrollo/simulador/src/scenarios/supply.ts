@@ -1,19 +1,23 @@
 import type { DiagnosisPlan, RuleScenario } from './types';
 
 /**
- * Air temperature (°C) beyond the seeded critical range (crit 11-35). Air temperature is a
- * state-driving metric that no irrigation rule reads, so forcing it critical does not
- * collide with the humidity the water rules need.
+ * Ambient humidity (%) beyond the seeded critical range (crit 42-96). It is a state-driving metric that
+ * no irrigation rule reads, so forcing it critical does not collide with the substrate humidity the water
+ * rules need.
  *
- * Only `SupplyRule` needs it (it doses in a CRITICAL sector). It goes away with that rule
- * (see `add-dosificacion-base`).
+ * It is NOT the air temperature (as it used to be): applying an input with more than 30 °C is exactly what
+ * the application preconditions forbid (P-D3), so a critical-by-heat sector could never be dosed.
+ *
+ * Only `SupplyRule` needs it (it doses in a CRITICAL sector). It goes away with that rule, once the v2
+ * application rules (N-*, F-*) replace it.
  */
-export const CRITICAL_AIR_TEMP = 40;
+export const CRITICAL_AMBIENT_HUMIDITY = 98;
 
 export const supply: RuleScenario = {
   key: 'SUPPLY',
   label: 'Dosificación de insumo',
-  description: 'Diagnóstico IA crítico pendiente de actuar — requiere un diagnóstico previo',
+  description:
+    'Diagnóstico IA crítico pendiente de actuar — requiere un diagnóstico previo y la regla encendida (arranca retirada)',
   branch: 'INSUMO',
   backendRules: ['SupplyRule'],
   needsCooldownReset: false,
@@ -28,9 +32,9 @@ export const supply: RuleScenario = {
       // SupplyRule only doses in a CRITICAL sector, and that state comes from the sensed metrics,
       // not from the diagnosis: without this the sector stays healthy/warning and the rule idles.
       telemetry: {
-        temp: {
-          value: CRITICAL_AIR_TEMP,
-          note: `temp = ${CRITICAL_AIR_TEMP} °C (estado crítico: la dosificación solo actúa en crítico)`,
+        humAmb: {
+          value: CRITICAL_AMBIENT_HUMIDITY,
+          note: `humAmb = ${CRITICAL_AMBIENT_HUMIDITY} % (estado crítico: la dosificación solo actúa en crítico)`,
         },
       },
       diagnosis,

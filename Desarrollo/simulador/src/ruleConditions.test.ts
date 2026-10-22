@@ -23,10 +23,12 @@ test('rules that do not decide with the diagnosis plan none', () => {
   assert.equal(calculateConditions(['R01', 'SHADING'], thresholds).diagnostico, null);
 });
 
-test('SupplyRule forces a critical air temperature without touching substrate humidity', () => {
+test('SupplyRule forces a critical ambient humidity without touching substrate humidity or air temperature', () => {
   const alone = calculateConditions(['SUPPLY'], thresholds);
-  assert.equal(alone.telemetria.temp, 40);
+  assert.equal(alone.telemetria.humAmb, 98);
+  // Con calor P-D3 no deja aplicar un insumo: el estado crítico no puede salir de la temperatura.
+  assert.ok(alone.telemetria.temp <= 30);
   const withIrrigation = calculateConditions(['R01', 'SUPPLY'], thresholds);
-  assert.equal(withIrrigation.telemetria.temp, 40);
+  assert.equal(withIrrigation.telemetria.humAmb, 98);
   assert.ok(withIrrigation.telemetria.humSus > thresholds.umbralCritico);
 });

@@ -31,6 +31,7 @@ import { buildThresholds, calculateConditions } from '../ruleConditions';
 import { shadeMarked, valveMarked, waitUntil } from '../faultFlow';
 import { faultyDevicesOf, sectorsWithValve, sectorsWithoutValve, type HardwareDevice } from '../hardwareCoverage';
 import { runPulses } from '../pulseChain';
+import { ensureTankStock } from '../tankStock';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
 interface Props {
@@ -334,6 +335,15 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           log.push(`✓ ${scope} ya estaba bloqueada: se usa ese bloqueo`);
         }
         setManualLocks(await api.getManualLocks());
+        setExecLog([...log]);
+      }
+
+      // Step 5b: an application is rejected against an unregistered or empty tank, so the modifier leaves the tanks
+      // of the target zone with stock (registers what is missing, tops up what is low) before the engine decides.
+      if (conditions.ensureTankStock) {
+        for (const line of await ensureTankStock(targetSensor.zonaId, { getTanks: api.getTanks, loadTank: api.loadTank })) {
+          log.push(line);
+        }
         setExecLog([...log]);
       }
 

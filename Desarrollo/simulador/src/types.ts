@@ -321,6 +321,22 @@ export interface ManualLock {
   motivo: string;
 }
 
+/** Input supply, as the platform names it. */
+export type Supply = 'FERTILIZER' | 'FUNGICIDE';
+
+/** An input tank of the platform (`GET /api/tanques`): one per supply and macro-zone. */
+export interface TankLevel {
+  zoneId: string;
+  supply: Supply;
+  supplyLabel: string;
+  capacityMl: number;
+  levelMl: number;
+  levelPct: number;
+  low: boolean;
+  updatedTs: number;
+  updatedBy: string | null;
+}
+
 /* ----------------------------------------------------------------
    Rule engine trace (GET /api/rules/evaluaciones/{sectorId}) — only what the happy path reads
    ---------------------------------------------------------------- */
