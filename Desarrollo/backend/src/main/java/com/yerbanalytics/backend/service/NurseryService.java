@@ -80,12 +80,19 @@ public class NurseryService {
     private final TrazaEvaluacionStore trazaStore;
     private final HistorialRepository historialRepository;
     private final DespachoRiego despacho;
+    /** Opcional (por setter): el estado de la bomba con la fase que informa el nodo ("En cola"). Sin él, el guardado. */
+    private SupplyDoseService supplyDose;
     private final PulsoSensadoService pulsos;
     private final EscalamientoNodoService escalamiento;
     private final ReadingRecorder readings;
     private final ReadingValidationGuard readingGuard;
     private final Clock reloj;
     private final int bateriaMinPct;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSupplyDose(SupplyDoseService supplyDose) {
+        this.supplyDose = supplyDose;
+    }
 
     public NurseryService(NurseryProperties properties,
                           ZonaRepository zonaRepository,
@@ -195,7 +202,7 @@ public class NurseryService {
                             // Derivado por tiempo del despacho (Regando / En cola / Cerrada): la columna
                             // sector.actuador_valve es legado y nadie la escribe ni la lee para decidir.
                             despacho.estadoValvula(se.getId()),
-                            se.getActuadorPump(),
+                            supplyDose != null ? supplyDose.estadoBomba(se.getId(), se.getActuadorPump()) : se.getActuadorPump(),
                             se.getActuadorShade()
                     );
                     reason = se.getReason();

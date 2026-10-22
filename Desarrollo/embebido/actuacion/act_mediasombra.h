@@ -21,6 +21,13 @@ namespace act_mediasombra {
 
 void iniciar();
 
+// ¿El motor está en marcha? Lo usa la cola de cargas para soltar el lugar de la malla cuando termina.
+bool moviendoseAhora();
+
+// ¿La malla ya está en la posición que pide 'cmd' (y no se está moviendo)? Entonces el comando es un sin_cambio:
+// no ocupa lugar en la cola de cargas.
+bool yaEnPosicion(const Comando& cmd);
+
 // Devuelve true si 'ack' ya tiene la respuesta (ya estaba en esa posición o
 // el comando es inválido); false si el motor arrancó y el ack saldrá por atender().
 // Un comando nuevo durante un movimiento lo reemplaza (el viejo: ERROR "reemplazado").

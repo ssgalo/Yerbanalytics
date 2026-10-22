@@ -67,6 +67,11 @@ import java.util.regex.Pattern;
  * siempre. El {@code ERROR cancelado} del ON que provoca nuestro propio OFF se ignora: llega con el
  * commandId del ON, que ya no es el del paso en curso.
  *
+ * <p><b>ACK intermedios.</b> Con la cola de cargas del nodo (add-cola-actuadores-nodo) un comando puede esperar turno:
+ * el nodo avisa {@code EN_CURSO en_cola / iniciado}. Eso no cierra ningún paso; sólo recalcula el plazo del ACK final
+ * (ver {@code aplicarIntermedio}). El ABRIR del riego encadena a ESPERAR en el mismo instante, así que el intermedio del
+ * ON siempre encuentra a ESPERAR en curso.
+ *
  * <p><b>Qué pasa ante una falla.</b> Siempre se llega al paso seguro: si falla el ABRIR o la espera se
  * cierra la válvula igual, porque un ACK perdido no prueba que la bomba no arrancó (idem la mediasombra,
  * que se enrolla). Si falla el paso seguro no se reintenta. Un comando sin ACK no se republica: el ACK
@@ -82,6 +87,9 @@ public class SecuenciaService implements UsoDelHardware {
     static final String RIEGO = "RIEGO";
     static final String MEDIASOMBRA = "MEDIASOMBRA";
     static final String LECTURA = "LECTURA";
+    /** Acciones sueltas de un solo paso: abrir = enrollar (100), cerrar = desplegar (0). */
+    static final String MEDIASOMBRA_ABRIR = "MEDIASOMBRA_ABRIR";
+    static final String MEDIASOMBRA_CERRAR = "MEDIASOMBRA_CERRAR";
 
     private static final String ABRIR = "ABRIR";
     private static final String ESPERAR = "ESPERAR";
@@ -175,8 +183,16 @@ public class SecuenciaService implements UsoDelHardware {
     public Optional<String> ocupadoPor() {
         Secuencia f = foto;
         return f != null && EN_CURSO.equals(f.estado())
-                ? Optional.of("Hay una secuencia de " + f.tipo().toLowerCase(Locale.ROOT) + " en curso.")
+                ? Optional.of("Hay una secuencia de " + nombreLegible(f.tipo()) + " en curso.")
                 : Optional.empty();
+    }
+
+    private static String nombreLegible(String tipo) {
+        return switch (tipo) {
+            case MEDIASOMBRA_ABRIR -> "abrir mediasombra";
+            case MEDIASOMBRA_CERRAR -> "cerrar mediasombra";
+            default -> tipo.toLowerCase(Locale.ROOT);
+        };
     }
 
     /**
@@ -253,7 +269,7 @@ public class SecuenciaService implements UsoDelHardware {
         ParametrosSecuencia pedidos = pedido == null || pedido.parametros() == null
                 ? new ParametrosSecuencia(null, null) : pedido.parametros();
         if (tipo == null) {
-            throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, MEDIASOMBRA o LECTURA).");
+            throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
         switch (tipo) {
             case RIEGO -> {
@@ -276,8 +292,11 @@ public class SecuenciaService implements UsoDelHardware {
             case LECTURA -> {
                 return new ParametrosSecuencia(null, null, Boolean.TRUE.equals(pedidos.ejecutarMotor()));
             }
-            default -> throw new SecuenciaInvalidaException(
-                    "Tipo de secuencia desconocido: " + tipo + " (RIEGO, MEDIASOMBRA o LECTURA).");
+            case MEDIASOMBRA_ABRIR, MEDIASOMBRA_CERRAR -> {
+                return new ParametrosSecuencia(null, null);
+            }
+            default -> throw new SecuenciaInvalidaException("Tipo de secuencia desconocido: " + tipo
+                    + " (RIEGO, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
     }
 
@@ -310,6 +329,9 @@ public class SecuenciaService implements UsoDelHardware {
                 p.pasos.add(new Paso(2, ESPERAR));
                 p.pasos.add(new Paso(3, ENROLLAR));
             }
+            // Un solo paso, que a la vez es el seguro: cierra la secuencia salga como salga (sin reintento).
+            case MEDIASOMBRA_ABRIR -> p.pasos.add(new Paso(1, ENROLLAR));
+            case MEDIASOMBRA_CERRAR -> p.pasos.add(new Paso(1, DESPLEGAR));
             default -> {
                 p.pasos.add(new Paso(1, PEDIR));
                 p.pasos.add(new Paso(2, ESPERAR_TELEMETRIA));
@@ -443,6 +465,7 @@ public class SecuenciaService implements UsoDelHardware {
         ComandoActuadorPublisher.Resultado r = actuadores.publicar(p.zonaId, p.sectorId, actuador, accion, parametros);
         paso.commandId = r.commandId();
         paso.publicadoEn = reloj.millis();
+        paso.venceAckEn = paso.publicadoEn + timeoutAckSeg(p, paso) * 1000L;
         if (!r.publicado()) {
             String detalle = detallePublicacion(r.error());
             cerrarYSeguir(p, paso, ERROR, "PUBLICACION_FALLIDA",
@@ -450,7 +473,40 @@ public class SecuenciaService implements UsoDelHardware {
         }
     }
 
+    /**
+     * Un ack intermedio ({@code EN_CURSO}, add-cola-actuadores-nodo) NO cierra el paso: el nodo serializa las cargas y
+     * avisa que la del paso espera turno ({@code en_cola}) o arrancó ({@code iniciado}). Sólo recalcula el plazo del
+     * paso (el ACK final sigue siendo el que lo cierra): {@code en_cola} suma la espera máxima al plazo del paso;
+     * {@code iniciado} lo cuenta desde ahora. Aplica a ESPERAR del riego (el ACK del ON) y a DESPLEGAR/ENROLLAR.
+     */
+    private void aplicarIntermedio(SecuenciaInterna p, AckActuador ack) {
+        Paso paso = enCurso(p);
+        if (paso == null || paso.commandId == null || !esDeComando(p, paso)
+                || !Objects.equals(paso.commandId, ack.commandId())) {
+            log.debug("ACK intermedio ignorado (commandId {} no es el del paso en curso)", ack.commandId());
+            return;
+        }
+        long esperaMs;
+        if (ContratoNodo.ACK_TIPO_EN_COLA.equals(ack.tipoDetalle())) {
+            esperaMs = ack.esperaMaxSec() * 1000L;
+        } else if (ContratoNodo.ACK_TIPO_INICIADO.equals(ack.tipoDetalle())) {
+            esperaMs = 0;
+        } else {
+            log.debug("ACK EN_CURSO con detalle '{}' desconocido, se ignora", ack.tipoDetalle());
+            return;
+        }
+        long ahora = reloj.millis();
+        paso.venceAckEn = ahora + esperaMs + timeoutAckSeg(p, paso) * 1000L;
+        if (ESPERAR.equals(paso.tipo) && RIEGO.equals(p.tipo)) {
+            paso.esperaHasta = ahora + esperaMs + p.duracionValvulaSeg * 1000L;   // fin esperado del riego, para la cuenta regresiva
+        }
+    }
+
     private void aplicarAck(SecuenciaInterna p, AckActuador ack) {
+        if (ack.esIntermedio()) {
+            aplicarIntermedio(p, ack);
+            return;
+        }
         Paso paso = enCurso(p);
         if (paso == null || paso.commandId == null || !esDeComando(p, paso)
                 || !Objects.equals(paso.commandId, ack.commandId())) {
@@ -483,8 +539,8 @@ public class SecuenciaService implements UsoDelHardware {
             }
             case ESPERAR_TELEMETRIA -> revisarLectura(p, paso, recibidas);
             default -> {
-                int timeoutSeg = timeoutAckSeg(p, paso);
-                if (ahora - paso.publicadoEn >= timeoutSeg * 1000L) {
+                // El plazo sale de venceAckEn: un ACK intermedio (en_cola / iniciado) lo recalcula.
+                if (ahora >= paso.venceAckEn) {
                     cerrarYSeguir(p, paso, ERROR, "ACTUADOR_SIN_RESPUESTA", detalleDeError(p, paso,
                             "ACTUADOR_SIN_RESPUESTA", null));
                 }
@@ -726,7 +782,7 @@ public class SecuenciaService implements UsoDelHardware {
         Long iniciadoEn;
         Long terminadoEn;
         long publicadoEn;
-        /** Plazo del ACK del ON, para el ESPERAR del riego (N + margen). */
+        /** Cuándo se da por perdido el ACK del comando del paso (lo recalculan los ACK intermedios). */
         long venceAckEn;
 
         Paso(int n, String tipo) {

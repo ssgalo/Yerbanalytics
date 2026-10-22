@@ -3,7 +3,7 @@ import type { RuleScenario } from './types';
 export const shading: RuleScenario = {
   key: 'SHADING',
   label: 'Mediasombra por pico UV',
-  description: 'Índice UV por encima del umbral — despliega la mediasombra',
+  description: 'Índice UV por encima del umbral — cierra la mediasombra',
   branch: 'MEDIASOMBRA',
   backendRules: ['ShadingRule'],
   needsCooldownReset: false,

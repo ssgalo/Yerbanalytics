@@ -42,8 +42,6 @@ class ParametrosRealesTest {
             Map.entry("insumo.max-dosis-24h", 1.0),                  // DailyDoseLimitRule:80
             Map.entry("insumo.dosis-ml", 10.0),                      // INSUMO_SEG_POR_DEFECTO 10 s del firmware, a 1 s por ml
             Map.entry("mediasombra.uv-umbral", 7.0),                 // uv-threshold
-            Map.entry("mediasombra.apertura-proteccion-uv", 30.0),   // ShadingRule:90
-            Map.entry("mediasombra.apertura-maxima", 100.0),         // configuracion_operativa
             Map.entry("readings.retention-days", 14.0),              // add-historial-lecturas D-4
             Map.entry("sensado.espera-respuesta", 60.0),             // reglas_v2 §11 Telemetría
             Map.entry("sensado.reintentos", 2.0),

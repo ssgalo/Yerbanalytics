@@ -23,6 +23,7 @@ import java.util.HashMap;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.ManualLockRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
+import com.yerbanalytics.backend.service.ActuatorProgress;
 import com.yerbanalytics.backend.service.ActuatorStopped;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.junit.jupiter.api.BeforeEach;
@@ -1282,5 +1283,101 @@ class DespachoRiegoTest {
                 .thenReturn(List.of(corte(id("MZ-2", 1), T0.minusSeconds(90))));
 
         assertThat(nuevoDespacho().estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+    }
+
+    // ------------------------------------------------------------------ add-cola-actuadores-nodo (D-9)
+
+    private ActuatorProgress progreso(int n, String commandId, ActuatorProgress.Phase fase, long atMs, long esperaMs) {
+        return new ActuatorProgress("MZ-2", id("MZ-2", n), "valve", commandId, fase, atMs, esperaMs);
+    }
+
+    @Test
+    void unRiegoEnLaColaDelNodoFiguraEnColaYSigueContandoEnElCupo() {
+        usarSimultaneos(1);
+        pedir("MZ-2", 1, 600);
+        despacho.tick();                                   // cmd-0 sale hacia el nodo
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+
+        despacho.onActuatorProgress(progreso(1, "cmd-0", ActuatorProgress.Phase.QUEUED, T0.toEpochMilli(), 20_000L));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("En cola");
+        pedir("MZ-2", 2, 600);
+        despacho.tick();
+        verify(publisher, times(1)).publicar(any(), any(), eq("valve"), eq("ON"), any());   // el cupo sigue ocupado
+        assertThat(despacho.estadoValvula(id("MZ-2", 2))).isEqualTo("En cola");              // la de la cola del despacho
+    }
+
+    @Test
+    void conEnColaElPlazoSumaLaEsperaMaximaYConIniciadoSaleDelArranque() {
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+        long t0 = T0.toEpochMilli();
+
+        despacho.onActuatorProgress(progreso(1, "cmd-0", ActuatorProgress.Phase.QUEUED, t0, 20_000L));
+        assertThat(despacho.finRiegoEnCurso(id("MZ-2", 1))).isEqualTo(t0 + 20_000L + 600_000L + 5_000L);
+
+        reloj.avanzar(Duration.ofSeconds(20));
+        despacho.onActuatorProgress(progreso(1, "cmd-0", ActuatorProgress.Phase.STARTED, t0 + 20_000L, 0L));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+        assertThat(despacho.finRiegoEnCurso(id("MZ-2", 1))).isEqualTo(t0 + 20_000L + 600_000L + 5_000L);
+    }
+
+    @Test
+    void unIniciadoTardioAdelantaElCierreRespectoDelRespaldoPorTiempo() {
+        pedir("MZ-2", 1, 100);
+        despacho.tick();
+        long t0 = T0.toEpochMilli();
+        reloj.avanzar(Duration.ofSeconds(30));             // el nodo lo tuvo 30 s en cola
+
+        despacho.onActuatorProgress(progreso(1, "cmd-0", ActuatorProgress.Phase.STARTED, t0 + 30_000L, 0L));
+
+        reloj.avanzar(Duration.ofMillis(100_000L + 5_000L - 1));   // 105 s desde el arranque: todavía regando
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+        reloj.avanzar(Duration.ofMillis(1));
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Cerrada");
+    }
+
+    @Test
+    void unProgresoDeOtroComandoNoTocaElRiegoVigente() {
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+        long fin = despacho.finRiegoEnCurso(id("MZ-2", 1));
+
+        despacho.onActuatorProgress(progreso(1, "cmd-viejo", ActuatorProgress.Phase.QUEUED, T0.toEpochMilli(), 60_000L));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+        assertThat(despacho.finRiegoEnCurso(id("MZ-2", 1))).isEqualTo(fin);
+    }
+
+    @Test
+    void unProgresoDeLaBombaOdeLaMediasombraNoTocaElRiego() {
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+        long fin = despacho.finRiegoEnCurso(id("MZ-2", 1));
+
+        despacho.onActuatorProgress(new ActuatorProgress("MZ-2", id("MZ-2", 1), "pump", "cmd-0",
+                ActuatorProgress.Phase.QUEUED, T0.toEpochMilli(), 60_000L));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Regando");
+        assertThat(despacho.finRiegoEnCurso(id("MZ-2", 1))).isEqualTo(fin);
+    }
+
+    @Test
+    void unProgresoDeUnSectorSinRiegoNoDejaNada() {
+        despacho.onActuatorProgress(progreso(9, "cmd-x", ActuatorProgress.Phase.STARTED, T0.toEpochMilli(), 0L));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 9))).isEqualTo("Cerrada");
+    }
+
+    @Test
+    void unCanceladoDeUnRiegoEncoladoLoCierraSinHaberRegado() {
+        pedir("MZ-2", 1, 600);
+        despacho.tick();
+        despacho.onActuatorProgress(progreso(1, "cmd-0", ActuatorProgress.Phase.QUEUED, T0.toEpochMilli(), 20_000L));
+
+        despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 1), "valve", "cmd-0", "cancelado"));
+
+        assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Cerrada");
     }
 }

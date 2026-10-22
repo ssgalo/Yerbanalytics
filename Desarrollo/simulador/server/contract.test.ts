@@ -189,3 +189,32 @@ test('the contrato.h firmware declares the same error types and topic', async ()
   for (const type of NODE_ERROR_TYPES) assert.ok(header.includes(`"${type}"`), `contrato.h declares ${type}`);
   assert.ok(header.includes('nursery/zone/%s/errores'));
 });
+
+test('the intermediate ACK vocabulary and the priority mirror contrato.h (add-cola-actuadores-nodo)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const c = await import('./contract.ts');
+  assert.deepEqual([...c.ACK_STATUSES], ['SUCCESS', 'ERROR', 'EN_CURSO']);
+  for (const tipo of ['en_cola', 'iniciado', 'cola_llena']) {
+    assert.ok((c.ACK_DETAIL_TYPES as readonly string[]).includes(tipo), `ACK_DETAIL_TYPES has ${tipo}`);
+  }
+  assert.equal(c.PRIORITY_PARAM, 'prioridad');
+  assert.equal(c.PRIORITY_IMMEDIATE, 'INMEDIATA');
+
+  let header: string;
+  try {
+    header = await readFile(new URL('../../embebido/comun/contrato.h', import.meta.url), 'utf8');
+  } catch {
+    return; // the firmware is not in this checkout: nothing to compare against
+  }
+  for (const needle of [
+    'STATUS_EN_CURSO = "EN_CURSO"',
+    'DETALLE_EN_COLA              = "en_cola"',
+    'DETALLE_INICIADO             = "iniciado"',
+    'DETALLE_COLA_LLENA           = "cola_llena"',
+    'KEY_PRIORIDAD       = "prioridad"',
+    'PRIORIDAD_INMEDIATA = "INMEDIATA"',
+    'KEY_ESPERA_MAX      = "esperaMaxSec"',
+  ]) {
+    assert.ok(header.includes(needle), `contrato.h declares ${needle}`);
+  }
+});

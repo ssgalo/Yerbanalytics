@@ -43,11 +43,12 @@ este cambio, genérica para cuentas de integración) con la migración manual id
 `migracion-permisos-servicio-simulador.sql`. Si el catálogo igual da 403, el panel avisa en vez de caer en silencio a los
 valores de fábrica (`loadThresholds`).
 
-## D8. Una carga por vez
-Tres pulsos con motor: riego (`RiegoPorDeficitRule` + `DeficitCriticoRule`), insumo (`SupplyRule`), mediasombra (`ShadingRule`). Antes de cada
-uno `PUT /api/demo/rules/{regla}` deja encendidas sólo las del paso; el estado previo de esas reglas se restaura en el `finally`.
-Entre un paso y el siguiente se espera que la acción **termine** (no un tiempo fijo): se consulta `GET /api/nursery` hasta que
-ninguna válvula de la zona esté en «Regando»/«En cola» (paso 1) o la bomba del sector deje «Dosificando» (paso 2), con plazo
-duración esperada (del motivo de la traza) + 120 s y aviso visible si se agota; después, 5 s (`STEP_WAIT_MS`). Si la regla
-no actuó se omite la espera de fin y sólo se hace la pausa. El paso 3 es el último y no espera. En modo simulador la lectura
-queda fijada durante los tres pulsos y el diagnóstico se registra justo antes del paso 2 (así es «nuevo» para `SupplyRule`).
+## D8. Una carga por vez — REEMPLAZADO por `add-cola-actuadores-nodo`
+> Esta decisión (tres pulsos con motor, una regla ejecutora encendida por vez, espera de fin de carga y pausa de 5 s) fue un
+> desvío para que el ESP32 no arrancara riego, insumo y mediasombra juntos y se reiniciara por brownout. **Ya no rige.** Ahora
+> el nodo serializa las cargas con una cola propia (`openspec/changes/add-cola-actuadores-nodo/`, design D-13) y el happy path
+> vuelve al diseño original: **un** pulso con las tres reglas habilitadas, sin encender/apagar reglas por paso (se borraron
+> `STEP_ORDER`, `STEP_RULES`, `enableOnly`, `waitUntilFinished`, `expectedSeconds` y `STEP_WAIT_MS`). El diagnóstico se registra
+> antes del pulso. La tarjeta sigue siendo por regla (traza) y suma el avance de cada acción leído del snapshot: válvula
+> `En cola`/`Regando`/`Cerrada` y bomba `En cola`/`Dosificando`/`En espera` → «en cola» / «en curso» / «hecho»; la mediasombra
+> queda «ordenada» (no tiene estado derivado del nodo).

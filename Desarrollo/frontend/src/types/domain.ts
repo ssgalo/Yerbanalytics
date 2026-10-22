@@ -71,8 +71,9 @@ export interface Diagnosis {
 
 /** Estado de los actuadores físicos del sector. */
 export interface Actuadores {
-  /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno en la tanda de la macro-zona) o `Cerrada`. */
+  /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno: en la tanda de la macro-zona o en la cola del nodo) o `Cerrada`. */
   valve: string;
+  /** Bomba de insumo: `Dosificando`, `En cola` (el nodo la tiene esperando su turno: sirve una carga a la vez) o `En espera`. Se muestra tal cual llega. */
   pump: string;
   shade: number;
 }
@@ -404,9 +405,8 @@ export interface MetricThreshold {
 }
 
 /**
- * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego y la
- * apertura máx. de mediasombra no viven acá: son parámetros del catálogo del motor de reglas
- * (`riego.volumen-max-evento`, `mediasombra.apertura-maxima`).
+ * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego no
+ * vive acá: es un parámetro del catálogo del motor de reglas (`riego.volumen-max-evento`).
  */
 export interface ConfigOperativa {
   insumoDosisMax24hMl: number;

@@ -13,8 +13,8 @@ TDD estricto. Suites: en `Desarrollo/simulador`, `npm test && npm run typecheck`
 ## 2b. Revisión
 - [x] 2b.1 Lectura fijada + emisión encendida antes del pulso, restauradas en `finally`; limpieza de pin en ESP32 real; sondeo de traza tolerante a errores; test de `humSus` entre crítico (incl.) y riego (excl.) con umbrales del catálogo.
 
-## 2c. Una carga por vez
-- [x] 2c.1 Tres pulsos con reglas ejecutoras encendidas de a una, espera de fin de carga (`waitUntilFinished`) + 5 s, restauración de flags en `finally`, estado por paso en la tarjeta.
+## 2c. Una carga por vez (REEMPLAZADO por `add-cola-actuadores-nodo`: vuelve a un solo pulso)
+- [x] 2c.1 (histórico, ya no rige) Tres pulsos con reglas ejecutoras encendidas de a una, espera de fin de carga (`waitUntilFinished`) + 5 s, restauración de flags en `finally`, estado por paso en la tarjeta.
 
 ## 3. Permisos del rol Servicio y mediasombra
 - [x] 3.0 Test de la matriz por defecto + `Permiso.java` + migración idempotente + docs; aviso visible si el catálogo falla; redacción «cerrada/abierta» con el umbral 50 espejado.

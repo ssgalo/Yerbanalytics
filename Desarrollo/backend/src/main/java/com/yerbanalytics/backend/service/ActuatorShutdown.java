@@ -2,13 +2,17 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.model.DispositivoEntity;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -16,6 +20,9 @@ import java.util.Set;
  * Ordena el cierre de los equipos <b>registrados</b> (Hardware) en un conjunto de sectores: válvula {@code OFF},
  * bomba {@code OFF} y mediasombra cerrada. Quien llama elige qué tipos de equipo: el estado seguro de una zona
  * ({@link ZoneSafeState}) cierra los tres; el bloqueo manual ({@link ManualLockService}) sólo agua y bombas.
+ *
+ * <p>Publica primero los {@code OFF} y al final la mediasombra, que lleva {@code prioridad: "INMEDIATA"}: el nodo
+ * serializa las cargas ({@code add-cola-actuadores-nodo}) y esta es la única orden que no espera turno.
  *
  * <p>Sale por el mismo {@link ComandoActuadorPublisher} que las reglas y las secuencias de Demo Expo, así
  * {@link SeguimientoComandosService} vigila cada orden hasta su ack. Una orden que no sale no frena a las demás.
@@ -36,7 +43,10 @@ public class ActuatorShutdown {
     private static final Map<String, Order> ORDERS = Map.of(
             HardwareService.ELECTROVALVULA, new Order("valve", "OFF", Map.of()),
             HardwareService.BOMBA, new Order("pump", "OFF", Map.of()),
-            HardwareService.MEDIASOMBRA, new Order("shade", "SET", Map.of("targetPct", 0)));
+            // prioridad INMEDIATA: es la orden de seguridad, el nodo no la hace esperar en su cola de cargas
+            // (add-cola-actuadores-nodo, D-3.1). Un SET 0 común (motor, secuencias) sí espera su turno.
+            HardwareService.MEDIASOMBRA, new Order("shade", "SET",
+                    Map.of("targetPct", 0, ContratoNodo.PARAM_PRIORIDAD, ContratoNodo.PRIORIDAD_INMEDIATA)));
 
     /** Todos los tipos de equipo que sabe cerrar. */
     public static final Set<String> ALL_TYPES = ORDERS.keySet();
@@ -60,7 +70,11 @@ public class ActuatorShutdown {
         Set<String> seen = new LinkedHashSet<>();
         int commands = 0;
         int failed = 0;
-        for (DispositivoEntity device : devices.findBySectorIdInAndTipoIn(sectorIds, types)) {
+        // Los OFF primero y la malla al final: el instante en que se suman cargas (la malla arranca ya, aunque haya
+        // otras corriendo) queda en milisegundos, no mientras todavía se están cerrando las válvulas.
+        List<DispositivoEntity> found = new ArrayList<>(devices.findBySectorIdInAndTipoIn(sectorIds, types));
+        found.sort(Comparator.comparing((DispositivoEntity d) -> HardwareService.MEDIASOMBRA.equals(d.getTipo())));
+        for (DispositivoEntity device : found) {
             Order order = ORDERS.get(device.getTipo());
             if (order == null || !seen.add(device.getSectorId() + "|" + device.getTipo())) {
                 continue;

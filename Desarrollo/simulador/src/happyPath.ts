@@ -1,5 +1,8 @@
 /* ============================================================
-   Happy path de la Demo Expo: riego + insumo + mediasombra en un solo botón.
+   Happy path de la Demo Expo: riego + insumo + mediasombra en un solo botón y UN solo pulso.
+
+   El nodo serializa las cargas (cola de cargas del ESP32, `add-cola-actuadores-nodo`): el motor puede ordenar las
+   tres acciones juntas sin que la fuente del prototipo caiga. Antes este módulo las escalonaba en tres pulsos; ya no.
 
    Módulo sin React ni fetch (las llamadas se inyectan en `HappyPathDeps`), para poder probar la
    decisión y la orquestación sin backend. NO duplica nada: el modo SIMULADOR combina los escenarios
@@ -115,18 +118,21 @@ function branchReadout(trace: EvaluationTrace, branch: string, actionType: strin
   return { acted: false, detail: 'sin acción' };
 }
 
+/** «Mediasombra cerrada/abierta» + el motivo, sin repetir lo que el motivo ya dice. */
+function shadeDetail(openingPct: number, reason: string): string {
+  const state = openingPct < SHADE_DEPLOY_BELOW_OPENING_PCT ? 'cerrada' : 'abierta';
+  return /^Mediasombra (cerrada|abierta)/.test(reason) ? reason : `Mediasombra ${state} · ${reason}`;
+}
+
 /** Resumen de la traza del Inspector: por rama, si actuó y por qué sí o por qué no. */
 export function summarizeTrace(trace: EvaluationTrace): HappyPathReadout {
   const riego = branchReadout(trace, 'RIEGO', 'ACTIVAR_VALVULA', 'Riego');
   const insumo = branchReadout(trace, 'INSUMO', 'ACTIVAR_BOMBA', 'Insumo');
   const shade = branchReadout(trace, 'MEDIASOMBRA', 'MOVER_MEDIASOMBRA', 'Mediasombra');
   const opening = /\[apertura=(\d+)\]/.exec(shade.detail);
-  // La orden lleva el % de APERTURA: por debajo del umbral del firmware la malla se despliega (queda cerrada).
+  // El hardware es binario: la orden lleva 100 (abierta) o 0 (cerrada) y el texto no muestra porcentajes.
   const mediasombra = shade.acted && opening
-    ? {
-        acted: true,
-        detail: `Mediasombra ${Number(opening[1]) < SHADE_DEPLOY_BELOW_OPENING_PCT ? 'cerrada' : 'abierta'} (${opening[1]} % de apertura) · ${shade.detail.replace(opening[0], '').trim()}`,
-      }
+    ? { acted: true, detail: shadeDetail(Number(opening[1]), shade.detail.replace(opening[0], '').trim()) }
     : shade;
   return { riego, insumo, mediasombra, allActed: riego.acted && insumo.acted && mediasombra.acted };
 }
@@ -169,53 +175,76 @@ export function diagnosisPrecheck(
   return { ok: true, reason: `diagnóstico ${diagnosis.estado} (${diagnosis.conf} %)` };
 }
 
+/* ---------------- avance de cada acción ---------------- */
+
+/**
+ * Avance de una acción desde que el motor la ordena. `ordenada` = la decisión salió, el nodo todavía no avisó nada;
+ * `en cola` = el nodo la tiene esperando turno (la fuente del prototipo no banca varias cargas a la vez, así que el
+ * nodo las serializa: ver `add-cola-actuadores-nodo`); `en curso` = está actuando; `hecho` = terminó.
+ */
+export type ProgressLabel = 'sin acción' | 'ordenada' | 'en cola' | 'en curso' | 'hecho';
+
+export interface ActionProgress {
+  riego: ProgressLabel;
+  insumo: ProgressLabel;
+  mediasombra: ProgressLabel;
+}
+
+/** Estado de los actuadores de un sector, como lo deriva el backend (snapshot del vivero). */
+export interface SectorActuators {
+  sectorId: string;
+  valve: string;
+  pump: string;
+}
+
+/** Avance al salir la traza: lo que no actuó queda en `sin acción`; el resto, `ordenada`. */
+export function initialProgress(readout: HappyPathReadout | null): ActionProgress {
+  const of = (r: RuleReadout | undefined): ProgressLabel => (r?.acted ? 'ordenada' : 'sin acción');
+  return { riego: of(readout?.riego), insumo: of(readout?.insumo), mediasombra: of(readout?.mediasombra) };
+}
+
+function advance(prev: ProgressLabel, state: string, queued: string, running: string): ProgressLabel {
+  if (prev === 'sin acción' || prev === 'hecho') return prev;
+  if (state === queued) return 'en cola';
+  if (state === running) return 'en curso';
+  // Ya no está ni en cola ni actuando: si antes lo estaba, terminó; si todavía no apareció, sigue `ordenada`.
+  return prev === 'ordenada' ? prev : 'hecho';
+}
+
+/**
+ * Siguiente avance a partir del snapshot: válvula `En cola` → en cola, `Regando` → en curso, `Cerrada` → hecho (si ya
+ * había aparecido); bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo:
+ * queda `ordenada` (lo que dice la traza).
+ */
+export function nextProgress(prev: ActionProgress, sector: SectorActuators | undefined): ActionProgress {
+  if (!sector) return prev;
+  return {
+    riego: advance(prev.riego, sector.valve, 'En cola', 'Regando'),
+    insumo: advance(prev.insumo, sector.pump, 'En cola', 'Dosificando'),
+    mediasombra: prev.mediasombra,
+  };
+}
+
+/** Terminó todo lo que tenía para terminar (la mediasombra no se sigue). */
+export function progressDone(progress: ActionProgress): boolean {
+  return (progress.riego === 'sin acción' || progress.riego === 'hecho')
+    && (progress.insumo === 'sin acción' || progress.insumo === 'hecho');
+}
+
+/** Lee el snapshot y devuelve el avance siguiente. Un snapshot que falla deja el avance como estaba. */
+export async function readProgress(
+  prev: ActionProgress,
+  sectorId: string,
+  getActuators: () => Promise<SectorActuators[]>,
+): Promise<ActionProgress> {
+  try {
+    return nextProgress(prev, (await getActuators()).find((a) => a.sectorId === sectorId));
+  } catch {
+    return prev;
+  }
+}
+
 /* ---------------- orquestación ---------------- */
-
-export type StepKey = 'riego' | 'insumo' | 'mediasombra';
-/** `finishing` = esperando que termine la acción; `pause` = los 5 s entre pasos. */
-export type StepStatus = 'pending' | 'running' | 'finishing' | 'pause' | 'done';
-
-/** Orden de los pasos: una carga a la vez, para no sumar el arranque de todas (el ESP32 se reinicia por brownout). */
-export const STEP_ORDER: StepKey[] = ['riego', 'insumo', 'mediasombra'];
-
-/** Reglas ejecutoras (nombres de `GET /api/demo/rules`) que quedan encendidas en cada paso; el resto de las tres, apagadas. */
-export const STEP_RULES: Record<StepKey, string[]> = {
-  riego: ['RiegoPorDeficitRule', 'DeficitCriticoRule'],
-  insumo: ['SupplyRule'],
-  mediasombra: ['ShadingRule'],
-};
-
-/** Espera entre un paso y el siguiente (ms). */
-export const STEP_WAIT_MS = 5_000;
-
-const TOUCHED_RULES = STEP_ORDER.flatMap((k) => STEP_RULES[k]);
-
-/** Segundos que se espera, a lo sumo, que termine la acción (más un margen): del motivo de la traza, o el tope del firmware. */
-export function expectedSeconds(key: StepKey, detail: string): number {
-  if (key === 'insumo') {
-    const ml = /(\d+)\s*ml\b/.exec(detail)?.[1];
-    return ml ? Number(ml) : 60; // 1 s por ml; tope de la bomba (LIMITE_INSUMO_SEG_MAX)
-  }
-  const sec = /(\d+)\s*s\b/.exec(detail)?.[1];
-  return sec ? Number(sec) : 1200; // tope de la válvula (CONTRATO_VALVULA_DURACION_MAX_SEG)
-}
-
-/** Margen que se suma a la duración esperada antes de rendirse. */
-export const FINISH_TIMEOUT_EXTRA_MS = 120_000;
-
-/** Consulta cada `pollMs` hasta que `isFinished` dé true o se agote `timeoutMs` (tiempo acumulado de las esperas). */
-export async function waitUntilFinished(
-  isFinished: () => Promise<boolean>,
-  opts: { pollMs: number; timeoutMs: number; sleep: (ms: number) => Promise<void> },
-): Promise<{ finished: boolean }> {
-  let elapsed = 0;
-  for (;;) {
-    if (await isFinished()) return { finished: true };
-    if (elapsed >= opts.timeoutMs) return { finished: false };
-    await opts.sleep(opts.pollMs);
-    elapsed += opts.pollMs;
-  }
-}
 
 export interface HappyPathDeps {
   zeroCooldowns(): Promise<unknown>;
@@ -235,30 +264,15 @@ export interface HappyPathDeps {
   getTrace(sectorId: string): Promise<EvaluationTrace | null>;
   sleep(ms: number): Promise<void>;
   log(line: string): void;
-  /** Sectores de la zona con el estado de sus actuadores (snapshot del vivero). */
-  getActuators(zonaId: string): Promise<{ sectorId: string; valve: string; pump: string }[]>;
-  /** Avance de cada paso, para la tarjeta de resultado. */
-  onStep?(key: StepKey, status: StepStatus): void;
 }
 
 export interface HappyPathOptions {
   tracePollMs?: number;
   maxTracePolls?: number;
-  stepWaitMs?: number;
-  /** Intervalo de consulta mientras se espera que termine la acción. */
-  finishPollMs?: number;
-  finishTimeoutExtraMs?: number;
-}
-
-export interface StepOutcome {
-  key: StepKey;
-  /** Lo que la traza de ESE pulso dice de la rama del paso; `null` si no llegó una traza nueva. */
-  readout: RuleReadout | null;
 }
 
 export interface HappyPathOutcome {
-  steps: StepOutcome[];
-  /** Los tres pasos juntos; `null` si a alguno le faltó la traza. */
+  /** Lo que la traza del pulso dice de cada rama; `null` si no llegó una traza nueva a tiempo. */
   readout: HappyPathReadout | null;
   /** Lo que la corrida dejó activo a propósito (se muestra en la tarjeta de resultado). */
   leftActive: string[];
@@ -269,7 +283,11 @@ function instantMs(ts: string | number): number {
   return typeof ts === 'number' ? ts : Date.parse(ts);
 }
 
-/** Ejecuta el happy path completo: tres pulsos, uno por regla. Lanza si algo del armado falla; limpia siempre. */
+/**
+ * Ejecuta el happy path: UN pulso con motor y las tres reglas tal como están (el nodo serializa las cargas, así que no
+ * hace falta escalonarlas). No enciende ni apaga reglas ni espera que una acción termine: el avance de cada una lo lee
+ * la tarjeta del snapshot (`readProgress`). Lanza si algo del armado falla; limpia siempre.
+ */
 export async function runHappyPath(
   mode: HappyPathMode,
   target: HappyTarget,
@@ -279,32 +297,10 @@ export async function runHappyPath(
 ): Promise<HappyPathOutcome> {
   const warnings: string[] = [];
   const leftActive: string[] = [];
-  const steps: StepOutcome[] = [];
-  const stepWaitMs = options.stepWaitMs ?? STEP_WAIT_MS;
   const pollMs = options.tracePollMs ?? 2_000;
   const maxPolls = options.maxTracePolls ?? 45;
-  const finishPollMs = options.finishPollMs ?? 2_000;
-  const finishExtraMs = options.finishTimeoutExtraMs ?? FINISH_TIMEOUT_EXTRA_MS;
-  const progress = (key: StepKey, status: StepStatus) => deps.onStep?.(key, status);
 
   let lastTs: number | null = await deps.getTrace(target.sectorId).then((t) => (t ? instantMs(t.ts) : null), () => null);
-
-  // Estado previo de las reglas que se encienden y apagan (estado de demo): se devuelve al terminar, pase lo que pase.
-  const rules = await deps.getRules();
-  const previousEnabled = new Map<string, boolean>();
-  for (const name of TOUCHED_RULES) {
-    const rule = rules.find((r) => r.name === name);
-    if (rule) previousEnabled.set(name, rule.enabled);
-  }
-  const currentEnabled = new Map(previousEnabled);
-  const setEnabled = async (name: string, enabled: boolean) => {
-    if (!currentEnabled.has(name) || currentEnabled.get(name) === enabled) return;
-    await deps.updateRule(name, { enabled });
-    currentEnabled.set(name, enabled);
-  };
-  const enableOnly = async (key: StepKey) => {
-    for (const name of TOUCHED_RULES) await setEnabled(name, STEP_RULES[key].includes(name));
-  };
 
   let restoreSimulation: (() => Promise<void>) | null = null;
   const errors: string[] = [];
@@ -318,13 +314,14 @@ export async function runHappyPath(
       deps.log('✓ Cooldowns de demo → 0');
       leftActive.push('cooldowns en 0');
 
+      const rules = await deps.getRules();
       const windowRule = rules.find((r) => r.name === WINDOW_RULE);
       const bypassed = windowRule ? withWindowBypass(windowRule) : null;
       if (windowRule && bypassed) {
         await deps.updateRule(WINDOW_RULE, { bypassed });
         deps.log('✓ Ventana horaria de riego (R-05) salteada: la demo anda a cualquier hora');
       }
-      // No se restauran: el despacho del riego revalida las guardas al abrir la válvula, después de que el motor decide.
+      // No se restaura: el despacho del riego revalida las guardas al abrir la válvula, después de que el motor decide.
       if (windowRule) leftActive.push('bypass de la ventana horaria de riego');
 
       if (conditions.clima) {
@@ -334,7 +331,7 @@ export async function runHappyPath(
       }
 
       // El motor decide con la PRIMERA lectura que llega tras el LEER_AHORA del pulso. Publicar una lectura antes no sirve:
-      // la fijamos en la zona (para los tres pulsos) y encendemos la emisión para que alguien responda.
+      // la fijamos en la zona y encendemos la emisión para que alguien responda.
       const previousPin = await deps.getPinned(target.zonaId);
       const previousEmission = await deps.getEmission();
       restoreSimulation = async () => {
@@ -343,11 +340,18 @@ export async function runHappyPath(
       };
       await deps.pinReadings(target.zonaId, conditions.telemetria);
       deps.log(
-        `✓ ${target.zonaId} contestará los pulsos con humSus ${conditions.telemetria.humSus} %, temp ${conditions.telemetria.temp} °C (lectura fijada)`,
+        `✓ ${target.zonaId} contestará el pulso con humSus ${conditions.telemetria.humSus} %, temp ${conditions.telemetria.temp} °C (lectura fijada)`,
       );
       if (!previousEmission) {
         await deps.setEmission(true);
-        deps.log('✓ Emisión automática encendida para que la zona responda los pulsos');
+        deps.log('✓ Emisión automática encendida para que la zona responda el pulso');
+      }
+
+      // El diagnóstico nace justo antes del pulso: así es «nuevo» para SupplyRule y ningún pulso anterior lo consumió.
+      const diagnosis = conditions.diagnostico;
+      if (diagnosis) {
+        const created = await deps.registerDiagnosis({ ...diagnosis, sectorId: target.sectorId, zonaId: target.zonaId });
+        deps.log(`✓ Diagnóstico IA ${created.id} en ${target.sectorId}: ${diagnosis.estado}, conf. ${diagnosis.conf} %`);
       }
     } else {
       await deps.clearWeather();
@@ -365,84 +369,38 @@ export async function runHappyPath(
       }
     }
 
-    for (const [index, key] of STEP_ORDER.entries()) {
-      progress(key, 'running');
-      await enableOnly(key);
-      // El diagnóstico nace justo antes del paso 2: así es «nuevo» para SupplyRule y ningún pulso anterior lo consume.
-      if (key === 'insumo' && mode === 'SIMULATOR') {
-        const diagnosis = buildSimulatorPlan(thresholds).conditions.diagnostico;
-        if (diagnosis) {
-          const created = await deps.registerDiagnosis({ ...diagnosis, sectorId: target.sectorId, zonaId: target.zonaId });
-          deps.log(`✓ Diagnóstico IA ${created.id} en ${target.sectorId}: ${diagnosis.estado}, conf. ${diagnosis.conf} %`);
-        }
-      }
-      await runPulses(1, {
-        trigger: () => deps.triggerPulse(),
-        sleep: deps.sleep,
-        onPulse: () => deps.log(`✓ Pulso con motor (${key}): sólo corre ${STEP_RULES[key].join(' + ')}`),
-      });
+    await runPulses(1, {
+      trigger: () => deps.triggerPulse(),
+      sleep: deps.sleep,
+      onPulse: () => deps.log('✓ Pulso con motor: riego, insumo y mediasombra se evalúan juntos (el nodo las ejecuta de a una)'),
+    });
 
-      // El pulso es asíncrono (202): se espera una traza distinta de la anterior. Se compara contra la traza previa
-      // y no contra el reloj, así no depende de que el simulador y el backend tengan la hora sincronizada.
-      let readout: RuleReadout | null = null;
-      let lastError: string | null = null;
-      for (let i = 0; i < maxPolls && !readout; i++) {
-        try {
-          const trace = await deps.getTrace(target.sectorId);
-          if (trace && instantMs(trace.ts) !== lastTs) {
-            lastTs = instantMs(trace.ts);
-            readout = summarizeTrace(trace)[key];
-            break;
-          }
-        } catch (e) {
-          lastError = e instanceof Error ? e.message : String(e);
-        }
-        await deps.sleep(pollMs);
-      }
-      if (!readout) {
-        const warning = lastError
-          ? `No se pudo leer la traza del motor (${lastError}). Si es un 403, al rol Servicio le falta \`reglas.ver\`.`
-          : 'El motor no publicó una traza nueva a tiempo: no se pudo leer qué hizo cada regla.';
-        if (!warnings.includes(warning)) warnings.push(warning);
-      }
-      steps.push({ key, readout });
-
-      // Antes de pasar a la carga siguiente: esperar que ESTA termine y sumar la pausa. El último paso no espera.
-      if (index < STEP_ORDER.length - 1) {
-        if (readout?.acted && key !== 'mediasombra') {
-          progress(key, 'finishing');
-          const seconds = expectedSeconds(key, readout.detail);
-          deps.log(`… esperando que termine ${key === 'riego' ? 'el riego' : 'la dosificación'} (hasta ~${seconds} s)`);
-          const busy = (a: { valve: string; pump: string }) =>
-            key === 'riego' ? a.valve === 'Regando' || a.valve === 'En cola' : a.pump === 'Dosificando';
-          const { finished } = await waitUntilFinished(
-            async () => {
-              const actuators = await deps.getActuators(target.zonaId);
-              return !actuators.some((a) => (key === 'riego' ? true : a.sectorId === target.sectorId) && busy(a));
-            },
-            { pollMs: finishPollMs, timeoutMs: seconds * 1000 + finishExtraMs, sleep: deps.sleep },
-          );
-          if (!finished) {
-            const warning = `${key === 'riego' ? 'El riego' : 'La dosificación'} no terminó en el plazo esperado: se sigue con el paso siguiente.`;
-            warnings.push(warning);
-            deps.log(`⚠ ${warning}`);
-          }
-        }
-        progress(key, 'pause');
-        deps.log(`… pausa de ${stepWaitMs / 1000} s`);
-        await deps.sleep(stepWaitMs);
-      }
-      progress(key, 'done');
-    }
-  } finally {
-    // Primero las reglas, después la lectura fijada y la emisión.
-    for (const [name, enabled] of previousEnabled) {
+    // El pulso es asíncrono (202): se espera una traza distinta de la anterior. Se compara contra la traza previa
+    // y no contra el reloj, así no depende de que el simulador y el backend tengan la hora sincronizada.
+    let readout: HappyPathReadout | null = null;
+    let lastError: string | null = null;
+    for (let i = 0; i < maxPolls && !readout; i++) {
       try {
-        await setEnabled(name, enabled);
+        const trace = await deps.getTrace(target.sectorId);
+        if (trace && instantMs(trace.ts) !== lastTs) {
+          lastTs = instantMs(trace.ts);
+          readout = summarizeTrace(trace);
+          break;
+        }
       } catch (e) {
-        errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
+        lastError = e instanceof Error ? e.message : String(e);
       }
+      await deps.sleep(pollMs);
     }
+    if (!readout) {
+      warnings.push(
+        lastError
+          ? `No se pudo leer la traza del motor (${lastError}). Si es un 403, al rol Servicio le falta \`reglas.ver\`.`
+          : 'El motor no publicó una traza nueva a tiempo: no se pudo leer qué hizo cada regla.',
+      );
+    }
+    return { readout, warnings, leftActive };
+  } finally {
     if (restoreSimulation) {
       try {
         await restoreSimulation();
@@ -452,14 +410,8 @@ export async function runHappyPath(
     }
     deps.log(
       errors.length === 0
-        ? '✓ Reglas, lectura fijada y emisión devueltas a su estado previo'
+        ? '✓ Lectura fijada y emisión devueltas a su estado previo'
         : `⚠ No se pudo devolver todo a su estado previo: ${errors.join('; ')}`,
     );
   }
-
-  const [r, i, m] = steps;
-  const readout = r?.readout && i?.readout && m?.readout
-    ? { riego: r.readout, insumo: i.readout, mediasombra: m.readout, allActed: r.readout.acted && i.readout.acted && m.readout.acted }
-    : null;
-  return { steps, readout, warnings, leftActive };
 }

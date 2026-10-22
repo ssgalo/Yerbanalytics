@@ -65,12 +65,16 @@ simulador (punto ámbar, con el motivo).
   ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
   actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
 - **Happy path de la demo** (pestaña *Demo Expo*, junto a la pasada del riel y las secuencias) — un botón que evalúa
-  riego, insumo y mediasombra **de a una carga por vez** (tres pulsos con motor, en ese orden) sobre el primer sector de la primera macro-zona. Antes de cada pulso deja encendidas sólo las reglas ejecutoras del paso (estado de demo, restaurado al terminar); espera a que la carga anterior TERMINE (válvulas de la zona sin «Regando»/«En cola»; bomba sin «Dosificando»; plazo = duración esperada + 120 s, con aviso si se agota) y suma 5 s antes de la siguiente. Así el ESP32 no arranca todas las cargas juntas. Con la fuente
+  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. No enciende ni apaga reglas ni espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
   en **Simulador** genera todo: lectura (`humSus` entre el umbral crítico y el de riego, `temp` crítica), diagnóstico de
   IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
   el diagnóstico de una pasada del riel previa, y avisa si no hay uno utilizable. Al final lee la traza del Inspector y
   muestra, por regla, si actuó y por qué. Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING.
+- **Abrir / cerrar mediasombra** (pestaña *Demo Expo*, tarjeta de *Secuencias*) — dos botones de un clic y una sola
+  acción: *Abrir* enrolla (`targetPct` 100) y *Cerrar* despliega (`targetPct` 0). Pasan por la API de secuencias del
+  backend (`MEDIASOMBRA_ABRIR` / `MEDIASOMBRA_CERRAR`), no por un publish directo, así el seguimiento de comandos y el
+  estado del backend los ven. Se deshabilitan mientras corre otra secuencia o una pasada.
 - **Cámara del riel** — vincular el teléfono, pedir una captura, ver la foto llegar y cargar a
   mano el diagnóstico que devolvería el modelo.
 
@@ -101,8 +105,19 @@ muestra en la consola. Para las macro-zonas que simula (las que tienen un sensor
 **responde el ack** en `nursery/zone/{zona}/sector/{sector}/ack`, como el firmware: el riego al
 cumplir `durationSec`, el insumo a los 10 s (o según `ml`/`durationSec`) y la mediasombra a los 3 s.
 Sin esto, el backend registraría una alerta `ActuadorSinRespuesta` por cada comando de la demo. Los
-comandos de otras zonas son de un nodo real y sólo se loguean. Las reglas están en
+comandos de otras zonas son de un nodo real y sólo se loguean. Las reglas de cada ack están en
 `server/contract.ts` (`simulatedAck`).
+
+**Cola de cargas del nodo.** El simulador se comporta como el firmware (`actuacion/cola_cargas`): corre a lo sumo
+`SIM_NODE_MAX_LOADS` cargas a la vez (riego de un sector, insumo de un sector, movimiento de la mediasombra; por
+defecto **1**, lo que aguanta la fuente del prototipo) y encola el resto en orden de llegada. Con la cola mandan los
+mismos ACK que el nodo: `EN_CURSO` con `detalle.tipo` `en_cola` (con `posicion` y `esperaMaxSec`) o `iniciado`, y el
+final de siempre (`SUCCESS`/`ERROR`). Un `valve OFF` / `pump OFF` actúa al instante y descarta lo encolado del mismo
+sector y actuador (`ERROR cancelado`); un `shade SET` con `parametros.prioridad = "INMEDIATA"` (sólo lo manda el
+estado seguro) no espera turno. Cambio de comportamiento: antes un OFF no cortaba el ON simulado en curso; ahora lo
+corta con `cancelado`, como el firmware. Hay **una cola por macro-zona** (el simulador no sabe qué nodo atiende qué
+sectores; la zona es el nodo testigo): con el límite en 1, una tanda de 10 válvulas se riega de a una, igual que en el
+prototipo. La lógica es pura y vive en `server/nodeQueue.ts` (reloj y timers inyectados, probada con reloj falso).
 
 ---
 

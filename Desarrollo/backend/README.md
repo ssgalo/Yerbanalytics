@@ -89,6 +89,15 @@ valores de 96 a 100, que el rango nuevo no admite: el catálogo los ignora y cae
 Corré `src/main/resources/migracion-confianza-70.sql` (idempotente, antes o después de arrancar) para
 borrarlos. No se pierde nada más.
 
+### Migración manual pendiente · mediasombra binaria
+
+La mediasombra es binaria (el firmware enrolla con un objetivo >= 50 y desenrolla por debajo), así que
+`ShadingRule` sólo pide 100 (abierta) o 0 (cerrada) y reenvía el cierre mientras dure el pico de UV
+(el valor guardado es lo último que mandó el backend, no la posición real; el firmware responde
+`sin_cambio` si ya está ahí). Salen `mediasombra.apertura-proteccion-uv` y `mediasombra.apertura-maxima`:
+corré `src/main/resources/migracion-mediasombra-binaria.sql` (idempotente) para borrar sus overrides; el
+catálogo los ignora con un warn si no lo hacés. El tope de las etapas de rustificación pasa a 100 % fijo.
+
 ### Migración manual pendiente · pulso de sensado y pasada diaria
 
 El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso
@@ -492,6 +501,25 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
   nuevo lo tomó). Si el sector no figuraba regando (un OFF de una secuencia de Demo Expo o del estado seguro) no
   se registra nada. Un `cancelado` sin comando pendiente (se perdió en un reinicio) no se puede atribuir a la
   válvula y no cierra nada: el riego vence solo por tiempo.
+- **Cola de cargas del nodo y ACK intermedios** (`add-cola-actuadores-nodo`). El nodo ejecuta a lo sumo
+  `MAX_CARGAS_SIMULTANEAS` cargas a la vez (1 por defecto: la fuente del prototipo no banca el pico de riego + insumo +
+  mediasombra juntos) y encola el resto, así que el backend sigue mandando todo en un pulso. Para saber cuándo una
+  carga espera y cuándo arranca, el nodo publica ACK intermedios `EN_CURSO` (`detalle.tipo` `en_cola` con `posicion` y
+  `esperaMaxSec`, o `iniciado`). `SeguimientoComandosService` los usa así: **sólo un final (`SUCCESS`/`ERROR`)
+  resuelve el comando**; un `EN_CURSO` lo mantiene pendiente y recalcula su plazo desde la hora de recepción
+  (`en_cola`: espera máxima + duración + `ack-margen-ms`; `iniciado`: duración + margen), y publica un
+  `ActuatorProgress` (`QUEUED`/`STARTED`). De ahí: `DespachoRiego` muestra la válvula **«En cola»** mientras el nodo la
+  tiene encolada (sigue ocupando el cupo de la zona: el comando ya salió) y «Regando» desde `iniciado`, contando la
+  duración desde el arranque; `SupplyDoseService` hace lo mismo con la bomba («En cola» en el snapshot mientras la base
+  diga `Dosificando`, que es lo que impide ordenar otra dosis; la fase vive en memoria) y `SecuenciaService` no confunde
+  un intermedio con el fin de un paso (recalcula su plazo). Sin intermedios (firmware viejo, sketch de la expo) todo
+  funciona como antes. Los intermedios de un comando ya resuelto o desconocido se ignoran. `ActuatorShutdown` (estado
+  seguro S-02, bloqueo manual) publica los `OFF` primero y la mediasombra al final con `prioridad: "INMEDIATA"`: es la
+  única orden que el nodo no hace esperar. Tras un reinicio del backend lo que estaba en la cola del nodo se reconstruye
+  del historial (puede cerrarse antes de tiempo; su ACK final llega como desconocido).
+- **Orden de despliegue: backend antes que firmware.** Un backend viejo con el firmware nuevo descarta el ACK final
+  (tomaba el `EN_CURSO` por un status desconocido y daba el comando por resuelto) y las secuencias de Demo Expo lo
+  tratan como error; un backend nuevo con el firmware viejo funciona igual que siempre.
 
 > **No operar con plantines reales sin E-01 y S-06.** Un sensor de humedad trabado en un valor seco
 > plausible haría regar en cada ciclo de lectura de la ventana (~20 L por día y por sector con el 40 %
@@ -994,7 +1022,13 @@ en curso). Una sola a la vez, y ninguna mientras corre una pasada del riel (ni a
 | `GET /api/secuencias/actual` | `200` + `Secuencia` (la en curso o la última) · `204` si no hubo ninguna desde el arranque |
 | `POST /api/secuencias/actual/cancelar` | `200` + `Secuencia` · `409` si no hay una en curso o ya se está cancelando |
 
-Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
+Además hay dos acciones sueltas de **un solo paso**: `MEDIASOMBRA_ABRIR` (enrolla: `shade SET {targetPct: 100}`)
+y `MEDIASOMBRA_CERRAR` (despliega: `targetPct: 0`), al mismo destino que la secuencia de mediasombra. Esperan el
+ACK final (los `EN_CURSO` `en_cola`/`iniciado` sólo estiran el plazo; `sin_cambio` es éxito, "ya estaba así"), no
+llevan parámetros y se rigen por la misma guardia (`409` con otra secuencia o una pasada). Se pasan por acá y no por
+un publish directo al broker para que el seguimiento de comandos y el estado del backend las vean.
+
+Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "MEDIASOMBRA_CERRAR", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
 `duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200: el tope del contrato);
 `esperaSeg` sólo a `MEDIASOMBRA` (default 10, de 0 a 600). La forma de `Secuencia` y sus pasos:
 `openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.

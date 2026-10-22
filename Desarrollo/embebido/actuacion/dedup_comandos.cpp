@@ -3,7 +3,10 @@
 namespace dedup_comandos {
 
 // Ring buffer pequeño de los últimos comandos recibidos.
-static const int MAX_RECORDADOS = 10;
+// Tiene que cubrir todo lo que puede estar vivo a la vez: hasta COLA_CARGAS_MAX (8) encolados + las cargas en curso
+// (límite + malla inmediata, hasta 8) + los finales recientes que todavía pueden reentregarse por QoS 1. Con 10 se
+// recordaban menos ids que comandos vivos y una reentrega de un encolado podía encolarse dos veces: 24 deja holgura.
+static const int MAX_RECORDADOS = 24;
 
 struct Registro {
   char commandId[40];

@@ -82,12 +82,14 @@ struct Comando {
   long  durationSec;        // parámetro riego (0 si no vino)
   float ml;                 // parámetro dosificación (0 si no vino)
   int   targetPct;          // parámetro mediasombra (-1 si no vino)
+  bool  prioridadInmediata; // parametros.prioridad == "INMEDIATA" (sólo se honra en shade SET)
 };
 
 // ----------------------------------------------------------------------------
 //  Ack (resultado de un comando, publicado por el nodo)
 // ----------------------------------------------------------------------------
-enum class EstadoAck { SUCCESS, ERROR };
+// EN_CURSO es un ack intermedio (en_cola / iniciado): no cierra el comando. SUCCESS y ERROR son los finales.
+enum class EstadoAck { SUCCESS, ERROR, EN_CURSO };
 
 struct Ack {
   char  commandId[40];
@@ -97,6 +99,8 @@ struct Ack {
   long  durationSec;        // datos de cierre (según actuador)
   float ml;
   int   targetPct;
+  int   posicion;           // sólo en_cola: lugar en la cola (1 = el próximo); 0 = no va
+  long  esperaMaxSec;       // sólo en_cola: cota superior de la espera (s)
 };
 
 // ----------------------------------------------------------------------------

@@ -243,7 +243,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay once scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay doce scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -257,6 +257,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   (un No concluyente no tiene score).
 > - `resources/migracion-confianza-70.sql` — borra las confianzas mínimas guardadas por encima de 95 %,
 >   que el rango nuevo (50–95 %, fábrica 70 %) no admite.
+> - `resources/migracion-mediasombra-binaria.sql` — borra `mediasombra.apertura-proteccion-uv` y
+>   `mediasombra.apertura-maxima` del catálogo (la mediasombra es binaria: abierta o cerrada).
 > - `resources/migracion-permisos-bloqueo.sql` — agrega `bloqueos.ver`/`bloqueos.gestionar` a la matriz de una
 >   base ya sembrada (la matriz sólo se siembra si está vacía).
 > - `resources/migracion-permisos-servicio-simulador.sql` — agrega `reglas.ver`, `pasadas.ver` y `pasadas.operar` al rol
@@ -461,7 +463,11 @@ Invariantes a respetar al tocar esta área:
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
   El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. Los errores del nodo
   (`nursery/zone/{zona}/errores`, S-05) también: `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType` y `buildNodeError` del simulador. El comando de
-  zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos.
+  zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos. Y los ACK intermedios del nodo
+  (`status: "EN_CURSO"` con `detalle.tipo` `en_cola` / `iniciado`, `cola_llena`, las claves `posicion` / `esperaMaxSec`) y
+  `parametros.prioridad = "INMEDIATA"` del `shade SET` de seguridad (cola de cargas del nodo, `add-cola-actuadores-nodo`):
+  el nodo sirve a lo sumo `MAX_CARGAS_SIMULTANEAS` cargas a la vez y el simulador hace lo mismo (`server/nodeQueue.ts`,
+  `SIM_NODE_MAX_LOADS`). Orden de despliegue: backend antes que firmware.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.
 

@@ -234,7 +234,12 @@ export interface Pasada {
    Secuencias de actuadores (Demo Expo)
    ---------------------------------------------------------------- */
 
-export type TipoSecuencia = 'RIEGO' | 'MEDIASOMBRA' | 'LECTURA';
+export type TipoSecuencia =
+  | 'RIEGO'
+  | 'MEDIASOMBRA'
+  | 'LECTURA'
+  | 'MEDIASOMBRA_ABRIR'
+  | 'MEDIASOMBRA_CERRAR';
 export type TipoPasoSecuencia =
   | 'ABRIR'
   | 'ESPERAR'

@@ -4,16 +4,17 @@ import { DEFAULT_THRESHOLDS, buildThresholds } from './ruleConditions';
 import {
   buildSimulatorPlan,
   diagnosisPrecheck,
-  STEP_WAIT_MS,
-  STEP_RULES,
   hintFor,
-  expectedSeconds,
-  waitUntilFinished,
+  initialProgress,
   loadThresholds,
+  nextProgress,
+  progressDone,
+  readProgress,
   pickTarget,
   runHappyPath,
   summarizeTrace,
   withWindowBypass,
+  type ActionProgress,
   type HappyPathDeps,
 } from './happyPath';
 import type { DemoRule, EvaluationTrace, SectorRef, TracedRule } from './types';
@@ -107,14 +108,14 @@ test('readout: the three rules acted', () => {
     trace([
       rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Déficit: riega 6 L' }] }),
       rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'Dosificación autorizada' }] }),
-      rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=30] Pico UV' }] }),
+      rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=0] Mediasombra cerrada por pico de radiación UV (índice 9.5 ≥ umbral 7.0).' }] }),
     ]),
   );
   assert.equal(r.riego.acted, true);
   assert.equal(r.riego.detail, 'Déficit: riega 6 L');
   assert.equal(r.insumo.acted, true);
   assert.equal(r.mediasombra.acted, true);
-  assert.match(r.mediasombra.detail, /^Mediasombra cerrada \(30 % de apertura\)/);
+  assert.match(r.mediasombra.detail, /^Mediasombra cerrada por pico de radiación UV/);
   assert.equal(r.allActed, true);
 });
 
@@ -153,9 +154,9 @@ test('readout: shade already protective is not an action but explains itself', (
 
 test('readout: opening at or above the firmware threshold (50) is open, not closed', () => {
   const r = summarizeTrace(
-    trace([rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=50] Plan' }] })]),
+    trace([rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=100] Plan de rustificación: día 3 — mediasombra abierta.' }] })]),
   );
-  assert.match(r.mediasombra.detail, /^Mediasombra abierta \(50 % de apertura\)/);
+  assert.match(r.mediasombra.detail, /^Mediasombra abierta · Plan de rustificación/);
 });
 
 /* ---- thresholds with a visible warning ---- */
@@ -189,29 +190,17 @@ test('hint says which mode will run', () => {
   assert.match(hintFor('REAL_NODE'), /ESP32/);
 });
 
-/* ---- orchestration: three pulses, one executor at a time ---- */
+/* ---- orchestration: ONE pulse with the three rules as they are (the node queues the loads) ---- */
 
-const WAIT = 777; // distinct from the trace poll interval so the tests can tell them apart
 const POLL = 13;
 
-function fakeDeps(over: Partial<HappyPathDeps> = {}, enabled: Record<string, boolean> = {}) {
+function fakeDeps(over: Partial<HappyPathDeps> = {}) {
   const calls: string[] = [];
-  const state: Record<string, boolean> = {
-    RiegoPorDeficitRule: true, DeficitCriticoRule: true, SupplyRule: true, ShadingRule: true, ...enabled,
-  };
   let pulses = 0;
   const deps: HappyPathDeps = {
     zeroCooldowns: async () => void calls.push('zero'),
-    getRules: async () => [
-      windowRule([]),
-      ...Object.keys(state).map((name) => ({ ...windowRule([]), name, enabled: state[name], bypassKeys: [] })),
-    ],
-    updateRule: async (name, u) => {
-      if (u.enabled !== undefined) {
-        state[name] = u.enabled;
-        calls.push(`rule:${name}:${u.enabled ? 'on' : 'off'}`);
-      } else calls.push(`bypass:${name}:${u.bypassed?.join(',')}`);
-    },
+    getRules: async () => [windowRule([])],
+    updateRule: async (name, u) => void calls.push(`update:${name}:${u.enabled !== undefined ? 'enabled' : `bypass=${u.bypassed?.join(',')}`}`),
     setWeather: async () => void calls.push('weather'),
     clearWeather: async () => void calls.push('clearWeather'),
     setOffline: async (on) => void calls.push(`offline:${on}`),
@@ -227,80 +216,48 @@ function fakeDeps(over: Partial<HappyPathDeps> = {}, enabled: Record<string, boo
         [
           rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Riega 720 s' }] }),
           rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'Dosifica 10 ml' }] }),
-          rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=30] UV' }] }),
+          rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=0] UV' }] }),
         ],
         pulses,
       ),
-    sleep: async (ms) => void (ms === WAIT && calls.push('wait')),
+    sleep: async () => {},
     log: () => {},
-    getActuators: async () => [{ sectorId: 'S-101', valve: 'Cerrada', pump: 'En espera' }],
-    onStep: (key, status) => void calls.push(`step:${key}:${status}`),
     ...over,
   };
-  return { deps, calls, state };
+  return { deps, calls };
 }
 
-const opts = { stepWaitMs: WAIT, tracePollMs: POLL, maxTracePolls: 3, finishPollMs: 31 };
+const opts = { tracePollMs: POLL, maxTracePolls: 3 };
 const target = { zonaId: 'MZ-1', sectorId: 'S-101', serial: 'SIM-1' };
 const real = { ...target, serial: null };
-const plain = (calls: string[]) => calls.filter((c) => !c.startsWith('step:'));
 
-test('step plan: irrigation executors, then supply, then shade; the wait is the named constant', () => {
-  assert.deepEqual(STEP_RULES.riego, ['RiegoPorDeficitRule', 'DeficitCriticoRule']);
-  assert.deepEqual(STEP_RULES.insumo, ['SupplyRule']);
-  assert.deepEqual(STEP_RULES.mediasombra, ['ShadingRule']);
-  assert.equal(STEP_WAIT_MS, 5_000);
-});
-
-test('real node: three pulses in order, one executor group enabled each time, 5 s waits between, flags restored', async () => {
-  const { deps, calls, state } = fakeDeps();
+test('real node: exactly ONE pulse, no rule toggled, nothing waited for', async () => {
+  const sleeps: number[] = [];
+  const { deps, calls } = fakeDeps({ sleep: async (ms) => void sleeps.push(ms) });
   const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.deepEqual(plain(calls), [
-    'clearWeather', 'offline:false', 'pin:MZ-1:none',
-    'rule:SupplyRule:off', 'rule:ShadingRule:off', 'pulse1', 'wait',
-    'rule:RiegoPorDeficitRule:off', 'rule:DeficitCriticoRule:off', 'rule:SupplyRule:on', 'pulse2', 'wait',
-    'rule:SupplyRule:off', 'rule:ShadingRule:on', 'pulse3',
-    // restore: everything back to its previous (all enabled) state
-    'rule:RiegoPorDeficitRule:on', 'rule:DeficitCriticoRule:on', 'rule:SupplyRule:on',
-  ]);
-  assert.deepEqual(Object.values(state), [true, true, true, true]);
-  assert.equal(out.steps.length, 3);
-  assert.ok(out.steps.every((s) => s.readout !== null));
+  assert.deepEqual(calls, ['clearWeather', 'offline:false', 'pin:MZ-1:none', 'pulse1']);
+  assert.ok(!calls.some((c) => c.endsWith(':enabled')), 'no rule is switched on or off');
+  assert.deepEqual(sleeps, [], 'no pause between steps, no wait for an action to finish');
   assert.equal(out.readout?.allActed, true);
 });
 
-test('previously disabled rules go back to disabled, not enabled', async () => {
-  const { deps, state } = fakeDeps({}, { ShadingRule: false, SupplyRule: false });
-  await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.equal(state.ShadingRule, false);
-  assert.equal(state.SupplyRule, false);
-  assert.equal(state.RiegoPorDeficitRule, true);
-});
-
-test('flags are restored even if a pulse fails', async () => {
-  const { deps, state } = fakeDeps({ triggerPulse: async () => { throw new Error('boom'); } });
-  await assert.rejects(runHappyPath('REAL_NODE', real, thresholds, deps, opts), /boom/);
-  assert.deepEqual(Object.values(state), [true, true, true, true]);
-});
-
-test('simulator: setup first, reading pinned for all three pulses, diagnosis right before step 2, cleanup at the end', async () => {
+test('simulator: setup, diagnosis BEFORE the single pulse, cleanup at the end', async () => {
   const { deps, calls } = fakeDeps();
   const out = await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
-  const c = plain(calls);
-  assert.deepEqual(c.slice(0, 5), ['zero', 'bypass:FueraDeVentanaRiegoRule:window', 'weather', 'pin:MZ-1:reading', 'emission:true']);
-  assert.equal(c.filter((x) => x === 'diagnosis').length, 1);
-  assert.ok(c.indexOf('pulse1') < c.indexOf('diagnosis'));
-  assert.ok(c.indexOf('diagnosis') < c.indexOf('pulse2'));
-  assert.equal(c.filter((x) => x.startsWith('pin:MZ-1:reading')).length, 1);
-  assert.deepEqual(c.slice(-2), ['pin:MZ-1:none', 'emission:false']);
+  assert.deepEqual(calls, [
+    'zero', 'update:FueraDeVentanaRiegoRule:bypass=window', 'weather', 'pin:MZ-1:reading', 'emission:true',
+    'diagnosis', 'pulse1',
+    'pin:MZ-1:none', 'emission:false',
+  ]);
   assert.ok(out.leftActive.length > 0);
+  assert.equal(out.readout?.allActed, true);
 });
 
-test('simulator: an error still releases the pin, emission and flags', async () => {
-  const { deps, calls, state } = fakeDeps({ registerDiagnosis: async () => { throw new Error('sin captura'); } });
+test('simulator: an error still releases the pin and the emission', async () => {
+  const { deps, calls } = fakeDeps({ registerDiagnosis: async () => { throw new Error('sin captura'); } });
   await assert.rejects(runHappyPath('SIMULATOR', target, thresholds, deps, opts), /sin captura/);
-  assert.deepEqual(plain(calls).slice(-2), ['pin:MZ-1:none', 'emission:false']);
-  assert.deepEqual(Object.values(state), [true, true, true, true]);
+  assert.deepEqual(calls.slice(-2), ['pin:MZ-1:none', 'emission:false']);
+  assert.ok(!calls.includes('pulse1'));
 });
 
 test('simulator: emission already on stays on; a previous pin is restored', async () => {
@@ -311,46 +268,36 @@ test('simulator: emission already on stays on; a previous pin is restored', asyn
     pinReadings: async (_z, m) => void pins.push(m),
   });
   await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
-  assert.ok(!plain(calls).some((c) => c.startsWith('emission:')));
+  assert.ok(!calls.some((c) => c.startsWith('emission:')));
   assert.deepEqual(pins[pins.length - 1], { humSus: 10 });
 });
 
-test('progress: en curso → esperando que termine → pausa 5 s → hecho; the last step has no wait', async () => {
-  const { deps, calls } = fakeDeps();
-  await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  const steps = calls.filter((c) => c.startsWith('step:'));
-  assert.deepEqual(steps, [
-    'step:riego:running', 'step:riego:finishing', 'step:riego:pause', 'step:riego:done',
-    'step:insumo:running', 'step:insumo:finishing', 'step:insumo:pause', 'step:insumo:done',
-    'step:mediasombra:running', 'step:mediasombra:done',
-  ]);
-});
-
-test('each step reads its own branch from the trace of ITS pulse', async () => {
+test('the readout comes from the trace of THE pulse (a trace older than the pulse is not it)', async () => {
   let pulses = 0;
+  let reads = 0;
   const { deps } = fakeDeps({
     triggerPulse: async () => void pulses++,
-    getTrace: async () =>
-      trace(
-        pulses === 1
-          ? [rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'ok' }] }),
-             rule({ ruleId: 'SupplyRule', rama: 'INSUMO', estado: 'OMITIDA_DESHABILITADA' })]
-          : [rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'bomba' }] }),
-             rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=30] UV' }] })],
-        pulses,
-      ),
+    getTrace: async () => {
+      reads++;
+      // before the pulse (and the first poll after it) the trace is the old one; then the new one arrives
+      const fresh = pulses > 0 && reads > 2;
+      return trace(
+        fresh
+          ? [rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'nuevo' }] })]
+          : [],
+        fresh ? 2 : 1,
+      );
+    },
   });
-  const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.equal(out.steps[0].readout?.acted, true);
-  assert.equal(out.steps[1].readout?.acted, true);
-  assert.equal(out.steps[2].readout?.acted, true);
+  const out = await runHappyPath('REAL_NODE', real, thresholds, deps, { tracePollMs: POLL, maxTracePolls: 5 });
+  assert.equal(out.readout?.riego.detail, 'nuevo');
 });
 
-test('real node warns when the sector has no usable AI diagnosis, and still runs the steps', async () => {
+test('real node warns when the sector has no usable AI diagnosis, and still runs the pulse', async () => {
   const { deps, calls } = fakeDeps({ getSectorDiagnosis: async () => null });
   const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
   assert.equal(out.warnings.length, 1);
-  assert.ok(plain(calls).includes('pulse3'));
+  assert.ok(calls.includes('pulse1'));
 });
 
 test('a pulse in course (409) is waited out', async () => {
@@ -363,10 +310,11 @@ test('a pulse in course (409) is waited out', async () => {
     getTrace: async () => trace([], n),
   });
   await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.ok(n >= 6);
+  assert.ok(n >= 2);
+  assert.ok(calls.includes('pulse2'));
 });
 
-test('trace read failures (403) are counted as failed polls and named in the final message', async () => {
+test('trace read failures (403) are named in the final message', async () => {
   let reads = 0;
   const { deps } = fakeDeps({
     getTrace: async () => {
@@ -385,79 +333,70 @@ test('simulator mode without a sensor serial is an error', async () => {
   await assert.rejects(runHappyPath('SIMULATOR', { ...target, serial: null }, thresholds, deps, opts), /sensor/i);
 });
 
-/* ---- waiting for the action to FINISH ---- */
+/* ---- progress of each action, read from the nursery snapshot ---- */
 
-test('expectedSeconds: irrigation seconds / dose ml x 1 s from the motive, else the firmware maximum', () => {
-  assert.equal(expectedSeconds('riego', 'Riega 6 L en 720 s'), 720);
-  assert.equal(expectedSeconds('riego', 'sin dato'), 1200);
-  assert.equal(expectedSeconds('insumo', 'Dosifica 10 ml'), 10);
-  assert.equal(expectedSeconds('insumo', 'sin dato'), 60);
+const allActed = summarizeTrace(
+  trace([
+    rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Riega 720 s' }] }),
+    rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'Dosifica 10 ml' }] }),
+    rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo: '[apertura=0] UV' }] }),
+  ]),
+);
+
+const snap = (valve: string, pump: string) => ({ sectorId: 'S-101', valve, pump });
+
+test('progress starts as ordered for what acted and "sin acción" for what did not', () => {
+  assert.deepEqual(initialProgress(allActed), { riego: 'ordenada', insumo: 'ordenada', mediasombra: 'ordenada' });
+  const partial = summarizeTrace(trace([rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'x' }] })]));
+  assert.deepEqual(initialProgress(partial), { riego: 'ordenada', insumo: 'sin acción', mediasombra: 'sin acción' });
+  assert.deepEqual(initialProgress(null), { riego: 'sin acción', insumo: 'sin acción', mediasombra: 'sin acción' });
 });
 
-test('waitUntilFinished: polls a fake nursery Regando → Regando → Cerrada, then stops', async () => {
-  const seq = [false, false, true];
-  let n = 0;
-  const slept: number[] = [];
-  const out = await waitUntilFinished(async () => seq[n++], { pollMs: 50, timeoutMs: 10_000, sleep: async (ms) => void slept.push(ms) });
-  assert.equal(out.finished, true);
-  assert.deepEqual(slept, [50, 50]);
+test('progress: valve Regando / pump En cola → riego en curso, insumo en cola; shade stays ordered', () => {
+  const p = nextProgress(initialProgress(allActed), snap('Regando', 'En cola'));
+  assert.deepEqual(p, { riego: 'en curso', insumo: 'en cola', mediasombra: 'ordenada' });
 });
 
-test('waitUntilFinished: gives up after the timeout and says it did not finish', async () => {
-  let polls = 0;
-  const out = await waitUntilFinished(async () => (polls++, false), { pollMs: 50, timeoutMs: 200, sleep: async () => {} });
-  assert.equal(out.finished, false);
-  assert.ok(polls >= 4 && polls <= 6);
+test('progress walks en cola → en curso → hecho as the node serializes the loads', () => {
+  const steps: [string, string, ActionProgress][] = [
+    ['Regando', 'En cola', { riego: 'en curso', insumo: 'en cola', mediasombra: 'ordenada' }],
+    ['Cerrada', 'Dosificando', { riego: 'hecho', insumo: 'en curso', mediasombra: 'ordenada' }],
+    ['Cerrada', 'En espera', { riego: 'hecho', insumo: 'hecho', mediasombra: 'ordenada' }],
+  ];
+  let p = initialProgress(allActed);
+  for (const [valve, pump, expected] of steps) {
+    p = nextProgress(p, snap(valve, pump));
+    assert.deepEqual(p, expected);
+  }
+  assert.equal(progressDone(p), true);
 });
 
-function nurserySequence(field: 'valve' | 'pump', busy: string, idle: string, busyPolls: number) {
-  let n = 0;
-  return async () => [{ sectorId: 'S-101', valve: 'Cerrada', pump: 'En espera', [field]: n++ < busyPolls ? busy : idle }];
-}
-
-test('step 1 waits while the zone valves are Regando/En cola, then pauses 5 s', async () => {
-  const { deps, calls } = fakeDeps({ getActuators: nurserySequence('valve', 'Regando', 'Cerrada', 3) });
-  await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  const c = calls;
-  assert.ok(c.indexOf('step:riego:finishing') < c.indexOf('step:riego:pause'));
-  assert.ok(c.indexOf('step:riego:pause') < c.indexOf('wait'));
+test('progress: a closed valve that never showed up is not "hecho" yet (the order may still be on its way)', () => {
+  const p = nextProgress(initialProgress(allActed), snap('Cerrada', 'En espera'));
+  assert.deepEqual(p, { riego: 'ordenada', insumo: 'ordenada', mediasombra: 'ordenada' });
+  assert.equal(progressDone(p), false);
 });
 
-test('step 2 waits while the pump is Dosificando', async () => {
-  let polls = 0;
-  const { deps } = fakeDeps({
-    getActuators: async () => [{ sectorId: 'S-101', valve: 'Cerrada', pump: polls++ < 3 ? 'Dosificando' : 'En espera' }],
-  });
-  const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.ok(polls >= 4);
-  assert.equal(out.warnings.length, 0);
+test('progress: a queued action that leaves the queue without running is closed, not stuck', () => {
+  let p = nextProgress(initialProgress(allActed), snap('En cola', 'En espera'));
+  assert.equal(p.riego, 'en cola');
+  p = nextProgress(p, snap('Cerrada', 'En espera'));
+  assert.equal(p.riego, 'hecho');
 });
 
-test('a step that did not act skips the wait-for-finish and only does the 5 s pause', async () => {
-  let asked = 0;
-  const { deps, calls } = fakeDeps({
-    getActuators: async () => (asked++, [{ sectorId: 'S-101', valve: 'Regando', pump: 'Dosificando' }]),
-    getTrace: async () => trace([rule({ ruleId: 'RiegoPorDeficitRule', rama: 'RIEGO', acciones: [{ tipo: 'NOOP_INFO', motivo: 'sin déficit' }] })], calls.filter((x) => x.startsWith('pulse')).length),
-  });
-  await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.equal(asked, 0);
-  assert.ok(calls.includes('step:riego:pause'));
-  assert.ok(!calls.includes('step:riego:finishing'));
+test('progress: what did not act is never reported as moving', () => {
+  const noRiego = summarizeTrace(trace([rule({ ruleId: 'SupplyRule', rama: 'INSUMO', acciones: [{ tipo: 'ACTIVAR_BOMBA', motivo: 'x' }] })]));
+  const p = nextProgress(initialProgress(noRiego), snap('Regando', 'Dosificando'));
+  assert.equal(p.riego, 'sin acción');
+  assert.equal(p.insumo, 'en curso');
 });
 
-test('timeout: continues with a visible warning instead of hanging', async () => {
-  const { deps, calls } = fakeDeps({
-    getActuators: async () => [{ sectorId: 'S-101', valve: 'Regando', pump: 'En espera' }],
-  });
-  const out = await runHappyPath('REAL_NODE', real, thresholds, deps, { ...opts, finishTimeoutExtraMs: 100, finishPollMs: 60 });
-  assert.ok(out.warnings.some((w) => /no terminó/i.test(w)));
-  assert.ok(calls.includes('pulse3'));
-});
-
-test('an error while waiting still restores the flags', async () => {
-  const { deps, state } = fakeDeps({ getActuators: async () => { throw new Error('nursery caído'); } });
-  await assert.rejects(runHappyPath('REAL_NODE', real, thresholds, deps, opts), /nursery caído/);
-  assert.deepEqual(Object.values(state), [true, true, true, true]);
+test('progress ignores a snapshot without the sector, and readProgress survives a failing snapshot', async () => {
+  const start = initialProgress(allActed);
+  assert.equal(nextProgress(start, undefined), start);
+  assert.deepEqual(await readProgress(start, 'S-101', async () => { throw new Error('boom'); }), start);
+  const read = await readProgress(start, 'S-101', async () => [snap('Regando', 'En cola'), { sectorId: 'S-102', valve: 'Cerrada', pump: 'En espera' }]);
+  assert.equal(read.riego, 'en curso');
 });
 
 test('defaults stay in sync', () => {

@@ -13,6 +13,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cierra el estado "Dosificando" de la bomba de un sector. El {@code ActionExecutor} lo pone al ordenar una dosis y
@@ -22,6 +24,10 @@ import java.time.Clock;
  * <ul>
  *   <li><b>Por ack:</b> el ack final de la bomba (ok, cancelado o error, ver {@link ActuatorStopped}) lo deja
  *       "En espera" al instante. Un {@code reemplazado} no llega: otro comando más nuevo sigue dosificando.</li>
+ *   <li><b>Cola del nodo</b> (add-cola-actuadores-nodo): el nodo serializa las cargas y avisa con ACK intermedios
+ *       ({@link ActuatorProgress}) cuándo una dosis queda en cola y cuándo arranca. El estado persistido sigue siendo
+ *       {@code Dosificando} (es lo que impide que {@code ActionExecutor} ordene otra dosis); la fase vive en memoria,
+ *       por sector, y {@link #estadoBomba} muestra "En cola" mientras la dosis espera turno.</li>
  *   <li><b>Por tiempo:</b> si el ack nunca llega (el nodo se reinició a mitad de la dosis, sin WiFi), pasada la
  *       duración de la dosis más {@code yerbanalytics.actuadores.ack-margen-ms} se da por terminada, igual que el
  *       riego. La duración sale de la última fila "Insumo" del sector; el estado vive en la base, así que también
@@ -35,6 +41,13 @@ public class SupplyDoseService {
 
     static final String DOSIFICANDO = "Dosificando";
     static final String EN_ESPERA = "En espera";
+    static final String EN_COLA = "En cola";
+
+    /** Lo último que el nodo informó de la dosis de un sector: en memoria, se pierde con un reinicio (cae al historial). */
+    private record Fase(ActuatorProgress.Phase fase, long atMs, long maxWaitMs) {
+    }
+
+    private final Map<String, Fase> fases = new ConcurrentHashMap<>();
 
     private final SectorRepository sectorRepository;
     private final HistorialRepository historialRepository;
@@ -51,12 +64,49 @@ public class SupplyDoseService {
         this.margenMs = margenMs;
     }
 
+    /** El nodo informó cómo va la dosis (en cola / arrancó): se recuerda la fase y la hora de recepción. */
+    @EventListener
+    public void onActuatorProgress(ActuatorProgress evento) {
+        if (!"pump".equals(evento.actuator())) {
+            return;
+        }
+        fases.put(evento.sectorId(), new Fase(evento.phase(), evento.atMs(), evento.maxWaitMs()));
+    }
+
+    /**
+     * Estado de la bomba para el snapshot: el persistido, salvo que sea {@code Dosificando} y el nodo tenga la dosis
+     * esperando turno, que es "En cola". Barato (un mapa en memoria): se pide por sector.
+     */
+    public String estadoBomba(String sectorId, String persistido) {
+        if (DOSIFICANDO.equals(persistido)) {
+            Fase f = fases.get(sectorId);
+            if (f != null && f.fase() == ActuatorProgress.Phase.QUEUED && !esDeUnaDosisVieja(sectorId, f)) {
+                return EN_COLA;
+            }
+        }
+        return persistido;
+    }
+
+    /**
+     * Un aviso anterior a la última orden de dosis del sector es de una dosis que ya no rige (un {@code reemplazado} no
+     * emite {@link ActuatorStopped}, así que su fase quedaría colgada): se descarta.
+     */
+    private boolean esDeUnaDosisVieja(String sectorId, Fase f) {
+        boolean vieja = historialRepository.findFirstBySectorIdAndTipoOrderByTsDesc(sectorId, "Insumo")
+                .map(ultima -> f.atMs() < ultima.getTs()).orElse(false);
+        if (vieja) {
+            fases.remove(sectorId, f);
+        }
+        return vieja;
+    }
+
     /** El ack final de la bomba cierra la dosis del sector. */
     @EventListener
     public void onActuatorStopped(ActuatorStopped evento) {
         if (!"pump".equals(evento.actuator())) {
             return;
         }
+        fases.remove(evento.sectorId());
         if (sectorRepository.cambiarBomba(evento.sectorId(), DOSIFICANDO, EN_ESPERA) > 0) {
             log.info("Sector {}: la dosis terminó (ack {}); la bomba vuelve a En espera.", evento.sectorId(), evento.ackType());
         }
@@ -68,9 +118,11 @@ public class SupplyDoseService {
         long ahora = reloj.millis();
         for (SectorEntity s : sectorRepository.findByActuadorPump(DOSIFICANDO)) {
             try {
-                if (vencida(s.getId(), ahora)
-                        && sectorRepository.cambiarBomba(s.getId(), DOSIFICANDO, EN_ESPERA) > 0) {
-                    log.warn("Sector {}: la dosis venció sin ack; se da por terminada y la bomba vuelve a En espera.", s.getId());
+                if (vencida(s.getId(), ahora)) {
+                    fases.remove(s.getId());
+                    if (sectorRepository.cambiarBomba(s.getId(), DOSIFICANDO, EN_ESPERA) > 0) {
+                        log.warn("Sector {}: la dosis venció sin ack; se da por terminada y la bomba vuelve a En espera.", s.getId());
+                    }
                 }
             } catch (RuntimeException e) {
                 log.error("Sector {}: no se pudo cerrar la dosis vencida; se reintenta en la próxima revisión.", s.getId(), e);
@@ -89,6 +141,12 @@ public class SupplyDoseService {
         long duracionMs = ultima.getDuracionSeg() != null
                 ? ultima.getDuracionSeg() * 1000L
                 : ContratoNodo.BOMBA_ML_MAX * ContratoNodo.BOMBA_INSUMO_MS_POR_ML;
+        Fase f = fases.get(sectorId);
+        if (f != null && f.atMs() >= ultima.getTs()) {   // un aviso anterior a la última orden es de una dosis vieja
+            // El nodo informó: STARTED cuenta desde el arranque; QUEUED, desde que se encoló más la espera máxima.
+            long desde = f.atMs() + (f.fase() == ActuatorProgress.Phase.QUEUED ? f.maxWaitMs() : 0L);
+            return desde + duracionMs + margenMs <= ahora;
+        }
         return ultima.getTs() + duracionMs + margenMs <= ahora;
     }
 }

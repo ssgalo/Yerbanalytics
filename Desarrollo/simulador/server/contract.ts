@@ -86,7 +86,7 @@ export function telemetryTopicFor(zonaId: string, demoMode: boolean): string {
 export const INPUT_DEFAULT_SEC = 10;
 /**
  * Opening (%) below which the firmware DEPLOYS the shade mesh (closes it): `shade SET {targetPct}` is an OPENING, and
- * >= this value rolls the mesh up. Mirrors MEDIASOMBRA_UMBRAL_APERTURA_PCT in `embebido/comun/config.example.h`.
+ * >= this value rolls the mesh up. The hardware is binary, so the backend only sends 100 (open) or 0 (closed). Mirrors MEDIASOMBRA_UMBRAL_APERTURA_PCT in `embebido/comun/config.example.h`.
  */
 export const SHADE_DEPLOY_BELOW_OPENING_PCT = 50;
 
@@ -98,6 +98,13 @@ export const INPUT_SEC_PER_ML = 1;
 export const SHADE_OPEN_THRESHOLD_PCT = 50;
 /** How long the simulated shade takes to reach its end stop. */
 export const SHADE_SIMULATED_SEC = 3;
+
+/**
+ * `parametros.prioridad` of a `shade SET`: with `INMEDIATA` the node does not make it wait in its load queue (only the
+ * safe state sends it). Ignored on `valve ON` / `pump ON`. Mirrors KEY_PRIORIDAD / PRIORIDAD_INMEDIATA in contrato.h.
+ */
+export const PRIORITY_PARAM = 'prioridad';
+export const PRIORITY_IMMEDIATE = 'INMEDIATA';
 
 /** Command payload, exactly as the backend publishes it. */
 export interface ActuatorCommand {
@@ -306,8 +313,9 @@ export interface RailEvent {
 
    - Zone command (backend → zone's witness node): QoS 1 both ways, no retain. The node answers
      with the usual telemetry on the zone telemetry topic, without a commandId and without ACK.
-   - ACK (node → backend): one per actuator command, published when it finishes. The ESP32
-     publishes QoS 0; the backend subscribes QoS 1.
+   - ACK (node → backend): the FINAL one per actuator command is published when it finishes; a load command also
+     gets intermediate `EN_CURSO` ones (`en_cola`, `iniciado`) while the node queues its loads
+     (add-cola-actuadores-nodo). The ESP32 publishes QoS 0; the backend subscribes QoS 1.
    ============================================================ */
 
 /** Topic the backend publishes the zone command to. */
@@ -347,7 +355,11 @@ export interface ZoneCommand {
   parametros: Record<string, never>;
 }
 
-export const ACK_STATUSES = ['SUCCESS', 'ERROR'] as const;
+/**
+ * `SUCCESS` and `ERROR` are the FINAL statuses (they close the command). `EN_CURSO` is an intermediate one
+ * (add-cola-actuadores-nodo): the node has the command queued (`en_cola`) or just started it (`iniciado`).
+ */
+export const ACK_STATUSES = ['SUCCESS', 'ERROR', 'EN_CURSO'] as const;
 export type AckStatus = (typeof ACK_STATUSES)[number];
 
 /** Union of the `detalle.tipo` values the firmware emits (see the "Ack" section of contrato.h). */
@@ -364,6 +376,9 @@ export const ACK_DETAIL_TYPES = [
   'falla_mecanica',
   'reemplazado',
   'cancelado',
+  'cola_llena',
+  'en_cola',
+  'iniciado',
 ] as const;
 export type AckDetailType = (typeof ACK_DETAIL_TYPES)[number];
 
@@ -375,7 +390,16 @@ export type AckDetailType = (typeof ACK_DETAIL_TYPES)[number];
 export interface ActuatorAck {
   commandId?: string;
   status: AckStatus;
-  detalle: { tipo: AckDetailType; durationSec?: number; ml?: number; targetPct?: number } & Record<string, unknown>;
+  detalle: {
+    tipo: AckDetailType;
+    durationSec?: number;
+    ml?: number;
+    targetPct?: number;
+    /** `en_cola` only: place in the node's queue (1 = next). */
+    posicion?: number;
+    /** `en_cola` only: upper bound of the wait, in seconds. */
+    esperaMaxSec?: number;
+  } & Record<string, unknown>;
 }
 
 /* ============================================================

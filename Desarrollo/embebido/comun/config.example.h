@@ -167,6 +167,13 @@
 #define LIMITE_BOMBA_ML_MAX        50     // dosis máx por comando (ml)
 #define LIMITE_INSUMO_SEG_MAX      60     // tiempo máx de la bomba de insumo por comando (s)
 
+// Cuántas cargas (tramo de riego, tramo de insumo, movimiento de la mediasombra) corren a la vez. El resto
+// espera en una cola en RAM, en orden de llegada (actuacion/cola_cargas). Por qué 1: el 17/10/2026 el motor
+// mandó riego, insumo y mediasombra en un mismo pulso, el nodo prendió todo junto, la fuente del prototipo no
+// aguantó el pico y el ESP32 se reinició. Se sube con una fuente mejor. El riel no entra en este límite.
+// Si falta en tu config.h, el módulo asume 1.
+#define MAX_CARGAS_SIMULTANEAS     1
+
 // ----------------------------------------------------------------------------
 //  Mediasombra (dos estados: enrollada / desenrollada)
 // ----------------------------------------------------------------------------

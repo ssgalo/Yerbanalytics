@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher.Resultado;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.model.DispositivoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.mqtt.MqttCommandGateway;
@@ -78,8 +79,28 @@ class ZoneSafeStateTest {
 
         verify(publisher).publicar("MZ-2", "MZ-2-001", "valve", "OFF", Map.of());
         verify(publisher).publicar("MZ-2", "MZ-2-001", "pump", "OFF", Map.of());
-        verify(publisher).publicar("MZ-2", "MZ-2-002", "shade", "SET", Map.of("targetPct", 0));
+        verify(publisher).publicar("MZ-2", "MZ-2-002", "shade", "SET",
+                Map.of("targetPct", 0, "prioridad", "INMEDIATA"));
         assertThat(result).isEqualTo(new ActuatorShutdown.Result(3, 0));
+    }
+
+    @Test
+    @DisplayName("publica los OFF primero y la mediasombra al final, aunque el repositorio la devuelva antes; la malla va con prioridad INMEDIATA")
+    void closesWaterFirstAndShadeLastWithPriority() {
+        registered(device(HardwareService.MEDIASOMBRA, "MZ-2-002"),
+                device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
+                device(HardwareService.BOMBA, "MZ-2-001"),
+                device(HardwareService.ELECTROVALVULA, "MZ-2-002"));
+
+        safeState.order("MZ-2");
+
+        var orden = org.mockito.Mockito.inOrder(publisher);
+        orden.verify(publisher, org.mockito.Mockito.times(3))
+                .publicar(anyString(), anyString(), org.mockito.ArgumentMatchers.argThat(a -> !"shade".equals(a)),
+                        eq("OFF"), any());
+        orden.verify(publisher).publicar("MZ-2", "MZ-2-002", "shade", "SET",
+                Map.of(ContratoNodo.PARAM_PRIORIDAD, ContratoNodo.PRIORIDAD_INMEDIATA, "targetPct", 0));
+        orden.verifyNoMoreInteractions();
     }
 
     @Test

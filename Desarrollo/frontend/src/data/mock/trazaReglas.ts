@@ -444,8 +444,8 @@ const EVALUADORES: Record<string, Evaluador> = {
 
   ShadingRule: (ev, e) =>
     ev.comparar('Índice UV pronosticado', e.uvIndex, 'GE', 'mediasombra.uv-umbral')
-      ? [accion('MOVER_MEDIASOMBRA', `[apertura=${Math.min(ev.numero('mediasombra.apertura-proteccion-uv'), ev.numero('mediasombra.apertura-maxima'))}] Pico de UV: mediasombra en posición protectora.`)]
-      : noop('Sin pico de UV: la apertura sigue el plan de rustificación.'),
+      ? [accion('MOVER_MEDIASOMBRA', `[apertura=0] Mediasombra cerrada por pico de radiación UV (índice  ≥ umbral ${ev.numero('mediasombra.uv-umbral').toFixed(1)}).`)]
+      : noop('Sin pico de UV: la mediasombra no se mueve.'),
 
   FollowUpRule: () => noop('Seguimiento post-acción: sin acciones pendientes de evaluar.'),
 };

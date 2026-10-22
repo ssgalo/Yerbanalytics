@@ -86,14 +86,18 @@ static void onMensajeMqtt(char *topic, byte *payload, unsigned int length)
 // ----------------------------------------------------------------------------
 //  Publicación de acks y eventos del riel
 // ----------------------------------------------------------------------------
-static void publicarAck(const Ack &a)
+static bool publicarAck(const Ack &a)
 {
   char buf[256];
   size_t escritos = util_json::serializarAck(a, buf, sizeof(buf));
   buf[escritos] = '\0';
   int sector = (a.sector >= 1 && a.sector <= CANT_SECTORES) ? a.sector : 1;
-  net_mqtt::publicar(topicAck[sector], buf, QOS_ACK);
+  if (!net_mqtt::publicar(topicAck[sector], buf, QOS_ACK))
+  {
+    return false;
+  }
   Serial.printf("[main] Ack sector %d publicado: %s\n", sector, buf);
+  return true;
 }
 
 // Publica los eventos del riel en orden. Uno que no se pudo publicar queda
@@ -149,10 +153,26 @@ static void taskRed(void *pv)
     net_mqtt::loop();
 
     // Acks producidos por task_actuacion (y por el callback, si el comando era inválido).
+    // Un ack que no se pudo publicar (red caída) queda primero en la cola y se reintenta en la próxima vuelta:
+    // con hasta tres acks por comando (en_cola, iniciado, final) no conviene perderlos (add-cola-actuadores-nodo).
     Ack a;
-    while (xQueueReceive(sys.ack, &a, 0) == pdTRUE)
+    while (xQueuePeek(sys.ack, &a, 0) == pdTRUE)
     {
-      publicarAck(a);
+      if (!mqttOk)
+      {
+        // Sin red los intermedios (informativos) se descartan para que los finales no queden detrás de una cola vieja.
+        if (a.status != EstadoAck::EN_CURSO)
+        {
+          break;
+        }
+        xQueueReceive(sys.ack, &a, 0);
+        continue;
+      }
+      if (!publicarAck(a))
+      {
+        break;
+      }
+      xQueueReceive(sys.ack, &a, 0);
     }
 
     // Eventos del riel.
@@ -188,7 +208,7 @@ void setup()
   // Recursos FreeRTOS (este nodo consume comandos y produce acks y eventos del riel).
   sys.telemetria = nullptr;
   sys.comandos = xQueueCreate(10, sizeof(Comando));
-  sys.ack = xQueueCreate(10, sizeof(Ack));
+  sys.ack = xQueueCreate(16, sizeof(Ack));   // hasta 3 por comando: en_cola, iniciado y final
   sys.comandoRiel = xQueueCreate(1, sizeof(ComandoRiel));
   sys.eventoRiel = xQueueCreate(8, sizeof(EventoRiel));
   sys.error = xQueueCreate(4, sizeof(ErrorNodo));
