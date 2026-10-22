@@ -145,6 +145,42 @@ class ReadingHistoryTest {
         assertThat(history.min(ZONE, ReadingMetric.UV, window)).contains(62.0);
     }
 
+    private void addDpv(Instant ts, ReadingOrigin origin, Double dpv) {
+        add(ZONE, ts, origin, null, null).setDpv(dpv);
+    }
+
+    @Test
+    @DisplayName("máximo del DPV en 72 h: el mayor de las lecturas de la ventana")
+    void maxDpvInThreeDays() {
+        addDpv(local(0, 6, 0), ReadingOrigin.PULSE, 0.4);
+        addDpv(local(1, 14, 0), ReadingOrigin.PULSE, 2.3);
+        addDpv(local(2, 14, 0), ReadingOrigin.OTHER, 1.1);
+        addDpv(local(-5, 14, 0), ReadingOrigin.PULSE, 4.0);
+
+        assertThat(history.max(ZONE, ReadingMetric.DPV, ReadingWindow.since(local(0, 0, 0)))).contains(2.3);
+    }
+
+    @Test
+    @DisplayName("las dos últimas lecturas de pulso con DPV bajo 0,3 vienen en orden cronológico")
+    void lastTwoDpvReadings() {
+        addDpv(local(0, 2, 0), ReadingOrigin.PULSE, 0.9);
+        addDpv(local(0, 6, 0), ReadingOrigin.PULSE, 0.21);
+        addDpv(local(0, 10, 0), ReadingOrigin.PULSE, 0.25);
+
+        assertThat(history.latest(ZONE, 2, true)).extracting(r -> ReadingMetric.DPV.valueIn(r))
+                .containsExactly(0.21, 0.25);
+    }
+
+    @Test
+    @DisplayName("una lectura sin DPV (la zona nunca tuvo T o HR) no cuenta, ni es cero")
+    void readingsWithoutDpvDoNotCount() {
+        addDpv(local(0, 6, 0), ReadingOrigin.PULSE, null);
+
+        var window = ReadingWindow.since(local(0, 0, 0));
+        assertThat(history.count(ZONE, ReadingMetric.DPV, window)).isZero();
+        assertThat(history.max(ZONE, ReadingMetric.DPV, window)).isEmpty();
+    }
+
     @Test
     @DisplayName("la ventana respeta from y to; sin to llega hasta lo último")
     void windowWithEnd() {

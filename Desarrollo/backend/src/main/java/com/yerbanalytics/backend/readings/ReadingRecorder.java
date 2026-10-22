@@ -6,7 +6,8 @@ import com.yerbanalytics.backend.repository.ZoneReadingRepository;
 import org.springframework.stereotype.Service;
 
 /**
- * Escribe el historial: una fila por lectura aceptada, con el estado completo de la zona después de aplicarla.
+ * Escribe el historial: una fila por lectura aceptada, con el estado completo de la zona después de aplicarla
+ * (las diez métricas sensadas y el DPV derivado).
  *
  * <p>No abre su propia transacción: corre dentro de la de la ingesta ({@code NurseryService.updateTelemetry}), de modo
  * que si falla el guardado la lectura de la zona tampoco se aplica. Preferible a una serie con huecos que haría fallar
@@ -43,6 +44,7 @@ public class ReadingRecorder {
         reading.setN(zone.getNRaw());
         reading.setP(zone.getPRaw());
         reading.setK(zone.getKRaw());
+        reading.setDpv(zone.getDpvRaw());
         repository.save(reading);
     }
 }

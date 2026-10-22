@@ -153,6 +153,53 @@ class NurseryServiceReadingsTest {
     }
 
     @Test
+    @DisplayName("una lectura con temperatura y humedad ambiental guarda el DPV en la zona y en la fila")
+    void readingWithTempAndHumiditySavesTheDpv() {
+        service.updateTelemetry("MZ-1", payload(NOW.toEpochMilli(),
+                new MqttTelemetryPayload.MetricsPayload(null, 60.0, 25.0, null, null, null, null, null, null, null)));
+
+        assertThat(zone.getDpvRaw()).isEqualTo(1.27);
+        assertThat(zone.getDpvTs()).isEqualTo(NOW.toEpochMilli());
+        assertThat(saved().getDpv()).isEqualTo(1.27);
+    }
+
+    @Test
+    @DisplayName("sin temperatura en la lectura el DPV conserva su valor y su marca de tiempo")
+    void readingWithoutTemperatureKeepsThePreviousDpv() {
+        zone.setDpvRaw(1.5);
+        zone.setDpvTs(1_000L);
+
+        service.updateTelemetry("MZ-1", payload(NOW.toEpochMilli(),
+                new MqttTelemetryPayload.MetricsPayload(null, 40.0, null, null, null, null, null, null, null, null)));
+
+        assertThat(zone.getDpvRaw()).isEqualTo(1.5);
+        assertThat(zone.getDpvTs()).isEqualTo(1_000L);
+        assertThat(saved().getDpv()).isEqualTo(1.5);
+    }
+
+    @Test
+    @DisplayName("sin humedad ambiental en la lectura el DPV conserva su valor y su marca de tiempo")
+    void readingWithoutHumidityKeepsThePreviousDpv() {
+        zone.setDpvRaw(1.5);
+        zone.setDpvTs(1_000L);
+
+        service.updateTelemetry("MZ-1", payload(NOW.toEpochMilli(),
+                new MqttTelemetryPayload.MetricsPayload(null, null, 30.0, null, null, null, null, null, null, null)));
+
+        assertThat(zone.getDpvRaw()).isEqualTo(1.5);
+        assertThat(zone.getDpvTs()).isEqualTo(1_000L);
+    }
+
+    @Test
+    @DisplayName("una humedad fuera de rango no genera un DPV nuevo")
+    void outOfRangeHumidityDoesNotComputeADpv() {
+        service.updateTelemetry("MZ-1", payload(NOW.toEpochMilli(),
+                new MqttTelemetryPayload.MetricsPayload(null, 130.0, 25.0, null, null, null, null, null, null, null)));
+
+        assertThat(zone.getDpvRaw()).isNull();
+    }
+
+    @Test
     @DisplayName("la CE llega en µS/cm y la fila la guarda en dS/m")
     void ceInDsPerM() {
         service.updateTelemetry("MZ-1", payload(NOW.toEpochMilli(),
