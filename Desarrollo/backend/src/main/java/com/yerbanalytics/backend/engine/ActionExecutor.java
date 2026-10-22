@@ -5,6 +5,8 @@ import com.yerbanalytics.backend.engine.riego.ColaRiego;
 import com.yerbanalytics.backend.engine.riego.SolicitudRiego;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.service.HistorialService;
+import com.yerbanalytics.backend.supply.ApplicationOutcome;
+import com.yerbanalytics.backend.supply.ApplicationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,8 +34,9 @@ import java.util.regex.Pattern;
  *       sólo la retira una <b>cancelación explícita de seguridad</b> ({@link CancelaRiego}: sustrato saturado,
  *       bloqueo manual, sensor sin datos y, para R-01, ventana cerrada o pausa por aplicación). "La humedad se
  *       recuperó" no cancela.</li>
- *   <li>{@code ACTIVAR_BOMBA}: actualiza el campo del sector, registra en historial y publica
- *       {@code pump ON {"ml"}} con la dosis de la regla. El "Dosificando" lo cierra {@code SupplyDoseService}
+ *   <li>{@code ACTIVAR_BOMBA}: <b>no publica la bomba</b>. Le pide la aplicación al {@link ApplicationService}, que
+ *       verifica las precondiciones, publica {@code pump ON {"ml"}} con la dosis del catálogo, la registra y descuenta
+ *       el tanque (o la deja pendiente para la próxima ventana). El "Dosificando" lo cierra {@code SupplyDoseService}
  *       (ack final de la bomba o, si no llega, el plazo de la dosis); acá nada lo vuelve a "En espera".</li>
  *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} con el porcentaje del motivo
  *       ({@code [apertura=N]}) y publica {@code shade SET}.</li>
@@ -75,6 +78,7 @@ public class ActionExecutor {
     private final HistorialService historialService;
     private final ComandoActuadorPublisher publisher;
     private final ColaRiego cola;
+    private final ApplicationService aplicaciones;
 
     /**
      * Último ciclo de lectura en que se persistió una alerta, por {@code zona|regla}. En memoria: tras un
@@ -82,10 +86,12 @@ public class ActionExecutor {
      */
     private final Map<String, Instant> alertasPorCiclo = new ConcurrentHashMap<>();
 
-    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola) {
+    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola,
+                          ApplicationService aplicaciones) {
         this.historialService = historialService;
         this.publisher = publisher;
         this.cola = cola;
+        this.aplicaciones = aplicaciones;
     }
 
     /**
@@ -96,8 +102,6 @@ public class ActionExecutor {
      * @param origen  qué disparó la evaluación (hoy sólo la respuesta a un pulso con motor)
      */
     public void execute(List<RuleAction> actions, RuleContext ctx, OrigenEvaluacion origen) {
-        String oldPump = ctx.sector().getActuadorPump();
-
         actualizarCola(actions, ctx);
         registrarInacciones(actions, ctx);
 
@@ -110,20 +114,15 @@ public class ActionExecutor {
 
                 case ACTIVAR_BOMBA -> {
                     log.info("Sector {}: ACTIVAR_BOMBA — {}", ctx.sector().getId(), action.motivo());
-                    ctx.sector().setActuadorPump("Dosificando");
-                    if (!"Dosificando".equals(oldPump)) {
-                        // La dosis la decide el backend (insumo.dosis-ml); sin detalle, el firmware usa la suya.
-                        if (action.detalle() instanceof DetalleInsumo dosis) {
-                            historialService.registrarInsumo(ctx.sector(), dosis.ml());
-                            // --- Downlink: enviar orden física al nodo actuador ---
-                            publishCommand(ctx, "pump", "ON", Map.of("ml", dosis.ml()));
-                        } else {
-                            historialService.registrarInsumo(ctx.sector());
-                            publishCommand(ctx, "pump", "ON", Map.of());
-                        }
+                    // La regla decide qué insumo; el servicio verifica las precondiciones, publica la orden y descuenta el tanque.
+                    if (action.detalle() instanceof DetalleInsumo insumo) {
+                        ApplicationOutcome resultado = aplicaciones.request(ctx.sector(), insumo.supply(),
+                                action.ruleName(), insumo.fromDiagnosis());
+                        log.info("Sector {}: aplicación de {} → {}{}", ctx.sector().getId(), insumo.supply(),
+                                resultado.status(), resultado.reason() != null ? " (" + resultado.reason() + ")" : "");
                     } else {
-                        log.info("Sector {}: ya está dosificando; no se vuelve a ordenar hasta que el ack o el plazo "
-                                + "de la dosis lo cierren.", ctx.sector().getId());
+                        log.warn("Sector {}: ACTIVAR_BOMBA de {} sin insumo: no se aplica nada.",
+                                ctx.sector().getId(), action.ruleName());
                     }
                 }
 

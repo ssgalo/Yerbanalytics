@@ -39,7 +39,7 @@ public class SupplyDoseService {
 
     private static final Logger log = LoggerFactory.getLogger(SupplyDoseService.class);
 
-    static final String DOSIFICANDO = "Dosificando";
+    public static final String DOSIFICANDO = "Dosificando";
     static final String EN_ESPERA = "En espera";
     static final String EN_COLA = "En cola";
 

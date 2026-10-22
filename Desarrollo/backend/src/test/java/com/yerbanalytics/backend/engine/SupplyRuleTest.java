@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
-import com.yerbanalytics.backend.engine.parametros.ParametrosInsumo;
+import com.yerbanalytics.backend.supply.Supply;
 import com.yerbanalytics.backend.engine.rules.SupplyRule;
 import com.yerbanalytics.backend.engine.traza.Comparacion;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -80,7 +80,7 @@ class SupplyRuleTest {
 
     @Test
     void declaraLaConfianzaMinimaDelDiagnostico() {
-        assertThat(rule.parametros()).containsExactly(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosInsumo.DOSIS_ML);
+        assertThat(rule.parametros()).containsExactly(ParametrosDiagnostico.CONFIANZA_MINIMA);
     }
 
     @Test
@@ -131,17 +131,10 @@ class SupplyRuleTest {
     }
 
     @Test
-    void laOrdenDeBombaLlevaLaDosisDelCatalogo() {
+    void laOrdenDeBombaPideFertilizanteYDejaLaDosisAlServicioDeAplicacion() {
         List<RuleAction> acciones = evaluar(rule, con("critical", 90.0));
 
-        assertThat(acciones.get(0).detalle()).isEqualTo(new DetalleInsumo(10));
-    }
-
-    @Test
-    void laDosisSaleDelCatalogoYNoDeUnaConstante() {
-        List<RuleAction> acciones = rule.evaluate(con("critical", 90.0),
-                ev(rule, java.util.Map.of(ParametrosInsumo.DOSIS_ML, "25")));
-
-        assertThat(acciones.get(0).detalle()).isEqualTo(new DetalleInsumo(25));
+        // La regla decide QUÉ insumo y por qué (un diagnóstico); cuánto lo decide el servicio con el catálogo.
+        assertThat(acciones.get(0).detalle()).isEqualTo(new DetalleInsumo(Supply.FERTILIZER, true));
     }
 }

@@ -5,6 +5,9 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.service.HistorialService;
+import com.yerbanalytics.backend.supply.ApplicationOutcome;
+import com.yerbanalytics.backend.supply.ApplicationService;
+import com.yerbanalytics.backend.supply.Supply;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,6 +36,7 @@ class ActionExecutorPublicacionTest {
     private HistorialService historial;
     private ComandoActuadorPublisher publisher;
     private ActionExecutor executor;
+    private ApplicationService aplicaciones;
     private SectorEntity sector;
     private RuleContext ctx;
 
@@ -41,7 +46,9 @@ class ActionExecutorPublicacionTest {
         publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c-1", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego());
+        aplicaciones = mock(ApplicationService.class);
+        when(aplicaciones.request(any(), any(), any(), anyBoolean())).thenReturn(ApplicationOutcome.applied());
+        executor = new ActionExecutor(historial, publisher, new ColaRiego(), aplicaciones);
         ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-1");
         sector = RuleContextTestFactory.sectorBasico("MZ-1-001");
         sector.setZona(zona);
@@ -50,30 +57,30 @@ class ActionExecutorPublicacionTest {
     }
 
     @Test
-    void activarBombaPublicaPumpOn() {
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis")), ctx, OrigenEvaluacion.TELEMETRIA);
+    void activarBombaLeDelegaLaAplicacionAlServicioConElInsumoDeLaRegla() {
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis",
+                new DetalleInsumo(Supply.FERTILIZER, true))), ctx, OrigenEvaluacion.TELEMETRIA);
 
-        verify(historial).registrarInsumo(sector);
-        verify(publisher).publicar("MZ-1", "MZ-1-001", "pump", "ON", Map.of());
+        verify(aplicaciones).request(sector, Supply.FERTILIZER, "SupplyRule", true);
+        // El ejecutor ya no publica la bomba ni escribe el historial del insumo: eso es del servicio de aplicación.
+        verify(publisher, never()).publicar(any(), any(), eq("pump"), any(), any());
+        verify(historial, never()).registrarInsumo(any(SectorEntity.class));
     }
 
     @Test
-    void activarBombaConDosisPublicaLosMlYLaDejaEnElHistorial() {
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis", new DetalleInsumo(25))),
-                ctx, OrigenEvaluacion.TELEMETRIA);
+    void laAplicacionNoDisparadaPorDiagnosticoNoExigeP_D1() {
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "NutritionPlan", "plan",
+                new DetalleInsumo(Supply.FUNGICIDE, false))), ctx, OrigenEvaluacion.TELEMETRIA);
 
-        verify(historial).registrarInsumo(sector, 25);
-        verify(publisher).publicar("MZ-1", "MZ-1-001", "pump", "ON", Map.of("ml", 25));
-        assertThat(sector.getActuadorPump()).isEqualTo("Dosificando");
+        verify(aplicaciones).request(sector, Supply.FUNGICIDE, "NutritionPlan", false);
     }
 
     @Test
-    void siElSectorYaEstaDosificandoNoPublicaOtraVez() {
-        sector.setActuadorPump("Dosificando");
-
-        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis", new DetalleInsumo(10))),
+    void activarBombaSinInsumoNoAplicaNada() {
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "SupplyRule", "dosis")),
                 ctx, OrigenEvaluacion.TELEMETRIA);
 
+        verify(aplicaciones, never()).request(any(), any(), any(), anyBoolean());
         verify(publisher, never()).publicar(any(), any(), eq("pump"), any(), any());
     }
 

@@ -40,7 +40,18 @@ class ParametrosRealesTest {
             Map.entry("riego.umbral-humedad", 45.0),                 // reglas_v2 §11 (era 42, idealMin de humSus)
             Map.entry("riego.lluvia-probabilidad", 70.0),            // reglas_v2 §11 (era 60)
             Map.entry("insumo.max-dosis-24h", 1.0),                  // DailyDoseLimitRule:80
-            Map.entry("insumo.dosis-ml", 10.0),                      // INSUMO_SEG_POR_DEFECTO 10 s del firmware, a 1 s por ml
+            Map.entry("insumo.dosis-fertilizante", 10.0),            // INSUMO_SEG_POR_DEFECTO 10 s del firmware, a 1 s por ml
+            Map.entry("insumo.dosis-fitosanitario", 10.0),
+            Map.entry("insumo.intervalo-fertilizante", 5.0),         // reglas_v2 §8.2 P-D2
+            Map.entry("insumo.intervalo-fitosanitario", 7.0),
+            Map.entry("insumo.temp-max-aplicar", 30.0),              // reglas_v2 §8.2 P-D3
+            Map.entry("insumo.humedad-min-aplicar", 45.0),           // reglas_v2 §8.2 P-D5
+            Map.entry("insumo.lluvia-impide-mm", 5.0),               // reglas_v2 §8.2 P-D4
+            Map.entry("insumo.lluvia-impide-horas", 6.0),
+            Map.entry("insumo.reingreso-horas", 24.0),               // reglas_v2 §8.3
+            Map.entry("insumo.stock-aviso", 20.0),
+            Map.entry("insumo.pendiente-vence-dias", 7.0),           // add-dosificacion-base D-5
+            Map.entry("diagnostico.vigencia-horas", 48.0),           // reglas_v2 §1.3 P-D1
             Map.entry("mediasombra.uv-umbral", 7.0),                 // uv-threshold
             Map.entry("readings.retention-days", 14.0),              // add-historial-lecturas D-4
             Map.entry("sensado.espera-respuesta", 60.0),             // reglas_v2 §11 Telemetría
@@ -132,14 +143,46 @@ class ParametrosRealesTest {
     }
 
     @Test
-    void laDosisDeInsumoVaDe1a50MlComoElTopeDelFirmware() {
-        DefinicionParametro d = catalogo.definicion("insumo.dosis-ml").orElseThrow();
+    void lasDosisDeInsumoVanDe1a50MlComoElTopeDelFirmware() {
+        for (String clave : List.of("insumo.dosis-fertilizante", "insumo.dosis-fitosanitario")) {
+            DefinicionParametro d = catalogo.definicion(clave).orElseThrow();
 
-        assertThat(d.familia()).isEqualTo(FamiliaParametro.INSUMO);
-        assertThat(d.tipo()).isEqualTo(TipoParametro.ENTERO);
-        assertThat(d.unidad()).isEqualTo("ml");
-        assertThat(d.min()).isEqualTo(1.0);
-        assertThat(d.max()).isEqualTo((double) com.yerbanalytics.backend.mqtt.ContratoNodo.BOMBA_ML_MAX);
+            assertThat(d.familia()).as(clave).isEqualTo(FamiliaParametro.INSUMO);
+            assertThat(d.tipo()).as(clave).isEqualTo(TipoParametro.ENTERO);
+            assertThat(d.unidad()).as(clave).isEqualTo("ml");
+            assertThat(d.min()).as(clave).isEqualTo(1.0);
+            // Una dosis mayor a la que corta el nodo se rechaza al guardar, no se recorta en silencio.
+            assertThat(d.max()).as(clave).isEqualTo((double) com.yerbanalytics.backend.mqtt.ContratoNodo.BOMBA_ML_MAX);
+        }
+        assertThat(catalogo.definicion("insumo.dosis-ml")).isEmpty();
+    }
+
+    @Test
+    void losParametrosDeAplicacionSonLosDeReglasV2Seccion8() {
+        record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica, Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("insumo.intervalo-fertilizante", TipoParametro.NUMERO, "d", "5", 3.0, 14.0),
+                new Esperado("insumo.intervalo-fitosanitario", TipoParametro.NUMERO, "d", "7", 5.0, 21.0),
+                new Esperado("insumo.ventana-manana", TipoParametro.VENTANA_HORARIA, "", "07:00-10:00", null, null),
+                new Esperado("insumo.ventana-tarde", TipoParametro.VENTANA_HORARIA, "", "17:00-19:00", null, null),
+                new Esperado("insumo.temp-max-aplicar", TipoParametro.NUMERO, "°C", "30", 25.0, 32.0),
+                new Esperado("insumo.humedad-min-aplicar", TipoParametro.NUMERO, "%", "45", 35.0, 60.0),
+                new Esperado("insumo.lluvia-impide-mm", TipoParametro.NUMERO, "mm", "5", 2.0, 20.0),
+                new Esperado("insumo.lluvia-impide-horas", TipoParametro.ENTERO, "h", "6", 2.0, 12.0),
+                new Esperado("insumo.reingreso-horas", TipoParametro.NUMERO, "h", "24", 12.0, 72.0),
+                new Esperado("insumo.stock-aviso", TipoParametro.NUMERO, "%", "20", 10.0, 50.0),
+                new Esperado("insumo.pendiente-vence-dias", TipoParametro.ENTERO, "d", "7", 1.0, 30.0),
+                new Esperado("diagnostico.vigencia-horas", TipoParametro.ENTERO, "h", "48", 12.0, 168.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).isNotBlank();
+        }
     }
 
     @Test
@@ -153,6 +196,7 @@ class ParametrosRealesTest {
     void elCatalogoRealTieneLasClavesDeHoyMasLasDeRiegoV2() {
         List<String> claves = new java.util.ArrayList<>(VALORES_DE_HOY.keySet());
         RIEGO_V2.forEach(e -> claves.add(e.clave()));
+        claves.addAll(List.of("insumo.ventana-manana", "insumo.ventana-tarde"));   // ventanas: no son numéricas
 
         assertThat(catalogo.definiciones()).extracting(DefinicionParametro::clave)
                 .containsExactlyInAnyOrderElementsOf(claves);
