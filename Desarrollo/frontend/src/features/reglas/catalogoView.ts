@@ -27,7 +27,7 @@ export const DESCRIPCION_RAMA: Record<RamaRegla, string> = {
 
 /**
  * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
- * escalamiento del nodo, el guard de lectura inválida y el servicio de fallas del hardware): el backend los lista en
+ * escalamiento del nodo, el guard de lectura inválida, el servicio de fallas del hardware y los de aplicación de insumos): el backend los lista en
  * `usadoPor` junto a las reglas. Se muestran en su propio grupo de la pestaña Parámetros.
  */
 export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string; rama: RamaRegla }> = {
@@ -60,6 +60,21 @@ export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string;
     titulo: 'Alerta de falla hidráulica',
     descripcion: 'Con qué humedad de sustrato la alerta de una falla hidráulica pide el riego manual del sector',
     rama: 'GLOBAL',
+  },
+  ApplicationPreconditions: {
+    titulo: 'Cuándo se puede aplicar un insumo',
+    descripcion: 'Intervalos entre aplicaciones, ventanas horarias y los límites de temperatura, lluvia y humedad de sustrato',
+    rama: 'INSUMO',
+  },
+  ApplicationService: {
+    titulo: 'Aplicación de insumos',
+    descripcion: 'Dosis, reingreso tras un fitosanitario y cuánto espera una aplicación diferida antes de descartarse',
+    rama: 'INSUMO',
+  },
+  TankService: {
+    titulo: 'Tanques de insumo',
+    descripcion: 'Con qué nivel se avisa que hay que reponer el insumo de un tanque',
+    rama: 'INSUMO',
   },
 };
 

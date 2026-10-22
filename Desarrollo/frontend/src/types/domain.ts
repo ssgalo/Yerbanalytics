@@ -95,6 +95,11 @@ export interface Sector {
   diagnosis: Diagnosis;
   reason: string;
   actuadores: Actuadores;
+  /**
+   * Hasta cuándo (epoch ms) el sector tiene el reingreso restringido tras un fitosanitario; `null` si nunca se le
+   * aplicó uno. Un valor pasado ya no restringe.
+   */
+  reentryUntil: number | null;
 }
 
 /** Tramo agronómico del DPV (reglas_v2 §1.4). */
@@ -518,6 +523,36 @@ export interface NewManualLock {
   /** Sin sector, se bloquea toda la macro-zona. */
   sectorId?: string;
   motivo: string;
+}
+
+/** Insumos que se aplican (reglas_v2 §8.1). Es el nombre que viaja por la API. */
+export type Supply = 'FERTILIZER' | 'FUNGICIDE';
+
+/**
+ * Tanque de un insumo en una macro-zona (un tanque por insumo y por MZ). Espejo del DTO `TankLevel`. Un tanque que
+ * nadie registró no figura: su stock es desconocido, no está lleno.
+ */
+export interface TankLevel {
+  zoneId: string;
+  supply: Supply;
+  /** Nombre para mostrar: "Fertilizante", "Fitosanitario". */
+  supplyLabel: string;
+  capacityMl: number;
+  levelMl: number;
+  levelPct: number;
+  /** Por debajo del nivel de aviso (`insumo.stock-aviso`): hay que reponer. */
+  low: boolean;
+  /** epoch ms */
+  updatedTs: number;
+  /** Quién hizo la última carga; `null` si desde entonces sólo hubo aplicaciones. */
+  updatedBy: string | null;
+}
+
+/** Carga de un tanque. Quién la hace lo sabe el backend por la sesión. */
+export interface NewTankLoad {
+  liters: number;
+  /** Obligatoria la primera vez (el tanque todavía no existe); después sólo para corregirla. */
+  capacityLiters?: number;
 }
 
 /** Estado operativo derivado de un dispositivo (HU-21). */

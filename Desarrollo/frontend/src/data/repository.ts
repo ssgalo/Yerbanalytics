@@ -24,6 +24,9 @@ import type {
   OrigenEvaluacion,
   ManualLock,
   NewManualLock,
+  NewTankLoad,
+  Supply,
+  TankLevel,
   ParametrosSecuencia,
   Pasada,
   Secuencia,
@@ -135,4 +138,11 @@ export interface DataRepository {
   activateManualLock(lock: NewManualLock): Promise<ManualLock>;
   /** Reanuda (desactiva) un bloqueo. Rechaza con `ManualLockError` si no existe o ya se reanudó (404). */
   releaseManualLock(id: number): Promise<void>;
+  /** Tanques de insumo registrados, por macro-zona e insumo. */
+  getTanks(): Promise<TankLevel[]>;
+  /**
+   * Suma litros al tanque de `supply` en `zoneId` y devuelve cómo quedó. Rechaza con `TankLoadError` (mensaje del
+   * 400/404) si la carga es inválida, no entra en el tanque o falta su capacidad.
+   */
+  loadTank(zoneId: string, supply: Supply, load: NewTankLoad): Promise<TankLevel>;
 }

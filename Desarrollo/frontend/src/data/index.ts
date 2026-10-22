@@ -13,6 +13,7 @@ export type { DataRepository } from './repository';
 export type { SeguridadRepository } from './seguridadRepository';
 export { ParametrosInvalidosError } from './parametrosError';
 export { ManualLockError } from './manualLockError';
+export { TankLoadError } from './tankError';
 export { PasadaRechazadaError } from './pasadaError';
 export { PlanRustificacionError } from './planRustificacionError';
 export {

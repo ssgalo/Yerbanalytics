@@ -20,6 +20,7 @@ import { SectorsCard } from './components/SectorsCard';
 import { SensingCard } from './components/SensingCard';
 import { HardeningCard } from './components/HardeningCard';
 import { ManualLockCard } from '@/features/manual-lock/ManualLockCard';
+import { TankCard } from '@/features/supply/TankCard';
 import styles from './MapPage.module.css';
 
 export function MapPage() {
@@ -61,6 +62,7 @@ export function MapPage() {
         />
         <SensingCard className={styles.sensing} zona={zona} wide={wide} />
         <HardeningCard className={styles.hardening} zona={zona} />
+        <TankCard className={styles.tanks} zoneId={zona.id} />
         <ManualLockCard className={styles.lock} zonaId={zona.id} label={`la macro-zona ${zona.id}`} />
       </div>
     </div>

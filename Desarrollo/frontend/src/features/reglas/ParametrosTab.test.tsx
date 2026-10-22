@@ -73,12 +73,18 @@ describe('ParametrosTab · agrupación (7.2)', () => {
       expect.stringMatching(/Riego · 7 reglas/),
       expect.stringMatching(/Ejecución del riego/),
       expect.stringMatching(/Insumos/),
+      expect.stringMatching(/Aplicación de insumos/),
+      expect.stringMatching(/Cuándo se puede aplicar un insumo/),
+      expect.stringMatching(/Tanques de insumo/),
       expect.stringMatching(/Mediasombra/),
       expect.stringMatching(/Seguimiento/),
     ]);
     // Colapsadas: ningún campo de regla a la vista. Los grupos de lo que lee parámetros sin ser una regla (ejecución
     // del riego, lectura inválida…) no se colapsan: sus campos son los únicos que se ven.
-    const deConsumidores = agruparPorConsumidor(catalogoDeFabrica()).flatMap((g) => g.parametros);
+    // Las ventanas horarias se editan con campos de texto, no numéricos.
+    const deConsumidores = agruparPorConsumidor(catalogoDeFabrica())
+      .flatMap((g) => g.parametros)
+      .filter((p) => p.tipo !== 'VENTANA_HORARIA');
     expect(screen.queryAllByRole('spinbutton')).toHaveLength(deConsumidores.length);
     // Orden por prioridad dentro de RIEGO: R-04 → ciclo → R-02 → R-05 → R-06 → R-03 → R-01
     const botones = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent ?? '');

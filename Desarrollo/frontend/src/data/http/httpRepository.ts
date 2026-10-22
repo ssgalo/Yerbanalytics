@@ -10,6 +10,7 @@ import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { ManualLockError } from '@/data/manualLockError';
+import { TankLoadError } from '@/data/tankError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { PlanRustificacionError } from '@/data/planRustificacionError';
 import { HORARIO_MEDIASOMBRA_DEFAULT } from '@/lib/planRustificacion';
@@ -33,6 +34,9 @@ import type {
   ParametrosSecuencia,
   ManualLock,
   NewManualLock,
+  NewTankLoad,
+  Supply,
+  TankLevel,
   Pasada,
   Secuencia,
   TipoSecuencia,
@@ -215,6 +219,34 @@ export class HttpRepository implements DataRepository {
     if (!res.ok) {
       throw new Error(`Error ${res.status} al ${accion} la actuación autónoma`);
     }
+  }
+
+  async getTanks(): Promise<TankLevel[]> {
+    const res = await apiFetch(`${this.baseUrl}/tanques?t=${Date.now()}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al obtener los tanques de insumo`);
+    }
+    return (await res.json()) as TankLevel[];
+  }
+
+  async loadTank(zoneId: string, supply: Supply, load: NewTankLoad): Promise<TankLevel> {
+    const res = await apiFetch(
+      `${this.baseUrl}/tanques/${encodeURIComponent(zoneId)}/${supply}/recarga`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(load),
+      },
+    );
+    // 400 y 404 traen { error } y son rechazos esperables (no entra, falta la capacidad), no una falla.
+    if (res.status === 400 || res.status === 404) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new TankLoadError(err?.error ?? 'No se pudo registrar la carga del tanque.');
+    }
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al registrar la carga del tanque`);
+    }
+    return (await res.json()) as TankLevel;
   }
 
   async getHardware(): Promise<HardwareData> {
