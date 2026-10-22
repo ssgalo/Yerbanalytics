@@ -87,6 +87,9 @@ public class SecuenciaService implements UsoDelHardware {
     static final String RIEGO = "RIEGO";
     static final String MEDIASOMBRA = "MEDIASOMBRA";
     static final String LECTURA = "LECTURA";
+    /** Acciones sueltas de un solo paso: abrir = enrollar (100), cerrar = desplegar (0). */
+    static final String MEDIASOMBRA_ABRIR = "MEDIASOMBRA_ABRIR";
+    static final String MEDIASOMBRA_CERRAR = "MEDIASOMBRA_CERRAR";
 
     private static final String ABRIR = "ABRIR";
     private static final String ESPERAR = "ESPERAR";
@@ -180,8 +183,16 @@ public class SecuenciaService implements UsoDelHardware {
     public Optional<String> ocupadoPor() {
         Secuencia f = foto;
         return f != null && EN_CURSO.equals(f.estado())
-                ? Optional.of("Hay una secuencia de " + f.tipo().toLowerCase(Locale.ROOT) + " en curso.")
+                ? Optional.of("Hay una secuencia de " + nombreLegible(f.tipo()) + " en curso.")
                 : Optional.empty();
+    }
+
+    private static String nombreLegible(String tipo) {
+        return switch (tipo) {
+            case MEDIASOMBRA_ABRIR -> "abrir mediasombra";
+            case MEDIASOMBRA_CERRAR -> "cerrar mediasombra";
+            default -> tipo.toLowerCase(Locale.ROOT);
+        };
     }
 
     /**
@@ -258,7 +269,7 @@ public class SecuenciaService implements UsoDelHardware {
         ParametrosSecuencia pedidos = pedido == null || pedido.parametros() == null
                 ? new ParametrosSecuencia(null, null) : pedido.parametros();
         if (tipo == null) {
-            throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, MEDIASOMBRA o LECTURA).");
+            throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
         switch (tipo) {
             case RIEGO -> {
@@ -281,8 +292,11 @@ public class SecuenciaService implements UsoDelHardware {
             case LECTURA -> {
                 return new ParametrosSecuencia(null, null, Boolean.TRUE.equals(pedidos.ejecutarMotor()));
             }
-            default -> throw new SecuenciaInvalidaException(
-                    "Tipo de secuencia desconocido: " + tipo + " (RIEGO, MEDIASOMBRA o LECTURA).");
+            case MEDIASOMBRA_ABRIR, MEDIASOMBRA_CERRAR -> {
+                return new ParametrosSecuencia(null, null);
+            }
+            default -> throw new SecuenciaInvalidaException("Tipo de secuencia desconocido: " + tipo
+                    + " (RIEGO, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
     }
 
@@ -315,6 +329,9 @@ public class SecuenciaService implements UsoDelHardware {
                 p.pasos.add(new Paso(2, ESPERAR));
                 p.pasos.add(new Paso(3, ENROLLAR));
             }
+            // Un solo paso, que a la vez es el seguro: cierra la secuencia salga como salga (sin reintento).
+            case MEDIASOMBRA_ABRIR -> p.pasos.add(new Paso(1, ENROLLAR));
+            case MEDIASOMBRA_CERRAR -> p.pasos.add(new Paso(1, DESPLEGAR));
             default -> {
                 p.pasos.add(new Paso(1, PEDIR));
                 p.pasos.add(new Paso(2, ESPERAR_TELEMETRIA));

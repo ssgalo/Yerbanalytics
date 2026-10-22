@@ -1022,7 +1022,13 @@ en curso). Una sola a la vez, y ninguna mientras corre una pasada del riel (ni a
 | `GET /api/secuencias/actual` | `200` + `Secuencia` (la en curso o la última) · `204` si no hubo ninguna desde el arranque |
 | `POST /api/secuencias/actual/cancelar` | `200` + `Secuencia` · `409` si no hay una en curso o ya se está cancelando |
 
-Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
+Además hay dos acciones sueltas de **un solo paso**: `MEDIASOMBRA_ABRIR` (enrolla: `shade SET {targetPct: 100}`)
+y `MEDIASOMBRA_CERRAR` (despliega: `targetPct: 0`), al mismo destino que la secuencia de mediasombra. Esperan el
+ACK final (los `EN_CURSO` `en_cola`/`iniciado` sólo estiran el plazo; `sin_cambio` es éxito, "ya estaba así"), no
+llevan parámetros y se rigen por la misma guardia (`409` con otra secuencia o una pasada). Se pasan por acá y no por
+un publish directo al broker para que el seguimiento de comandos y el estado del backend las vean.
+
+Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "MEDIASOMBRA_CERRAR", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
 `duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200: el tope del contrato);
 `esperaSeg` sólo a `MEDIASOMBRA` (default 10, de 0 a 600). La forma de `Secuencia` y sus pasos:
 `openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.

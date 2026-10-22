@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * Foto inmutable de una secuencia guionada (design add-secuencias-demo-expo §2.7). {@code tipo}:
- * RIEGO | MEDIASOMBRA | LECTURA. {@code estado}: EN_CURSO | COMPLETADA | FALLIDA | CANCELADA.
+ * RIEGO | MEDIASOMBRA | LECTURA | MEDIASOMBRA_ABRIR | MEDIASOMBRA_CERRAR. {@code estado}: EN_CURSO | COMPLETADA | FALLIDA | CANCELADA.
  * {@code error} es el detalle del primer paso fallido. {@code sectorId} es {@code null} en la lectura
  * (el sensado es por zona) y {@code lectura} lo es hasta que llega la telemetría.
  */
