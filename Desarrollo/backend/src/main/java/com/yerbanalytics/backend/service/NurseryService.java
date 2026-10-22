@@ -220,7 +220,8 @@ public class NurseryService {
                         finalTip,
                         diagnosis,
                         reason,
-                        actuators
+                        actuators,
+                        se.getReentryUntil()
                 );
 
                 zoneSectors.add(sectorDto);
