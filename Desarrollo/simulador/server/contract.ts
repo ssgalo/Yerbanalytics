@@ -84,6 +84,12 @@ export function telemetryTopicFor(zonaId: string, demoMode: boolean): string {
 
 /** How long the firmware runs the input pump on a `pump ON` without parameters (INSUMO_SEG_POR_DEFECTO). */
 export const INPUT_DEFAULT_SEC = 10;
+/**
+ * Opening (%) below which the firmware DEPLOYS the shade mesh (closes it): `shade SET {targetPct}` is an OPENING, and
+ * >= this value rolls the mesh up. Mirrors MEDIASOMBRA_UMBRAL_APERTURA_PCT in `embebido/comun/config.example.h`.
+ */
+export const SHADE_DEPLOY_BELOW_OPENING_PCT = 50;
+
 /** The firmware's longest input pump run per command (LIMITE_INSUMO_SEG_MAX). */
 export const INPUT_MAX_SEC = 60;
 /** The firmware's input pump calibration (BOMBA_INSUMO_MS_POR_ML), in seconds per ml. */

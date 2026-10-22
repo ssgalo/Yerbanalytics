@@ -21,6 +21,7 @@ import type {
   CaptureOrder,
   DemoRule,
   DemoRuleUpdate,
+  EvaluationTrace,
   ManualLock,
   NewDiagnosis,
   NodeErrorPlan,
@@ -504,3 +505,35 @@ export async function uploadImage(ordenId: string, file: File, token: string): P
   await check(res, 'subir la imagen capturada');
 }
 
+
+/* ----------------------------------------------------------------
+   Happy path de la Demo Expo (API pública del backend, por el proxy)
+   ---------------------------------------------------------------- */
+
+/** Última traza del motor para un sector (la que muestra el Inspector); `null` si todavía no se evaluó (204). */
+export async function getEvaluationTrace(sectorId: string): Promise<EvaluationTrace | null> {
+  const res = await fetch(`${BACKEND}/api/rules/evaluaciones/${encodeURIComponent(sectorId)}`);
+  if (res.status === 204) return null;
+  return json(res, 'consultar la traza del motor');
+}
+
+/** Estado de válvula y bomba de los sectores de una zona (snapshot del vivero): sirve para saber cuándo terminó una carga. */
+export async function getZoneActuators(zonaId: string): Promise<{ sectorId: string; valve: string; pump: string }[]> {
+  const data = await json<{ sectors?: { id: string; zona: string; actuadores?: { valve: string; pump: string } }[] }>(
+    await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
+    'consultar los actuadores del vivero',
+  );
+  return (data.sectors ?? [])
+    .filter((x) => x.zona === zonaId)
+    .map((x) => ({ sectorId: x.id, valve: x.actuadores?.valve ?? '', pump: x.actuadores?.pump ?? '' }));
+}
+
+/** Diagnóstico de IA vigente de un sector, tal como lo expone el snapshot del vivero. */
+export async function getSectorDiagnosis(sectorId: string): Promise<{ estado: string; conf: number | null } | null> {
+  const data = await json<{ sectors?: { id: string; diagnosis?: { estado: string; conf: number | null } }[] }>(
+    await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
+    'consultar el diagnóstico del sector',
+  );
+  const diagnosis = data.sectors?.find((s) => s.id === sectorId)?.diagnosis;
+  return diagnosis ? { estado: diagnosis.estado, conf: diagnosis.conf } : null;
+}

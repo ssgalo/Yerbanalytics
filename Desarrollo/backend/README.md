@@ -57,6 +57,12 @@ Corré `src/main/resources/migracion-permisos-bloqueo.sql` (idempotente, antes o
 agregar los de la matriz por defecto. No toca lo que el Administrador editó. Se aplican al reiniciar el backend
 (la matriz vive en memoria).
 
+### Migración manual pendiente · permisos de reglas y pasadas para el rol Servicio
+
+El rol Servicio (cuentas de integración) recibe `reglas.ver`, `pasadas.ver` y `pasadas.operar` en la matriz por defecto: lee el
+catálogo y la traza del motor y pide pulsos, secuencias y pasadas. En una base ya sembrada faltan (403): corré
+`src/main/resources/migracion-permisos-servicio-simulador.sql` (idempotente) y reiniciá el backend.
+
 ### Migración manual pendiente · permiso de lectura del hardware para el rol Servicio
 
 El simulador (cuenta de rol Servicio) consulta qué sectores ya no tienen electroválvula registrada para armar su escenario

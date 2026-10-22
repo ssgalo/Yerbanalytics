@@ -21,12 +21,20 @@ class PermisoTest {
                 "bloqueos.ver", "bloqueos.gestionar", "hardware.ver", "hardware.reparar");
         assertThat(codigos(Rol.SERVICIO)).containsExactlyInAnyOrder("vivero.ver", "topologia.ver", "capturas.ver",
                 "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar",
-                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar", "hardware.ver", "hardware.reparar");
+                "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar", "hardware.ver", "hardware.reparar",
+                "reglas.ver", "pasadas.ver", "pasadas.operar");
         assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar", "bloqueos.ver", "bloqueos.gestionar",
                         "hardware.reparar")
                 .doesNotContain("auditoria.ver", "pasadas.operar", "usuarios.gestionar");
         assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver", "hardware.ver")
                 .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar", "hardware.reparar");
+    }
+
+    @Test
+    void elRolServicioPuedeLeerLasReglasYOperarElPulsoSinEditarNada() {
+        // Las cuentas de integración leen el catálogo y la traza del motor y piden pulsos, secuencias y pasadas.
+        assertThat(codigos(Rol.SERVICIO)).contains("reglas.ver", "pasadas.ver", "pasadas.operar")
+                .doesNotContain("reglas.editar", "configuracion.editar", "usuarios.gestionar");
     }
 
     @Test
