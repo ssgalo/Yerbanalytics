@@ -120,7 +120,7 @@ class UmbralAlertaTest {
 
     private static List<Zona> zonaCon(double valor, String status, MetricSpec spec) {
         Metric m = new Metric(spec.key(), spec.label(), spec.unit(), valor, String.valueOf((long) valor), status, "#000", spec);
-        LecturaZona lectura = new LecturaZona(List.of(m), 1L, "hace 1 min", false);
+        LecturaZona lectura = new LecturaZona(List.of(m), null, 1L, "hace 1 min", false);
         return List.of(new Zona("MZ-2", "Macro-zona 2", "", List.of(), 0, 0, 0, 0, lectura, null));
     }
 

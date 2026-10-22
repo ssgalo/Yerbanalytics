@@ -248,7 +248,7 @@ public class NurseryService {
                     alerta,
                     off,
                     zoneSectors.size(),
-                    new LecturaZona(zoneMetrics, ze.getLastReadingTime(), zoneAgo, isStale),
+                    new LecturaZona(zoneMetrics, isStale ? null : VaporDeficit.of(ze.getDpvRaw()), ze.getLastReadingTime(), zoneAgo, isStale),
                     new NodoTestigo(
                             ze.getNodoMac(),
                             ze.getNodoBattery(),
