@@ -1,6 +1,6 @@
 /* ============================================================
    Secuencias directas de actuadores (Demo Expo - simulador).
-   Three cards: Riego, Mediasombra, Lectura de sensores.
+   Four cards: Riego, Mediasombra, Abrir/cerrar mediasombra, Lectura de sensores.
    Adapted from the dashboard's SecuenciasPanel.tsx but without react-router-dom
    and using the simulator's useSecuenciaSimulator hook.
    ============================================================ */
@@ -55,8 +55,8 @@ function tipoPasoLabel(paso: PasoSecuencia, sec: Secuencia): string {
   switch (paso.tipo) {
     case 'ABRIR': return `Abrir válvula (${sec.sectorId ?? '—'})`;
     case 'CERRAR': return 'Cerrar válvula';
-    case 'DESPLEGAR': return 'Desplegar mediasombra';
-    case 'ENROLLAR': return 'Enrollar mediasombra';
+    case 'DESPLEGAR': return sec.tipo === 'MEDIASOMBRA_CERRAR' ? 'Cerrar mediasombra (desplegar)' : 'Desplegar mediasombra';
+    case 'ENROLLAR': return sec.tipo === 'MEDIASOMBRA_ABRIR' ? 'Abrir mediasombra (enrollar)' : 'Enrollar mediasombra';
     case 'ESPERAR':
       return sec.tipo === 'RIEGO'
         ? `Regar ${sec.parametros.duracionSeg ?? '—'} s`
@@ -250,6 +250,28 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
             onClick={() => espera !== null && void iniciar('MEDIASOMBRA', { esperaSeg: espera })}
           >
             Desplegar y enrollar
+          </button>
+        </Tarjeta>
+
+        <Tarjeta
+          titulo="Abrir o cerrar mediasombra"
+          descripcion="Una sola acción, sin espera. Abrir la enrolla (deja pasar la luz); cerrar la despliega."
+        >
+          <button
+            type="button"
+            className="small"
+            disabled={ocupado}
+            onClick={() => void iniciar('MEDIASOMBRA_ABRIR')}
+          >
+            Abrir mediasombra
+          </button>
+          <button
+            type="button"
+            className="small"
+            disabled={ocupado}
+            onClick={() => void iniciar('MEDIASOMBRA_CERRAR')}
+          >
+            Cerrar mediasombra
           </button>
         </Tarjeta>
 

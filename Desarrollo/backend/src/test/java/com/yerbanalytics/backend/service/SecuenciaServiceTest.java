@@ -620,6 +620,121 @@ class SecuenciaServiceTest {
         }
     }
 
+    // ================================================================ MEDIASOMBRA ABRIR / CERRAR
+
+    @Nested
+    @DisplayName("mediasombra abrir / cerrar (un solo paso)")
+    class MediasombraAbrirCerrar {
+
+        @Test
+        @DisplayName("MEDIASOMBRA_ABRIR: un paso ENROLLAR que publica SET 100 en el primer sector de la zona")
+        void planDeAbrir() {
+            Secuencia s = iniciar("MEDIASOMBRA_ABRIR", null, null);
+
+            assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("ENROLLAR");
+            assertThat(s.sectorId()).isEqualTo(SECTOR);
+            assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(null, null));
+            verificarPublicado("shade", "SET", Map.of("targetPct", 100));
+        }
+
+        @Test
+        @DisplayName("MEDIASOMBRA_CERRAR: un paso DESPLEGAR que publica SET 0")
+        void planDeCerrar() {
+            Secuencia s = iniciar("MEDIASOMBRA_CERRAR", null, null);
+
+            assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("DESPLEGAR");
+            verificarPublicado("shade", "SET", Map.of("targetPct", 0));
+        }
+
+        @Test
+        @DisplayName("el ACK final SUCCESS cierra el paso y la secuencia queda COMPLETADA")
+        void ackExitoso() {
+            iniciar("MEDIASOMBRA_ABRIR", null, null);
+
+            ackOk(1);
+
+            assertThat(paso(1).estado()).isEqualTo("OK");
+            assertThat(secuencia().estado()).isEqualTo("COMPLETADA");
+            assertThat(service.ocupadoPor()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("sin_cambio (ya estaba en esa posición) es éxito")
+        void sinCambioEsExito() {
+            iniciar("MEDIASOMBRA_CERRAR", null, null);
+
+            ack(paso(1).commandId(), "SUCCESS", "{\"tipo\":\"sin_cambio\"}");
+
+            assertThat(paso(1).estado()).isEqualTo("OK");
+            assertThat(secuencia().estado()).isEqualTo("COMPLETADA");
+        }
+
+        @Test
+        @DisplayName("EN_CURSO (en_cola / iniciado) no cierra el paso y estira el plazo del ACK")
+        void intermedioNoCierra() {
+            iniciar("MEDIASOMBRA_ABRIR", null, null);
+            String id = paso(1).commandId();
+
+            ack(id, "EN_CURSO", "{\"tipo\":\"en_cola\",\"esperaMaxSec\":60}");
+            assertThat(paso(1).estado()).isEqualTo("EN_CURSO");
+            avanzar(60);   // pasó el timeout normal (45 s): sigue esperando por la cola
+            assertThat(paso(1).estado()).isEqualTo("EN_CURSO");
+
+            ack(id, "EN_CURSO", "{\"tipo\":\"iniciado\"}");
+            assertThat(paso(1).estado()).isEqualTo("EN_CURSO");
+
+            ack(id, "SUCCESS", "{\"tipo\":\"ok\"}");
+            assertThat(secuencia().estado()).isEqualTo("COMPLETADA");
+        }
+
+        @Test
+        @DisplayName("ACK ERROR deja la secuencia FALLIDA, sin reintentar el comando")
+        void ackConError() {
+            iniciar("MEDIASOMBRA_ABRIR", null, null);
+
+            ack(paso(1).commandId(), "ERROR", "{\"tipo\":\"falla_mecanica\"}");
+
+            assertThat(paso(1).codigoError()).isEqualTo("FALLA_MECANICA");
+            assertThat(secuencia().estado()).isEqualTo("FALLIDA");
+            verify(actuadores, times(1)).publicar(anyString(), anyString(), anyString(), anyString(), anyMap());
+        }
+
+        @Test
+        @DisplayName("sin ACK vence a los 45 s con ACTUADOR_SIN_RESPUESTA")
+        void sinAck() {
+            iniciar("MEDIASOMBRA_CERRAR", null, null);
+
+            avanzar(45);
+
+            assertThat(paso(1).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
+            assertThat(secuencia().estado()).isEqualTo("FALLIDA");
+        }
+
+        @Test
+        @DisplayName("409 si hay otra secuencia en curso, y 409 con el motivo del guardia si hay una pasada")
+        void ocupado() {
+            iniciar("RIEGO", 15, null);
+            assertThatThrownBy(() -> iniciar("MEDIASOMBRA_ABRIR", null, null))
+                    .isInstanceOf(SecuenciaRechazadaException.class)
+                    .hasMessage("Ya hay una secuencia en curso.");
+
+            service.cancelar();
+            ackOk(3);
+            pasadaOcupada.set(Optional.of("Hay una pasada del riel en curso."));
+            assertThatThrownBy(() -> iniciar("MEDIASOMBRA_CERRAR", null, null))
+                    .isInstanceOf(SecuenciaRechazadaException.class)
+                    .hasMessage("Hay una pasada del riel en curso.");
+        }
+
+        @Test
+        @DisplayName("mientras corre, ocupadoPor() lo informa con un texto legible")
+        void ocupadoPorLegible() {
+            iniciar("MEDIASOMBRA_ABRIR", null, null);
+
+            assertThat(service.ocupadoPor()).contains("Hay una secuencia de abrir mediasombra en curso.");
+        }
+    }
+
     // ================================================================ LECTURA
 
     @Nested
