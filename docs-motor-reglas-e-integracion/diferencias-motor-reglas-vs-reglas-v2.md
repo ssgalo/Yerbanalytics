@@ -15,6 +15,11 @@
 > - **Prioridades:** la regla nueva es la **1** y las reglas que eran 1…20 pasaron a 2…21 (R-04 = 3, ciclo = 4, R-02 = 5, R-05 = 7, R-06 = 8, R-03 = 9, R-01 = 11, `SupplyRule` = 12, `ShadingRule` = 13, `FollowUpRule` = 21). Los números de prioridad que siguen más abajo son los anteriores.
 > - **`ABORT_MEDIASOMBRA`** es una acción bloqueante nueva: corta las reglas de la rama MEDIASOMBRA. Donde más abajo dice que MEDIASOMBRA sólo se detiene con `ABORT_ALL`, hoy también se detiene con ésa.
 
+> **Actualización parcial del 22/10/2026** (`add-dosificacion-base`):
+> - **P-D1…P-D5 pasan a Implementada** (tabla de abajo), pero **como maquinaria, sin quien la use todavía**: viven en `supply/ApplicationService` y `supply/ApplicationPreconditions`, y ninguna regla productiva pide hoy una aplicación (N-*, F-* no existen). `SupplyRule` y `DailyDoseLimitRule` quedan **retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`) y `SupplyRule`, encendida, ya no publica la bomba: le pide la aplicación al servicio.
+> - §8.1–8.3 (dosis por insumo, stock de tanques con aviso al 20 %, reingreso de 24 h, aplicaciones diferidas a la próxima ventana) quedan implementadas. Dosis de fábrica 10 ml (la spec decía 100 ml; el firmware no acepta más de 50 ml por comando). Hay una sola bomba por sector y el comando no lleva el insumo (ver el README del backend).
+> - Los conteos y las citas `archivo:línea` del resto del documento no se recalcularon.
+
 Abreviaturas de ruta: `engine/` = `…/backend/engine/`; `rules/` = `…/backend/engine/rules/`; `riego/` = `…/backend/engine/riego/`; `param/` = `…/backend/engine/parametros/`; `traza/` = `…/backend/engine/traza/`; `service/` = `…/backend/service/`; `res/` = `Desarrollo/backend/src/main/resources/`.
 
 ---
@@ -140,11 +145,11 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 | F-04 | Foco | Ausente | — | No hay tratamiento de sectores lindantes |
 | F-05 | Sano tras tratamiento | Ausente | — | El seguimiento se cierra por delta de humedad, no por diagnóstico Sano |
 | F-06 | Tope de aplicaciones | Ausente | — | El único tope es 1 dosis/24 h; no hay 3 en 30 días |
-| P-D1 | Diagnóstico vigente | Parcial | `SupplyRule` | Sólo confianza ≥ 85 % (`diagnostico.confianza-minima`; doc: 70 %); sin antigüedad ≤ 48 h ni "última captura" |
-| P-D2 | Intervalo mínimo | Parcial | `DailyDoseLimitRule` | Bloquea con ≥ 1 "Insumo" en 24 h (`insumo.max-dosis-24h`); sin intervalo 5/7 días ni prioridad fitosanitario |
-| P-D3 | Ventana y temperatura | Ausente | — | Sin ventanas 07-10 / 17-19 ni tope 30 °C |
-| P-D4 | Sin lluvia ≥ 5 mm/6 h | Ausente | — | `SupplyRule` no consulta el pronóstico |
-| P-D5 | Humedad ≥ 45 % | Ausente | — | `SupplyRule` no mira la humedad de sustrato |
+| P-D1 | Diagnóstico vigente | Implementada | `ValidDiagnosis` (vía `ApplicationService`) | Último diagnóstico del sector, ≤ 48 h (`diagnostico.vigencia-horas`), confianza ≥ 70 %, no «No concluyente». «Última captura» se lee como «último diagnóstico». Sin regla productiva que la pida |
+| P-D2 | Intervalo mínimo | Implementada | `ApplicationPreconditions` | Intervalo 5 d (fertilizante) / 7 d (fitosanitario) y una aplicación por día; con ambos el mismo día va el fitosanitario y el fertilizante espera al día siguiente |
+| P-D3 | Ventana y temperatura | Implementada | `ApplicationPreconditions` | Ventanas 07–10 y 17–19 (`insumo.ventana-manana` / `insumo.ventana-tarde`) y ≤ 30 °C (lectura de la zona o, si falta, pronóstico) |
+| P-D4 | Sin lluvia ≥ 5 mm/6 h | Implementada | `ApplicationPreconditions` | `insumo.lluvia-impide-mm` / `insumo.lluvia-impide-horas`; sin pronóstico no bloquea |
+| P-D5 | Humedad ≥ 45 % | Implementada | `ApplicationPreconditions` | `insumo.humedad-min-aplicar`, o riego posterior a la última lectura; sin lectura de humedad se difiere |
 | E-01 | Efectividad del riego | Distinta | `FollowUpRule` + `HistorialService.evaluarSeguimiento` | `\|Δ humedad\| ≥ 5` a los 2 min (doc: ≥ +8 a los 30 min con lectura de verificación); no alimenta ninguna regla |
 | E-02 | Efectividad fertilizante | Ausente | — | Los eventos "Insumo" se evalúan con humedad de sustrato, no con diagnóstico |
 | E-03 | Efectividad fitosanitario | Ausente | — | Ídem; sin vecinos ni severidad |
