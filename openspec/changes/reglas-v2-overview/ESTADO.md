@@ -13,7 +13,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | 1 | `add-bloqueo-manual` | ✅ | `feat/reglas-v2-bloqueo-manual` | C | S-01. API `/api/bloqueos`, cierre inmediato de válvulas y bombas (`ActuatorShutdown`), alertas INFO, tarjeta en sector y macro-zona, escenario `LOCK` del simulador. Migración manual de permisos (`migracion-permisos-bloqueo.sql`). Pendiente en 5: que M-01/M-02 respeten el bloqueo de zona |
 | 2 | `add-seguridad-lectura-hardware` | ✅ | `feat/reglas-v2-seguridad-lectura-hardware` | C | S-03 (`ReadingValidationGuard`: rango físico, relecturas, descarte por métrica, alerta WARNING→CRITICAL) y S-04 (`IncompleteHardwareRule`, `HardwareCoverage`, `ABORT_MEDIASOMBRA`). Las prioridades de las reglas se corrieron una (la nueva es la 1). Migración manual de permisos (`migracion-permisos-hardware-servicio.sql`: `hardware.ver` para el rol Servicio). Un sector sin electroválvula registrada deja de regarse solo |
 | 3 | `add-fallas-esp32` | ✅ | `feat/reglas-v2-fallas-esp32` | C, 2 | S-05. Tópico `nursery/zone/{zona}/errores`, `HardwareFaultService` (único que escribe `dispositivo.falla`), `HydraulicFaultRule` (prioridad 2) y `ShadeFaultRule`, `POST /api/hardware/{id}/reparacion` con permiso `hardware.reparar` (el Operario ahora ve Hardware). Migración manual de permisos (`migracion-permisos-hardware-reparar.sql`). Un sector con falla hidráulica deja de regarse solo hasta registrar la reparación. Firmware **sin compilar** (sin toolchain); el caudalímetro queda detrás de `ENVIAR_ERRORES_CAUDAL` |
-| 4 | `add-metrica-dpv` | ⬜ | — | C, H | §1.4 DPV |
+| 4 | `add-metrica-dpv` | ✅ | `feat/reglas-v2-metrica-dpv` | C, H | §1.4. `VaporPressureDeficit` (puro) y `VaporPressureBand`; la ingesta lo calcula con T y HR de la lectura y lo guarda en `zona.dpv`/`dpv_ts` y `zone_reading.dpv` (sin migración manual). `GET /api/nursery` → `lectura.dpv`; fila informativa en el detalle de zona. Habilita 8 (F-F1, F-F2, F-P1) |
 | 5 | `add-mediasombra-v2` | ⬜ | — | C | M-01, M-02, §7, `ZoneRuleEngine`. Tareas 1.1/1.2 ya alineadas con lo que dejó C |
 | 6 | `add-dosificacion-base` | ⬜ | — | C, 2 | §8.1–8.3. Requiere confirmar la bomba por insumo |
 | 7 | `add-plan-nutricion` | ⬜ | — | C, H, 6, 5 | N-01, N-02 |
@@ -33,7 +33,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | S-03, S-04 | ✅ | 2 |
 | S-05 | ✅ | 3 |
 | S-06 | ⬜ | 10 |
-| §1.4 DPV | ⬜ | 4 |
+| §1.4 DPV | ✅ | 4 |
 | M-01, M-02, §7 | ⬜ | 5 |
 | §8.1–8.3 | ⬜ | 6 |
 | N-01, N-02 | ⬜ | 7 |

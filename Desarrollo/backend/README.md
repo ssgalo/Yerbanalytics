@@ -951,8 +951,8 @@ guarda la última lectura (`*Raw`), así que cada lectura aceptada se anota adem
 
 - **Qué se guarda.** Una fila por lectura aceptada de una macro-zona: las diez métricas **tal como quedan en la zona
   después de aplicarla** (también las que no vinieron, con su valor vigente; una que nunca se reportó queda nula, no en
-  cero), la hora del nodo, la de recepción y el `origen`. `ce` en dS/m, igual que la zona. `dpv` queda nulo hasta
-  `add-metrica-dpv`. Una lectura anterior a la última guardada (buffer offline del nodo) no entra.
+  cero), la hora del nodo, la de recepción y el `origen`. `ce` en dS/m, igual que la zona. `dpv` es el déficit de
+  presión de vapor (ver "DPV" abajo). Una lectura anterior a la última guardada (buffer offline del nodo) no entra.
 - **Origen.** `PULSE` = respondió a un pulso de sensado, con o sin motor; `OTHER` = envío manual, verificación de
   efectividad, secuencia LECTURA, arranque del nodo. Se decide con `PulsoSensadoService.recordResponse`, que a
   diferencia de `respondePulso` distingue "respondió a un pulso sin motor" de "no respondió a ninguno".
@@ -970,6 +970,28 @@ guarda la última lectura (`*Raw`), así que cada lectura aceptada se anota adem
   `SIN_DATO` hasta juntar lecturas; no se reconstruye el pasado.
 - La telemetría que publica el simulador alimenta la serie igual que la de un nodo real (hay un test con el JSON del
   contrato). Esto no es una regla: no tiene control de demo.
+
+### DPV (déficit de presión de vapor)
+
+Métrica **derivada** (reglas_v2 §1.4): no la manda el nodo ni está en el contrato MQTT; la ingesta la calcula.
+
+- **Cálculo.** `readings/VaporPressureDeficit.calculate(T, HR)` (pura): `es = 0,6108·e^(17,27·T/(T+237,3))`,
+  `DPV = es·(1 − HR/100)`, en kPa. Devuelve `null` si falta una entrada, no es finita o HR cae fuera de 0–100; no inventa un valor.
+  Se redondea a 0,01 kPa sólo al persistir (`round`).
+- **Cuándo.** En `NurseryService.updateTelemetry`, con la temperatura y la humedad **aceptadas en esa misma lectura**
+  (una descartada por S-03 cuenta como ausente). Si falta alguna, el DPV conserva su valor y su `dpv_ts` anteriores: las reglas
+  comparan frescura por métrica. Se escribe antes de `ReadingRecorder`, así la fila del historial ya lo lleva.
+- **Dónde.** Columnas `zona.dpv` y `zona.dpv_ts` (se agregan solas con `ddl-auto=update`; sin migración) y `zone_reading.dpv`. No
+  pasa por `ZonaEntity.raw/setRaw` (esas son las diez sensadas). Las reglas lo piden por `ReadingHistory` con
+  `ReadingMetric.DPV` (`latest`, `max`…); sin lecturas es `SIN_DATO`, no cero. Un clon existente arranca sin DPV hasta la primera lectura.
+- **Tramos** (`VaporPressureBand`): `< 0,3` aire saturado · `0,3–0,5` transición · `0,5–1,2` confortable · `1,2–2,0` demanda
+  alta · `≥ 2,0` calor seco; el límite inferior pertenece al tramo. Los umbrales de las reglas (0,3 y 2,0) los declara cada regla
+  en su catálogo, no este enum.
+- **API.** `GET /api/nursery` → `zonas[].lectura.dpv` = `{value, band, label}` (`dto/VaporDeficit`), `null` sin dato o con el
+  nodo fuera de servicio. Es informativo: no entra en `lectura.metrics`, no tiene `MetricSpec` ni umbrales editables y no
+  cambia el estado de los sectores.
+- No es una regla: no tiene control de demo. El simulador lo alimenta solo con la temperatura y la humedad que ya publica
+  (38 °C y 25 % ⇒ 4,97 kPa).
 
 ## Control de reglas desde el simulador (`/api/demo/**`)
 
