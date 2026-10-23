@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.dto.SectorIncompleto;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.engine.HardwareFaults;
 import com.yerbanalytics.backend.model.DispositivoEntity;
+import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
@@ -183,7 +184,8 @@ public class HardwareService {
         boolean esNodo = NODO_TESTIGO.equals(e.getTipo());
         String estado = deriveEstado(e, esNodo, pulsosSinRespuesta.getOrDefault(e.getZonaId(), 0));
         boolean bateriaBaja = e.getBateria() != null && e.getBateria() < bateriaMinPct;
-        String ubicacion = e.getSectorId() != null ? e.getSectorId() : e.getZonaId();
+        String ubicacion = esNodo && e.getSectorId() != null ? e.getZonaId() + " · " + e.getSectorId()
+                : (e.getSectorId() != null ? e.getSectorId() : e.getZonaId());
         String luLabel = e.getUltimoUpdate() != null
                 ? formatAgo(e.getUltimoUpdate())
                 : (esNodo ? "Sin reportes" : "—");
@@ -234,7 +236,7 @@ public class HardwareService {
         // tipos de actuador presentes por sector (sólo sectores con al menos un dispositivo).
         Map<String, List<String>> tiposPorSector = new LinkedHashMap<>();
         for (DispositivoEntity e : entities) {
-            if (e.getSectorId() == null) continue;
+            if (e.getSectorId() == null || NODO_TESTIGO.equals(e.getTipo())) continue;
             tiposPorSector.computeIfAbsent(e.getSectorId(), k -> new ArrayList<>()).add(e.getTipo());
         }
         List<SectorIncompleto> out = new ArrayList<>();
@@ -285,6 +287,7 @@ public class HardwareService {
             if (!dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO).isEmpty()) {
                 throw new HardwareConflictException("La macro-zona «" + zonaId + "» ya tiene un nodo testigo.");
             }
+            sectorId = witnessSectorOf(zonaId, dto.sectorId());
         } else {
             sectorId = trim(dto.sectorId());
             if (sectorId == null) {
@@ -307,6 +310,32 @@ public class HardwareService {
         e.setSectorId(sectorId);
         dispositivoRepository.save(e);
         return getHardware();
+    }
+
+    /**
+     * El sector donde está instalado el nodo testigo de {@code zonaId}, que es opcional: el nodo mide para toda la macro-zona, pero
+     * E-01 verifica el riego del sector que lo rodea. Nulo si no se informó; si se informó tiene que existir y ser de la zona.
+     */
+    private String witnessSectorOf(String zonaId, String requested) {
+        String sectorId = trim(requested);
+        if (sectorId == null) {
+            return null;
+        }
+        SectorEntity sector = sectorRepository.findById(sectorId)
+                .orElseThrow(() -> new InvalidHardwareException("El sector «" + sectorId + "» no existe."));
+        if (sector.getZona() == null || !zonaId.equals(sector.getZona().getId())) {
+            throw new InvalidHardwareException("El sector «" + sectorId + "» no pertenece a la macro-zona «" + zonaId + "».");
+        }
+        return sectorId;
+    }
+
+    /** El sector donde está el nodo testigo de la macro-zona, si se registró. */
+    @Transactional(readOnly = true)
+    public Optional<String> witnessSector(String zonaId) {
+        return dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO).stream()
+                .map(DispositivoEntity::getSectorId)
+                .filter(s -> s != null && !s.isBlank())
+                .findFirst();
     }
 
     @Transactional

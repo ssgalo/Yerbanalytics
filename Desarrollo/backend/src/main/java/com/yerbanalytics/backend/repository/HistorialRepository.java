@@ -38,6 +38,21 @@ public interface HistorialRepository extends JpaRepository<HistorialEventoEntity
     /** Eventos con seguimiento pendiente de evaluar (latencia aún no resuelta). */
     List<HistorialEventoEntity> findByEvoShowTrueAndEvoEvaluadoTsIsNull();
 
+    /** Seguimientos abiertos de la evaluación de efectividad v2 (E-01…E-03). */
+    List<HistorialEventoEntity> findByEvoShowTrueAndEvoEvaluadoTsIsNullAndEfectividadTipoIsNotNull();
+
+    /** Seguimientos abiertos de antes de la evaluación v2 (sin tipo de efectividad): el servicio los reubica o los cierra. */
+    List<HistorialEventoEntity> findByEvoShowTrueAndEvoEvaluadoTsIsNullAndEfectividadTipoIsNull();
+
+    /** ¿El sector ya tiene un seguimiento abierto de este tipo? Una racha de aplicaciones se evalúa una sola vez. */
+    boolean existsBySectorIdAndEfectividadTipoAndEvoShowTrueAndEvoEvaluadoTsIsNull(String sectorId, String efectividadTipo);
+
+    /** Las acciones "sin efectividad" de una macro-zona que siguen bloqueando (S-06): se levantan sólo registrando la revisión. */
+    List<HistorialEventoEntity> findByZonaIdAndBloqueoRepeticionTrueAndEfectividadTipoIsNotNull(String zonaId);
+
+    /** Lo mismo para un sector. */
+    List<HistorialEventoEntity> findBySectorIdAndBloqueoRepeticionTrueAndEfectividadTipoIsNotNull(String sectorId);
+
     /**
      * Cuenta los eventos de un tipo determinado para un sector en los últimos {@code desde} ms.
      * Usado por {@code DosisLimiteRule} para verificar el límite de dosis en 24 h sin
