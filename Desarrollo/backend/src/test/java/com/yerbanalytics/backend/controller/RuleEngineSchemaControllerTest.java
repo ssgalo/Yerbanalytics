@@ -7,9 +7,13 @@ import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosNutricion;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.rules.IncompleteHardwareRule;
+import com.yerbanalytics.backend.engine.zone.ZoneRule;
+import com.yerbanalytics.backend.engine.zone.ZoneRuleContext;
+import com.yerbanalytics.backend.engine.zone.ZoneRuleEngine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +44,9 @@ class RuleEngineSchemaControllerTest {
 
     @MockBean
     private RuleOrchestrator orchestrator;
+
+    @MockBean
+    private ZoneRuleEngine zoneRuleEngine;
 
     private static Rule regla(String nombre, int prioridad, RuleBranch rama, DefinicionParametro... params) {
         return new Rule() {
@@ -84,5 +91,32 @@ class RuleEngineSchemaControllerTest {
                 .andExpect(jsonPath("$.nodes[?(@.id=='start')].parametros[*]", empty()))
                 .andExpect(jsonPath("$.nodes[?(@.id=='abort-GLOBAL')].parametros[*]", empty()))
                 .andExpect(jsonPath("$.nodes[?(@.id=='success-RIEGO')].parametros[*]", empty()));
+    }
+
+    @Test
+    void lasReglasDeMacroZonaEntranAlGrafoDeSuRamaDespuesDeLasDeSector() throws Exception {
+        when(orchestrator.getRules()).thenReturn(List.of(
+                regla("ManualLockRule", 0, RuleBranch.GLOBAL),
+                regla("SupplyRule", 12, RuleBranch.INSUMO)));
+        when(zoneRuleEngine.getRules()).thenReturn(List.of(
+                reglaDeZona("NutritionPlanRule", 23, RuleBranch.INSUMO, ParametrosNutricion.PLAN_INTERVAL)));
+
+        mockMvc.perform(get("/api/rules/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[?(@.id=='NutritionPlanRule')].branch", contains("INSUMO")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='NutritionPlanRule')].parametros[*]", contains("nutricion.intervalo-plan")))
+                .andExpect(jsonPath("$.edges[?(@.source=='SupplyRule' && @.target=='NutritionPlanRule')]", hasSize(1)))
+                .andExpect(jsonPath("$.edges[?(@.source=='NutritionPlanRule' && @.target=='success-INSUMO')]", hasSize(1)));
+    }
+
+    private static ZoneRule reglaDeZona(String nombre, int prioridad, RuleBranch rama, DefinicionParametro... params) {
+        return new ZoneRule() {
+            @Override public int priority() { return prioridad; }
+            @Override public String name() { return nombre; }
+            @Override public String label() { return nombre; }
+            @Override public RuleBranch branch() { return rama; }
+            @Override public List<DefinicionParametro> parametros() { return List.of(params); }
+            @Override public List<RuleAction> evaluate(ZoneRuleContext ctx, Evaluacion ev) { return List.of(); }
+        };
     }
 }

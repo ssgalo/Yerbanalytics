@@ -74,7 +74,62 @@ class SupplyRepositoriesTest {
         assertThat(applications.findFirstBySectorIdOrderByTsDesc("ZT-1-099")).isEmpty();
     }
 
+    // --- application: plan de nutrición ---
+
+    private static ApplicationEntity application(String sector, String zone, Supply supply, long ts, String rule) {
+        return new ApplicationEntity(UUID.randomUUID().toString(), sector, zone, supply, 10, ts, rule);
+    }
+
+    @Test
+    @DisplayName("la última fertilización de la zona es la más reciente de cualquier sector y de cualquier regla")
+    void lastFertilizationOfTheZone() {
+        applications.save(application("ZT-3-001", "ZT-3", Supply.FERTILIZER, 1_000, "NutritionPlanRule"));
+        applications.save(application("ZT-3-002", "ZT-3", Supply.FERTILIZER, 4_000, "SupplyRule"));
+        applications.save(application("ZT-3-003", "ZT-3", Supply.FUNGICIDE, 8_000, "NutritionPlanRule"));
+        applications.save(application("ZT-4-001", "ZT-4", Supply.FERTILIZER, 9_000, "NutritionPlanRule"));
+        applications.flush();
+
+        assertThat(applications.findFirstByZoneIdAndSupplyOrderByTsDesc("ZT-3", Supply.FERTILIZER))
+                .get().extracting(ApplicationEntity::getTs).isEqualTo(4_000L);
+        assertThat(applications.findFirstByZoneIdAndSupplyOrderByTsDesc("ZT-9", Supply.FERTILIZER)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("la última aplicación del plan en la zona desde el inicio de la tanda ignora otras reglas y tandas anteriores")
+    void lastPlanApplicationSinceTheBatchStart() {
+        applications.save(application("ZT-3-001", "ZT-3", Supply.FERTILIZER, 1_000, "NutritionPlanRule"));   // tanda anterior
+        applications.save(application("ZT-3-002", "ZT-3", Supply.FERTILIZER, 5_000, "NutritionPlanRule"));
+        applications.save(application("ZT-3-003", "ZT-3", Supply.FERTILIZER, 6_000, "NutritionPlanRule"));
+        applications.save(application("ZT-3-004", "ZT-3", Supply.FERTILIZER, 7_000, "SupplyRule"));          // correctiva
+        applications.flush();
+
+        assertThat(applications.findFirstByZoneIdAndSupplyAndRuleNameAndTsGreaterThanEqualOrderByTsDesc(
+                "ZT-3", Supply.FERTILIZER, "NutritionPlanRule", 5_000))
+                .get().extracting(ApplicationEntity::getTs).isEqualTo(6_000L);
+        assertThat(applications.findFirstByZoneIdAndSupplyAndRuleNameAndTsGreaterThanEqualOrderByTsDesc(
+                "ZT-3", Supply.FERTILIZER, "NutritionPlanRule", 6_001)).isEmpty();
+    }
+
     // --- pending_application ---
+
+    @Test
+    @DisplayName("cuenta las pendientes de una zona, un insumo y una regla: lo que mantiene abierta la tanda del plan")
+    void countsThePlanBatchPending() {
+        pending.save(new PendingApplicationEntity(UUID.randomUUID().toString(), "ZT-3-001", "ZT-3", Supply.FERTILIZER,
+                "NutritionPlanRule", false, 1_000L, "P-D3"));
+        pending.save(new PendingApplicationEntity(UUID.randomUUID().toString(), "ZT-3-002", "ZT-3", Supply.FERTILIZER,
+                "NutritionPlanRule", false, 1_000L, "P-D5"));
+        pending.save(new PendingApplicationEntity(UUID.randomUUID().toString(), "ZT-3-003", "ZT-3", Supply.FERTILIZER,
+                "SupplyRule", true, 1_000L, "P-D3"));
+        pending.save(new PendingApplicationEntity(UUID.randomUUID().toString(), "ZT-3-001", "ZT-3", Supply.FUNGICIDE,
+                "NutritionPlanRule", false, 1_000L, "P-D3"));
+        pending.save(new PendingApplicationEntity(UUID.randomUUID().toString(), "ZT-4-001", "ZT-4", Supply.FERTILIZER,
+                "NutritionPlanRule", false, 1_000L, "P-D3"));
+        pending.flush();
+
+        assertThat(pending.countByZoneIdAndSupplyAndRuleName("ZT-3", Supply.FERTILIZER, "NutritionPlanRule")).isEqualTo(2);
+        assertThat(pending.countByZoneIdAndSupplyAndRuleName("ZT-9", Supply.FERTILIZER, "NutritionPlanRule")).isZero();
+    }
 
     @Test
     @DisplayName("a lo sumo una pendiente por sector e insumo")

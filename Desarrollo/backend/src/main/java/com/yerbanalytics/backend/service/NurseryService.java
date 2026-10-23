@@ -12,6 +12,7 @@ import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.riego.CicloLectura;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
+import com.yerbanalytics.backend.engine.zone.ZoneRuleEngine;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
@@ -25,6 +26,7 @@ import com.yerbanalytics.backend.readings.VaporPressureDeficit;
 import com.yerbanalytics.backend.readings.ReadingValidationGuard;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
+import com.yerbanalytics.backend.nutrition.NutritionPlanService;
 import com.yerbanalytics.backend.sensing.PulsoSensadoService;
 import com.yerbanalytics.backend.model.DiagnosticoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -83,6 +85,10 @@ public class NurseryService {
     private final DespachoRiego despacho;
     /** Opcional (por setter): el estado de la bomba con la fase que informa el nodo ("En cola"). Sin él, el guardado. */
     private SupplyDoseService supplyDose;
+    /** Opcional (por setter): las reglas por macro-zona (plan de nutrición). Sin él, la ingesta sólo evalúa sectores. */
+    private ZoneRuleEngine zoneRules;
+    /** Opcional (por setter): el plan de nutrición que se muestra en el detalle de cada zona. Sin él, el snapshot no lo trae. */
+    private NutritionPlanService nutritionPlan;
     private final PulsoSensadoService pulsos;
     private final EscalamientoNodoService escalamiento;
     private final ReadingRecorder readings;
@@ -93,6 +99,16 @@ public class NurseryService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setSupplyDose(SupplyDoseService supplyDose) {
         this.supplyDose = supplyDose;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setZoneRules(ZoneRuleEngine zoneRules) {
+        this.zoneRules = zoneRules;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setNutritionPlan(NutritionPlanService nutritionPlan) {
+        this.nutritionPlan = nutritionPlan;
     }
 
     public NurseryService(NurseryProperties properties,
@@ -255,7 +271,8 @@ public class NurseryService {
                             ze.getNodoBattery(),
                             ze.getNodoSignal(),
                             ze.getNodoBattery() != null && ze.getNodoBattery() < bateriaMinPct
-                    )
+                    ),
+                    nutritionPlan != null ? nutritionPlan.status(ze) : null
             ));
         }
 
@@ -697,6 +714,11 @@ public class NurseryService {
             }
         }
         sectorRepository.saveAll(sectors);
+
+        // Las reglas de la macro-zona (plan de nutrición) corren UNA vez, con los sectores ya evaluados y la misma lectura.
+        if (ejecutaMotor && zoneRules != null) {
+            zoneRules.evaluate(zona, sectors, ahora, hardwarePorSector, fallasPorSector);
+        }
 
         // Heartbeat del nodo testigo de la zona: batería/señal/último update (HU-21 CA-01).
         // Antes el mac/battery del payload se descartaban; ahora alimentan el registro de hardware.

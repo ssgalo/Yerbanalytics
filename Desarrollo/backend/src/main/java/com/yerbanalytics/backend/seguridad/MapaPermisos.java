@@ -88,6 +88,9 @@ public final class MapaPermisos {
         permiso(r, get, "/api/configuracion", Permiso.CONFIGURACION_VER);
         permiso(r, put, "/api/configuracion", Permiso.CONFIGURACION_EDITAR);
 
+        // Plan de nutrición de una macro-zona: el intervalo es configuración agronómica (el plan se lee del snapshot).
+        permiso(r, put, "/api/zonas/*/plan-nutricion", Permiso.CONFIGURACION_EDITAR);
+
         permiso(r, get, "/api/diagnosticos/**", Permiso.DIAGNOSTICOS_VER);
         permiso(r, post, "/api/diagnosticos", Permiso.DIAGNOSTICOS_REGISTRAR);
 

@@ -51,6 +51,10 @@ class ParametrosRealesTest {
             Map.entry("insumo.reingreso-horas", 24.0),               // reglas_v2 §8.3
             Map.entry("insumo.stock-aviso", 20.0),
             Map.entry("insumo.pendiente-vence-dias", 7.0),           // add-dosificacion-base D-5
+            Map.entry("nutricion.intervalo-plan", 7.0),              // reglas_v2 §8.4 N-01
+            Map.entry("nutricion.ce-baja", 0.5),                     // reglas_v2 §8.4 N-02
+            Map.entry("nutricion.ce-lecturas", 6.0),
+            Map.entry("nutricion.sin-fertilizar-dias", 5.0),
             Map.entry("diagnostico.vigencia-horas", 48.0),           // reglas_v2 §1.3 P-D1
             Map.entry("mediasombra.uv-umbral", 7.0),                 // uv-threshold
             Map.entry("readings.retention-days", 14.0),              // add-historial-lecturas D-4
@@ -182,6 +186,27 @@ class ParametrosRealesTest {
             assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
             assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
             assertThat(d.refSpec()).as(e.clave()).isNotBlank();
+        }
+    }
+
+    @Test
+    void losParametrosDeNutricionSonLosDeReglasV2Seccion8_4() {
+        record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica, Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("nutricion.intervalo-plan", TipoParametro.NUMERO, "d", "7", 3.0, 30.0),
+                new Esperado("nutricion.ce-baja", TipoParametro.NUMERO, "dS/m", "0.5", 0.3, 1.0),
+                new Esperado("nutricion.ce-lecturas", TipoParametro.ENTERO, "lecturas", "6", 3.0, 12.0),
+                new Esperado("nutricion.sin-fertilizar-dias", TipoParametro.NUMERO, "d", "5", 3.0, 14.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(FamiliaParametro.NUTRICION);
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.4");
         }
     }
 

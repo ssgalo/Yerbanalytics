@@ -389,6 +389,7 @@ El proyecto sigue el patrón multicapa clásico de Spring Boot:
 - `seguridad/`: Autenticación, roles, permisos, gestión de usuarios y auditoría (HU-01 / HU-20).
 - `dto/`: Objetos de Transferencia de Datos. Mantienen paridad con `domain.ts` del frontend.
 - `service/`: Lógica de negocio. `NurseryService` genera el snapshot del vivero.
+- `engine/zone/`: reglas que deciden sobre una macro-zona entera y su motor (`ZoneRuleEngine`); `nutrition/`: el plan de nutrición (N-01, N-02).
 - `service/mock/`: Generador determinístico portado del mock del frontend.
 
 ## Endpoints
@@ -999,11 +1000,59 @@ fertilizante o fitosanitario emite `ACTIVAR_BOMBA` con un `DetalleInsumo(supply,
   `diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture` y `stock`; cooldowns `interval-fertilizer` e `interval-fungicide`.
 
 > **La dosificación v1 queda retirada pero no borrada.** `SupplyRule` (estado crítico + confianza) y `DailyDoseLimitRule` (1 dosis cada 24 h)
-> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `RuleOverridesStore`; en la traza figuran «deshabilitadas»), porque las reglas
-> que las reemplazan (N-*, F-*) todavía no existen: borrarlas dejaría al vivero sin dosificación. Ningún camino productivo pide hoy una
-> aplicación. Para probarla de punta a punta: `YERBANALYTICS_REGLAS_RETIRADAS=ninguna` (cualquier valor que no sea el nombre de una regla; un valor
+> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `RuleOverridesStore`; en la traza figuran «deshabilitadas»). Hoy el único camino
+> productivo que pide aplicaciones es el **plan de nutrición** (N-01, ver abajo), que no decide con el diagnóstico de IA: lo que reemplaza a
+> `SupplyRule` son las reglas por diagnóstico F-* (todavía no están), así que borrarla dejaría al vivero sin dosificación por diagnóstico. Para
+> probarla de punta a punta: `YERBANALYTICS_REGLAS_RETIRADAS=ninguna` (cualquier valor que no sea el nombre de una regla; un valor
 > vacío puede leerse como «sin definir» y dejar la lista de fábrica) enciende `SupplyRule` de arranque, o con el modo demo se la enciende desde el simulador. `DailyDoseLimitRule` queda redundante: P-D2 ya limita una aplicación por día y por intervalo. Se borran
-> junto con `insumo.max-dosis-24h` cuando entre la primera regla N/F.
+> junto con `insumo.max-dosis-24h` cuando entren las reglas F-* que las reemplazan.
+
+## Plan de nutrición (`add-plan-nutricion` · reglas_v2 §8.4)
+
+Fertilizante foliar **en todos los sectores de la macro-zona cada N días**, sin mirar lo que se mide (N-01), y adelantado si la CE baja
+(N-02). Las dos son **reglas de macro-zona**: no se evalúan sector por sector sino una vez por zona, y cada aplicación pasa por el
+`ApplicationService` (único camino para aplicar un insumo, ver arriba).
+
+| Pieza | Qué hace |
+|---|---|
+| `engine/zone/ZoneRule` | Interfaz de una regla de macro-zona (`ConsumidorParametros` + `DemoControllable`). Decide y devuelve acciones; no ejecuta |
+| `engine/zone/ZoneRuleEngine` | Corre las `ZoneRule` por prioridad, **una vez por zona**, en `NurseryService.updateTelemetry` después del bucle de sectores y sólo con el motor encendido (pulso con motor). Cada regla ejecuta sus acciones antes de que corra la siguiente |
+| `engine/zone/ZoneActionExecutor` | Ejecuta las acciones de zona: la transición del plan (`UPDATE_NUTRITION_PLAN`) y las alertas (`ALERTA`, una por evento) |
+| `engine/zone/ZoneTraceStore` | Última traza de las reglas de zona, por zona, en memoria. `GET /api/rules/evaluaciones/{sectorId}` la **suma** a la del sector, así el Inspector las dibuja en el mismo grafo (rama `INSUMO`) |
+| `nutrition/NutritionPlanRule` (N-01) | Cuando pasaron los días del intervalo desde la última aplicación del plan (o la zona nunca recibió el plan, o N-02 lo adelantó) pide la **tanda**: fertilizante en cada sector de la zona. `INFO` al iniciar |
+| `nutrition/LowEcRule` (N-02) | Con la CE media de las últimas `nutricion.ce-lecturas` (6) lecturas de pulso < `nutricion.ce-baja` (0,5 dS/m) **y** sin fertilizar en la zona hace `nutricion.sin-fertilizar-dias` (5), adelanta N-01 y deja el `INFO` «CE baja: la fertilización de base del sustrato podría estar agotada» |
+| `nutrition/NutritionPlanService` | El estado del plan de cada zona y sus transiciones (`START`, `ADVANCE`, `COMPLETE`); el intervalo de la zona (`setInterval`) |
+| `nutrition/NutritionSchedule` | Cuándo vence el plan (función pura): la usan N-01 para decidir y el snapshot para mostrar la próxima aplicación |
+
+- **La tanda.** Iniciar el plan pide fertilizante en cada sector de la zona y abre una tanda. Mientras algún sector espera su ventana (queda
+  en `pending_application`, lo reintenta `PendingApplicationScheduler` cada 5 min) la tanda está abierta y N-01 no vuelve a pedir. Se cierra
+  cuando ninguno espera —todos se aplicaron o se descartaron con motivo— y **recién ahí corre el intervalo**: `zona.last_plan_application_ts`
+  es la hora en que se aplicó el último sector, no la de la decisión. Los sectores que no cumplen las precondiciones P-D2…P-D5 no cambian nada:
+  quedan pendientes y se reintentan en la ventana siguiente, como cualquier aplicación.
+- **Estado en la zona** (columnas nuevas, se agregan solas con `ddl-auto=update`; sin migración manual): `nutrition_plan_interval_days`
+  (`NULL` = rige el del catálogo), `last_plan_application_ts`, `nutrition_plan_due_ts` (el adelantamiento de N-02) y `nutrition_batch_start_ts`
+  (la tanda en curso). Sobrevive a un reinicio. Una zona sin ninguna aplicación del plan se considera **vencida** (propuesta de D-5: aplica en
+  la próxima ventana apta); por eso, con N-01 encendida, el primer pulso con motor de cada zona pide la tanda.
+- **Quién queda fuera de la tanda.** Un sector con bloqueo manual propio (S-01), sin bomba registrada (S-04) o con falla hidráulica sin reparar
+  (S-05) no recibe el pedido y queda en su Registro de Inacción con el motivo. Con la **zona entera bloqueada** el plan queda vencido y espera a que
+  se reanude (no se descarta la tanda por una causa que el operario puede levantar). Un tanque sin registrar rechaza cada aplicación (`CRITICAL`
+  del tanque) y la tanda se cierra descartada: **cargá los tanques antes del primer pulso**.
+- **N-02.** Sin las lecturas necesarias dice «sin dato» y no actúa; «sin fertilizar» cuenta **cualquier** aplicación de fertilizante en la zona,
+  del plan o correctiva. Mientras el plan está adelantado o en curso no vuelve a avisar (una alerta por evento).
+- **Intervalo por macro-zona.** `PUT /api/zonas/{zonaId}/plan-nutricion {"intervalDays": n}` (permiso `configuracion.editar`) fija los días de la
+  zona; el rango es el de `nutricion.intervalo-plan` (3–30, fábrica 7) y uno fuera de rango se rechaza (`400`, no se recorta). Una zona sin
+  intervalo propio usa el del catálogo. Con un intervalo menor a `insumo.intervalo-fertilizante` (5 d) el límite real es el de P-D2 por sector.
+  El plan se lee de `GET /api/nursery` → `zonas[].nutritionPlan` (`intervalDays`, `customInterval`, `lastApplicationTs`, `nextDueTs`,
+  `batchOpen`, `advanced`).
+- **Dosis.** Las aplica el `ApplicationService` con `insumo.dosis-fertilizante` (10 ml de fábrica, 1–50): la v2 dice 100 ml por sector, pero el
+  firmware sólo acepta 50 ml por comando (ver «Aplicación de insumos»). El plan no tiene una dosis propia.
+- **Parámetros** (familia `NUTRICION`, editables en Motor de reglas → Parámetros): `nutricion.intervalo-plan`, `nutricion.ce-baja`,
+  `nutricion.ce-lecturas`, `nutricion.sin-fertilizar-dias`.
+- **Si una regla de zona lanza**, la excepción se propaga como en las de sector (la ingesta revierte y el pulso siguiente lo reintenta) y antes
+  se guarda la traza parcial con esa regla en `ERROR`.
+- **Control desde el simulador** (`/api/demo/rules`): `NutritionPlanRule` (cooldown `interval`, minutos entre aplicaciones del plan; 0 lo
+  vence ya) y `LowEcRule` (cooldown `no-fertilized`; bypass `samples`: la última lectura de CE cuenta como la media). Las dos se apagan.
+  Escenarios `NUTRITION_PLAN` y `LOW_EC` en el simulador.
 
 ## Historial de lecturas
 

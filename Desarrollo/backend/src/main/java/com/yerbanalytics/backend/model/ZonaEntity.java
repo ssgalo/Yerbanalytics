@@ -129,6 +129,29 @@ public class ZonaEntity {
     @Column(name = "pulsos_sin_respuesta")
     private Integer pulsosSinRespuesta;
 
+    // ------------------------------------------------------------------
+    // Plan de nutrición (reglas_v2 §8.4)
+    // ------------------------------------------------------------------
+
+    /**
+     * Días entre dos aplicaciones del plan en esta macro-zona. {@code null} = no fijó el suyo: rige el valor del
+     * catálogo ({@code nutricion.intervalo-plan}).
+     */
+    @Column(name = "nutrition_plan_interval_days")
+    private Integer nutritionPlanIntervalDays;
+
+    /** Epoch ms en que se completó la última tanda del plan (todos los sectores aplicados o descartados). */
+    @Column(name = "last_plan_application_ts")
+    private Long lastPlanApplicationTs;
+
+    /** Epoch ms desde el que el plan está vencido por adelantamiento (N-02); {@code null} = rige el intervalo. */
+    @Column(name = "nutrition_plan_due_ts")
+    private Long nutritionPlanDueTs;
+
+    /** Epoch ms en que arrancó la tanda en curso; {@code null} = no hay una abierta. */
+    @Column(name = "nutrition_batch_start_ts")
+    private Long nutritionBatchStartTs;
+
     /**
      * Valor crudo de una métrica por su clave del contrato, o {@code null} si el nodo nunca
      * la reportó. Evita que cada consumidor repita la cadena de {@code if}s por clave.

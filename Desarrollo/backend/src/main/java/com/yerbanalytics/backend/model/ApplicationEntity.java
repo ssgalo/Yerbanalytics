@@ -19,7 +19,9 @@ import lombok.Setter;
  * el mismo servicio aparte: R-06 y el seguimiento de efectividad siguen leyendo de ahí.
  */
 @Entity
-@Table(name = "application", indexes = @Index(name = "idx_application_sector_ts", columnList = "sector_id, ts"))
+@Table(name = "application", indexes = {
+        @Index(name = "idx_application_sector_ts", columnList = "sector_id, ts"),
+        @Index(name = "idx_application_zone_ts", columnList = "zone_id, ts")})
 @Getter
 @Setter
 @NoArgsConstructor

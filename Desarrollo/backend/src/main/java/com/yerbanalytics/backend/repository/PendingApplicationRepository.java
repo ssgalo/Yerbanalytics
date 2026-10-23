@@ -17,4 +17,7 @@ public interface PendingApplicationRepository extends JpaRepository<PendingAppli
     List<PendingApplicationEntity> findBySectorId(String sectorId);
 
     List<PendingApplicationEntity> findAllByOrderByCreatedTsAsc();
+
+    /** Cuántas aplicaciones de la macro-zona siguen esperando ventana por pedido de esa regla (tanda del plan abierta). */
+    long countByZoneIdAndSupplyAndRuleName(String zoneId, Supply supply, String ruleName);
 }
