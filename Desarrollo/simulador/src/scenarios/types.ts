@@ -22,6 +22,16 @@ export interface ThresholdMap {
   ceBaja: number;
   /** Substrate humidity (%) from which F-F2 reads the conditions as favorable to fungal diseases. */
   humedadPredisponente: number;
+  /** Substrate pH from which F-C1 reads a chlorosis as iron chlorosis (high pH): no fertilizer. */
+  phFerrica: number;
+  /** Light (% of the LDR) from which F-S1 reads the solar stress as caused by radiation. */
+  luzAlta: number;
+  /** Substrate humidity (%) under which F-S1 replenishes the water of a sector with solar stress. */
+  humedadReposicion: number;
+  /** Light (% of the LDR) under which F-S3 reads that the sun does not explain the solar stress. */
+  luzBaja: number;
+  /** Air temperature (°C) under which F-S3 reads that the sun does not explain the solar stress. */
+  tempBaja: number;
   /** Physical upper limit of a humidity reading (%): above it the backend discards the reading (S-03). */
   humedadMaxima: number;
   /** Rereads the backend asks for after an out-of-range value, before discarding the metric (S-03). */

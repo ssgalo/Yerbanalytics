@@ -1,12 +1,9 @@
-import { conflictsWithAZoneThatCannotApply, conflictsWithEarlierDiagnoses } from './shared';
+import { conflictsWithAZoneThatCannotApply, conflictsWithEarlierDiagnoses, diagnosisPlan } from './shared';
 import type { DiagnosisPlan, RuleScenario } from './types';
-
-/** Points over the minimum confidence the diagnosis carries: clearly valid (P-D1), not on the edge. */
-const CONFIDENCE_MARGIN = 15;
 
 /** The diagnosis a biotic scenario registers: the state, a mild severity (so the rule needs another reason to act) and a valid confidence. */
 export function mildDiagnosis(estado: string, minConfidence: number): DiagnosisPlan {
-  return { estado, sev: 'Baja', confidence: 'Alta', conf: Math.min(100, minConfidence + CONFIDENCE_MARGIN) };
+  return diagnosisPlan(estado, 'Baja', minConfidence);
 }
 
 /**

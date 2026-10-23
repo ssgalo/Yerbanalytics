@@ -87,6 +87,7 @@ test('the registry keeps the order and keys of the original catalog', () => {
       'R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE',
       'FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR', 'APPLICATION_PRECONDITIONS',
       'NUTRITION_PLAN', 'LOW_EC', 'FUNGAL_DAMAGE', 'FOLIAR_PEST', 'FUNGAL_CONDITION', 'OUTBREAK', 'FUNGICIDE_CAP',
+      'CHLOROSIS_NUTRITIONAL', 'CHLOROSIS_NON_NUTRITIONAL', 'SOLAR_STRESS', 'SOLAR_STRESS_UNEXPLAINED',
     ],
   );
 });
@@ -109,6 +110,10 @@ test('only the diagnosis-driven scenarios ask for a prior diagnosis', () => {
     'FUNGAL_DAMAGE',
     'FOLIAR_PEST',
     'FUNGICIDE_CAP',
+    'CHLOROSIS_NUTRITIONAL',
+    'CHLOROSIS_NON_NUTRITIONAL',
+    'SOLAR_STRESS',
+    'SOLAR_STRESS_UNEXPLAINED',
   ]);
 });
 
@@ -704,7 +709,10 @@ test('F-06: a severe fungal diagnosis with the cap bypass', () => {
 });
 
 test('the scenarios that register their own diagnosis conflict with each other, once per pair, whatever the order', () => {
-  const diagnosisScenarios = ['SUPPLY', 'FUNGAL_DAMAGE', 'FOLIAR_PEST', 'FUNGICIDE_CAP', 'OUTBREAK'];
+  const diagnosisScenarios = [
+    'SUPPLY', 'FUNGAL_DAMAGE', 'FOLIAR_PEST', 'FUNGICIDE_CAP', 'OUTBREAK',
+    'CHLOROSIS_NUTRITIONAL', 'CHLOROSIS_NON_NUTRITIONAL', 'SOLAR_STRESS', 'SOLAR_STRESS_UNEXPLAINED',
+  ];
   for (const a of diagnosisScenarios) {
     for (const b of diagnosisScenarios) {
       if (a === b) continue;

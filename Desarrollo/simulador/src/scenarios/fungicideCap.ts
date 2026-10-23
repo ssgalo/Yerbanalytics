@@ -1,5 +1,5 @@
-import { conflictsWithAZoneThatCannotApply, conflictsWithEarlierDiagnoses } from './shared';
-import type { DiagnosisPlan, RuleScenario } from './types';
+import { conflictsWithAZoneThatCannotApply, conflictsWithEarlierDiagnoses, diagnosisPlan } from './shared';
+import type { RuleScenario } from './types';
 
 /**
  * F-06, fungicide cap: a high-severity fungal diagnosis (reason enough for `FungalDamageRule` to ask for the fungicide) with
@@ -22,12 +22,7 @@ export const fungicideCap: RuleScenario = {
   applyOrder: 64,
   conflicts: [...conflictsWithEarlierDiagnoses('FUNGICIDE_CAP'), ...conflictsWithAZoneThatCannotApply()],
   apply: ({ thresholds }) => {
-    const diagnosis: DiagnosisPlan = {
-      estado: 'Daño fúngico',
-      sev: 'Alta',
-      confidence: 'Alta',
-      conf: Math.min(100, thresholds.confianzaMinima + 15),
-    };
+    const diagnosis = diagnosisPlan('Daño fúngico', 'Alta', thresholds.confianzaMinima);
     return {
       diagnosis,
       bypassRules: { ApplicationPreconditions: ['cap'] },
