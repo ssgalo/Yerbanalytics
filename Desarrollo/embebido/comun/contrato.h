@@ -84,7 +84,11 @@ static const char* ACT_SHADE      = "shade";
 //    pump  ON {} | {ml}      → insumo al sector: abre su válvula y prende la bomba de insumo
 //                              (sin ml: INSUMO_SEG_POR_DEFECTO; con ml: BOMBA_INSUMO_MS_POR_ML)
 //    pump  OFF               → corta el insumo del sector
-//    shade SET {targetPct}   → % de APERTURA: >= MEDIASOMBRA_UMBRAL_APERTURA_PCT enrolla, si no desenrolla
+//    shade SET {targetPct}   → % de APERTURA: >= MEDIASOMBRA_UMBRAL_APERTURA_PCT enrolla, si no desenrolla.
+//                              La mediasombra es de la MACRO-ZONA (una por zona, add-rustificacion-por-macrozona):
+//                              el backend manda el shade SET por el comando de ZONA (nursery/zone/{zona}/command,
+//                              con "actuador":"shade") y el nodo contesta por el ack de zona (nursery/zone/{zona}/ack).
+//                              Un shade SET por el tópico de un sector se sigue aceptando (backend anterior).
 static const char* ACCION_ON      = "ON";
 static const char* ACCION_OFF     = "OFF";
 static const char* ACCION_SET     = "SET";
@@ -337,9 +341,18 @@ inline void contratoTopicErrores(char* buf, size_t n) {
   snprintf(buf, n, "nursery/zone/%s/errores", NODO_ZONA_ID);
 }
 
-// Comando de zona "leer ahora": el nodo testigo de la zona se suscribe a este topic.
+// Comando de zona: "leer ahora" (nodo testigo) y el shade SET de la mediasombra, que es de la macro-zona.
 inline void contratoTopicComandoZona(char* buf, size_t n) {
   snprintf(buf, n, "nursery/zone/%s/command", NODO_ZONA_ID);
 }
+
+// Ack de un comando de zona con actuador (la mediasombra): mismo payload que el ack del sector.
+// Espejos: ContratoNodo.TOPIC_ACK_ZONA (backend), simulador/server/contract.ts (zoneAckTopic).
+inline void contratoTopicAckZona(char* buf, size_t n) {
+  snprintf(buf, n, "nursery/zone/%s/ack", NODO_ZONA_ID);
+}
+
+// Sector de un Comando/Ack que es de la zona y no de un sector (la mediasombra): su ack va por contratoTopicAckZona.
+#define CONTRATO_SECTOR_ZONA 0
 
 #endif  // CONTRATO_H

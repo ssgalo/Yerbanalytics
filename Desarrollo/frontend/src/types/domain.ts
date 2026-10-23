@@ -69,14 +69,16 @@ export interface Diagnosis {
   sev: Severity;
 }
 
-/** Estado de los actuadores físicos del sector. */
+/** Estado de los actuadores físicos del sector. La mediasombra no está acá: es de la macro-zona (`Zona.mediasombra`). */
 export interface Actuadores {
   /** Electroválvula: `Regando` (abierta), `En cola` (espera su turno: en la tanda de la macro-zona o en la cola del nodo) o `Cerrada`. */
   valve: string;
   /** Bomba de insumo: `Dosificando`, `En cola` (el nodo la tiene esperando su turno: sirve una carga a la vez) o `En espera`. Se muestra tal cual llega. */
   pump: string;
-  shade: number;
 }
+
+/** Última posición que el sistema le ordenó a la mediasombra de una macro-zona (no es una lectura). */
+export type PosicionMediasombra = 'abierta' | 'cerrada';
 
 /**
  * Un sector del vivero (~100 tubetes). No tiene métricas propias: la lectura pertenece a
@@ -174,6 +176,8 @@ export interface Zona {
   nodo: NodoTestigo;
   /** `null` si el snapshot no lo trae. */
   nutritionPlan?: NutritionPlan | null;
+  /** Mediasombra de la zona (una por macro-zona): última posición ordenada; `null` si nunca se le ordenó nada. */
+  mediasombra?: PosicionMediasombra | null;
 }
 
 /** KPIs y conteos globales del vivero. */
@@ -498,8 +502,11 @@ export interface EtapaRustificacion {
   abiertaHasta: string;
 }
 
-/** Estado de un plan: los dos primeros son vigentes; cancelado/finalizado ya no rigen. */
-export type EstadoPlanRustificacion = 'programado' | 'en_curso' | 'finalizado' | 'cancelado';
+/**
+ * Estado de un plan: `programado` (todavía no empezó) y `en_curso` rigen; pasada la última etapa sigue `en_curso` y
+ * se sostiene la última hasta que alguien elimina el plan, que queda `cancelado`.
+ */
+export type EstadoPlanRustificacion = 'programado' | 'en_curso' | 'cancelado';
 
 /**
  * Plan de rustificación de una macro-zona: expone a los plantines al sol cada vez más tiempo antes

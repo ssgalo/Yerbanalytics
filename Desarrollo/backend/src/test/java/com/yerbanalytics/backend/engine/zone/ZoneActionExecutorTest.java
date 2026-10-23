@@ -8,6 +8,7 @@ import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.nutrition.NutritionPlanService;
+import com.yerbanalytics.backend.mediasombra.MediasombraService;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +42,7 @@ class ZoneActionExecutorTest {
     void setUp() {
         plan = mock(NutritionPlanService.class);
         history = mock(HistorialService.class);
-        executor = new ZoneActionExecutor(plan, history);
+        executor = new ZoneActionExecutor(plan, history, mock(MediasombraService.class));
         ZonaEntity zone = new ZonaEntity();
         zone.setId("MZ-2");
         zone.setName("Macro-zona 2");

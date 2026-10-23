@@ -1,4 +1,4 @@
-/* Plan de rustificación vigente de una macro-zona: dónde va, qué rige hoy, sus etapas y la cancelación. */
+/* Plan de rustificación vigente de una macro-zona: dónde va, qué rige hoy, sus etapas y cómo eliminarlo. */
 import { useState } from 'react';
 import type { PlanRustificacion } from '@/types/domain';
 import { Button } from '@/components/ui/Button';
@@ -12,7 +12,7 @@ import styles from './Hardening.module.css';
 
 interface HardeningPlanViewProps {
   plan: PlanRustificacion;
-  /** Horario por defecto al que vuelve la zona si se cancela; null si no se pudo leer. */
+  /** Horario por defecto al que vuelve la zona si se elimina el plan; null si no se pudo leer. */
   defaultWindow: { desde: string; hasta: string } | null;
   canManage: boolean;
   busy: boolean;
@@ -51,6 +51,13 @@ export function HardeningPlanView({ plan, defaultWindow, canManage, busy, onCanc
             <Chip tone="line">Programado</Chip>
             <span>
               Empieza el <b>{formatDate(plan.fechaInicio)}</b> ({pr.faltan === 1 ? 'mañana' : `en ${pr.faltan} días`})
+            </span>
+          </>
+        ) : pr.terminado ? (
+          <>
+            <Chip tone="info">En curso</Chip>
+            <span>
+              Terminaron las {plan.etapas.length} etapas: <b>se sostiene la última</b> hasta que elimines el plan
             </span>
           </>
         ) : (
@@ -110,20 +117,21 @@ export function HardeningPlanView({ plan, defaultWindow, canManage, busy, onCanc
       </ol>
 
       <p className={styles.note}>
-        Fuera de la ventana de cada etapa la mediasombra queda cerrada. Dentro de ella, otras reglas pueden cerrarla
-        igual.
+        Fuera de la ventana de cada etapa la mediasombra queda cerrada. Dentro de ella, el motor de reglas puede
+        cerrarla (por ejemplo, ante un pico de UV) y queda así hasta la próxima apertura. Al terminar la última etapa,
+        esa ventana se sostiene hasta que se elimine el plan.
       </p>
 
       {cancelError && (
         <Callout tone="crit" role="alert">
-          No se pudo cancelar el plan: {cancelError}
+          No se pudo eliminar el plan: {cancelError}
         </Callout>
       )}
 
       {confirming ? (
         <Callout tone="warn">
           <p className={styles.confirmText}>
-            ¿Cancelar el plan? La mediasombra de esta macro-zona vuelve desde ahora al horario por defecto
+            ¿Eliminar el plan? La mediasombra de esta macro-zona vuelve desde ahora al horario por defecto
             {defaultWindow ? ` (abierta de ${defaultWindow.desde} a ${defaultWindow.hasta})` : ''}. No se puede deshacer.
           </p>
           <div className={styles.confirmActions}>
@@ -131,7 +139,7 @@ export function HardeningPlanView({ plan, defaultWindow, canManage, busy, onCanc
               No, seguir con el plan
             </Button>
             <Button size="sm" variant="danger" onClick={() => void cancel()} disabled={busy}>
-              {busy ? 'Cancelando…' : 'Sí, cancelar plan'}
+              {busy ? 'Eliminando…' : 'Sí, eliminar plan'}
             </Button>
           </div>
         </Callout>
@@ -143,7 +151,7 @@ export function HardeningPlanView({ plan, defaultWindow, canManage, busy, onCanc
           </span>
           {canManage && (
             <Button variant="danger" size="sm" onClick={() => setConfirming(true)}>
-              Cancelar plan
+              Eliminar plan
             </Button>
           )}
         </div>

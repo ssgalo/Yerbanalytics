@@ -314,7 +314,7 @@ public class HistorialService {
         registrarConfiguracion(
                 "Recalibración de parámetros agronómicos por " + usuario + ".",
                 "Se validaron los nuevos umbrales y límites contra el rango fisiológico.",
-                "Configuración actualizada: umbrales, límites operativos y plan de rustificación.");
+                "Configuración actualizada: umbrales, límites operativos y horario por defecto de la mediasombra.");
     }
 
     /**
@@ -339,6 +339,51 @@ public class HistorialService {
                 "Recalibración del criterio de diagnóstico por " + usuario + ".",
                 "Se validaron las bandas de severidad (enteros, mínimo < media < alta) y el orden de criticidad.",
                 detalle);
+    }
+
+    /**
+     * Registra un movimiento (u orden no enviada) de la mediasombra de una macro-zona. La malla es de la zona: el evento
+     * queda con {@code sectorId = "—"}. {@code regla} dice quién la movió (una regla del motor, el horario de la
+     * mediasombra o una secuencia).
+     */
+    public void registrarMediasombra(String zonaId, String zonaName, String regla, String lectura, String decision,
+                                     String accion, String res, long ts) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(zonaId);
+        e.setZonaName(zonaName != null ? zonaName : zonaId);
+        e.setTipo("Mediasombra");
+        e.setTs(ts);
+        e.setRegla(regla);
+        e.setLectura(lectura);
+        e.setDecision(decision);
+        e.setAccion(accion);
+        e.setRes(res);
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /** Registra que alguien inició o eliminó el plan de rustificación de una macro-zona. */
+    @Transactional
+    public void registrarPlanRustificacion(String usuario, String zonaId, String zonaName, String decision, String accion) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(zonaId);
+        e.setZonaName(zonaName != null ? zonaName : zonaId);
+        e.setTipo("Configuración");
+        e.setTs(reloj.millis());
+        e.setLectura("Plan de rustificación de la macro-zona " + zonaId + " (" + usuario + ").");
+        e.setDecision(decision);
+        e.setAccion(accion);
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
     }
 
     private void registrarConfiguracion(String lectura, String decision, String accion) {

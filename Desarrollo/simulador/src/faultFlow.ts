@@ -18,10 +18,18 @@ export function valveMarked(devices: HardwareDevice[], sectorId: string): boolea
   return devices.some((d) => d.tipo === VALVE_TYPE && d.sectorId === sectorId && isMarkedFaulty(d));
 }
 
-/** `true` if the shade net of any sector of the zone is marked as faulty: the mesh belongs to the whole macro-zone. */
+/**
+ * `true` if the shade net of the zone is marked as faulty. The mesh belongs to the macro-zone and is registered with
+ * it, like the witness node; a device still hanging from one of its sectors (a base not yet migrated) also counts.
+ */
 export function shadeMarked(devices: HardwareDevice[], zonaId: string, sectors: SectorRef[]): boolean {
   const ofZone = new Set(sectors.filter((s) => s.zonaId === zonaId).map((s) => s.id));
-  return devices.some((d) => d.tipo === SHADE_TYPE && d.sectorId !== null && ofZone.has(d.sectorId) && isMarkedFaulty(d));
+  return devices.some(
+    (d) =>
+      d.tipo === SHADE_TYPE &&
+      ((d.sectorId === null && d.zonaId === zonaId) || (d.sectorId !== null && ofZone.has(d.sectorId))) &&
+      isMarkedFaulty(d),
+  );
 }
 
 export interface WaitDeps {

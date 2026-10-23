@@ -173,12 +173,12 @@ public class SeguimientoComandosService {
             // Es la falla de la malla de la macro-zona (S-05): la marca y la alerta son del servicio de fallas.
             NodeError falla = new NodeError(zonaId, null, "", NodeErrorType.SHADE_LIMIT_SWITCH, null);
             if (hardwareFaultService.report(falla) == HardwareFaultService.Outcome.IGNORED) {
-                alertar(zonaId, NivelAlerta.CRITICAL, REGLA_FALLA, "Sector " + sectorId + ": "
+                alertar(zonaId, NivelAlerta.CRITICAL, REGLA_FALLA, donde(zonaId, sectorId) + ": "
                         + "la mediasombra no llegó al final de carrera a tiempo (" + tipo + "). "
                         + "Revisar el motor y los finales de carrera.");
             }
         } else {
-            alertar(zonaId, NivelAlerta.WARNING, REGLA_FALLA, "Sector " + sectorId + ": "
+            alertar(zonaId, NivelAlerta.WARNING, REGLA_FALLA, donde(zonaId, sectorId) + ": "
                     + "el nodo no pudo ejecutar " + nombre(actuador) + " (" + (tipo != null ? tipo : "sin detalle") + ").");
         }
     }
@@ -235,11 +235,16 @@ public class SeguimientoComandosService {
             if (p.venceMs() <= ahora && pendientes.remove(p.commandId(), p)) {
                 resueltos.add(p.commandId());   // un ack que llegue después ya no vuelve a alertar
                 log.warn("Sector {}: el nodo no confirmó {} (commandId {}).", p.sectorId(), nombre(p.actuador()), p.commandId());
-                alertar(p.zonaId(), NivelAlerta.WARNING, REGLA_SIN_RESPUESTA, "Sector " + p.sectorId() + ": "
+                alertar(p.zonaId(), NivelAlerta.WARNING, REGLA_SIN_RESPUESTA, donde(p.zonaId(), p.sectorId()) + ": "
                         + "el nodo no confirmó " + nombre(p.actuador()) + " a tiempo. "
                         + "Puede estar apagado, sin WiFi o sin conexión al broker.");
             }
         }
+    }
+
+    /** A quién se refiere un aviso: al sector, o a la macro-zona si el comando no tenía sector (la mediasombra). */
+    private static String donde(String zonaId, String sectorId) {
+        return sectorId != null ? "Sector " + sectorId : "Macro-zona " + zonaId;
     }
 
     /** Cantidad de comandos esperando ack (para tests y diagnóstico). */

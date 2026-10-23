@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.engine.zone;
 
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
+import com.yerbanalytics.backend.engine.MallaZona;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -187,7 +188,8 @@ class ZoneRuleEngineTest {
         SectorEntity sector = new SectorEntity();
         sector.setId("MZ-2-005");
 
-        engine(probe).evaluate(zone, List.of(sector), NOW, Map.of("MZ-2-005", HardwareCoverage.COMPLETE), Map.of());
+        engine(probe).evaluate(zone, List.of(sector), NOW, Map.of("MZ-2-005", HardwareCoverage.COMPLETE), Map.of(), null,
+                MallaZona.OPERATIVA);
 
         assertThat(seen).hasSize(1);
         assertThat(seen.get(0).zoneLocked()).isTrue();
@@ -205,7 +207,7 @@ class ZoneRuleEngineTest {
         engine(rule("Probe", 22, c -> {
             seen.add(c);
             return List.of();
-        })).evaluate(zone, List.of(), NOW, Map.of(), Map.of());
+        })).evaluate(zone, List.of(), NOW, Map.of(), Map.of(), null, MallaZona.OPERATIVA);
 
         assertThat(seen.get(0).zoneLocked()).isFalse();
     }
@@ -215,5 +217,31 @@ class ZoneRuleEngineTest {
         ZoneRuleEngine engine = engine(rule("B", 23, c -> List.of()), rule("A", 22, c -> List.of()));
 
         assertThat(engine.getRules()).extracting(ZoneRule::name).containsExactly("A", "B");
+    }
+    @Test
+    void unAbortMediasombraCortaLasReglasQueSiguenDeEsaRama() {
+        ZoneRule guarda = mediasombra("Guarda", 13,
+                c -> List.of(RuleAction.of(ActionType.ABORT_MEDIASOMBRA, "Guarda", "falla")));
+        ZoneRule mueve = mediasombra("Mueve", 14, c -> List.of(noop("Mueve")));
+        ZoneRule otra = rule("Otra", 22, c -> List.of(noop("Otra")));
+
+        List<TrazaRegla> trace = engine(otra, mueve, guarda).evaluate(ctx());
+
+        assertThat(trace).extracting(TrazaRegla::ruleId).containsExactly("Guarda", "Mueve", "Otra");
+        assertThat(trace.get(1).estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
+        assertThat(trace.get(1).bloqueadaPor()).isEqualTo("Guarda");
+        assertThat(trace.get(2).estado()).as("las otras ramas siguen").isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(executed).containsExactly("Guarda", "Otra");
+    }
+
+    private static ZoneRule mediasombra(String name, int priority, Function<ZoneRuleContext, List<RuleAction>> body) {
+        ZoneRule base = rule(name, priority, body);
+        return new ZoneRule() {
+            @Override public int priority() { return base.priority(); }
+            @Override public String name() { return base.name(); }
+            @Override public String label() { return base.label(); }
+            @Override public RuleBranch branch() { return RuleBranch.MEDIASOMBRA; }
+            @Override public List<RuleAction> evaluate(ZoneRuleContext ctx, Evaluacion ev) { return base.evaluate(ctx, ev); }
+        };
     }
 }

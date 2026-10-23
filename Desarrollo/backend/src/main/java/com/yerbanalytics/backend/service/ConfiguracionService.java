@@ -3,16 +3,14 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.dto.Configuracion;
 import com.yerbanalytics.backend.dto.ConfiguracionOperativa;
 import com.yerbanalytics.backend.dto.MetricSpec;
-import com.yerbanalytics.backend.dto.RustificacionEtapa;
 import com.yerbanalytics.backend.dto.UmbralMetrica;
+import com.yerbanalytics.backend.mediasombra.VentanaDiaria;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
-import com.yerbanalytics.backend.model.RustificacionEtapaEntity;
 import com.yerbanalytics.backend.model.UmbralMetricaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
-import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
 import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import static com.yerbanalytics.backend.constant.NurseryConstants.SPECS;
@@ -21,8 +19,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +28,7 @@ import java.util.regex.Pattern;
 
 /**
  * Configuración agronómica (HU-15): lectura, validación y persistencia de umbrales,
- * límites operativos y plan de rustificación. Es la fuente de verdad en runtime para
+ * límites operativos y horario por defecto de la mediasombra. Es la fuente de verdad en runtime para
  * los umbrales de métricas ({@link #getEffectiveSpecs()}) y los parámetros de
  * seguimiento post-acción que consumen {@code NurseryService} e {@code HistorialService}.
  */
@@ -42,11 +40,13 @@ public class ConfiguracionService {
 
     /** Hora de fábrica de la pasada diaria del riel. */
     public static final String PASADA_HORA_FABRICA = "11:00";
+    /** Horario por defecto de la mediasombra de fábrica (abierta de 08:00 a 17:00). */
+    public static final String MEDIASOMBRA_DESDE_FABRICA = "08:00";
+    public static final String MEDIASOMBRA_HASTA_FABRICA = "17:00";
     private static final Pattern HORA_HH_MM = Pattern.compile("([01]\\d|2[0-3]):[0-5]\\d");
 
     private final UmbralMetricaRepository umbralRepository;
     private final ConfiguracionOperativaRepository operativaRepository;
-    private final RustificacionEtapaRepository rustificacionRepository;
     private final HistorialService historialService;
     private final CatalogoParametrosService catalogoParametros;
 
@@ -62,12 +62,10 @@ public class ConfiguracionService {
 
     public ConfiguracionService(UmbralMetricaRepository umbralRepository,
                                 ConfiguracionOperativaRepository operativaRepository,
-                                RustificacionEtapaRepository rustificacionRepository,
                                 @Lazy HistorialService historialService,
                                 CatalogoParametrosService catalogoParametros) {
         this.umbralRepository = umbralRepository;
         this.operativaRepository = operativaRepository;
-        this.rustificacionRepository = rustificacionRepository;
         this.historialService = historialService;
         this.catalogoParametros = catalogoParametros;
 
@@ -84,7 +82,7 @@ public class ConfiguracionService {
 
     @Transactional(readOnly = true)
     public Configuracion getConfiguracion() {
-        return new Configuracion(buildUmbralesDto(), buildOperativaDto(loadOperativa()), buildRustificacionDto());
+        return new Configuracion(buildUmbralesDto(), buildOperativaDto(loadOperativa()));
     }
 
     private List<UmbralMetrica> buildUmbralesDto() {
@@ -116,13 +114,8 @@ public class ConfiguracionService {
                 e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : SensingCadence.DEFAULT_MINUTES,
                 e.getUpdatedBy(), e.getUpdatedTs(),
                 pasadaDiariaActiva(e), pasadaDiariaHora(e),
-                (int) Math.ceil(catalogoParametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)));
-    }
-
-    private List<RustificacionEtapa> buildRustificacionDto() {
-        return rustificacionRepository.findAllByOrderByOrdenAsc().stream()
-                .map(e -> new RustificacionEtapa(e.getOrden(), e.getDiaDesde(), e.getDiaHasta(), e.getAperturaPct()))
-                .toList();
+                (int) Math.ceil(catalogoParametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)),
+                mediasombraDesde(e), mediasombraHasta(e));
     }
 
     // ------------------------------------------------------------------
@@ -164,17 +157,15 @@ public class ConfiguracionService {
         if (op.pasadaDiariaHora() != null) {
             oe.setPasadaDiariaHora(op.pasadaDiariaHora());
         }
+        if (op.mediasombraAbiertaDesde() != null) {
+            oe.setMediasombraAbiertaDesde(op.mediasombraAbiertaDesde());
+        }
+        if (op.mediasombraAbiertaHasta() != null) {
+            oe.setMediasombraAbiertaHasta(op.mediasombraAbiertaHasta());
+        }
         oe.setUpdatedBy(usuario != null && !usuario.isBlank() ? usuario : "Ingeniero Agrónomo");
         oe.setUpdatedTs(System.currentTimeMillis());
         operativaRepository.save(oe);
-
-        // Plan de rustificación: se reemplaza por completo, reindexando el orden.
-        rustificacionRepository.deleteAllInBatch();
-        List<RustificacionEtapa> etapas = cfg.rustificacion() != null ? cfg.rustificacion() : List.of();
-        int orden = 1;
-        for (RustificacionEtapa et : etapas) {
-            rustificacionRepository.save(new RustificacionEtapaEntity(orden++, et.diaDesde(), et.diaHasta(), et.aperturaPct()));
-        }
 
         invalidateCache();
         // The effective stale threshold depends on the pulse interval: drop the rules snapshot now and again after commit.
@@ -188,16 +179,12 @@ public class ConfiguracionService {
     // Validación fisiológica (HU-15 CA-03..06)
     // ------------------------------------------------------------------
 
-    /** La mediasombra es binaria: la apertura de una etapa llega hasta 100 %. */
-    private static final double APERTURA_MAXIMA_PCT = 100.0;
-
     private void validar(Configuracion cfg) {
         if (cfg == null) {
             throw new InvalidConfigurationException("La configuración es obligatoria.");
         }
         validarUmbrales(cfg.umbrales());
         validarOperativa(cfg.operativa());
-        validarRustificacion(cfg.rustificacion(), APERTURA_MAXIMA_PCT);
     }
 
     private void validarUmbrales(List<UmbralMetrica> umbrales) {
@@ -259,30 +246,24 @@ public class ConfiguracionService {
             throw new InvalidConfigurationException("pasadaDiariaHora: la hora de la pasada diaria debe tener el "
                     + "formato HH:mm, entre 00:00 y 23:59.");
         }
+        validarHorarioMediasombra(op.mediasombraAbiertaDesde(), op.mediasombraAbiertaHasta());
     }
 
-    private void validarRustificacion(List<RustificacionEtapa> etapas, double aperturaMax) {
-        if (etapas == null || etapas.isEmpty()) {
-            return; // el plan es opcional
+    /**
+     * Horario por defecto de la mediasombra: las dos horas juntas (o ninguna, que conserva el guardado), {@code HH:mm} y
+     * el cierre después de la apertura (no cruza la medianoche).
+     */
+    private void validarHorarioMediasombra(String desde, String hasta) {
+        if (desde == null && hasta == null) {
+            return;
         }
-        List<RustificacionEtapa> ordenadas = new ArrayList<>(etapas);
-        ordenadas.sort(Comparator.comparingInt(RustificacionEtapa::diaDesde));
-        int prevHasta = 0;
-        for (RustificacionEtapa et : ordenadas) {
-            if (et.diaDesde() < 1 || et.diaDesde() > et.diaHasta()) {
-                throw new InvalidConfigurationException(
-                        "Etapa de rustificación inválida: «día desde» debe ser ≥ 1 y ≤ «día hasta».");
-            }
-            if (et.diaDesde() <= prevHasta) {
-                throw new InvalidConfigurationException(
-                        "Las etapas de rustificación no pueden solaparse en el cronograma.");
-            }
-            if (et.aperturaPct() < 0 || et.aperturaPct() > aperturaMax) {
-                throw new InvalidConfigurationException(
-                        "La apertura de cada etapa debe estar entre 0 % y la apertura máxima ("
-                                + fmt(aperturaMax) + " %).");
-            }
-            prevHasta = et.diaHasta();
+        if (!horaValida(desde) || !horaValida(hasta)) {
+            throw new InvalidConfigurationException("mediasombraAbiertaDesde / mediasombraAbiertaHasta: el horario de "
+                    + "la mediasombra debe tener el formato HH:mm, entre 00:00 y 23:59.");
+        }
+        if (!LocalTime.parse(hasta).isAfter(LocalTime.parse(desde))) {
+            throw new InvalidConfigurationException("mediasombraAbiertaHasta: la hora de cierre de la mediasombra debe "
+                    + "ser posterior a la de apertura.");
         }
     }
 
@@ -391,6 +372,30 @@ public class ConfiguracionService {
     public static String pasadaDiariaHora(ConfiguracionOperativaEntity e) {
         String hora = e.getPasadaDiariaHora();
         return hora != null && horaValida(hora) ? hora : PASADA_HORA_FABRICA;
+    }
+
+    /** Apertura del horario por defecto de la mediasombra ({@code HH:mm}); sin valor válido, la de fábrica. */
+    public static String mediasombraDesde(ConfiguracionOperativaEntity e) {
+        String desde = e.getMediasombraAbiertaDesde();
+        String hasta = e.getMediasombraAbiertaHasta();
+        return horarioValido(desde, hasta) ? desde : MEDIASOMBRA_DESDE_FABRICA;
+    }
+
+    /** Cierre del horario por defecto de la mediasombra ({@code HH:mm}); sin valor válido, el de fábrica. */
+    public static String mediasombraHasta(ConfiguracionOperativaEntity e) {
+        String desde = e.getMediasombraAbiertaDesde();
+        String hasta = e.getMediasombraAbiertaHasta();
+        return horarioValido(desde, hasta) ? hasta : MEDIASOMBRA_HASTA_FABRICA;
+    }
+
+    /** El horario por defecto de la mediasombra vigente (el guardado o el de fábrica). */
+    public VentanaDiaria horarioMediasombraPorDefecto() {
+        ConfiguracionOperativaEntity e = loadOperativa();
+        return new VentanaDiaria(LocalTime.parse(mediasombraDesde(e)), LocalTime.parse(mediasombraHasta(e)));
+    }
+
+    private static boolean horarioValido(String desde, String hasta) {
+        return horaValida(desde) && horaValida(hasta) && LocalTime.parse(hasta).isAfter(LocalTime.parse(desde));
     }
 
     /** {@code HH:mm} con dos dígitos en cada parte, de 00:00 a 23:59. */

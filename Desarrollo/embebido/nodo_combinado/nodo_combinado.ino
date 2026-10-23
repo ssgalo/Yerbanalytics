@@ -38,9 +38,36 @@ static SistemaColas sys;
 
 static char topicTelemetria[96];
 static char topicComandoZona[96];
+static char topicAckZona[96];
 static char topicComando[CANT_SECTORES + 1][96];   // índice 1 y 2
 static char topicAck[CANT_SECTORES + 1][96];
 static char topicErrores[96];
+
+// ----------------------------------------------------------------------------
+//  Comando de zona con actuador: la mediasombra es de la macro-zona (una por zona). Se encola como cualquier
+//  comando, con sector CONTRATO_SECTOR_ZONA: su ack sale por el tópico de zona. Sólo la mediasombra es de la zona.
+// ----------------------------------------------------------------------------
+static void encolarComandoDeZona(byte *payload, unsigned int length)
+{
+  Comando cmd = {};
+  cmd.sector = CONTRATO_SECTOR_ZONA;
+  bool ok = util_json::parsearComando((const char *)payload, length, cmd);
+  if (!ok || cmd.actuador != TipoActuador::MEDIASOMBRA)
+  {
+    Ack err = {};
+    strlcpy(err.commandId, cmd.commandId, sizeof(err.commandId));
+    err.sector = CONTRATO_SECTOR_ZONA;
+    err.status = EstadoAck::ERROR;
+    err.targetPct = -1;
+    strlcpy(err.tipoDetalle, "comando_invalido", sizeof(err.tipoDetalle));
+    xQueueSend(sys.ack, &err, 0);
+    return;
+  }
+  if (xQueueSend(sys.comandos, &cmd, 0) != pdTRUE)
+  {
+    Serial.println("[main] Cola de comandos llena; comando de zona descartado");
+  }
+}
 
 // ----------------------------------------------------------------------------
 //  Callback MQTT: parsea y encola (no ejecuta ni publica acá).
@@ -58,13 +85,17 @@ static void onMensajeMqtt(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, topicComandoZona) == 0)
   {
     // LEER_AHORA: sólo avisa a task_sensado; la lectura y la publicación siguen su camino de siempre.
-    // Sin ack (la respuesta es la telemetría). Acción desconocida o JSON ilegible: se ignora con un log.
+    // Sin ack (la respuesta es la telemetría). Con "actuador" (la mediasombra, que es de la zona): se encola y su
+    // ack sale por el tópico de zona. Acción desconocida o JSON ilegible: se ignora con un log.
     char commandId[40];
     switch (util_json::parsearComandoZona((const char *)payload, length, commandId, sizeof(commandId)))
     {
     case util_json::ResultadoComandoZona::LEER_AHORA:
       Serial.printf("[main] LEER_AHORA (commandId '%s'): lectura inmediata\n", commandId);
       task_sensado::pedirLecturaAhora();
+      break;
+    case util_json::ResultadoComandoZona::ACTUADOR:
+      encolarComandoDeZona(payload, length);
       break;
     case util_json::ResultadoComandoZona::ACCION_DESCONOCIDA:
       Serial.printf("[main] Comando de zona ignorado (commandId '%s'): acción desconocida\n", commandId);
@@ -130,6 +161,16 @@ static bool publicarAck(const Ack &a)
   char buf[256];
   size_t escritos = util_json::serializarAck(a, buf, sizeof(buf));
   buf[escritos] = '\0';
+  if (a.sector == CONTRATO_SECTOR_ZONA)
+  {
+    // La mediasombra es de la macro-zona: su ack va por el tópico de zona.
+    if (!net_mqtt::publicar(topicAckZona, buf, QOS_ACK))
+    {
+      return false;
+    }
+    Serial.printf("[main] Ack de zona publicado: %s\n", buf);
+    return true;
+  }
   int sector = (a.sector >= 1 && a.sector <= CANT_SECTORES) ? a.sector : 1;
   if (!net_mqtt::publicar(topicAck[sector], buf, QOS_ACK))
   {
@@ -275,6 +316,7 @@ void setup()
   // Topics: telemetría (zona/sector según config); comando de zona; comando y ack de cada sector.
   contratoTopicTelemetria(topicTelemetria, sizeof(topicTelemetria));
   contratoTopicComandoZona(topicComandoZona, sizeof(topicComandoZona));
+  contratoTopicAckZona(topicAckZona, sizeof(topicAckZona));
   contratoTopicErrores(topicErrores, sizeof(topicErrores));
   for (int s = 1; s <= CANT_SECTORES; s++)
   {
@@ -300,7 +342,7 @@ void setup()
     net_mqtt::suscribir(topicComando[s], QOS_COMANDO);
   }
   net_mqtt::suscribir(TOPIC_RIEL_COMANDO, QOS_RIEL_COMANDO);
-  net_mqtt::suscribir(topicComandoZona, QOS_COMANDO_ZONA);   // LEER_AHORA (4ª y última: MAX_SUSCRIPCIONES)
+  net_mqtt::suscribir(topicComandoZona, QOS_COMANDO_ZONA);   // LEER_AHORA y shade SET (4ª y última: MAX_SUSCRIPCIONES)
 
   // Drivers y tareas de ambos subsistemas.
   task_sensado::iniciarDrivers();

@@ -36,8 +36,9 @@ class MqttConfigSecuenciasTest {
         MqttPahoMessageDrivenChannelAdapter a = config.ackInboundAdapter(factory);
 
         assertThat(clientIdDe(a)).isEqualTo("yerba-ack");
-        assertThat(a.getTopic()).containsExactly("nursery/zone/+/sector/+/ack");
-        assertThat(a.getQos()).containsExactly(1);
+        // El de los sectores y el de la zona (la mediasombra es de la macro-zona).
+        assertThat(a.getTopic()).containsExactly("nursery/zone/+/sector/+/ack", "nursery/zone/+/ack");
+        assertThat(a.getQos()).containsOnly(1);
         assertThat(a.getOutputChannel()).isNotNull();
     }
 

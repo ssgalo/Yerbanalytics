@@ -33,7 +33,8 @@ class NutritionWiringTest {
     @Test
     @DisplayName("el motor de zonas corre N-02 antes que N-01: la CE baja adelanta el plan en el mismo pulso")
     void engineRunsLowEcBeforeThePlan() {
-        assertThat(engine.getRules()).extracting(ZoneRule::name).containsExactly("LowEcRule", "NutritionPlanRule");
+        // Las de la mediasombra, también de zona, van antes y no cambian este orden.
+        assertThat(engine.getRules()).extracting(ZoneRule::name).containsSubsequence("LowEcRule", "NutritionPlanRule");
     }
 
     @Test

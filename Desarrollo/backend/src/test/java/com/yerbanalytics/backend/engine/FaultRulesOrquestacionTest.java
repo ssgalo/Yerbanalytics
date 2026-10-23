@@ -12,7 +12,6 @@ import com.yerbanalytics.backend.engine.rules.ManualLockRule;
 import com.yerbanalytics.backend.engine.rules.PausaTrasAplicacionRule;
 import com.yerbanalytics.backend.engine.rules.PosponerPorLluviaRule;
 import com.yerbanalytics.backend.engine.rules.RiegoPorDeficitRule;
-import com.yerbanalytics.backend.engine.rules.ShadeFaultRule;
 import com.yerbanalytics.backend.engine.rules.StaleSensorRule;
 import com.yerbanalytics.backend.engine.rules.SustratoSaturadoRule;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
@@ -37,13 +36,12 @@ import static org.mockito.Mockito.when;
 
 /**
  * S-05 en el orquestador real (sin Spring): la falla hidráulica saca al sector del riego y del insumo (también de
- * R-02); la falla de la malla corta sólo la rama de la mediasombra; todo lo demás sigue.
+ * R-02); todo lo demás sigue. La malla es de la macro-zona: su falla la ve la regla de zona ShadeFaultRule.
  */
 @DisplayName("S-05 en el orquestador")
 class FaultRulesOrquestacionTest {
 
-    private static final HardwareFaults VALVULA = new HardwareFaults("SIN_CAUDAL", null);
-    private static final HardwareFaults MALLA = new HardwareFaults(null, "MEDIASOMBRA_FIN_DE_CARRERA");
+    private static final HardwareFaults VALVULA = new HardwareFaults("SIN_CAUDAL");
 
     private final RuleOverridesStore overrides = new RuleOverridesStore();
     private RuleOrchestrator orquestador;
@@ -69,9 +67,7 @@ class FaultRulesOrquestacionTest {
                 new HydraulicFaultRule(), new StaleSensorRule(), new SustratoSaturadoRule(),
                 new CicloLecturaRiegoRule(), new DeficitCriticoRule(), new FueraDeVentanaRiegoRule(),
                 new PausaTrasAplicacionRule(), new PosponerPorLluviaRule(), new RiegoPorDeficitRule(),
-                ejecutora("Dosis", 12, RuleBranch.INSUMO, ActionType.ACTIVAR_BOMBA),
-                new ShadeFaultRule(),
-                ejecutora("Sombra", 14, RuleBranch.MEDIASOMBRA, ActionType.MOVER_MEDIASOMBRA)));
+                ejecutora("Dosis", 12, RuleBranch.INSUMO, ActionType.ACTIVAR_BOMBA)));
         Collections.shuffle(reglas);
         orquestador = new RuleOrchestrator(reglas, catalogo, new TrazaEvaluacionStore(), overrides);
     }
@@ -101,7 +97,6 @@ class FaultRulesOrquestacionTest {
         assertThat(regla(r, "RiegoPorDeficitRule").bloqueadaPor()).isEqualTo("HydraulicFaultRule");
         assertThat(de(r, ActionType.ACTIVAR_BOMBA)).isEmpty();
         assertThat(regla(r, "Dosis").estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
-        assertThat(de(r, ActionType.MOVER_MEDIASOMBRA)).as("la malla de la zona sigue").hasSize(1);
     }
 
     @Test
@@ -120,18 +115,6 @@ class FaultRulesOrquestacionTest {
 
         assertThat(de(r, ActionType.ACTIVAR_VALVULA)).isNotEmpty();
         assertThat(regla(r, "HydraulicFaultRule").acciones()).extracting(a -> a.tipo()).containsExactly(ActionType.NOOP_INFO);
-    }
-
-    @Test
-    @DisplayName("falla de la malla: sólo se omite la rama de la mediasombra; riego e insumos siguen")
-    void fallaDeLaMalla() {
-        ResultadoEvaluacion r = evaluar(40.0, MALLA);
-
-        assertThat(de(r, ActionType.MOVER_MEDIASOMBRA)).isEmpty();
-        assertThat(regla(r, "Sombra").estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
-        assertThat(regla(r, "Sombra").bloqueadaPor()).isEqualTo("ShadeFaultRule");
-        assertThat(de(r, ActionType.ACTIVAR_VALVULA)).hasSize(1);
-        assertThat(de(r, ActionType.ACTIVAR_BOMBA)).hasSize(1);
     }
 
     @Test
@@ -164,15 +147,13 @@ class FaultRulesOrquestacionTest {
     }
 
     @Test
-    @DisplayName("bypass 'fault' en las dos reglas: el sector y la malla averiados vuelven a evaluarse")
+    @DisplayName("bypass 'fault': el sector averiado vuelve a evaluarse")
     void bypass() {
         overrides.put("HydraulicFaultRule", new RuleOverride(true, Map.of(), Set.of("fault")));
-        overrides.put("ShadeFaultRule", new RuleOverride(true, Map.of(), Set.of("fault")));
 
-        ResultadoEvaluacion r = evaluar(40.0, new HardwareFaults("SIN_CAUDAL", "MEDIASOMBRA_FIN_DE_CARRERA"));
+        ResultadoEvaluacion r = evaluar(40.0, new HardwareFaults("SIN_CAUDAL"));
 
         assertThat(de(r, ActionType.ACTIVAR_VALVULA)).hasSize(1);
         assertThat(de(r, ActionType.ACTIVAR_BOMBA)).hasSize(1);
-        assertThat(de(r, ActionType.MOVER_MEDIASOMBRA)).hasSize(1);
     }
 }

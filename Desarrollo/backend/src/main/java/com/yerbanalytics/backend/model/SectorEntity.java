@@ -81,9 +81,6 @@ public class SectorEntity {
     @Column(name = "actuador_pump", nullable = false)
     private String actuadorPump;
 
-    @Column(name = "actuador_shade", nullable = false)
-    private Integer actuadorShade;
-
     /**
      * Epoch ms hasta el que el sector tiene el reingreso restringido tras un fitosanitario (reglas_v2 §8.3).
      * {@code null} si nunca se le aplicó uno; un valor pasado equivale a "sin restricción". Sólo informa:

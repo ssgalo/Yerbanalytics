@@ -30,8 +30,8 @@ class ZoneRuleContextTest {
                 RuleOverrides.NONE);
     }
 
-    private static final HardwareCoverage WITH_PUMP = new HardwareCoverage(true, true, true, true);
-    private static final HardwareCoverage WITHOUT_PUMP = new HardwareCoverage(true, false, true, true);
+    private static final HardwareCoverage WITH_PUMP = new HardwareCoverage(true, true, true);
+    private static final HardwareCoverage WITHOUT_PUMP = new HardwareCoverage(true, false, true);
 
     @Test
     void unSectorConBombaYSinFallasNiBloqueosPuedeDosificarse() {
@@ -64,19 +64,9 @@ class ZoneRuleContextTest {
         SectorEntity a = sector("A");
 
         ZoneRuleContext ctx = ctx(false, Set.of(), Map.of("A", WITH_PUMP),
-                Map.of("A", new HardwareFaults("SIN_CAUDAL", null)), a);
+                Map.of("A", new HardwareFaults("SIN_CAUDAL")), a);
 
         assertThat(ctx.dosingBlock(a)).hasValueSatisfying(r -> assertThat(r).contains("falla hidráulica"));
-    }
-
-    @Test
-    void laFallaDeLaMallaNoImpideDosificar() {
-        SectorEntity a = sector("A");
-
-        ZoneRuleContext ctx = ctx(false, Set.of(), Map.of("A", WITH_PUMP),
-                Map.of("A", new HardwareFaults(null, "MEDIASOMBRA_FIN_DE_CARRERA")), a);
-
-        assertThat(ctx.dosingBlock(a)).isEmpty();
     }
 
     @Test
