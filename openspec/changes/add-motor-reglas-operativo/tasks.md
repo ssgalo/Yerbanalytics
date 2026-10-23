@@ -83,7 +83,7 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 ## 13. Documentación
 - [x] 13.1 CLAUDE.md: invariante de D-15 en §4 ("Sin controles de demo"), §6 ("Modos de operación", "Patrón para agregar una nueva regla": `code()`, `objective()`, `effect()`, `protection()`, estado operativo) y §6.2; regla "sin emojis" en §4 "Convenciones de estilo"; §4 Sidebar con la vista Rustificación real y Umbrales sólo con bandas; endpoints `PUT /api/rules/{name}/estado`; §6 lista de migraciones con `migracion-umbrales-al-motor.sql` y el conteo reconciliado con los archivos de `resources/`.
 - [x] 13.2 README del backend ("Motor de reglas": estado operativo, precedencia con la demo, protecciones; migración nueva), del frontend (pantalla) y del simulador (en modo demo el override del simulador gana sobre el estado operativo).
-- [ ] 13.3 Avisar en #64, #65, #67 y #68 qué adapta cada uno (tabla del design).
+- [x] ~~13.3 Avisar en #64, #65, #67 y #68 qué adapta cada uno (tabla del design).~~ Reemplazada: se decidió un único PR de integración (rama `integ/motor-reglas-v2`) que sustituye a #64, #65, #67 y #68.
 
 ## 14. Verificación
 - [ ] 14.1 Las tres suites verdes, `npm run lint` con 0 warnings, `tsc -b` y `npm run build` del frontend.
