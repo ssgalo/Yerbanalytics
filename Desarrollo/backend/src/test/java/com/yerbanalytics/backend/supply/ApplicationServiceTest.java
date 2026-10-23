@@ -312,6 +312,18 @@ class ApplicationServiceTest {
     }
 
     @Test
+    void cancellingByRuleOnlyRemovesTheRequestThatRuleMade() {
+        clock.set(at("12:00"));
+        service.request(sector, Supply.FERTILIZER, "NutritionPlanRule", false);
+
+        service.cancelPending(SECTOR_ID, Supply.FERTILIZER, "ChlorosisNutritionalRule");
+        assertThat(pendingRows).as("el pedido es de otra regla: sigue").hasSize(1);
+
+        service.cancelPending(SECTOR_ID, Supply.FERTILIZER, "NutritionPlanRule");
+        assertThat(pendingRows).isEmpty();
+    }
+
+    @Test
     void aPendingApplicationExpiresAfterTheConfiguredDays() {
         clock.set(at("12:00"));
         requestFertilizer();

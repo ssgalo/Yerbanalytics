@@ -163,6 +163,17 @@ public class ApplicationService implements ConsumidorParametros {
         });
     }
 
+    /**
+     * Retira el pedido pendiente de {@code supply} sólo si lo hizo {@code ruleName}: otra regla (el plan de nutrición) puede
+     * tener el suyo en la misma fila, y no es de quien corta.
+     */
+    @Transactional
+    public void cancelPending(String sectorId, Supply supply, String ruleName) {
+        pending.findBySectorIdAndSupply(sectorId, supply)
+                .filter(p -> ruleName.equals(p.getRuleName()))
+                .ifPresent(p -> cancelPending(sectorId, supply));
+    }
+
     // -------------------------------------------------------------------------
     // Reintento de las diferidas
     // -------------------------------------------------------------------------
