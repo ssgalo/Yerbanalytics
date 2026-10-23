@@ -866,7 +866,7 @@ La forma de `Pasada` y sus pasos está en `openspec/changes/add-pasada-riel/desi
   capturas y diagnósticos, que son el registro real, ya se persisten. Se puede iniciar otra enseguida.
 - **Limitación.** Un `LLEGO` del firmware no prueba que el carro se movió: éste no puede saber si el
   motor tiene alimentación. Y con el final de carrera de home en falso, `HOME` termina al instante
-  (`pasos: 0`). Detalle en el README del sketch `vivero_esp32_red`.
+  (`pasos: 0`). Detalle en la sección "Riel" de `Desarrollo/embebido/README.md`.
 - **Diagnóstico.** `GET /api/pasadas/actual` lo completa por captura aunque la pasada ya haya
   terminado: llega ~1 min después de la última foto, cuando el servicio de inferencia barre.
 

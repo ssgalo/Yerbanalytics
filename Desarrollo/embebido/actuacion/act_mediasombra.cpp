@@ -44,7 +44,7 @@ static void detenerMotor() {
   ledcWrite(PIN_MEDIASOMBRA_ENA, 0);
 }
 
-// Enrollar = motor "atrás" (IN1 LOW, IN2 HIGH), como en vivero_esp32.
+// Enrollar = motor "atrás" (IN1 LOW, IN2 HIGH), como en el sketch retirado vivero_esp32.
 static void arrancarMotor(bool enrollar) {
   digitalWrite(PIN_MEDIASOMBRA_IN1, enrollar ? LOW : HIGH);
   digitalWrite(PIN_MEDIASOMBRA_IN2, enrollar ? HIGH : LOW);

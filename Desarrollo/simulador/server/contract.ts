@@ -251,7 +251,7 @@ export function toContractUnits(metrics: Partial<Record<MetricKey, number>>): Co
    Camera rail contract (add-pasada-riel, design.md §1).
 
    SOURCE OF TRUTH: the "Riel" section of `Desarrollo/embebido/comun/contrato.h`; also mirrored
-   by `ContratoRiel.java` (backend) and the `RIEL_*` defines of `vivero_esp32_red.ino`.
+   by `ContratoRiel.java` (backend) and `actuacion/act_riel` of the modular firmware.
 
    Constants and types only: the simulator does NOT simulate the rail. They live here so a
    future change (or a test) speaks the same vocabulary as the firmware.
@@ -315,7 +315,7 @@ export interface RailEvent {
 
    SOURCE OF TRUTH: the "Ack" and "Comando de zona" sections of
    `Desarrollo/embebido/comun/contrato.h`; also mirrored by `ContratoNodo.java` (backend) and
-   the sketch `vivero_esp32_red.ino`.
+   the modular firmware (`nodo_actuador`/`nodo_combinado`).
 
    The simulator answers the zone command for the zones it simulates (backend-driven sensing):
    it replies with one telemetry round, like the firmware does.

@@ -116,7 +116,7 @@ flowchart TD
 La pasada va de punta a punta: el riel se mueve a la posición, el backend emite la orden de captura de ese
 sector y, cuando la foto llega, pasa a la siguiente; ~1 min después de la última el servicio de inferencia
 carga los diagnósticos. Probada con hardware real el 03/10/2026; límites de hardware conocidos en el
-README de `vivero_esp32_red`.
+sección "Riel" de `Desarrollo/embebido/README.md`.
 
 Cargar un diagnóstico no dispara el motor: queda en el sector y las reglas lo leen en la
 siguiente evaluación (con la próxima lectura o en el barrido del watchdog).
@@ -139,7 +139,7 @@ Tablas que toca este carril (la foto en sí va al filesystem):
 | Nodo → backend | `nursery/zone/{zona}/telemetry` | Nodo testigo o simulador | Backend |
 | Backend → nodo | `nursery/zone/{zona}/sector/{sector}/command` | Backend (el riego, el despacho; bomba y mediasombra, el Action Executor) | Nodo actuador del sector |
 | Nodo → backend | `nursery/zone/{zona}/sector/{sector}/ack` | Nodo actuador | Backend (`AckActuadorReceiver` → `SeguimientoComandosService`: alerta si es una falla o si no llega a tiempo) |
-| Backend → riel | `nursery/rail/command` | Backend (la pasada: `IR_A` 1 o 2, `HOME`) | ESP32 del riel (`vivero_esp32_red`) |
+| Backend → riel | `nursery/rail/command` | Backend (la pasada: `IR_A` 1 o 2, `HOME`) | ESP32 del riel (firmware modular, `actuacion/act_riel`) |
 | Riel → backend | `nursery/rail/event` | ESP32 del riel (`ACEPTADO`, `LLEGO`, `ERROR`) | Backend (`RielEventoReceiver`) |
 
 **Telemetría** (lo que manda el nodo testigo de MZ-2):
@@ -369,5 +369,5 @@ Lo resuelto va tachado; lo que sigue abierto, con su cita.
     ya no se completa (`riego/DespachoRiego.java:487-493`, `WeatherService.java:146-156`).
 12. **El cupo de 10 válvulas se llena por número de sector**, no por urgencia ni por humedad, y
     la cola vive en memoria: un reinicio la pierde y la siguiente telemetría vuelve a decidir.
-13. **El firmware del nodo modular no se compiló** y nada de él se probó con hardware; el sketch del riel
-    (`vivero_esp32_red`) sí se compiló, flasheó y probó: ver `conectar-esp32.md`.
+13. **El firmware del nodo modular no se compiló** y nada de él se probó con hardware; el riel (portado del
+    sketch `vivero_esp32_red`, retirado el 23/10/2026) sí se probó con hardware el 03/10: ver `conectar-esp32.md`.

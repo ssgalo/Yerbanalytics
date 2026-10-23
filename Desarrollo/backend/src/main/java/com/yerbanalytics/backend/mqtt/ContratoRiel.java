@@ -3,8 +3,8 @@ package com.yerbanalytics.backend.mqtt;
 /**
  * Contrato MQTT del riel de la cámara. Espejo de la sección "Riel" de
  * {@code Desarrollo/embebido/comun/contrato.h} (<strong>fuente de verdad</strong>); si algo cambia,
- * cambia allá primero. Los otros espejos son {@code simulador/server/contract.ts} y el sketch
- * {@code vivero_esp32_red}.
+ * cambia allá primero. Los otros espejos son {@code simulador/server/contract.ts} y
+ * {@code actuacion/act_riel} del firmware modular.
  *
  * <p>Un solo riel, sin id en el tópico. El backend publica el comando (QoS 1) y consume el evento.
  *

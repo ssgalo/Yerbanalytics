@@ -149,7 +149,7 @@ static const char* STATUS_EN_CURSO = "EN_CURSO";
 //    cualquier otro valor se trata como ausente (un valor raro nunca debe hacer fallar un cierre de seguridad).
 //    Un firmware viejo ignora la clave; un backend viejo no entiende EN_CURSO (desplegar el backend primero).
 //    Un commandId encolado cuenta como "en curso" para el dedup: su reentrega se ignora.
-//    El ESP32 de vivero_esp32_red publica QoS 0 (PubSubClient); el backend suscribe QoS 1. Sin retain.
+//    El ESP32 publica QoS 0 (PubSubClient); el backend suscribe QoS 1. Sin retain.
 //      {"commandId":"<uuid>","status":"SUCCESS","detalle":{"tipo":"ok","durationSec":20}}
 //      {"commandId":"<uuid>","status":"ERROR","detalle":{"tipo":"falla_mecanica"}}
 //      {"commandId":"<uuid>","status":"EN_CURSO","detalle":{"tipo":"en_cola","posicion":2,"esperaMaxSec":45}}
@@ -241,7 +241,6 @@ static const uint8_t QOS_ERROR = 1;
 //  Espejos que deben decir lo mismo:
 //    - backend:   mqtt/ContratoNodo.java (TOPIC_COMANDO_ZONA, ACCION_LEER_AHORA)
 //    - simulador: simulador/server/contract.ts (zoneCommandTopic, READ_NOW_ACTION; sin comportamiento)
-//    - firmware:  prototipo_hardware/vivero_esp32_red/vivero_esp32_red.ino (ZONA_*)
 static const char* ACCION_LEER_AHORA = "LEER_AHORA";
 static const uint8_t QOS_COMANDO_ZONA = 1;
 
@@ -249,11 +248,9 @@ static const uint8_t QOS_COMANDO_ZONA = 1;
 //  Riel de la cámara (add-pasada-riel, design.md §1)
 // ----------------------------------------------------------------------------
 //  Un solo riel, sin id en el tópico. Lo implementan actuacion/act_riel (firmware
-//  modular: nodo_combinado y nodo_actuador) y el sketch prototipo_hardware/vivero_esp32_red
-//  (que NO incluye este archivo: lo espeja con #define locales). Espejos que deben decir lo mismo:
+//  modular: nodo_combinado y nodo_actuador). Espejos que deben decir lo mismo:
 //    - backend:   mqtt/ContratoRiel.java
 //    - simulador: simulador/server/contract.ts (RAIL_*; sin comportamiento)
-//    - firmware:  prototipo_hardware/vivero_esp32_red/vivero_esp32_red.ino (RIEL_*)
 //
 //  Comando  backend → ESP32 · nursery/rail/command · backend publica QoS 1, ESP32 suscribe QoS 1
 //    {"commandId":"<uuid>","actuador":"rail","accion":"IR_A","parametros":{"posicion":1}}
