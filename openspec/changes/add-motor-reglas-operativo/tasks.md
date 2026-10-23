@@ -27,7 +27,7 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 ## 3. Backend: API, permisos y registro (D-5, D-6, D-7, D-8)
 - [x] 3.1 RED: `ReglasEstadoControllerTest` (MockMvc): `200` al apagar una regla de acción sin motivo; `400 MOTIVO_REQUERIDO`, `400 CONFIRMACION_REQUERIDA` (con `consecuencia`) y `400 MOTIVO_DEMASIADO_LARGO` para una protección; `404` nombre desconocido; mismo estado ⇒ `200` sin fila ni evento.
 - [x] 3.2 RED: `MapaPermisosCoberturaTest` cubre `PUT /api/rules/*/estado`; test de seguridad: Operario y Servicio ⇒ `403`, Ingeniero Agrónomo ⇒ `200`.
-- [x] 3.3 RED: `GET /api/rules/parametros` lista todas las piezas del registro con `codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`.
+- [x] 3.3 (reemplazada por la sección 15) RED: `GET /api/rules/parametros` lista todas las piezas del registro con `codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`.
 - [x] 3.4 RED: `HistorialServiceTest`: `registrarEstadoRegla` deja un evento `Configuración` con regla, usuario, motivo y, si es protección, la consecuencia.
 - [x] 3.5 GREEN: `PUT /api/rules/{name}/estado` (controller + servicio), `ReglaCatalogoDto` ampliada, `CatalogoParametrosService.catalogo()` desde el registro, `MapaPermisos`, descripción de `Permiso.REGLAS_EDITAR`.
 
@@ -51,7 +51,7 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 
 ## 7. Frontend: datos y tipos
 - [x] 7.1 RED: tests del repositorio HTTP y mock: `setEstadoRegla(name, { activa, motivo, confirmaProteccion })`; error tipado con `MOTIVO_REQUERIDO` / `CONFIRMACION_REQUERIDA`.
-- [x] 7.2 GREEN: `ReglaCatalogo` (`codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`), `RuleNode.activaPorDefecto`/`codigo`, `ActionRecord.reglasInactivas`; `DataRepository`, `httpRepository`, `mockRepository`; `catalogoReglas.fixture.json` sin emojis y con los campos nuevos.
+- [x] 7.2 (reemplazada por la sección 15) GREEN: `ReglaCatalogo` (`codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`), `RuleNode.activaPorDefecto`/`codigo`, `ActionRecord.reglasInactivas`; `DataRepository`, `httpRepository`, `mockRepository`; `catalogoReglas.fixture.json` sin emojis y con los campos nuevos.
 - [x] 7.3 `lib/catalogoSeguridad.ts`: descripción de `reglas.editar`.
 
 ## 8. Frontend: sin emojis (D-12)
@@ -76,9 +76,9 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 11.3 GREEN: se borran `SeguimientoForm`, `LimitesActuadoresForm`, sus tests y los campos de `ConfigOperativa`/`configValidation`; `RustificacionPage` + ruta + entrada del Sidebar; textos de `ConfiguracionPage` y `PreferencesPage` sin el motor.
 
 ## 12. Simulador (D-9)
-- [x] 12.1 RED: `RuleToggles` (o su modelo) muestra la leyenda "Apagada en el vivero" en una regla con `operationalActive: false`, con el interruptor habilitado.
+- [x] 12.1 (reemplazada por la sección 15) RED: `RuleToggles` (o su modelo) muestra la leyenda "Apagada en el vivero" en una regla con `operationalActive: false`, con el interruptor habilitado.
 - [x] 12.2 (reemplazada por 15.5) RED: `happyPath` sigue prendiendo `SupplyRule` por demo y completa el tramo de insumo (test de regresión).
-- [x] 12.3 GREEN: tipos (`DemoRule.operationalActive`), `RuleToggles`, `happyPath`; escenarios que asumían etiquetas con emoji.
+- [x] 12.3 (reemplazada por la sección 15) GREEN: tipos (`DemoRule.operationalActive`), `RuleToggles`, `happyPath`; escenarios que asumían etiquetas con emoji.
 
 ## 13. Documentación
 - [x] 13.1 CLAUDE.md: invariante de D-15 en §4 ("Sin controles de demo"), §6 ("Modos de operación", "Patrón para agregar una nueva regla": `code()`, `objective()`, `effect()`, `protection()`, estado operativo) y §6.2; regla "sin emojis" en §4 "Convenciones de estilo"; §4 Sidebar con la vista Rustificación real y Umbrales sólo con bandas; endpoints `PUT /api/rules/{name}/estado`; §6 lista de migraciones con `migracion-umbrales-al-motor.sql` y el conteo reconciliado con los archivos de `resources/`.
@@ -92,7 +92,7 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [ ] 14.4 Manual, modo demo con el simulador: Control de reglas muestra el estado en sólo lectura y `PUT enabled` da 400; con `SupplyRule` apagada el happy path avisa y saltea sólo el insumo; prendida en Motor de reglas, el happy path completa el tramo de insumo.
 - [ ] 14.5 Historial: el grafo de un riego anterior al apagado de R-03 sigue mostrando R-03.
 - [ ] 14.6 Migración manual corrida dos veces en la base de desarrollo; crear una fila operativa nueva funciona.
-- [ ] 14.7 Revisión con contexto fresco del diff antes del PR (CLAUDE.md, regla de PR).
+- [x] 14.7 Revisión con contexto fresco del diff antes del PR (CLAUDE.md, regla de PR): hecha; sus hallazgos se corrigieron (sección 16).
 
 ## 15. Cambio de diseño: Motor de reglas, única fuente de verdad del encendido (D-2, D-9, D-15)
 La demo pierde el interruptor de encendido; conserva sólo cooldowns y bypass. Estado efectivo = operativo.
