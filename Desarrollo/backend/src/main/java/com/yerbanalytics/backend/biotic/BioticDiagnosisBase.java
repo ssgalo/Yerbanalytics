@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleInsumo;
+import com.yerbanalytics.backend.engine.DiagnosisGate;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
@@ -15,7 +16,6 @@ import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.supply.Supply;
-import com.yerbanalytics.backend.supply.ValidDiagnosis;
 
 import java.util.List;
 import java.util.Optional;
@@ -90,20 +90,12 @@ abstract class BioticDiagnosisBase implements Rule {
     public final List<RuleAction> evaluate(RuleContext ctx, Evaluacion ev) {
         SectorEntity sector = ctx.sector();
         String sectorId = sector.getId();
-        String state = sector.getDiagnosisEstado();
 
-        if (!kind.matches(state)) {
-            return List.of(RuleAction.noopInfo(name(), String.format(
-                    "El diagnóstico de %s es «%s»: no es %s.", sectorId, state, kind.label())));
+        Optional<RuleAction> notApplicable = DiagnosisGate.check(ctx, ev, name(), kind.label(), kind::matches);
+        if (notApplicable.isPresent()) {
+            return List.of(notApplicable.get());
         }
-
         double minConfidence = ev.numero(ParametrosDiagnostico.CONFIANZA_MINIMA);
-        ValidDiagnosis.Verdict verdict = ValidDiagnosis.of(state, sector.getDiagnosisConf(), sector.getDiagnosisTs(),
-                ctx.now(), minConfidence, ev.numero(ParametrosDiagnostico.VALIDITY_HOURS));
-        if (!ev.compararFijo("Diagnóstico vigente (P-D1)", verdict.valid(), Operador.EQ, true)) {
-            return List.of(RuleAction.noopInfo(name(), String.format(
-                    "El diagnóstico de %s (%s) no sirve para tratar: %s.", sectorId, kind.label(), verdict.reason())));
-        }
 
         Severity severity = Severity.parse(sector.getDiagnosisSev()).orElse(Severity.MILD);
         Optional<String> why = severityReason(ev, severity)
