@@ -98,6 +98,9 @@
   --on-art: #ffffff;
   --on-art-muted: #a9b5ae;
 
+  /* velo detrás de un diálogo modal */
+  --scrim: rgba(21, 35, 27, 0.42);
+
   /* tipografía: Archivo, una familia variable en tres anchos */
   --font-display: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;

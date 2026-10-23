@@ -49,10 +49,6 @@ const RULE_BY_TYPE: Record<string, string> = {
   Mediasombra: 'ShadingRule',
 };
 
-/** El backend antepone un emoji a cada etiqueta de regla; el historial no los muestra. */
-export const plainLabel = (label: string): string =>
-  label.replace(/^[\p{Extended_Pictographic}\p{Emoji_Component}️‍\s]+/u, '').trim() || label;
-
 const isActive = (n: RuleNode) => n.type === 'default' && n.activa !== false;
 
 /** Reglas activas del esquema, por prioridad. */
@@ -109,7 +105,7 @@ export function historyGraph(
 
   let last = nodes[0];
   for (const r of rules.filter((x) => x.branch === 'GLOBAL')) {
-    const node: HistoryNode = { id: r.id, label: plainLabel(r.label), kind: 'rule', branch: 'GLOBAL', state: stateOf(r) };
+    const node: HistoryNode = { id: r.id, label: r.label, kind: 'rule', branch: 'GLOBAL', state: stateOf(r) };
     nodes.push(node);
     link(last, node);
     last = node;
@@ -132,7 +128,7 @@ export function historyGraph(
     link(lastGlobal, lane);
     let prev = lane;
     for (const r of branchRules) {
-      const node: HistoryNode = { id: r.id, label: plainLabel(r.label), kind: 'rule', branch, state: stateOf(r) };
+      const node: HistoryNode = { id: r.id, label: r.label, kind: 'rule', branch, state: stateOf(r) };
       nodes.push(node);
       link(prev, node);
       prev = node;

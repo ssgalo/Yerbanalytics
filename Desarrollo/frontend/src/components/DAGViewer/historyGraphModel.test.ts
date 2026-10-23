@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildRuleSchema } from '@/data/mock/reglasMock';
 import type { ActionRecord } from '@/types/domain';
-import { decidingRule, historyGraph, orthogonalPath, plainLabel } from './historyGraphModel';
+import { decidingRule, historyGraph, orthogonalPath } from './historyGraphModel';
 
 const schema = buildRuleSchema();
 
@@ -89,14 +89,6 @@ describe('decidingRule', () => {
 
   it('una regla apagada no puede haber decidido', () => {
     expect(decidingRule(schema, event({ tipo: 'Insumo', regla: 'SupplyRule' }))).toBeNull();
-  });
-});
-
-describe('plainLabel', () => {
-  it('quita el emoji del principio de la etiqueta', () => {
-    expect(plainLabel('💦 Riego por déficit hídrico (R-01)')).toBe('Riego por déficit hídrico (R-01)');
-    expect(plainLabel('⏸️ Pausa tras una aplicación (R-06)')).toBe('Pausa tras una aplicación (R-06)');
-    expect(plainLabel('Bloqueo manual')).toBe('Bloqueo manual');
   });
 });
 

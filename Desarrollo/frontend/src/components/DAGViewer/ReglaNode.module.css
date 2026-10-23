@@ -92,7 +92,7 @@
 }
 
 .candado {
-  font-size: 10px;
+  display: inline-flex;
   line-height: 1;
 }
 
@@ -119,7 +119,8 @@
 
 .marca {
   margin-left: auto;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .marcaSi {

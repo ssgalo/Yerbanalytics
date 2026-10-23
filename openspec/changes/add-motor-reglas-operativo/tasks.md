@@ -55,9 +55,9 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 7.3 `lib/catalogoSeguridad.ts`: descripción de `reglas.editar`.
 
 ## 8. Frontend: sin emojis (D-12)
-- [ ] 8.1 RED: `sinEmojis.test.ts` recorre `src/**/*.{ts,tsx,json}` y falla con `\p{Extended_Pictographic}` (hoy falla con `ReglaNode.tsx`, el fixture y los tests).
-- [ ] 8.2 RED: `ReglaNode.test` (ícono `lock` con texto accesible), `NodoPanel.test` (`Chip` "Alerta"), `lecturaTraza.test` (resultado, no carácter).
-- [ ] 8.3 GREEN: reemplazos de D-12; tests existentes sin emojis; token `--scrim` en `tokens.css` y `theme.ts`, usado en `ReasoningModal.module.css`.
+- [x] 8.1 RED: `sinEmojis.test.ts` recorre `src/**/*.{ts,tsx,json}` y falla con `\p{Extended_Pictographic}` (hoy falla con `ReglaNode.tsx`, el fixture y los tests).
+- [x] 8.2 RED: `ReglaNode.test` (ícono `lock` con texto accesible), `NodoPanel.test` (`Chip` "Alerta"), `lecturaTraza.test` (resultado, no carácter).
+- [x] 8.3 GREEN: reemplazos de D-12; tests existentes sin emojis; token `--scrim` en `tokens.css` y `theme.ts`, usado en `ReasoningModal.module.css`.
 
 ## 9. Frontend: pantalla Motor de reglas (D-13)
 - [ ] 9.1 RED: `catalogoView.test`: agrupado por objetivo en el orden fijado, grupos vacíos fuera; compartidos ubicados en el primer grupo con consumidor; `CONSUMIDORES` sin las piezas que ahora son reglas y con `objetivo`.

@@ -34,7 +34,7 @@ const montar = (data: Partial<ReglaNodeData>) =>
   render(
     <ReglaNodeView
       data={{
-        label: '💦 Riego',
+        label: 'Riego',
         ruleId: 'RiegoPorDeficitRule',
         estado: 'accion',
         traza: traza({}),
@@ -54,17 +54,17 @@ describe('ReglaNodeView', () => {
     expect(linea.textContent).toContain('38 %');
     expect(linea.textContent).toContain('<');
     expect(linea.textContent).toContain('45 %');
-    expect(linea.textContent).toContain('✓');
+    expect(within(linea).getByText('Se cumple')).toBeTruthy();
     expect(linea.getAttribute('data-resultado')).toBe('CUMPLE');
   });
 
-  it('una comparación no cumplida se marca con ✗', () => {
+  it('una comparación no cumplida se marca como tal', () => {
     montar({
       estado: 'paso',
       traza: traza({ comparaciones: [cmp({ recibido: 55, resultado: 'NO_CUMPLE' })] }),
     });
 
-    expect(screen.getByTestId('comparacion-0').textContent).toContain('✗');
+    expect(within(screen.getByTestId('comparacion-0')).getByText('No se cumple')).toBeTruthy();
     expect(screen.getByTestId('comparacion-0').getAttribute('data-resultado')).toBe('NO_CUMPLE');
   });
 
@@ -108,13 +108,13 @@ describe('ReglaNodeView', () => {
     });
 
     const linea = screen.getByTestId('comparacion-0');
-    expect(within(linea).getByLabelText('No configurable')).toBeTruthy();
+    expect(within(linea).getByRole('img', { name: 'Condición fija: no se edita' })).toBeTruthy();
   });
 
   it('una configurable no lleva candado', () => {
     montar({});
     expect(
-      within(screen.getByTestId('comparacion-0')).queryByLabelText('No configurable'),
+      within(screen.getByTestId('comparacion-0')).queryByRole('img', { name: 'Condición fija: no se edita' }),
     ).toBeNull();
   });
 
@@ -145,11 +145,11 @@ describe('ReglaNodeView', () => {
         acciones: [],
         bloqueadaPor: 'PosponerPorLluviaRule',
       }),
-      bloqueadaPorLabel: '🌧️ Condición climática (lluvia)',
+      bloqueadaPorLabel: 'Condición climática (lluvia)',
     });
 
     expect(screen.getByText('Omitida')).toBeTruthy();
-    expect(screen.getByText(/la cortó 🌧️ Condición climática \(lluvia\)/)).toBeTruthy();
+    expect(screen.getByText(/la cortó Condición climática \(lluvia\)/)).toBeTruthy();
     expect(screen.queryByTestId('comparacion-0')).toBeNull();
   });
 
@@ -175,11 +175,11 @@ describe('ReglaNodeView', () => {
         acciones: [],
         bloqueadaPor: 'ManualLockRule',
       }),
-      bloqueadaPorLabel: '🔒 Bloqueo manual',
+      bloqueadaPorLabel: 'Bloqueo manual',
     });
 
     expect(screen.getByText('No alcanzada')).toBeTruthy();
-    expect(screen.getByText(/se detuvo en 🔒 Bloqueo manual/)).toBeTruthy();
+    expect(screen.getByText(/se detuvo en Bloqueo manual/)).toBeTruthy();
   });
 
   it('una regla con error muestra el mensaje', () => {

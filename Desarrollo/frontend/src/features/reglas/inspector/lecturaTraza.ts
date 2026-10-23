@@ -30,23 +30,20 @@ function valorTexto(v: Comparacion['recibido'], unidad: string): string {
   return unidad ? `${n} ${unidadSegunValor(unidad, Number(n))}` : n;
 }
 
-const MARCAS: Record<ResultadoComparacion, string> = { CUMPLE: '✓', NO_CUMPLE: '✗', SIN_DATO: '?' };
-
 export interface ComparacionFormateada {
   recibido: string;
   operador: string;
   umbral: string;
-  marca: string;
+  /** Cómo salió la comparación; quien la dibuja elige el ícono (`MarcaResultado`), acá no hay caracteres. */
   resultado: ResultadoComparacion;
 }
 
-/** "38 %  <  42 %  ✓": las tres partes por separado para poder dar estilo a cada una. */
+/** "38 %  <  42 %" y su resultado: las partes por separado para poder dar estilo a cada una. */
 export function formatoComparacion(c: Comparacion): ComparacionFormateada {
   return {
     recibido: valorTexto(c.recibido, c.unidad),
     operador: simboloOperador(c.operador),
     umbral: valorTexto(c.umbral, c.unidad),
-    marca: MARCAS[c.resultado],
     resultado: c.resultado,
   };
 }

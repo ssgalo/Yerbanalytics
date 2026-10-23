@@ -30,7 +30,7 @@ describe('ReglaCard', () => {
   it('colapsada muestra el nombre, la prioridad y el resumen "N parámetros · M modificados"', () => {
     montar(conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40'), 'RiegoPorDeficitRule');
 
-    expect(screen.getByText('💦 Riego por déficit hídrico (R-01)')).toBeTruthy();
+    expect(screen.getByText('Riego por déficit hídrico')).toBeTruthy();
     expect(screen.getByText('6 parámetros · 1 modificado')).toBeTruthy();
     // Cerrada no renderiza los campos...
     expect(screen.queryByLabelText(/Umbral de riego/)).toBeNull();

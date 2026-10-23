@@ -227,8 +227,8 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
 
     fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'pausa' } });
 
-    expect(screen.getByText('⏸️ Pausa tras una aplicación (R-06)')).toBeTruthy();
-    expect(screen.queryByText('🌧️ Posponer por lluvia (R-03)')).toBeNull();
+    expect(screen.getByText('Pausa tras una aplicación')).toBeTruthy();
+    expect(screen.queryByText('Posponer por lluvia')).toBeNull();
     // Al buscar, las coincidencias se abren solas
     expect(screen.getByLabelText(/Pausa de riego tras una aplicación/)).toBeTruthy();
   });
@@ -238,8 +238,8 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
 
     fireEvent.change(screen.getByLabelText('Rama'), { target: { value: 'INSUMO' } });
 
-    expect(screen.getByText('🧪 Dosificación de insumo')).toBeTruthy();
-    expect(screen.queryByText('💦 Riego por déficit hídrico (R-01)')).toBeNull();
+    expect(screen.getByText('Dosificación de insumo')).toBeTruthy();
+    expect(screen.queryByText('Riego por déficit hídrico')).toBeNull();
   });
 
   it('"sólo modificados" muestra las reglas con algún parámetro editado', () => {
@@ -247,8 +247,8 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
 
     fireEvent.click(screen.getByLabelText(/Sólo modificados/));
 
-    expect(screen.getByText('🛑 Límite de dosis diaria')).toBeTruthy();
-    expect(screen.queryByText('💦 Riego por déficit hídrico (R-01)')).toBeNull();
+    expect(screen.getByText('Límite de dosis diaria')).toBeTruthy();
+    expect(screen.queryByText('Riego por déficit hídrico')).toBeNull();
   });
 
   it('"Ver por parámetro" lista cada parámetro una sola vez con las reglas que lo usan', () => {

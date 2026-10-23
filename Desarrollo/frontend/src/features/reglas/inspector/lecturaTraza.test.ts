@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { etiquetaOrigen, formatoComparacion, resumenTraza, simboloOperador } from './lecturaTraza';
 import { evaluarMotor, type EntradaMotor } from '@/data/mock/trazaReglas';
-import { buildRuleSchema } from '@/data/mock/reglasMock';
+import { buildRuleSchema, soloReglasDeLaCadena } from '@/data/mock/reglasMock';
 import fixture from '@/data/mock/catalogoReglas.fixture.json';
 import type { CatalogoReglas, Comparacion } from '@/types/domain';
 
-const catalogo = fixture as CatalogoReglas;
+const catalogo = soloReglasDeLaCadena(fixture as CatalogoReglas);
 const schema = buildRuleSchema();
 const base: EntradaMotor = {
   sectorId: 'MZ-1-001',
@@ -42,15 +42,14 @@ describe('simboloOperador', () => {
 });
 
 describe('formatoComparacion', () => {
-  it('arma "recibido op umbral" con la unidad y marca si se cumplió', () => {
+  it('arma "recibido op umbral" con la unidad y devuelve el resultado, no un carácter', () => {
     expect(formatoComparacion(cmp({}))).toEqual({
       recibido: '38 %',
       operador: '<',
       umbral: '45 %',
-      marca: '✓',
       resultado: 'CUMPLE',
     });
-    expect(formatoComparacion(cmp({ recibido: 55, resultado: 'NO_CUMPLE' })).marca).toBe('✗');
+    expect(formatoComparacion(cmp({ recibido: 55, resultado: 'NO_CUMPLE' })).resultado).toBe('NO_CUMPLE');
   });
 
   it('con valor 1 la unidad va en singular: "1 riego" y "3 riegos"', () => {
@@ -62,7 +61,7 @@ describe('formatoComparacion', () => {
   it('SIN_DATO se lee "sin dato" y no inventa valor', () => {
     const f = formatoComparacion(cmp({ recibido: null, resultado: 'SIN_DATO' }));
     expect(f.recibido).toBe('sin dato');
-    expect(f.marca).toBe('?');
+    expect(f.resultado).toBe('SIN_DATO');
   });
 
   it('redondea decimales largos y deja la unidad pegada con un espacio', () => {
@@ -82,7 +81,7 @@ describe('formatoComparacion', () => {
 });
 
 describe('formatoComparacion · ventana horaria (operador EN)', () => {
-  it('"17:42 ∈ 06:00-18:00 ✓": la hora local contra la ventana, sin unidad', () => {
+  it('"17:42 ∈ 06:00-18:00": la hora local contra la ventana, sin unidad', () => {
     const f = formatoComparacion(
       cmp({
         etiqueta: 'Hora local',
@@ -95,7 +94,7 @@ describe('formatoComparacion · ventana horaria (operador EN)', () => {
       }),
     );
 
-    expect([f.recibido, f.operador, f.umbral, f.marca]).toEqual(['17:42', '∈', '06:00-18:00', '✓']);
+    expect([f.recibido, f.operador, f.umbral, f.resultado]).toEqual(['17:42', '∈', '06:00-18:00', 'CUMPLE']);
   });
 
   it('simboloOperador conoce a todos los operadores', () => {
@@ -140,7 +139,7 @@ describe('resumenTraza', () => {
     expect(r).toContainEqual(
       expect.objectContaining({
         tipo: 'omitida',
-        texto: expect.stringMatching(/Riego por déficit hídrico \(R-01\) quedó omitida por .*Posponer por lluvia/),
+        texto: expect.stringMatching(/Riego por déficit hídrico quedó omitida por .*Posponer por lluvia/),
       }),
     );
   });

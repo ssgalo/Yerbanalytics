@@ -6,7 +6,7 @@ import { usePageTitle } from '@/hooks/PageMeta';
 import { useColumnQuery } from '@/hooks/useColumnQuery';
 import { useHistory } from '@/hooks/useHistory';
 import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
-import { decidingRule, plainLabel } from '@/components/DAGViewer/historyGraphModel';
+import { decidingRule } from '@/components/DAGViewer/historyGraphModel';
 import type { Range } from '@/lib/columnQuery';
 import { ActionDetail } from './components/ActionDetail';
 import { HISTORY_COLUMNS } from './actionPresentation';
@@ -42,7 +42,7 @@ export function HistorialPage() {
   const ruleLabel = useCallback(
     (id: string) => {
       const node = schema?.nodes.find((n) => n.id === id);
-      return node ? plainLabel(node.label) : id;
+      return node ? node.label : id;
     },
     [schema],
   );

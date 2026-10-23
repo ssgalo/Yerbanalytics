@@ -38,8 +38,8 @@ describe('Ruta /reglas (7.1)', () => {
     expect(screen.getByRole('tab', { name: 'Inspector' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Parámetros/ }).getAttribute('aria-selected')).toBe('true');
     // La pestaña Parámetros carga el catálogo del repositorio (mock): las 13 reglas
-    expect(await screen.findByText('💦 Riego por déficit hídrico (R-01)')).toBeTruthy();
-    expect(screen.getByText('🔒 Bloqueo manual')).toBeTruthy();
+    expect(await screen.findByText('Riego por déficit hídrico')).toBeTruthy();
+    expect(screen.getByText('Bloqueo manual')).toBeTruthy();
   });
 
   it('el título de la topbar es "Motor de reglas"', async () => {
@@ -108,7 +108,7 @@ describe('Borrador de Parámetros entre pestañas (#1)', () => {
 
   it('sin cambios no hay marca en la pestaña', async () => {
     montarEn('/reglas');
-    await screen.findByText('💦 Riego por déficit hídrico (R-01)');
+    await screen.findByText('Riego por déficit hídrico');
     expect(screen.queryByTitle(/sin guardar/)).toBeNull();
   });
 });
