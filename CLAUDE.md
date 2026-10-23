@@ -110,6 +110,7 @@ hardware real.
 - **Tanque (de insumo)**: stock de un insumo por macro-zona; lo carga el operario y cada aplicación lo descuenta. Un tanque sin registrar
   es un stock desconocido, no un tanque lleno. **Reingreso**: tras un fitosanitario el sector queda 24 h con el reingreso restringido
   (`Sector.reentryUntil`); sólo informa, no bloquea actuadores.
+- **Efectividad (E-01…E-03) y S-06**: cada riego, fertilizante correctivo (F-C2) y fitosanitario abre un seguimiento que `effectiveness/EffectivenessJob` resuelve: el riego con una lectura de verificación a los 30 min (que **no corre el motor**) y +8 puntos de humedad; los tratamientos comparando el diagnóstico a los 14 / 7 días. «Sin efectividad» **bloquea su repetición autónoma** (riego: toda la zona; tratamiento: el sector; R-02, el plan de nutrición y la mediasombra no) hasta que alguien registre la revisión (`POST /api/efectividad/{id}/revision`, permiso `efectividad.revisar`). El nodo testigo puede registrarse con el sector donde está.
 - **Plan de nutrición**: fertilizante foliar en **todos los sectores de la macro-zona cada N días** (3–30, fábrica 7; lo fija el agrónomo en el
   detalle de la zona), sin mirar lo que se mide (N-01), y adelantado si la CE media baja de 0,5 dS/m sin fertilizar en 5 días (N-02). El motor
   lo pide en una **tanda** (un pedido por sector) y el intervalo corre desde que se aplicó el último sector (`nutrition/`).
@@ -269,7 +270,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay catorce scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay quince scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -295,6 +296,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   `hardware.ver` al Operario a una matriz ya sembrada (S-05, registro de reparaciones).
 > - `resources/migracion-permisos-insumos.sql` — agrega `insumos.ver`/`insumos.gestionar` (el Operario carga los tanques; el rol Servicio
 >   los usa desde el simulador) a una matriz ya sembrada.
+> - `resources/migracion-permisos-efectividad.sql` — agrega `efectividad.revisar` (Ingeniero y Operario) a una matriz ya sembrada (S-06).
 > - `resources/migracion-dosis-por-insumo.sql` — `insumo.dosis-ml` pasa a `insumo.dosis-fertilizante`/`insumo.dosis-fitosanitario`
 >   (copia el valor editado al fertilizante).
 >
@@ -321,6 +323,7 @@ cd Desarrollo/backend
   días). El plan se lee de `GET /api/nursery` → `zonas[].nutritionPlan`. Ver "Plan de nutrición" en el README del backend.
 - `GET /api/tanques`, `POST /api/tanques/{zona}/{insumo}/recarga {liters, capacityLiters?}` → tanques de insumo por macro-zona y
   registro de sus cargas (permisos `insumos.ver` / `insumos.gestionar`). Ver "Aplicación de insumos" en el README del backend.
+- `POST /api/efectividad/{eventId}/revision {detail}` → revisión de una acción que quedó sin efectividad (S-06): levanta el bloqueo de su repetición (permiso `efectividad.revisar`; el detalle es obligatorio). Ver "Efectividad de las acciones y S-06" en el README del backend.
 - `POST /api/sectores/{sectorId}/revision-fitosanitario {detail}` → revisión de un sector que alcanzó el tope de fitosanitarios (F-06): levanta el
   bloqueo (permiso `insumos.gestionar`; el detalle es obligatorio). Ver "Reglas bióticas" en el README del backend.
 - `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{id}` → bloqueo manual de la actuación autónoma por sector o

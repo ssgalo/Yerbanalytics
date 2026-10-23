@@ -72,3 +72,28 @@ reaplica (sólo los eventos evaluados desde este cambio bloquean). Sin script ma
 ## Preguntas abiertas
 - ¿Qué hacer si no hay diagnóstico vigente al vencer la latencia (E-02/E-03)? Default: `Pendiente` hasta 48 h, luego `Sin efectividad`.
 - ¿El bloqueo de riego por S-06 de la MZ levanta solo cuando una verificación posterior sí sube ≥ 8? La v2 dice "hasta que alguien registre la revisión": **no**, sólo la revisión.
+
+## Decisiones tomadas al implementar
+
+Los nombres de la spec se implementaron en inglés: `EfectividadService` → `EffectivenessService` (política) + `EffectivenessJob` (scheduler),
+`SinEfectividadRule` → `IneffectiveActionRule`, `AccionEvaluable` → tres evaluadores puros (`IrrigationEvaluator`, `CorrectiveFertilizerEvaluator`,
+`FungicideEvaluator`) sin interfaz común, porque sus entradas difieren y una interfaz con datos opcionales no aportaba nada.
+
+- **El bloqueo es la marca `bloqueo_repeticion` del evento**, ahora con `efectividad_tipo` (`IRRIGATION` | `CORRECTIVE_FERTILIZER` | `FUNGICIDE`). Sólo la baja
+  `EffectivenessReviewService`. Una verificación posterior que sí suba no lo levanta (pregunta abierta resuelta como la v2).
+- **El `CRITICAL` lo emite el job una vez, al dar el veredicto**, no la regla en cada ciclo. La regla (riego) y la precondición (tratamientos) sólo bloquean.
+- **S-06 de tratamientos es una precondición** de `ApplicationPreconditions` (rechaza, no difiere) y no una regla, porque una regla de la rama de insumos
+  bloquearía por igual al fertilizante correctivo y al fitosanitario, y no hay otro lugar por el que pase **toda** aplicación. Su bypass `block` es el de
+  `IneffectiveActionRule`: apagar o saltear la regla también deja pasar a los tratamientos.
+- **No se creó la llave `r02-cap`** que pedía la spec de control: R-02 ya tiene su cooldown `cap` (`DeficitCriticoRule`).
+- **D-7 (tope de R-02): se mantiene siempre** y queda registrado como desviación consciente de la v2.
+- **Prioridad 7** para `IneffectiveActionRule`: se liberó moviendo `DailyDoseLimitRule` (retirada) a 28.
+- **Sin diagnóstico vigente (pregunta abierta):** el seguimiento queda abierto `efectividad.espera-sin-diagnostico-horas` (48) y después es «Sin efectividad por
+  falta de dato». Se agregó como parámetro, igual que las esperas de E-02 (`efectividad.latencia-fertilizante-dias`, 14) y E-03 (`efectividad.latencia-fitosanitario-dias`, 7).
+- **Racha de aplicaciones (E-02):** mientras el sector tiene un seguimiento abierto de ese tipo no se abre otro; el fitosanitario de un sector sano (preventivo a
+  lindantes de un foco) no abre seguimiento, porque no hay daño contra el cual comparar.
+- **Lectura de verificación:** `VerificationReads` (memoria del proceso) marca el pedido; `NurseryService` lo consulta antes de resolver el pulso. Si el backend
+  se reinicia entre el pedido y la respuesta, el pedido se repite a los 5 minutos.
+- **Sector del nodo testigo:** `dispositivo.sector_id` (ya existía, antes sólo para actuadores) se admite para el nodo testigo, validado contra la zona; no cuenta
+  como «sector con hardware incompleto».
+- **Escenario «Riego efectivo»:** pendiente (ver tasks 7.2).

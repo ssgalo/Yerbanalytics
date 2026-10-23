@@ -1150,6 +1150,42 @@ extendido de la macro-zona) no está implementada**: ver abajo.
   una hora de apertura ni de cierre que se pueda retener 5 horas. Sin ese dueño, una versión «parcial» cerraría la malla a destiempo o la dejaría cerrada. Los
   parámetros `estres.pct-sectores-mz` y `estres.dias-proteccion` de la spec tampoco se crearon.
 
+## Efectividad de las acciones y S-06 (`add-efectividad-y-s06` · reglas_v2 §4 y §9)
+
+Cada acción que se puede juzgar abre un **seguimiento** en el historial y, pasada su espera, el servicio de efectividad la evalúa. Una acción «sin
+efectividad» **bloquea su repetición autónoma** hasta que alguien registre la revisión (S-06).
+
+| Pieza | Qué hace |
+|---|---|
+| `effectiveness/EffectivenessJob` | `@Scheduled` (`yerbanalytics.historial.eval-interval-ms`, 30 s). Recorre los seguimientos abiertos y los cierra. Reemplaza al `@Scheduled` de `HistorialService` y a `FollowUpRule` (borrada: era un delegador que repetía una consulta global por cada sector evaluado) |
+| `effectiveness/EffectivenessService` | Política: esperas, delta de E-01, qué es un diagnóstico vigente para comparar y qué aplicaciones abren seguimiento. Es `DemoControllable` (apagable) y `FollowUpPolicy` |
+| `IrrigationEvaluator` · `CorrectiveFertilizerEvaluator` · `FungicideEvaluator` | Lógica pura de E-01, E-02 y E-03 |
+| `effectiveness/EffectivenessBlockService` | Lado de consulta de S-06: qué está bloqueado en una zona o un sector |
+| `engine/rules/IneffectiveActionRule` (S-06) | Prioridad 7 · `RIEGO`, **después de R-02**: con el último riego de la zona sin efectividad corta la rama de riego de todos los sectores y retira lo encolado salvo el déficit crítico |
+| `effectiveness/EffectivenessReviewService` | `POST /api/efectividad/{eventId}/revision {detail}` (permiso `efectividad.revisar`): baja la marca de bloqueo y deja un evento «Revisión» |
+
+- **E-01 (riego).** `efectividad.verificacion-min` (30 min) **después de que cierra la válvula** el servicio pide `LEER_AHORA` a la zona; esa lectura
+  (`VerificationReads`) se guarda con origen `OTHER`, **no corre el motor ni cuenta como respuesta al pulso** (principio 7 de la v2). El riego es
+  «Efectiva» si la humedad **subió** `efectividad.delta-riego` (8) puntos o más: el delta lleva signo (antes se usaba `Math.abs`, y un riego que bajaba la
+  humedad contaba como efectivo). Si el nodo testigo tiene **sector registrado** (opcional en el alta de hardware, `dispositivo.sector_id`), sólo se verifica el
+  riego de ese sector; sin él, cualquier riego de la zona.
+- **E-02 (fertilizante correctivo, F-C2).** `efectividad.latencia-fertilizante-dias` (14) desde la **primera** aplicación de la racha: Efectiva si el sector
+  es Sano o la severidad bajó al menos un nivel. El plan de nutrición (N-01/N-02) no se evalúa ni se bloquea.
+- **E-03 (fitosanitario).** `efectividad.latencia-fitosanitario-dias` (7): Efectiva si la severidad no aumentó y **ningún lindante nuevo** tiene el mismo
+  diagnóstico (los lindantes de la grilla de F-04; se guardan los que ya lo tenían al aplicar en `historial_evento.vecinos_antes`).
+- **F-05.** Un diagnóstico Sano vigente y posterior al tratamiento cierra el seguimiento como «Efectiva» antes de la espera, con un `INFO`.
+- **Sin diagnóstico vigente** al vencer la espera: el seguimiento queda abierto `efectividad.espera-sin-diagnostico-horas` (48) y después es «Sin efectividad
+  por falta de dato».
+- **Alcance del bloqueo.** Riego: toda la macro-zona (`IneffectiveActionRule`). Fertilizante correctivo y fitosanitario: el sector, como **precondición** más de
+  `ApplicationPreconditions` (rechaza, no difiere), porque toda aplicación pasa por ahí. La mediasombra nunca se bloquea.
+- **Aviso.** El `CRITICAL` lo emite `EffectivenessJob` **una vez, al dar el veredicto** (no la regla en cada ciclo, que repetiría el mismo evento).
+- **R-02 (D-7).** Se mantiene el tope de un riego cada `riego.exceptuado-bloqueo` (12 h) **siempre**, no sólo con S-06 en pie: sin caudalímetro un sensor
+  roto que marca «seco» dispararía R-02 en cada ciclo. Es la desviación consciente de la decisión (a) de `align-reglas-existentes-v2`; se conserva.
+- **Eventos de antes.** Los seguimientos abiertos sin tipo se reubican en el primer ciclo: los de riego se evalúan como riego, los demás se cierran sin
+  veredicto. El `bloqueo_repeticion` histórico no bloquea (sólo cuentan los eventos con `efectividad_tipo`).
+- **Retirado.** Los parámetros de latencia y umbral de recuperación de la configuración agronómica (`getLatencyMs`, `getUmbralRecuperacion`) ya no los lee nadie.
+- **Migración manual:** `resources/migracion-permisos-efectividad.sql` (permiso `efectividad.revisar` para Ingeniero y Operario en una matriz ya sembrada).
+
 ## Historial de lecturas
 
 Casi todas las reglas de nutrición y de hongos/plagas/estrés de `reglas_v2` miran el **pasado** de las lecturas
