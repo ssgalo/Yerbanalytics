@@ -90,6 +90,15 @@ estado operativo, estado por defecto, consecuencia (si es protección) y último
 - **WHEN** se pide prender una regla que ya está prendida
 - **THEN** responde `200` y no se escribe fila ni evento de historial
 
+#### Scenario: Apagar una retirada que sólo la siembra tiene apagada
+- **WHEN** una persona pide apagar `SupplyRule`, que está apagada sólo por `yerbanalytics.reglas.retiradas` (sin fila)
+- **THEN** se exigen motivo y confirmación si es una protección, se guarda la fila (quién, cuándo, motivo) y se deja el evento de historial
+- **AND** un segundo pedido igual, ya con fila, responde `200` sin escribir nada
+
+#### Scenario: Pedidos simultáneos para la misma regla
+- **WHEN** llegan varios pedidos a la vez para la misma regla
+- **THEN** se atienden de a uno y sólo el primero escribe fila y evento
+
 #### Scenario: El simulador no escribe el estado operativo
 - **WHEN** la cuenta de rol Servicio pide `PUT /api/rules/{name}/estado`
 - **THEN** responde `403`
