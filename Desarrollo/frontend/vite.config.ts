@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
@@ -15,5 +16,8 @@ export default defineConfig({
     // Sin `open`: el navegador lo abre `start-all`, que es el único que sabe cuántas
     // pestañas hacen falta (dashboard y, si está instalado, simulador). Con `open: true`
     // acá se abría una pestaña de más cada vez que se levantaba todo junto.
+  },
+  test: {
+    setupFiles: ['./src/testSetup.ts'],
   },
 });
