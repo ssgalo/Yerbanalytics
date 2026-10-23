@@ -38,6 +38,8 @@ import type {
   SimulatedSensor,
   SimulatedWeather,
   SimulatorStatus,
+  Supply,
+  TankLevel,
   TelemetryInput,
   TipoSecuencia,
 } from './types';
@@ -393,6 +395,28 @@ export async function createManualLock(lock: {
 
 export async function releaseManualLock(id: number): Promise<void> {
   await check(await fetch(`${BACKEND}/api/bloqueos/${id}`, { method: 'DELETE' }), 'levantar el bloqueo manual');
+}
+
+/* ----------------------------------------------------------------
+   Input tanks (public platform API: the same one the dashboard uses)
+   ---------------------------------------------------------------- */
+
+export async function getTanks(): Promise<TankLevel[]> {
+  return json(await fetch(`${BACKEND}/api/tanques`), 'consultar los tanques de insumo');
+}
+
+/** Adds liters to a tank; the first load of a tank also declares its capacity. */
+export async function loadTank(
+  zoneId: string,
+  supply: Supply,
+  load: { liters: number; capacityLiters?: number },
+): Promise<TankLevel> {
+  const res = await fetch(`${BACKEND}/api/tanques/${encodeURIComponent(zoneId)}/${supply}/recarga`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(load),
+  });
+  return json(res, 'registrar la carga del tanque');
 }
 
 /* ----------------------------------------------------------------

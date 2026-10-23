@@ -7,6 +7,7 @@ import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { SecuenciaRechazadaError } from '@/data/secuenciaError';
 import { ManualLockError } from '@/data/manualLockError';
+import { TankLoadError } from '@/data/tankError';
 import { PlanRustificacionError } from '@/data/planRustificacionError';
 import type {
   ActionRecord,
@@ -30,6 +31,9 @@ import type {
   TrazaEvaluacion,
   ManualLock,
   NewManualLock,
+  NewTankLoad,
+  Supply,
+  TankLevel,
   NuevoPlanRustificacion,
   PlanRustificacion,
 } from '@/types/domain';
@@ -83,6 +87,8 @@ export class MockRepository implements DataRepository {
   private planes: Map<string, PlanRustificacion> | null = null;
   private manualLocks: ManualLock[] = [];
   private nextLockId = 1;
+  /** Tanques de insumo de la sesión; arranca sin ninguno registrado, como un backend recién instalado. */
+  private tanks: TankLevel[] = [];
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
 
@@ -276,6 +282,43 @@ export class MockRepository implements DataRepository {
       throw new ManualLockError(`No hay un bloqueo vigente con id ${id}.`);
     }
     this.manualLocks = this.manualLocks.filter((l) => l.id !== id);
+  }
+
+  async getTanks(): Promise<TankLevel[]> {
+    return structuredClone(this.tanks);
+  }
+
+  async loadTank(zoneId: string, supply: Supply, load: NewTankLoad): Promise<TankLevel> {
+    if (!Number.isFinite(load.liters) || load.liters <= 0) {
+      throw new TankLoadError('Los litros de la carga deben ser un número mayor que cero.');
+    }
+    const existing = this.tanks.find((t) => t.zoneId === zoneId && t.supply === supply);
+    if (!existing && load.capacityLiters == null) {
+      throw new TankLoadError('El tanque todavía no está registrado: indicá su capacidad en litros.');
+    }
+    const capacityMl = Math.round((load.capacityLiters ?? existing!.capacityMl / 1000) * 1000);
+    const levelMl = (existing?.levelMl ?? 0) + Math.round(load.liters * 1000);
+    if (levelMl > capacityMl) {
+      throw new TankLoadError(
+        `La carga no entra: el tanque quedaría en ${(levelMl / 1000).toFixed(1)} L y su capacidad es de ${(capacityMl / 1000).toFixed(1)} L.`,
+      );
+    }
+    const levelPct = (levelMl * 100) / capacityMl;
+    const tank: TankLevel = {
+      zoneId,
+      supply,
+      supplyLabel: supply === 'FERTILIZER' ? 'Fertilizante' : 'Fitosanitario',
+      capacityMl,
+      levelMl,
+      levelPct,
+      low: levelPct < 20,
+      updatedTs: Date.now(),
+      updatedBy: 'Usuario de la demo',
+    };
+    this.tanks = [...this.tanks.filter((t) => t !== existing), tank].sort(
+      (a, b) => a.zoneId.localeCompare(b.zoneId) || a.supply.localeCompare(b.supply),
+    );
+    return structuredClone(tank);
   }
 
   private fleet(): RawDispositivo[] {

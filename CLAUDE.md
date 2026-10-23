@@ -103,6 +103,12 @@ hardware real.
   lectura son parámetros `sensado.*` del catálogo. También se pide a mano (`POST /api/pulsos`, con o sin motor).
 - **Diagnóstico nuevo**: las reglas que usan el diagnóstico de IA (hoy la de insumo) actúan una vez
   por diagnóstico; queda marcado como usado en el sector. La telemetría no toca el diagnóstico.
+- **Aplicación (de insumo)**: orden de fertilizante o fitosanitario a un sector (`supply/ApplicationService`). Toda aplicación pasa por
+  ahí: la regla decide **qué** insumo y el servicio verifica las precondiciones P-D1…P-D5, publica `pump ON {ml}` y descuenta el tanque.
+  Lo que no es el momento queda **pendiente** y se reintenta en la próxima ventana apta (07–10 / 17–19 de fábrica).
+- **Tanque (de insumo)**: stock de un insumo por macro-zona; lo carga el operario y cada aplicación lo descuenta. Un tanque sin registrar
+  es un stock desconocido, no un tanque lleno. **Reingreso**: tras un fitosanitario el sector queda 24 h con el reingreso restringido
+  (`Sector.reentryUntil`); sólo informa, no bloquea actuadores.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
@@ -248,7 +254,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay doce scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay catorce scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -272,6 +278,10 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   para su escenario de hardware incompleto); sólo lectura.
 > - `resources/migracion-permisos-hardware-reparar.sql` — agrega `hardware.reparar` (Ingeniero, Operario y Servicio) y
 >   `hardware.ver` al Operario a una matriz ya sembrada (S-05, registro de reparaciones).
+> - `resources/migracion-permisos-insumos.sql` — agrega `insumos.ver`/`insumos.gestionar` (el Operario carga los tanques; el rol Servicio
+>   los usa desde el simulador) a una matriz ya sembrada.
+> - `resources/migracion-dosis-por-insumo.sql` — `insumo.dosis-ml` pasa a `insumo.dosis-fertilizante`/`insumo.dosis-fitosanitario`
+>   (copia el valor editado al fertilizante).
 >
 > Detalle en el README del backend.
 
@@ -292,6 +302,8 @@ cd Desarrollo/backend
 - `POST /api/pulsos {ejecutarMotor}` → pulso de sensado manual de todas las zonas, sólo por API; `409` si hay
   uno en curso. En Demo Expo, la lectura con motor es la secuencia `LECTURA` con `ejecutarMotor` (sólo la zona
   de la secuencia). Ver "Pulso de sensado" en el README del backend.
+- `GET /api/tanques`, `POST /api/tanques/{zona}/{insumo}/recarga {liters, capacityLiters?}` → tanques de insumo por macro-zona y
+  registro de sus cargas (permisos `insumos.ver` / `insumos.gestionar`). Ver "Aplicación de insumos" en el README del backend.
 - `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{id}` → bloqueo manual de la actuación autónoma por sector o
   macro-zona (S-01): al activar cierra válvulas y bombas y cancela el riego encolado; reanudar no repone nada.
   Un bloqueo es de un sector o de una zona, nunca de los dos. Ver "Bloqueo manual" en el README del backend.
@@ -340,6 +352,12 @@ cd Desarrollo/backend
   `ShadeFaultRule` leen la marca por `RuleContext.faults` y sacan al sector (o a la malla) de lo autónomo; R-02 no se exceptúa.
   Efecto a conocer: **un sector con falla hidráulica no se riega ni se dosifica solo hasta que alguien registre la reparación**.
   Detalle en el README del backend ("Fallas del nodo (S-05)").
+- **Las aplicaciones de insumo se deciden en las reglas y se ejecutan en `ApplicationService`** (`supply/`), igual que el riego en su despacho:
+  una regla emite `ACTIVAR_BOMBA` con `DetalleInsumo(supply, fromDiagnosis)` y **nunca publica la bomba**; el servicio verifica
+  `ApplicationPreconditions` (P-D1…P-D5, `DemoControllable`), el stock del tanque, registra y descuenta. El backend manda **mililitros** (el
+  firmware convierte a tiempo y corta solo; tope 50 ml por comando = `ContratoNodo.BOMBA_ML_MAX`) y hay una bomba por sector: el comando
+  no lleva el insumo. **`SupplyRule` y `DailyDoseLimitRule` están retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`) hasta que
+  entren las reglas N-*/F-*: hoy ninguna regla productiva pide una aplicación. Detalle en el README del backend.
 - **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y

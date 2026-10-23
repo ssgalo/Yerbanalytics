@@ -172,7 +172,7 @@ function leerReglasDelBackend(): Record<string, string> {
 
 /**
  * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
- * escalamiento del nodo, el guard de lectura inválida y el servicio de fallas del hardware): también
+ * escalamiento del nodo, el guard de lectura inválida, el servicio de fallas del hardware y los de aplicación de insumos): también
  * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
@@ -182,6 +182,9 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   EscalamientoNodo: resolve(DIR_ENGINE, '..', 'service', 'EscalamientoNodoService.java'),
   ReadingValidationGuard: resolve(DIR_ENGINE, '..', 'readings', 'ReadingValidationGuard.java'),
   HardwareFaultService: resolve(DIR_ENGINE, '..', 'service', 'HardwareFaultService.java'),
+  ApplicationPreconditions: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationPreconditions.java'),
+  ApplicationService: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationService.java'),
+  TankService: resolve(DIR_ENGINE, '..', 'supply', 'TankService.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {

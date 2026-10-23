@@ -18,16 +18,16 @@ class PermisoTest {
         assertThat(Permiso.matrizPorDefecto(Rol.ADMINISTRADOR)).containsExactlyInAnyOrder(Permiso.values());
         assertThat(codigos(Rol.OPERARIO)).containsExactlyInAnyOrder(
                 "vivero.ver", "diagnosticos.ver", "historial.ver", "capturas.ver", "pasadas.ver",
-                "bloqueos.ver", "bloqueos.gestionar", "hardware.ver", "hardware.reparar");
+                "bloqueos.ver", "bloqueos.gestionar", "hardware.ver", "hardware.reparar", "insumos.ver", "insumos.gestionar");
         assertThat(codigos(Rol.SERVICIO)).containsExactlyInAnyOrder("vivero.ver", "topologia.ver", "capturas.ver",
                 "capturas.ordenar", "diagnosticos.ver", "diagnosticos.registrar", "camara.gestionar",
                 "bloqueos.ver", "bloqueos.gestionar", "simulacion.gestionar", "hardware.ver", "hardware.reparar",
-                "reglas.ver", "pasadas.ver", "pasadas.operar");
+                "reglas.ver", "pasadas.ver", "pasadas.operar", "insumos.ver", "insumos.gestionar");
         assertThat(codigos(Rol.INGENIERO_AGRONOMO)).contains("configuracion.editar", "reglas.editar", "bloqueos.ver", "bloqueos.gestionar",
-                        "hardware.reparar")
+                        "hardware.reparar", "insumos.ver", "insumos.gestionar")
                 .doesNotContain("auditoria.ver", "pasadas.operar", "usuarios.gestionar");
-        assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver", "hardware.ver")
-                .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar", "hardware.reparar");
+        assertThat(codigos(Rol.PRODUCTOR_VIVERISTA)).contains("pasadas.operar", "topologia.ver", "bloqueos.ver", "hardware.ver", "insumos.ver")
+                .doesNotContain("auditoria.ver", "reglas.editar", "bloqueos.gestionar", "hardware.reparar", "insumos.gestionar");
     }
 
     @Test

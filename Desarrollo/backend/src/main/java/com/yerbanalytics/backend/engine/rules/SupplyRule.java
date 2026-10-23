@@ -8,30 +8,29 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
-import com.yerbanalytics.backend.engine.parametros.ParametrosInsumo;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
+import com.yerbanalytics.backend.supply.Supply;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
- * Regla de dosificación de insumo por diagnóstico IA (HU-07).
+ * Regla de dosificación de insumo por diagnóstico IA (HU-07). <b>Retirada por defecto</b>: arranca apagada
+ * ({@code yerbanalytics.reglas.retiradas}, ver {@code RuleOverridesStore}) hasta que las reglas v2 de aplicación
+ * (N-*, F-*) la reemplacen; sin ellas, borrarla dejaría al vivero sin dosificación.
  *
  * <p><b>Prioridad:</b> 12 (ejecutora, corre justo después de {@link RiegoRule}).
  *
  * <p><b>Condición:</b> el sector está en estado {@code "critical"} Y la confianza del
  * diagnóstico alcanza {@code diagnostico.confianza-minima} (HU-07 CA-01/02).
  *
- * <p><b>Acción si se cumple:</b> {@code ACTIVAR_BOMBA} con la dosis en ml ({@code insumo.dosis-ml}) — el
- * {@link com.yerbanalytics.backend.engine.ActionExecutor} activará la bomba peristáltica con esa cantidad y
- * registrará la dosificación en el historial.
+ * <p><b>Acción si se cumple:</b> {@code ACTIVAR_BOMBA} para fertilizante. La regla sólo decide <i>qué</i>; el
+ * {@link com.yerbanalytics.backend.engine.ActionExecutor} se lo pide al {@code ApplicationService}, que verifica las
+ * precondiciones (ventana, temperatura, lluvia, humedad, intervalos), aplica la dosis del catálogo y descuenta el tanque.
  *
  * <p><b>Acción si no se cumple:</b> {@code NOOP_INFO} — Registro de Inacción
  * que explica qué condición falló (status, confianza insuficiente, o sin diagnóstico).
- *
- * <p><b>Nota R3:</b> en la Fase 4 esta regla será enriquecida con el guard de
- * {@code DosisLimiteRule} (máximo 24 h) y la integración real del modelo IA.
  */
 @Component
 public class SupplyRule implements Rule {
@@ -67,7 +66,7 @@ public class SupplyRule implements Rule {
 
     @Override
     public List<DefinicionParametro> parametros() {
-        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosInsumo.DOSIS_ML);
+        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA);
     }
 
     @Override
@@ -94,9 +93,7 @@ public class SupplyRule implements Rule {
             String motivo = String.format(
                     "Diagnóstico IA: %s (confianza %.0f%% ≥ %.0f%%). Dosificación autorizada.",
                     estado, conf, confUmbral);
-            // La cantidad la decide el backend: sin ella el firmware dosificaría su valor por defecto.
-            int ml = (int) Math.round(ev.numero(ParametrosInsumo.DOSIS_ML));
-            return List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, NAME, motivo, new DetalleInsumo(ml)));
+            return List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, NAME, motivo, new DetalleInsumo(Supply.FERTILIZER, true)));
         } else {
             String motivo = String.format(
                     "Diagnóstico IA: %s (confianza %.0f%% < %.0f%% requerida). No se dosifica.",

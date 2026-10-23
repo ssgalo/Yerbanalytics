@@ -18,6 +18,8 @@ import { DiagnosisCard } from './components/DiagnosisCard';
 import { PostActionCard } from './components/PostActionCard';
 import { SectorHistory } from './components/SectorHistory';
 import { ManualLockCard } from '@/features/manual-lock/ManualLockCard';
+import { Callout } from '@/components/ui/Callout';
+import { hasReentryRestriction, reentryMessage } from './reentry';
 
 import styles from './SectorPage.module.css';
 
@@ -92,6 +94,11 @@ export function SectorPage() {
           Ver última evaluación del motor
         </Link>
       </div>
+
+      {/* Reingreso restringido tras un fitosanitario: sólo informa, no bloquea ningún actuador */}
+      {sector.reentryUntil != null && hasReentryRestriction(sector.reentryUntil, Date.now()) && (
+        <Callout tone="warn">{reentryMessage(sector.reentryUntil)}</Callout>
+      )}
 
       {/* Diagnóstico a la izquierda, seguimiento a la derecha, historial abajo a todo el ancho */}
       <div className={styles.layout}>

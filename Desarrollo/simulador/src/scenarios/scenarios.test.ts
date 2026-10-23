@@ -43,7 +43,9 @@ function legacy(selected: LegacyKey[], t: ThresholdMap) {
     clima = clima ? { ...clima, uvIndex: uv } : { tempC: 32, humedadRelPct: 45, probLluviaPct: 5, precipMm: 0, uvIndex: uv };
   }
   if (selected.includes('SUPPLY')) {
-    telemetria.temp = 40;
+    // Antes forzaba el estado crítico con temp = 40; eso choca con P-D3 (no se aplica con más de 30 °C), así que ahora
+    // lo fuerza la humedad ambiental (add-dosificacion-base).
+    telemetria.humAmb = 98;
     diagnostico = { estado: 'Clorosis', sev: 'Alta', confidence: 'Alta', conf: Math.min(100, t.confianzaMinima + 5) };
   }
   return { telemetria, clima, diagnostico, needsCooldownReset };
@@ -83,7 +85,7 @@ test('the registry keeps the order and keys of the original catalog', () => {
     SCENARIOS.map((s) => s.key),
     [
       'R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE',
-      'FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR',
+      'FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR', 'APPLICATION_PRECONDITIONS',
     ],
   );
 });
@@ -422,6 +424,42 @@ test('a hydraulic fault coexists with the rules that want the same dry soil, and
   const both = calculateConditions(['FAULT_NO_FLOW', 'FAULT_SHADE_LIMIT'], thresholds);
   assert.equal(both.conflictos.length, 0);
   assert.deepEqual(both.nodeErrors.map((e) => e.tipo), ['SIN_CAUDAL', 'MEDIASOMBRA_FIN_DE_CARRERA'], 'both errors go out, in applyOrder');
+});
+
+/* ------------------------------------------------------------------ precondiciones de aplicación */
+
+test('the application preconditions modifier makes P-D3, P-D4 and P-D5 hold and asks for tank stock', () => {
+  const r = calculateConditions(['APPLICATION_PRECONDITIONS'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.telemetria.temp, 22, 'P-D3: bajo los 30 °C');
+  assert.equal(r.telemetria.humSus, 55, 'P-D5: sobre el 45 %');
+  assert.equal(r.clima?.tempC, 22);
+  assert.equal(r.clima?.probLluviaPct, 0, 'P-D4: sin lluvia');
+  assert.equal(r.clima?.precipMm, 0);
+  assert.equal(r.ensureTankStock, true);
+  assert.equal(r.needsCooldownReset, true, 'los intervalos entre aplicaciones se llevan a cero');
+  assert.match(r.resumen.join(' | '), /window/);
+});
+
+test('without the modifier no tank stock is asked for', () => {
+  assert.equal(calculateConditions(['SUPPLY'], thresholds).ensureTankStock, false);
+});
+
+test('the modifier combines with the rule that asks for an application, and that rule keeps its own metrics', () => {
+  const r = calculateConditions(['SUPPLY', 'APPLICATION_PRECONDITIONS'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.telemetria.humAmb, 98, 'el estado crítico de SupplyRule sale de la humedad ambiental');
+  assert.equal(r.telemetria.temp, 22, 'y no de la temperatura: con calor P-D3 no deja aplicar');
+  assert.equal(r.diagnostico?.estado, 'Clorosis');
+  assert.equal(r.ensureTankStock, true);
+});
+
+test('a scenario that claims the same metric on purpose wins over the modifier (a rainy day)', () => {
+  const r = calculateConditions(['R03', 'APPLICATION_PRECONDITIONS'], thresholds);
+
+  assert.ok((r.clima?.probLluviaPct ?? 0) >= thresholds.lluviaProbabilidad, 'la lluvia de R-03 no la pisa el modificador');
 });
 
 /* ------------------------------------------------------------------ resumen */

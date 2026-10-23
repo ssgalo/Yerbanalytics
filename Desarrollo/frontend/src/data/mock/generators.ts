@@ -292,6 +292,7 @@ function makeSector(
     diagnosis,
     reason,
     actuadores: { valve, pump, shade: shadePct },
+    reentryUntil: null,
   };
 }
 

@@ -16,6 +16,7 @@ import {
   withWindowBypass,
   type ActionProgress,
   type HappyPathDeps,
+  withBypasses,
 } from './happyPath';
 import type { DemoRule, EvaluationTrace, SectorRef, TracedRule } from './types';
 
@@ -51,9 +52,11 @@ test('plan: irrigation due (not critical), critical sector, UV above threshold, 
   assert.equal(conditions.conflictos.length, 0);
   const hum = conditions.telemetria.humSus;
   assert.ok(hum > thresholds.umbralCritico && hum < thresholds.umbralHumedad, `humSus ${hum}`);
-  assert.ok(conditions.telemetria.temp > 35);
+  assert.equal(conditions.telemetria.humAmb, 98);
   assert.ok(conditions.clima && conditions.clima.uvIndex >= thresholds.uvUmbral);
-  assert.equal(conditions.clima?.probLluviaPct, 5);
+  assert.equal(conditions.clima?.probLluviaPct, 0, 'P-D4: el modificador de aplicación deja el día sin lluvia');
+  assert.ok(conditions.telemetria.temp <= 30, 'P-D3: con calor no se aplica un insumo');
+  assert.equal(conditions.ensureTankStock, true);
   assert.ok(conditions.diagnostico && (conditions.diagnostico.conf ?? 0) >= thresholds.confianzaMinima);
   assert.equal(conditions.needsCooldownReset, true);
   assert.equal(conditions.pulses, 1);
@@ -68,6 +71,18 @@ test('plan follows the live catalog, not hardcoded values', () => {
 });
 
 /* ---- window bypass ---- */
+
+const rule_ = (name: string, enabled: boolean, bypassed: string[]): DemoRule => ({
+  name,
+  label: name,
+  branch: 'INSUMO',
+  priority: 12,
+  enabled,
+  cooldownKeys: [],
+  bypassKeys: ['window', 'daily'],
+  cooldownMinutes: {},
+  bypassed,
+});
 
 const windowRule = (bypassed: string[]): DemoRule => ({
   name: 'FueraDeVentanaRiegoRule',
@@ -85,6 +100,12 @@ test('withWindowBypass adds the key once and keeps the others', () => {
   assert.deepEqual(withWindowBypass(windowRule([])), ['window']);
   assert.deepEqual(withWindowBypass(windowRule(['x'])), ['x', 'window']);
   assert.equal(withWindowBypass(windowRule(['window'])), null);
+});
+
+test('withBypasses adds only the keys that are missing, once, and keeps the others', () => {
+  assert.deepEqual(withBypasses(rule_('P', true, []), ['window', 'daily']), ['window', 'daily']);
+  assert.deepEqual(withBypasses(rule_('P', true, ['x', 'window']), ['window', 'daily']), ['x', 'window', 'daily']);
+  assert.equal(withBypasses(rule_('P', true, ['daily', 'window']), ['window', 'daily']), null);
 });
 
 /* ---- trace readout ---- */
@@ -199,8 +220,9 @@ function fakeDeps(over: Partial<HappyPathDeps> = {}) {
   let pulses = 0;
   const deps: HappyPathDeps = {
     zeroCooldowns: async () => void calls.push('zero'),
-    getRules: async () => [windowRule([])],
+    getRules: async () => [windowRule([]), rule_('SupplyRule', false, []), rule_('ApplicationPreconditions', true, [])],
     updateRule: async (name, u) => void calls.push(`update:${name}:${u.enabled !== undefined ? 'enabled' : `bypass=${u.bypassed?.join(',')}`}`),
+    ensureTankStock: async () => (calls.push('stock'), []),
     setWeather: async () => void calls.push('weather'),
     clearWeather: async () => void calls.push('clearWeather'),
     setOffline: async (on) => void calls.push(`offline:${on}`),
@@ -237,6 +259,7 @@ test('real node: exactly ONE pulse, no rule toggled, nothing waited for', async 
   const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
   assert.deepEqual(calls, ['clearWeather', 'offline:false', 'pin:MZ-1:none', 'pulse1']);
   assert.ok(!calls.some((c) => c.endsWith(':enabled')), 'no rule is switched on or off');
+  assert.ok(!calls.includes('stock'), 'the real tanks are not touched');
   assert.deepEqual(sleeps, [], 'no pause between steps, no wait for an action to finish');
   assert.equal(out.readout?.allActed, true);
 });
@@ -245,12 +268,38 @@ test('simulator: setup, diagnosis BEFORE the single pulse, cleanup at the end', 
   const { deps, calls } = fakeDeps();
   const out = await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
   assert.deepEqual(calls, [
-    'zero', 'update:FueraDeVentanaRiegoRule:bypass=window', 'weather', 'pin:MZ-1:reading', 'emission:true',
+    'zero', 'update:FueraDeVentanaRiegoRule:bypass=window',
+    // La dosificación arranca retirada: se enciende, se saltea la ventana y el límite diario, y se asegura el stock.
+    'update:SupplyRule:enabled', 'update:ApplicationPreconditions:bypass=window,daily', 'stock',
+    'weather', 'pin:MZ-1:reading', 'emission:true',
     'diagnosis', 'pulse1',
     'pin:MZ-1:none', 'emission:false',
   ]);
   assert.ok(out.leftActive.length > 0);
   assert.equal(out.readout?.allActed, true);
+});
+
+test('real node warns when the supply rule is still retired, because the input would never act', async () => {
+  const { deps, calls } = fakeDeps();
+  const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
+  assert.ok(out.warnings.some((w) => /SupplyRule/.test(w)));
+  assert.ok(!calls.some((c) => c.startsWith('update:')), 'it only warns, it does not switch anything');
+});
+
+test('real node does not warn when the supply rule is already on', async () => {
+  const { deps } = fakeDeps({ getRules: async () => [rule_('SupplyRule', true, [])] });
+  const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
+  assert.ok(!out.warnings.some((w) => /SupplyRule/.test(w)));
+});
+
+test('simulator: a supply rule already on and the bypasses already set are not touched again', async () => {
+  const { deps, calls } = fakeDeps({
+    getRules: async () => [
+      windowRule(['window']), rule_('SupplyRule', true, []), rule_('ApplicationPreconditions', true, ['window', 'daily']),
+    ],
+  });
+  await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
+  assert.ok(!calls.some((c) => c.startsWith('update:')));
 });
 
 test('simulator: an error still releases the pin and the emission', async () => {
@@ -294,7 +343,10 @@ test('the readout comes from the trace of THE pulse (a trace older than the puls
 });
 
 test('real node warns when the sector has no usable AI diagnosis, and still runs the pulse', async () => {
-  const { deps, calls } = fakeDeps({ getSectorDiagnosis: async () => null });
+  const { deps, calls } = fakeDeps({
+    getSectorDiagnosis: async () => null,
+    getRules: async () => [rule_('SupplyRule', true, [])],
+  });
   const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
   assert.equal(out.warnings.length, 1);
   assert.ok(calls.includes('pulse1'));

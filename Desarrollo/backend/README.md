@@ -57,6 +57,20 @@ Corré `src/main/resources/migracion-permisos-bloqueo.sql` (idempotente, antes o
 agregar los de la matriz por defecto. No toca lo que el Administrador editó. Se aplican al reiniciar el backend
 (la matriz vive en memoria).
 
+### Migración manual pendiente · permisos de los tanques de insumo
+
+`insumos.ver` e `insumos.gestionar` son permisos nuevos y la matriz se siembra **sólo si `rol_permiso` está vacía**: una base
+anterior no los tiene y nadie (salvo quien edite la matriz) podría ver los tanques ni registrar una carga. Corré
+`src/main/resources/migracion-permisos-insumos.sql` (idempotente, antes o después de arrancar). El Operario es quien carga; el rol
+Servicio los recibe para que el simulador deje stock en sus escenarios. Se aplican al reiniciar el backend.
+
+### Migración manual pendiente · dosis por insumo
+
+La dosis única `insumo.dosis-ml` se reparte en `insumo.dosis-fertilizante` e `insumo.dosis-fitosanitario`. El backend **arranca igual**
+sin correr nada (un override de una clave que ya no existe se ignora con un warn), pero si alguien había editado la dosis, se pierde.
+`src/main/resources/migracion-dosis-por-insumo.sql` copia el valor editado a la dosis del fertilizante (la dosificación v1 aplicaba un
+producto genérico, que es el fertilizante) y borra el viejo. Idempotente.
+
 ### Migración manual pendiente · permisos de reglas y pasadas para el rol Servicio
 
 El rol Servicio (cuentas de integración) recibe `reglas.ver`, `pasadas.ver` y `pasadas.operar` en la matriz por defecto: lee el
@@ -531,13 +545,12 @@ solicitudes eternas, cada una **vence** al empezar el tercer ciclo de lectura co
 El pronóstico (Open-Meteo) se pide con timeouts HTTP (`yerbanalytics.weather.connect-timeout-ms`,
 3 s, y `read-timeout-ms`, 5 s) y se precalienta al arrancar; un refresco colgado se reemplaza a los 60 s.
 
-**Dosificación (bomba de insumo).** `SupplyRule` decide la dosis con `insumo.dosis-ml` (10 ml de fábrica, 1–50: el
-tope del firmware) y el `ActionExecutor` publica `pump ON {"ml": N}`; el firmware calcula el tiempo (1 s por ml). Mientras
-el sector figura `Dosificando` no se ordena otra dosis. Ese estado lo cierra `SupplyDoseService`: al ACK final de la
-bomba (`ok`, `cancelado` o un error; un `reemplazado` no) y, de respaldo, por tiempo: pasada la duración de la dosis
-(`duracion_seg` de su fila "Insumo") más `yerbanalytics.actuadores.ack-margen-ms`, así un nodo que se reinicia a mitad
-de la dosis no deja el sector colgado (también limpia los que quedaron así antes de un reinicio del backend).
-Es la base mínima de `add-dosificacion-base`, que la reemplaza por insumos, tanques y precondiciones.
+**Dosificación (bomba de insumo).** Ya no la ordena `SupplyRule` directo: toda aplicación pasa por el `ApplicationService`
+(sección «Aplicación de insumos»), que publica `pump ON {"ml": N}`; el firmware calcula el tiempo (1 s por ml). Mientras el sector
+figura `Dosificando` no se ordena otra dosis. Ese estado lo cierra `SupplyDoseService`: al ACK final de la bomba (`ok`, `cancelado` o
+un error; un `reemplazado` no) y, de respaldo, por tiempo: pasada la duración de la dosis (`duracion_seg` de su fila "Insumo") más
+`yerbanalytics.actuadores.ack-margen-ms`, así un nodo que se reinicia a mitad de la dosis no deja el sector colgado (también limpia los
+que quedaron así antes de un reinicio del backend).
 
 Otros límites conocidos: R-06 depende de los eventos "Insumo"; el cupo se llena por número de sector, no por urgencia. El detalle de qué cubre y qué
 no cada regla frente a la spec está en
@@ -942,6 +955,55 @@ y `simulador/server/contract.ts`).
 > **Efecto operativo.** Un sector con falla hidráulica **no se riega solo ni se dosifica** hasta que se registre la reparación, y con
 > la mediasombra averiada la malla no recibe comandos de la regla de mediasombra. El estado seguro del nodo caído (S-02) no pasa por
 > las reglas: sigue ordenando cerrar la malla.
+
+## Aplicación de insumos (`add-dosificacion-base` · reglas_v2 §8.1–8.3)
+
+Mismo reparto que el riego: **las reglas deciden, un servicio ejecuta**. Una regla que resuelve que a un sector le corresponde
+fertilizante o fitosanitario emite `ACTIVAR_BOMBA` con un `DetalleInsumo(supply, fromDiagnosis)`; el `ActionExecutor` se lo pide a
+`ApplicationService.request(...)`, que devuelve `APPLIED | DEFERRED(motivo) | REJECTED(motivo)`. Código en `supply/`.
+
+| Pieza | Qué hace |
+|---|---|
+| `Supply` | `FERTILIZER` / `FUNGICIDE`: dosis, intervalo y clave de cooldown de cada uno |
+| `ApplicationPreconditions` | P-D1…P-D5 como función pura (`check(facts, vigentes, overrides)`); es `DemoControllable` |
+| `ValidDiagnosis` | P-D1: el último diagnóstico del sector, a lo sumo `diagnostico.vigencia-horas` (48), confianza ≥ `diagnostico.confianza-minima`, no «No concluyente» |
+| `ApplicationService` | verifica, publica la orden, registra (`application` + fila «Insumo» del historial que lee R-06), marca el reingreso, descuenta el tanque, y administra la cola de diferidas |
+| `PendingApplicationScheduler` | cada `yerbanalytics.insumo.pendientes-revision-ms` (5 min) reintenta las diferidas |
+| `TankService` | stock por insumo y por macro-zona: carga, descuento, avisos `WARNING` (bajo `insumo.stock-aviso`) y `CRITICAL` (vacío o aplicación sin stock) |
+
+- **Resultado de las precondiciones.** P-D1 (diagnóstico) **rechaza**: un diagnóstico viejo no se arregla esperando. El resto
+  (intervalo, una por día, ventana, temperatura, lluvia, humedad) **difiere**: queda en `pending_application` y se reintenta con los
+  datos de ese momento hasta que la regla de origen la cancele (`cancelPending`), deje de ser válida o venza (`insumo.pendiente-vence-dias`,
+  7). Lo que no se aplicó queda en el historial del sector como Registro de Inacción, una sola vez mientras el motivo no cambie.
+- **El dato que falta no es un dato bueno.** Sin humedad de sustrato no se aplica; sin pronóstico, la lluvia no bloquea (se asume que no
+  llueve) y la temperatura sale de la lectura de la zona (o del pronóstico). Un tanque sin registrar es un stock **desconocido**, no un
+  tanque lleno: se rechaza hasta que alguien lo cargue.
+- **Fitosanitario antes que fertilizante (P-D2).** Si el mismo día corresponden ambos, va el fitosanitario y el fertilizante espera al día
+  siguiente. Un fitosanitario pendiente sólo frena al fertilizante si, con los datos de ahora, se aplicaría: si está trabado por su propio
+  intervalo (7 días), esperarlo dejaría al fertilizante sin salir durante días.
+- **Cada tick revalida.** El reintento no tiene hora fija: corre seguido y deja que las precondiciones decidan, porque las ventanas son
+  parámetros del catálogo (`insumo.ventana-manana`, `insumo.ventana-tarde`; 07–10 y 17–19 de fábrica) y atar el tick a dos horas las
+  desfasaría en cuanto el agrónomo las cambie.
+- **Reingreso.** Un fitosanitario deja `sector.reingreso_hasta` (`insumo.reingreso-horas`, 24 h); el snapshot lo expone como
+  `reentryUntil` y el dashboard lo muestra. Sólo informa: no bloquea ningún actuador.
+- **Dosis y bomba.** El backend manda **mililitros** y el firmware los convierte a tiempo y corta solo. La dosis tiene como tope el que
+  acepta el firmware por comando (`ContratoNodo.BOMBA_ML_MAX` = 50 ml, `LIMITE_BOMBA_ML_MAX`): una dosis mayor se rechaza al guardar, no se
+  recorta en silencio. De fábrica 10 ml (la spec decía 100 ml; no entra en el firmware actual). Hay **una bomba por sector** y el comando
+  no lleva el insumo: el backend sólo sabe qué insumo pidió la regla, y descuenta ese tanque; que la bomba esté conectada al tanque correcto
+  es del operario. Si hace falta que el nodo elija la bomba, hay que sumar el insumo al contrato (`contrato.h`, `ContratoNodo`, el simulador y el
+  firmware) y registrar dos tipos de dispositivo por sector.
+- **API de tanques.** `GET /api/tanques` (`insumos.ver`) y `POST /api/tanques/{zona}/{insumo}/recarga` (`insumos.gestionar`) con
+  `{liters, capacityLiters?}`: la primera carga declara la capacidad; una carga que desborda el tanque se rechaza (`400`). La carga queda en
+  el historial de la macro-zona con el usuario.
+- **Control desde el simulador** (`/api/demo/rules/ApplicationPreconditions`): apagada, no se aplica nada y queda constancia; bypass
+  `diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture` y `stock`; cooldowns `interval-fertilizer` e `interval-fungicide`.
+
+> **La dosificación v1 queda retirada pero no borrada.** `SupplyRule` (estado crítico + confianza) y `DailyDoseLimitRule` (1 dosis cada 24 h)
+> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `RuleOverridesStore`; en la traza figuran «deshabilitadas»), porque las reglas
+> que las reemplazan (N-*, F-*) todavía no existen: borrarlas dejaría al vivero sin dosificación. Ningún camino productivo pide hoy una
+> aplicación. Para probarla de punta a punta: `YERBANALYTICS_REGLAS_RETIRADAS=ninguna` (cualquier valor que no sea el nombre de una regla; un valor
+> vacío puede leerse como «sin definir» y dejar la lista de fábrica) enciende `SupplyRule` de arranque, o con el modo demo se la enciende desde el simulador. `DailyDoseLimitRule` queda redundante: P-D2 ya limita una aplicación por día y por intervalo. Se borran
+> junto con `insumo.max-dosis-24h` cuando entre la primera regla N/F.
 
 ## Historial de lecturas
 

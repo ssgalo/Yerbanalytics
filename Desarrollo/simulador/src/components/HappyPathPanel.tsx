@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
 import { registerDiagnosisWithCapture } from '../captureFlow';
+import { ensureTankStock } from '../tankStock';
 import {
   hintFor,
   initialProgress,
@@ -104,6 +105,7 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
           zeroCooldowns: api.zeroDemoCooldowns,
           getRules: api.getDemoRules,
           updateRule: api.updateDemoRule,
+          ensureTankStock: (zonaId) => ensureTankStock(zonaId, { getTanks: api.getTanks, loadTank: api.loadTank }),
           setWeather: api.setSimulatedWeather,
           clearWeather: api.clearSimulatedWeather,
           setOffline: api.setOfflineForecast,

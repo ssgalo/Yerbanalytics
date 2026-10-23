@@ -84,6 +84,14 @@ public class SectorEntity {
     @Column(name = "actuador_shade", nullable = false)
     private Integer actuadorShade;
 
+    /**
+     * Epoch ms hasta el que el sector tiene el reingreso restringido tras un fitosanitario (reglas_v2 §8.3).
+     * {@code null} si nunca se le aplicó uno; un valor pasado equivale a "sin restricción". Sólo informa:
+     * no bloquea actuadores.
+     */
+    @Column(name = "reingreso_hasta")
+    private Long reentryUntil;
+
     // Las lecturas sensadas viven en ZonaEntity: hay un solo nodo testigo por macro-zona
     // y los 100 sectores comparten esa lectura. El sector conserva sólo lo que es suyo
     // (diagnóstico del plantín, actuadores y estado derivado).

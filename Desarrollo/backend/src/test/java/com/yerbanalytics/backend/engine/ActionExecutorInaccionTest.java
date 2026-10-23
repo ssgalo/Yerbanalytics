@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.service.HistorialService;
+import com.yerbanalytics.backend.supply.ApplicationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class ActionExecutorInaccionTest {
         ComandoActuadorPublisher publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego());
+        executor = new ActionExecutor(historial, publisher, new ColaRiego(), mock(ApplicationService.class));
     }
 
     private static RuleContext ctx(String sectorId, Instant ahora) {

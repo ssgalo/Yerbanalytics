@@ -29,6 +29,8 @@ export type Permiso =
   | 'pasadas.operar'
   | 'bloqueos.ver'
   | 'bloqueos.gestionar'
+  | 'insumos.ver'
+  | 'insumos.gestionar'
   | 'simulacion.gestionar'
   | 'usuarios.gestionar'
   | 'auditoria.ver';

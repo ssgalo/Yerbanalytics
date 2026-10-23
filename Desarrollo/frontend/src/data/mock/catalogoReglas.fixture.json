@@ -125,8 +125,7 @@
       "rama": "INSUMO",
       "prioridad": 12,
       "parametros": [
-        "diagnostico.confianza-minima",
-        "insumo.dosis-ml"
+        "diagnostico.confianza-minima"
       ]
     },
     {
@@ -734,9 +733,9 @@
       "updatedTs": null
     },
     {
-      "clave": "insumo.dosis-ml",
-      "etiqueta": "Dosis de insumo por aplicación",
-      "descripcion": "Mililitros que dosifica la bomba peristáltica en cada aplicación. El backend se lo manda al nodo en el comando; el firmware no acepta más de 50 ml por comando.",
+      "clave": "insumo.dosis-fertilizante",
+      "etiqueta": "Dosis de fertilizante por aplicación",
+      "descripcion": "Mililitros de fertilizante por aplicación. El backend se lo manda al nodo en el comando y el firmware corta solo; no acepta más de 50 ml por comando.",
       "familia": "INSUMO",
       "tipo": "ENTERO",
       "unidad": "ml",
@@ -745,10 +744,250 @@
       "min": 1.0,
       "max": 50.0,
       "decimales": 0,
-      "refSpec": "add-dosificacion-base (parcial); firmware LIMITE_BOMBA_ML_MAX",
+      "refSpec": "reglas_v2 §8.1 (acotada por el firmware: LIMITE_BOMBA_ML_MAX)",
       "modificado": false,
       "usadoPor": [
-        "SupplyRule"
+        "ApplicationService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.dosis-fitosanitario",
+      "etiqueta": "Dosis de fitosanitario por aplicación",
+      "descripcion": "Mililitros de fitosanitario por aplicación. El backend se lo manda al nodo en el comando y el firmware corta solo; no acepta más de 50 ml por comando.",
+      "familia": "INSUMO",
+      "tipo": "ENTERO",
+      "unidad": "ml",
+      "valor": "10",
+      "fabrica": "10",
+      "min": 1.0,
+      "max": 50.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.1 (acotada por el firmware: LIMITE_BOMBA_ML_MAX)",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.intervalo-fertilizante",
+      "etiqueta": "Intervalo mínimo entre fertilizaciones",
+      "descripcion": "Días que deben pasar entre dos aplicaciones de fertilizante en un mismo sector.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "d",
+      "valor": "5",
+      "fabrica": "5",
+      "min": 3.0,
+      "max": 14.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D2",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.intervalo-fitosanitario",
+      "etiqueta": "Intervalo mínimo entre fitosanitarios",
+      "descripcion": "Días que deben pasar entre dos aplicaciones de fitosanitario en un mismo sector.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "d",
+      "valor": "7",
+      "fabrica": "7",
+      "min": 5.0,
+      "max": 21.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D2",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.ventana-manana",
+      "etiqueta": "Ventana de aplicación de la mañana",
+      "descripcion": "Franja de la mañana en que se permite aplicar insumos. La hora de fin queda afuera.",
+      "familia": "INSUMO",
+      "tipo": "VENTANA_HORARIA",
+      "unidad": "",
+      "valor": "07:00-10:00",
+      "fabrica": "07:00-10:00",
+      "min": null,
+      "max": null,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D3",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.ventana-tarde",
+      "etiqueta": "Ventana de aplicación de la tarde",
+      "descripcion": "Franja de la tarde en que se permite aplicar insumos. La hora de fin queda afuera.",
+      "familia": "INSUMO",
+      "tipo": "VENTANA_HORARIA",
+      "unidad": "",
+      "valor": "17:00-19:00",
+      "fabrica": "17:00-19:00",
+      "min": null,
+      "max": null,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D3",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.temp-max-aplicar",
+      "etiqueta": "Temperatura máxima para aplicar",
+      "descripcion": "Con más temperatura que esta (última lectura o pronóstico) no se aplican insumos.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "°C",
+      "valor": "30",
+      "fabrica": "30",
+      "min": 25.0,
+      "max": 32.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D3",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.humedad-min-aplicar",
+      "etiqueta": "Humedad de sustrato mínima para aplicar",
+      "descripcion": "Con menos humedad de sustrato que esta no se aplican insumos, salvo que el sector se haya regado después de la lectura.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "45",
+      "fabrica": "45",
+      "min": 35.0,
+      "max": 60.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D5",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.lluvia-impide-mm",
+      "etiqueta": "Lluvia prevista que impide aplicar",
+      "descripcion": "Milímetros de lluvia acumulada prevista en la ventana del pronóstico que impiden aplicar insumos.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "mm",
+      "valor": "5",
+      "fabrica": "5",
+      "min": 2.0,
+      "max": 20.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §8.2 P-D4",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationPreconditions"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.lluvia-impide-horas",
+      "etiqueta": "Ventana del pronóstico de lluvia para aplicar",
+      "descripcion": "Cantidad de horas hacia adelante del pronóstico que se consideran para impedir una aplicación.",
+      "familia": "INSUMO",
+      "tipo": "ENTERO",
+      "unidad": "h",
+      "valor": "6",
+      "fabrica": "6",
+      "min": 2.0,
+      "max": 12.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.2 P-D4",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.reingreso-horas",
+      "etiqueta": "Reingreso restringido tras un fitosanitario",
+      "descripcion": "Horas en que el sector queda con reingreso restringido después de aplicarle un fitosanitario.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "h",
+      "valor": "24",
+      "fabrica": "24",
+      "min": 12.0,
+      "max": 72.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.3",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.stock-aviso",
+      "etiqueta": "Nivel de tanque que avisa reponer",
+      "descripcion": "Por debajo de este porcentaje de su capacidad, el tanque de un insumo genera un aviso para reponerlo.",
+      "familia": "INSUMO",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "20",
+      "fabrica": "20",
+      "min": 10.0,
+      "max": 50.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.3",
+      "modificado": false,
+      "usadoPor": [
+        "TankService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "insumo.pendiente-vence-dias",
+      "etiqueta": "Vencimiento de una aplicación diferida",
+      "descripcion": "Días que una aplicación diferida espera una ventana apta antes de descartarse. Propuesta del equipo: la v2 no fija un plazo.",
+      "familia": "INSUMO",
+      "tipo": "ENTERO",
+      "unidad": "d",
+      "valor": "7",
+      "fabrica": "7",
+      "min": 1.0,
+      "max": 30.0,
+      "decimales": 0,
+      "refSpec": "add-dosificacion-base D-5",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationService"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -788,7 +1027,28 @@
       "refSpec": "reglas_v2 §1.3 y §11; HU-04 CA-03",
       "modificado": false,
       "usadoPor": [
-        "SupplyRule"
+        "SupplyRule",
+        "ApplicationService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "diagnostico.vigencia-horas",
+      "etiqueta": "Vigencia del diagnóstico",
+      "descripcion": "Horas que un diagnóstico de IA sigue valiendo para aplicar un insumo. Pasado ese tiempo hay que esperar uno nuevo.",
+      "familia": "DIAGNOSTICO",
+      "tipo": "ENTERO",
+      "unidad": "h",
+      "valor": "48",
+      "fabrica": "48",
+      "min": 12.0,
+      "max": 168.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §1.3 P-D1",
+      "modificado": false,
+      "usadoPor": [
+        "ApplicationService"
       ],
       "updatedBy": null,
       "updatedTs": null

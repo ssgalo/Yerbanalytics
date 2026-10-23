@@ -57,6 +57,7 @@ describe('matriz · borrador', () => {
       'Captura',
       'Pasadas del riel',
       'Bloqueo manual',
+      'Insumos',
       'Simulación',
       'Seguridad',
     ]);

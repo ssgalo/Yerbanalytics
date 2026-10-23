@@ -81,6 +81,11 @@ export interface ScenarioPatch {
   repair?: { detail: string };
   /** The target zone must have at least one device marked as faulty, because that is what the scenario repairs. */
   needsFaultyDevice?: boolean;
+  /**
+   * The target zone's input tanks must have stock BEFORE the pulse: an application is rejected against an unregistered or
+   * empty tank. The simulator registers or tops up what is missing through the public tank API.
+   */
+  ensureTankStock?: boolean;
 }
 
 export interface ScenarioConflict {

@@ -61,10 +61,14 @@
   grid-area: lock;
 }
 
+.tanks {
+  grid-area: tanks;
+}
+
 /* Macro-zona más ancha que alta: las tarjetas apiladas, a todo el ancho */
 .wide {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'sectors' 'sensing' 'hardening' 'lock';
+  grid-template-areas: 'sectors' 'sensing' 'hardening' 'tanks' 'lock';
 }
 
 /* Macro-zona más alta que ancha: los sectores miden lo que su grilla (hasta un tope; lo demás se
@@ -75,6 +79,7 @@
   grid-template-areas:
     'sectors sensing'
     'hardening hardening'
+    'tanks tanks'
     'lock lock';
 }
 
@@ -82,6 +87,6 @@
 @media (max-width: 900px) {
   .tall {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'sectors' 'sensing' 'hardening' 'lock';
+    grid-template-areas: 'sectors' 'sensing' 'hardening' 'tanks' 'lock';
   }
 }

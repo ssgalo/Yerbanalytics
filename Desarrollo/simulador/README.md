@@ -65,12 +65,12 @@ simulador (punto ámbar, con el motivo).
   ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
   actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
 - **Happy path de la demo** (pestaña *Demo Expo*, junto a la pasada del riel y las secuencias) — un botón que evalúa
-  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. No enciende ni apaga reglas ni espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
-  en **Simulador** genera todo: lectura (`humSus` entre el umbral crítico y el de riego, `temp` crítica), diagnóstico de
+  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. Con la fuente en **Simulador** enciende la dosificación (`SupplyRule`, que el backend arranca retirada), saltea la ventana horaria y el límite diario de aplicación y asegura stock en los tanques de la zona (ver «Aplicación de insumos»); con la fuente en **ESP32 real** no toca ninguna regla y sólo avisa si la dosificación sigue retirada. No espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
+  en **Simulador** genera todo: lectura (`humSus` entre el umbral crítico y el de riego, `humAmb` crítica), diagnóstico de
   IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
   el diagnóstico de una pasada del riel previa, y avisa si no hay uno utilizable. Al final lee la traza del Inspector y
-  muestra, por regla, si actuó y por qué. Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING.
+  muestra, por regla, si actuó y por qué. Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING + APPLICATION_PRECONDITIONS.
 - **Abrir / cerrar mediasombra** (pestaña *Demo Expo*, tarjeta de *Secuencias*) — dos botones de un clic y una sola
   acción: *Abrir* enrolla (`targetPct` 100) y *Cerrar* despliega (`targetPct` 0). Pasan por la API de secuencias del
   backend (`MEDIASOMBRA_ABRIR` / `MEDIASOMBRA_CERRAR`), no por un publish directo, así el seguimiento de comandos y el
@@ -225,6 +225,25 @@ bloqueo como causa. El bloqueo queda vigente hasta que se lo levanta en «Bloque
 «Nodo sin respuesta»: la causa de que no se riegue sería ambigua. La cuenta de rol Servicio necesita
 `bloqueos.ver` y `bloqueos.gestionar` (vienen en la matriz por defecto; en una base ya sembrada, correr
 `migracion-permisos-bloqueo.sql` del backend).
+
+**Aplicación de insumos (add-dosificacion-base).** Toda aplicación pasa por el `ApplicationService` del backend, que verifica
+las precondiciones P-D1…P-D5 (diagnóstico vigente, intervalo y una por día, ventana 07–10 / 17–19, ≤ 30 °C, sin lluvia, humedad
+de sustrato ≥ 45 %) y el stock del tanque antes de publicar la orden de bomba. Lo que no cumple queda pendiente y se reintenta.
+
+- **`SupplyRule` y `DailyDoseLimitRule` arrancan retiradas** en el backend (`yerbanalytics.reglas.retiradas`): figuran
+  «deshabilitadas» en la traza hasta que las reglas de aplicación de la v2 las reemplacen. Con el modo demo encendido se las
+  vuelve a encender desde Telemetría → Control de reglas (el happy path en modo Simulador lo hace solo).
+- **`ApplicationPreconditions`** es una pieza controlable más (Control de reglas): se apaga (no se aplica nada), se saltea cada
+  guarda (`diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture`, `stock`) y se acortan los intervalos
+  (`interval-fertilizer`, `interval-fungicide`, en minutos; 0 los elimina).
+- El escenario **`APPLICATION_PRECONDITIONS`** es un *modificador*: no acciona una regla sino que deja cumplidas P-D3…P-D5 (`temp`
+  22 °C, `humSus` 55 %, clima sin lluvia) y pide `ensureTankStock`: antes del pulso registra (20 L) o repone los tanques de la zona
+  destino por `POST /backend/api/tanques/{zona}/{insumo}/recarga`. **No puede mover el reloj**: la ventana horaria se saltea con
+  el bypass `window`. Se combina con la regla que pide la aplicación (hoy `SUPPLY`). Necesita que la cuenta de rol Servicio tenga
+  `insumos.ver` e `insumos.gestionar` (vienen en la matriz por defecto; en una base ya sembrada, correr
+  `migracion-permisos-insumos.sql` del backend).
+- **`SUPPLY` ya no usa la temperatura** para volver crítico al sector: usa `humAmb` = 98 %. Con calor (> 30 °C) P-D3 no deja aplicar,
+  así que un sector crítico por calor jamás podría dosificarse.
 
 **Lecturas fijadas.** La respuesta a un `LEER_AHORA` es la lectura con la que decide el motor, y la emisión automática la
 arma al azar: una lectura que el escenario publicó antes del pulso queda pisada por ella. Por eso un escenario puede pedir

@@ -48,6 +48,8 @@ export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'pasadas.operar', grupo: 'Pasadas del riel', descripcion: 'Iniciar y cancelar la pasada', lectura: 'pasadas.ver' },
   { codigo: 'bloqueos.ver', grupo: 'Bloqueo manual', descripcion: 'Ver los bloqueos manuales vigentes', lectura: null },
   { codigo: 'bloqueos.gestionar', grupo: 'Bloqueo manual', descripcion: 'Bloquear y reanudar la actuación autónoma', lectura: 'bloqueos.ver' },
+  { codigo: 'insumos.ver', grupo: 'Insumos', descripcion: 'Ver los tanques de insumo y su stock', lectura: null },
+  { codigo: 'insumos.gestionar', grupo: 'Insumos', descripcion: 'Registrar la carga de los tanques de insumo', lectura: 'insumos.ver' },
   { codigo: 'simulacion.gestionar', grupo: 'Simulación', descripcion: 'Controlar reglas, cooldowns y clima en modo demo', lectura: null },
   { codigo: 'usuarios.gestionar', grupo: 'Seguridad', descripcion: 'Usuarios, matriz de permisos y política de sesión', lectura: null },
   { codigo: 'auditoria.ver', grupo: 'Seguridad', descripcion: 'Registro de auditoría de seguridad', lectura: null },
@@ -65,12 +67,13 @@ const TODOS_LOS_VER: Permiso[] = [
   'capturas.ver',
   'pasadas.ver',
   'bloqueos.ver',
+  'insumos.ver',
 ];
 
 /** La matriz que siembra el backend en una base vacía. */
 export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
   ADMINISTRADOR: CATALOGO_PERMISOS.map((p) => p.codigo),
-  INGENIERO_AGRONOMO: [...TODOS_LOS_VER, 'configuracion.editar', 'reglas.editar', 'bloqueos.gestionar', 'hardware.reparar'],
+  INGENIERO_AGRONOMO: [...TODOS_LOS_VER, 'configuracion.editar', 'reglas.editar', 'bloqueos.gestionar', 'hardware.reparar', 'insumos.gestionar'],
   PRODUCTOR_VIVERISTA: [...TODOS_LOS_VER, 'pasadas.operar'],
   OPERARIO: [
     'vivero.ver',
@@ -82,6 +85,8 @@ export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
     'bloqueos.gestionar',
     'hardware.ver',
     'hardware.reparar',
+    'insumos.ver',
+    'insumos.gestionar',
   ],
   SERVICIO: [
     'vivero.ver',
@@ -96,6 +101,8 @@ export const MATRIZ_POR_DEFECTO: Record<Rol, readonly Permiso[]> = {
     'simulacion.gestionar',
     'hardware.ver',
     'hardware.reparar',
+    'insumos.ver',
+    'insumos.gestionar',
   ],
 };
 

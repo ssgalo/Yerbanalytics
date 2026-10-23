@@ -172,6 +172,21 @@ public class HistorialService {
         historialRepository.save(e);
     }
 
+    /**
+     * Registra una aplicación de {@code ml} mililitros de un insumo concreto, pedida por {@code regla}. Es la fila
+     * "Insumo" que lee la pausa de riego (R-06) y el seguimiento de efectividad. A diferencia de las otras variantes no
+     * supone que la dispara un diagnóstico: la aplicación puede venir de un plan de nutrición.
+     */
+    public void registrarInsumo(SectorEntity s, int ml, String insumo, String regla) {
+        HistorialEventoEntity e = armarInsumo(s);
+        e.setRegla(regla);
+        e.setDuracionSeg((int) Math.ceil(ml * ContratoNodo.BOMBA_INSUMO_MS_POR_ML / 1000.0));
+        e.setLectura("Aplicación de " + insumo.toLowerCase() + " pedida por la regla " + regla + ".");
+        e.setDecision("Las precondiciones de aplicación se cumplen: se ordenan " + ml + " ml de "
+                + insumo.toLowerCase() + ".");
+        historialRepository.save(e);
+    }
+
     /** Registra una dosificación de insumo, con seguimiento de la métrica afectada. */
     public void registrarInsumo(SectorEntity s) {
         historialRepository.save(armarInsumo(s));

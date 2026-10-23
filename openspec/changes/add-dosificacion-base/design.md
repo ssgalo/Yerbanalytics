@@ -16,6 +16,28 @@
 | Stock | No existe |
 | Ack/seguimiento | `SeguimientoComandosService` vigila cada comando de actuador |
 
+## Decisiones tomadas (22/10/2026)
+
+Las tres que `tasks.md` 0.1 dejaba abiertas, más los desvíos que salieron de implementar.
+
+| Id | Decisión | Por qué |
+|---|---|---|
+| D-2 | **(b) una bomba por sector**, el comando no lleva insumo | No toca contrato ni firmware. El backend sabe el insumo que pidió la regla y descuenta ese tanque; que la bomba esté conectada al tanque correcto es del operario. Si hace falta que el nodo elija la bomba, se retoma la opción (a) en un cambio propio |
+| D-6 | Tanque **por insumo y por macro-zona** | Es lo que asumía el diseño; permite avisar la reposición donde está el tanque |
+| D-9 | **`SupplyRule` y `DailyDoseLimitRule` quedan retiradas, no borradas** | Sin N-*/F-* nadie dosificaría. Arrancan apagadas (`yerbanalytics.reglas.retiradas`, sembradas en `RuleOverridesStore`) y se borran con `insumo.max-dosis-24h` cuando entre la primera regla N/F. Encendida, `SupplyRule` ya no publica la bomba: le pide la aplicación al servicio |
+
+Desvíos respecto de lo escrito más abajo:
+
+- **Dosis.** La spec decía 100 ml, rango 20–500. El firmware sólo acepta 50 ml por comando (`LIMITE_BOMBA_ML_MAX`, `ContratoNodo.BOMBA_ML_MAX`), y elevarlo es tocar el firmware (fuera de alcance con D-2 = b). Quedó **10 ml de fábrica** (el valor que ya regía), **1–50 ml**: una dosis mayor se rechaza al guardar. `ParametrosRealesTest` ata el máximo al contrato.
+- **Dos dosis.** `insumo.dosis-ml` se reparte en `insumo.dosis-fertilizante` e `insumo.dosis-fitosanitario` (`migracion-dosis-por-insumo.sql`).
+- **Reintento.** No hay un tick fijo en 07:00 y 17:00: corre cada 5 min y las precondiciones deciden (D-5 y la tarea 6.2). Las ventanas son parámetros y atar el tick a dos horas las desfasaría al editarlas.
+- **Vencimiento de una diferida.** 7 días, parámetro `insumo.pendiente-vence-dias` (la v2 no fija uno).
+- **P-D1** exige también `diagnostico.vigencia-horas` (48 h, parámetro) y «última captura» se lee como «último diagnóstico del sector».
+- **Dato que falta.** Sin humedad de sustrato (P-D5) se difiere; sin pronóstico (P-D4) no bloquea; un tanque sin registrar es un stock desconocido y rechaza.
+- **El fitosanitario pendiente sólo frena al fertilizante si se aplicaría ahora** (D-4): si está trabado por su intervalo de 7 días, el fertilizante no espera.
+- **D-8** quedó como `ValidDiagnosis` (pura) y D-3 como `ApplicationPreconditions` (pura, además `DemoControllable`).
+- **`SUPPLY` del simulador** vuelve crítico al sector con la humedad ambiental, no con la temperatura: con más de 30 °C P-D3 no deja aplicar.
+
 ## Decisiones
 
 ### D-1 — Un solo camino para aplicar
@@ -23,7 +45,7 @@ Toda regla pide una aplicación así: `ApplicationService.request(sectorId, Insu
 el servicio **ejecuta**. Mismo patrón que el riego (reglas deciden, `DespachoRiego` abre por tandas) y que "el
 diagnóstico describe; el motor decide". Devuelve `APLICADA | DIFERIDA(motivo) | RECHAZADA(motivo)`.
 
-### D-2 — Insumo ↔ bomba (CAMBIO DE CONTRATO — decisión a confirmar)
+### D-2 — Insumo ↔ bomba (CAMBIO DE CONTRATO — **se eligió (b)**, ver «Decisiones tomadas»)
 La v2: "cada insumo tiene su tanque y su bomba dosificadora". Verificado: el sistema registra **una** bomba por sector, sin insumo,
 y el comando MQTT no dice qué insumo. Hay dos salidas:
 - (a) **Dos tipos de dispositivo** (`bomba_fertilizante`, `bomba_fitosanitario`), cada uno una por sector, y el comando

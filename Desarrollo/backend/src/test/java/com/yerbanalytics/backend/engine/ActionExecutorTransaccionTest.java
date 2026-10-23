@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.service.HistorialService;
+import com.yerbanalytics.backend.supply.ApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +47,7 @@ class ActionExecutorTransaccionTest {
         ComandoActuadorPublisher publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego());
+        executor = new ActionExecutor(historial, publisher, new ColaRiego(), mock(ApplicationService.class));
     }
 
     @AfterEach

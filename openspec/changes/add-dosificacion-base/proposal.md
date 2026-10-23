@@ -4,6 +4,8 @@
 > precondiciones **P-D1…P-D5**) y la **vigencia del diagnóstico** (§1.3). Índice: `reglas-v2-overview/README.md`.
 > **Depende de:** `add-control-demo-reglas`, `add-seguridad-lectura-hardware`.
 
+> **Estado:** implementado. Las decisiones que quedaban abiertas y los desvíos de la spec están en `design.md` («Decisiones tomadas») y en `tasks.md`.
+
 ## Why
 
 Todas las reglas N y F de la v2 terminan en lo mismo: "aplicar 100 mL de [insumo] en el sector en la próxima ventana

@@ -26,8 +26,22 @@ export type HappyPathMode = 'SIMULATOR' | 'REAL_NODE';
 export const WINDOW_RULE = 'FueraDeVentanaRiegoRule';
 export const WINDOW_BYPASS_KEY = 'window';
 
-/** Escenarios que se combinan: riego por déficit, dosificación y mediasombra por UV. */
-export const HAPPY_PATH_SCENARIOS = ['R01', 'SUPPLY', 'SHADING'];
+/**
+ * La dosificación v1 arranca RETIRADA en el backend (`yerbanalytics.reglas.retiradas`) hasta que entren las reglas de
+ * aplicación de la v2. En modo simulador el happy path la enciende (es un interruptor de demo, como el bypass de R-05).
+ */
+export const SUPPLY_RULE = 'SupplyRule';
+
+/**
+ * Las precondiciones de aplicación (P-D1…P-D5). En modo simulador se saltean la ventana horaria (como R-05) y el límite de
+ * una aplicación por día, para que la demo ande a cualquier hora y se pueda repetir. El resto (temperatura, lluvia,
+ * humedad, stock) las deja cumplidas el escenario APPLICATION_PRECONDITIONS.
+ */
+export const PRECONDITIONS_RULE = 'ApplicationPreconditions';
+export const PRECONDITIONS_BYPASS_KEYS = ['window', 'daily'];
+
+/** Escenarios que se combinan: riego por déficit, dosificación (con sus precondiciones) y mediasombra por UV. */
+export const HAPPY_PATH_SCENARIOS = ['R01', 'SUPPLY', 'SHADING', 'APPLICATION_PRECONDITIONS'];
 
 export interface HappyTarget {
   zonaId: string;
@@ -70,9 +84,15 @@ export function buildSimulatorPlan(thresholds: ThresholdMap): { conditions: Rule
   return { conditions: calculateConditions(HAPPY_PATH_SCENARIOS, thresholds) };
 }
 
+/** Lista de bypasses con `keys` agregadas, o `null` si ya estaban todas (no hace falta tocar nada). */
+export function withBypasses(rule: DemoRule, keys: string[]): string[] | null {
+  const missing = keys.filter((k) => !rule.bypassed.includes(k));
+  return missing.length === 0 ? null : [...rule.bypassed, ...missing];
+}
+
 /** Lista de bypasses con `window` agregado, o `null` si ya estaba (no hace falta tocar nada). */
 export function withWindowBypass(rule: DemoRule): string[] | null {
-  return rule.bypassed.includes(WINDOW_BYPASS_KEY) ? null : [...rule.bypassed, WINDOW_BYPASS_KEY];
+  return withBypasses(rule, [WINDOW_BYPASS_KEY]);
 }
 
 /* ---------------- lectura de la traza ---------------- */
@@ -250,6 +270,8 @@ export interface HappyPathDeps {
   zeroCooldowns(): Promise<unknown>;
   getRules(): Promise<DemoRule[]>;
   updateRule(name: string, update: DemoRuleUpdate): Promise<unknown>;
+  /** Registra o repone los tanques de insumo de la zona y devuelve las líneas para el registro de la corrida. */
+  ensureTankStock(zonaId: string): Promise<string[]>;
   setWeather(weather: SimulatedWeather): Promise<unknown>;
   clearWeather(): Promise<void>;
   setOffline(on: boolean): Promise<unknown>;
@@ -324,6 +346,25 @@ export async function runHappyPath(
       // No se restaura: el despacho del riego revalida las guardas al abrir la válvula, después de que el motor decide.
       if (windowRule) leftActive.push('bypass de la ventana horaria de riego');
 
+      // La dosificación v1 arranca retirada y la aplicación pasa por las precondiciones de la v2: se enciende la regla,
+      // se saltean la ventana horaria y el límite diario, y se asegura stock en los tanques de la zona.
+      const supplyRule = rules.find((r) => r.name === SUPPLY_RULE);
+      if (supplyRule && !supplyRule.enabled) {
+        await deps.updateRule(SUPPLY_RULE, { enabled: true });
+        deps.log('✓ Dosificación (SupplyRule) encendida: arranca retirada hasta que entren las reglas de aplicación de la v2');
+        leftActive.push('dosificación encendida');
+      }
+      const preconditions = rules.find((r) => r.name === PRECONDITIONS_RULE);
+      const preconditionsBypass = preconditions ? withBypasses(preconditions, PRECONDITIONS_BYPASS_KEYS) : null;
+      if (preconditions && preconditionsBypass) {
+        await deps.updateRule(PRECONDITIONS_RULE, { bypassed: preconditionsBypass });
+        deps.log('✓ Ventana horaria y límite diario de aplicación salteados: la demo anda a cualquier hora y se puede repetir');
+      }
+      if (preconditions) leftActive.push('bypass de la ventana y del límite diario de aplicación');
+      if (conditions.ensureTankStock) {
+        for (const line of await deps.ensureTankStock(target.zonaId)) deps.log(line);
+      }
+
       if (conditions.clima) {
         await deps.setWeather(conditions.clima);
         deps.log(`✓ Clima simulado: UV ${conditions.clima.uvIndex} (umbral ${thresholds.uvUmbral}) → la mediasombra se protege`);
@@ -357,6 +398,13 @@ export async function runHappyPath(
       await deps.clearWeather();
       await deps.setOffline(false);
       deps.log('✓ Sin clima simulado: rige el pronóstico real');
+      // No se enciende nada (este modo no toca reglas), pero si la dosificación sigue retirada el insumo nunca va a actuar.
+      const supplyRule = (await deps.getRules()).find((r) => r.name === SUPPLY_RULE);
+      if (supplyRule && !supplyRule.enabled) {
+        const warning = 'La dosificación (SupplyRule) está retirada: el insumo no va a actuar. Encendela en el panel de reglas o arrancá el backend con YERBANALYTICS_REGLAS_RETIRADAS vacío.';
+        warnings.push(warning);
+        deps.log(`⚠ ${warning}`);
+      }
       // Nada debe pisar al nodo real: se suelta cualquier lectura fijada que haya quedado.
       await deps.pinReadings(target.zonaId, {});
       const check = diagnosisPrecheck(await deps.getSectorDiagnosis(target.sectorId), thresholds.confianzaMinima);
