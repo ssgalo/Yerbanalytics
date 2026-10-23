@@ -96,6 +96,27 @@ class HistorialServiceFollowUpTest {
     }
 
     @Test
+    void laRevisionQuedaEnElHistorialConQuienLaHizoYQueConstato() {
+        HistorialEventoEntity revisado = new HistorialEventoEntity();
+        revisado.setSectorId("MZ-1-045");
+        revisado.setZonaId("MZ-1");
+        revisado.setZonaName("Macro-zona 1");
+        revisado.setEfectividadTipo("FUNGICIDE");
+        revisado.setEvoMotivo("El daño llegó a lindantes: MZ-1-046.");
+
+        service.registrarRevisionEfectividad("Ana", revisado, "Era otro hongo");
+
+        HistorialEventoEntity e = saved();
+        assertThat(e.getTipo()).isEqualTo("Revisión");
+        assertThat(e.getSectorId()).isEqualTo("MZ-1-045");
+        assertThat(e.getLectura()).contains("Fitosanitario sin efectividad").contains("MZ-1-046");
+        assertThat(e.getDecision()).contains("Ana").contains("Era otro hongo");
+        assertThat(e.getAccion()).contains("Bloqueo levantado").contains("en el sector");
+        assertThat(e.isEvoShow()).isFalse();
+        assertThat(e.isBloqueoRepeticion()).isFalse();
+    }
+
+    @Test
     void laEsperaSeEscribeParaElHistorial() {
         assertThat(LatencyLabel.of(30 * 60_000L)).isEqualTo("30 min");
         assertThat(LatencyLabel.of(3 * 3_600_000L)).isEqualTo("3 h");

@@ -254,7 +254,7 @@ public class HistorialService {
         e.setEvoShow(true);
         e.setEvoMetric("Diagnóstico del sector");
         e.setEvoUnit("");
-        e.setEvoAntes(baseline.severity() == null ? baseline.state() : baseline.state() + " " + baseline.severity());
+        e.setEvoAntes(baseline.severity() == null ? baseline.state() : baseline.state() + " " + baseline.severity().label());
         e.setEvoAhora("—");
         e.setEvoDelta("—");
         e.setEvoLatencia(followUps.latencyLabel(followUp.kind()));
@@ -336,6 +336,32 @@ public class HistorialService {
         e.setLectura("Sector con el tope de fitosanitarios alcanzado.");
         e.setDecision("Revisión registrada por " + usuario + ": " + detalle);
         e.setAccion("Bloqueo levantado: el sector puede recibir fitosanitarios otra vez.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra la revisión de una acción que quedó sin efectividad (S-06): quién la hizo, cuándo (el reloj del vivero) y qué
+     * constató. Levanta el bloqueo de la repetición autónoma de esa acción. Queda en el sector de la acción revisada.
+     */
+    @Transactional
+    public void registrarRevisionEfectividad(String usuario, HistorialEventoEntity revisado, String detalle) {
+        EffectivenessKind kind = EffectivenessKind.parse(revisado.getEfectividadTipo()).orElse(EffectivenessKind.IRRIGATION);
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(revisado.getSectorId());
+        e.setZonaId(revisado.getZonaId());
+        e.setZonaName(revisado.getZonaName() != null ? revisado.getZonaName() : revisado.getZonaId());
+        e.setTipo("Revisión");
+        e.setTs(reloj.millis());
+        e.setLectura(kind.label() + " sin efectividad"
+                + (revisado.getEvoMotivo() != null ? ": " + revisado.getEvoMotivo() : "."));
+        e.setDecision("Revisión registrada por " + usuario + ": " + detalle);
+        e.setAccion("Bloqueo levantado: " + kind.label().toLowerCase() + " vuelve a poder repetirse de forma autónoma "
+                + (kind.isZoneScoped() ? "en la macro-zona." : "en el sector."));
         e.setRes("Efectiva");
         e.setSev(EMDASH);
         e.setEvoShow(false);

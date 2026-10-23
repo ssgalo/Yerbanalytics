@@ -133,6 +133,8 @@ public final class MapaPermisos {
         permiso(r, post, "/api/tanques/**", Permiso.INSUMOS_GESTIONAR);
         // Revisión de un sector que alcanzó el tope de fitosanitarios (F-06): la hace quien maneja los insumos.
         permiso(r, post, "/api/sectores/*/revision-fitosanitario", Permiso.INSUMOS_GESTIONAR);
+        // Revisión de una acción que quedó sin efectividad (S-06): la hace quien constata en persona qué pasó en el vivero.
+        permiso(r, post, "/api/efectividad/*/revision", Permiso.EFECTIVIDAD_REVISAR);
 
         // Demo (solo existe cuando yerbanalytics.demo.enabled=true; en producción los controllers no se registran)
         permiso(r, null, "/api/demo/**", Permiso.SIMULACION_GESTIONAR);
