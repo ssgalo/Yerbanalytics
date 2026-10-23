@@ -22,4 +22,7 @@ public interface ApplicationRepository extends JpaRepository<ApplicationEntity, 
     /** La última aplicación que una regla ordenó en la macro-zona desde {@code since} (cierre de una tanda del plan). */
     Optional<ApplicationEntity> findFirstByZoneIdAndSupplyAndRuleNameAndTsGreaterThanEqualOrderByTsDesc(
             String zoneId, Supply supply, String ruleName, long since);
+
+    /** Cuántas aplicaciones de ese insumo recibió el sector desde {@code since} (epoch ms): el tope de fitosanitarios y el foco. */
+    long countBySectorIdAndSupplyAndTsGreaterThanEqual(String sectorId, Supply supply, long since);
 }
