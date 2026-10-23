@@ -116,7 +116,7 @@ Administrador inicial del backend (ver su README).
   ve "Tu rol no tiene secciones habilitadas".
 - **Acciones**: `useAuth().puede('<permiso>')` oculta o deshabilita la edición en Configuración
   (`configuracion.editar`; el interruptor de Demo Expo, `demo-expo.configurar`), Motor de reglas
-  (`reglas.editar`: Parámetros en sólo lectura, sin guardar), Hardware (`hardware.gestionar`),
+  (`reglas.editar`: interruptores y parámetros en sólo lectura, sin guardar), Hardware (`hardware.gestionar`),
   Topología (`topologia.gestionar`) y Demo Expo (`pasadas.operar`: iniciar/cancelar).
 - **403 uniforme**: el cliente HTTP convierte un `403` en `PermisoDenegadoError` con el mensaje
   "No tenés permiso para esta acción." y recarga el perfil (la matriz pudo cambiar mientras se
@@ -172,6 +172,9 @@ src/
 │   ├── sector/         Detalle de sector
 │   ├── diagnostics/    Diagnósticos de IA
 │   ├── auth/           Login, cambio de contraseña y guardas de ruta
+│   ├── configuracion/  Umbrales (sólo las bandas de las métricas), Rustificación, Criterio de diagnóstico y Preferencias
+│   ├── reglas/         Motor de reglas: pestaña Reglas (interruptor operativo, parámetros) e Inspector (grafo con la última evaluación)
+│   ├── historial/      Historial con grafo de razonamiento
 │   ├── usuarios/       Usuarios, roles y permisos, auditoría y política de sesión
 │   ├── demo-expo/      Demo Expo: pasada del riel y secuencias de riego, mediasombra y lectura en vivo (pestaña oculta; se enciende en Configuración → "Mostrar Demo Expo")
 │   └── placeholder/    Módulos no incluidos en la demo
@@ -179,6 +182,17 @@ src/
 ├── App.tsx        AuthProvider + RouterProvider (el vivero se monta dentro del shell, con sesión)
 └── main.tsx       entrypoint
 ```
+
+### Motor de reglas y Rustificación
+
+- **Motor de reglas** (`/reglas`): las reglas agrupadas por objetivo, cada una con su interruptor operativo
+  (`PUT /api/rules/{name}/estado`, `reglas.editar`) y sus parámetros. Apagar una protección pide motivo y confirmación;
+  una regla apagada se ve como tal y, en modo demo, avisa que el simulador puede estar forzándola. Sin `reglas.editar` todo
+  queda en sólo lectura. El interruptor no es un control de demo: ésos viven en el simulador.
+- **Rustificación** (`/rustificacion`, dentro de Configuración): el horario por defecto de la mediasombra y el resumen del
+  plan de cada macro-zona, con enlace a su detalle. **Umbrales** (`/configuracion`) queda sólo con las bandas de alerta de
+  las métricas.
+- Sin emojis en la interfaz: los íconos salen de `Icon` y los estados de `StateGlyph`.
 
 ### Del mock al backend real
 

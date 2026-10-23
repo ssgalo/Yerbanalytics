@@ -57,7 +57,9 @@ simulador (punto ámbar, con el motivo).
 - **Topología** — regenera la grilla (N macro-zonas × M sectores) para que coincida con el
   hardware a simular.
 - **Control de reglas y automatización** — con el backend en modo demo, apaga reglas y acorta sus
-  cooldowns (*Telemetría → Control de reglas*), inyecta clima (con marcas horarias, UV máximo del día y
+  cooldowns (*Telemetría → Control de reglas*; **en modo demo su interruptor gana sobre el estado operativo**: si el vivero
+  apagó una regla en Motor de reglas, el simulador la ve con la leyenda «Apagada en el vivero» y puede prenderla igual; el
+  simulador nunca escribe el estado operativo), inyecta clima (con marcas horarias, UV máximo del día y
   un modo "sin pronóstico") y arma las condiciones para que una regla dispare en el siguiente pulso
   (*Automatización*). Ver "Cómo agregar el escenario de una regla".
 - **Fuente de telemetría** — con el backend en modo demo, **toda** la telemetría del simulador sale por
@@ -65,7 +67,7 @@ simulador (punto ámbar, con el motivo).
   ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
   actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
 - **Happy path de la demo** (pestaña *Demo Expo*, junto a la pasada del riel y las secuencias) — un botón que evalúa
-  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. Con la fuente en **Simulador** enciende la dosificación (`SupplyRule`, que el backend arranca retirada), saltea la ventana horaria y el límite diario de aplicación y asegura stock en los tanques de la zona (ver «Aplicación de insumos»); con la fuente en **ESP32 real** no toca ninguna regla y sólo avisa si la dosificación sigue retirada. No espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
+  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. Con la fuente en **Simulador** enciende la dosificación (`SupplyRule`, que el backend arranca retirada o que el vivero pudo apagar; decide por `effectiveEnabled`), saltea la ventana horaria y el límite diario de aplicación y asegura stock en los tanques de la zona (ver «Aplicación de insumos»); con la fuente en **ESP32 real** no toca ninguna regla y sólo avisa si la dosificación sigue apagada. No espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
   en **Simulador** genera todo: lectura (`humSus` entre el umbral crítico y el de riego, `humAmb` crítica), diagnóstico de
   IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
@@ -234,9 +236,9 @@ bloqueo como causa. El bloqueo queda vigente hasta que se lo levanta en «Bloque
 las precondiciones P-D1…P-D5 (diagnóstico vigente, intervalo y una por día, ventana 07–10 / 17–19, ≤ 30 °C, sin lluvia, humedad
 de sustrato ≥ 45 %) y el stock del tanque antes de publicar la orden de bomba. Lo que no cumple queda pendiente y se reintenta.
 
-- **`SupplyRule` y `DailyDoseLimitRule` arrancan retiradas** en el backend (`yerbanalytics.reglas.retiradas`): figuran
-  «deshabilitadas» en la traza hasta que las reglas de aplicación de la v2 las reemplacen. Con el modo demo encendido se las
-  vuelve a encender desde Telemetría → Control de reglas (el happy path en modo Simulador lo hace solo).
+- **`SupplyRule` y `DailyDoseLimitRule` arrancan retiradas** en el backend (`yerbanalytics.reglas.retiradas`, estado operativo
+  por defecto): figuran «deshabilitadas» en la traza hasta que las reglas de aplicación de la v2 las reemplacen. Con el modo demo
+  encendido se las vuelve a encender desde Telemetría → Control de reglas (el override del simulador gana) (el happy path en modo Simulador lo hace solo).
 - **`ApplicationPreconditions`** es una pieza controlable más (Control de reglas): se apaga (no se aplica nada), se saltea cada
   guarda (`diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture`, `stock`) y se acortan los intervalos
   (`interval-fertilizer`, `interval-fungicide`, en minutos; 0 los elimina).
