@@ -61,23 +61,31 @@ export const soloReglasDeLaCadena = (catalogo: CatalogoReglas): CatalogoReglas =
 /** La pieza de fábrica con ese nombre, o `undefined`. */
 export const reglaDeFabrica = (nombre: string): ReglaCatalogo | undefined => FABRICA.reglas.find((r) => r.id === nombre);
 
+/** Falta `activa` en el cuerpo (ACTIVA_REQUERIDA), con el mensaje del backend. */
+export function exigirActiva(cambio: Partial<CambioEstadoRegla>): void {
+  if (cambio.activa === undefined || cambio.activa === null) {
+    throw new EstadoReglaError('ACTIVA_REQUERIDA', 'Falta indicar si la regla se prende o se apaga.');
+  }
+}
+
 /**
- * Valida el cambio de estado con las mismas reglas del backend: apagar una protección exige motivo y confirmación;
+ * Valida el cambio de estado con las mismas reglas del backend (y los mismos mensajes), una vez descartado el mismo
+ * estado, que el backend resuelve antes y sin validar nada: apagar una protección exige motivo y confirmación;
  * prender nunca pide nada; el motivo tiene tope. Lanza `EstadoReglaError`.
  */
 export function validarCambioEstado(regla: ReglaCatalogo, cambio: CambioEstadoRegla): void {
   const motivo = cambio.motivo?.trim() ?? '';
   if (motivo.length > MOTIVO_MAX) {
-    throw new EstadoReglaError('MOTIVO_DEMASIADO_LARGO', `El motivo no puede pasar de ${MOTIVO_MAX} caracteres.`);
+    throw new EstadoReglaError('MOTIVO_DEMASIADO_LARGO', `El motivo no puede superar los ${MOTIVO_MAX} caracteres.`);
   }
   if (cambio.activa || regla.proteccion === null) return;
   if (motivo === '') {
-    throw new EstadoReglaError('MOTIVO_REQUERIDO', 'Para apagar una protección hay que decir el motivo.');
+    throw new EstadoReglaError('MOTIVO_REQUERIDO', 'Apagar una protección exige indicar el motivo.');
   }
   if (cambio.confirmaProteccion !== true) {
     throw new EstadoReglaError(
       'CONFIRMACION_REQUERIDA',
-      'Apagar una protección necesita confirmación.',
+      'Apagar una protección exige confirmar la consecuencia.',
       regla.proteccion,
     );
   }

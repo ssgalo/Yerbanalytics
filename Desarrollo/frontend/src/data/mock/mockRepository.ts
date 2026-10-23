@@ -55,6 +55,7 @@ import {
   buildRuleSchema,
   catalogoVigente,
   soloReglasDeLaCadena,
+  exigirActiva,
   validarCambioEstado,
   validarCambios,
   type EstadoRegla,
@@ -484,10 +485,13 @@ export class MockRepository implements DataRepository {
     const catalogo = await this.getCatalogoReglas();
     const regla = catalogo.reglas.find((r) => r.id === nombre);
     if (!regla) throw new Error(`Error 404: la regla ${nombre} no existe`);
-    // Mismo orden que el backend: se valida antes de mirar si el estado cambia.
+    // Mismo orden que el backend (ReglasEstadoService): activa requerida; mismo estado = éxito sin validar motivo ni
+    // confirmación; recién entonces se validan. Excepción: apagar lo que sólo la siembra tiene apagado (sin fila) es una
+    // decisión explícita y se registra.
+    exigirActiva(cambio);
+    const apagadaSoloPorLaSiembra = !cambio.activa && !this.estadosReglas.has(nombre);
+    if (regla.activa === cambio.activa && !apagadaSoloPorLaSiembra) return regla;
     validarCambioEstado(regla, cambio);
-    // Mismo estado que el vigente: no escribe ni registra nada.
-    if (regla.activa === cambio.activa) return regla;
 
     const motivo = cambio.motivo?.trim() || null;
     const usuario = 'Ingeniero Agrónomo';

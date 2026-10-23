@@ -135,8 +135,57 @@ describe('MockRepository · estado de las reglas', () => {
     expect(prendida.estado).not.toBeNull();
   });
 
-  it('una pieza desconocida falla', async () => {
-    await expect(nuevo().setEstadoRegla('NoExiste', { activa: false })).rejects.toThrow(/NoExiste/);
+  it('una pieza desconocida falla como un 404, antes que cualquier otra validación', async () => {
+    await expect(nuevo().setEstadoRegla('NoExiste', { activa: false })).rejects.toThrow(/404.*NoExiste/);
+    await expect(
+      nuevo().setEstadoRegla('NoExiste', {} as unknown as { activa: boolean }),
+    ).rejects.toThrow(/404/);
+  });
+
+  it('sin el campo activa: ACTIVA_REQUERIDA con el mensaje del backend', async () => {
+    await expect(
+      nuevo().setEstadoRegla('RiegoPorDeficitRule', { motivo: 'x' } as unknown as { activa: boolean }),
+    ).rejects.toMatchObject({
+      codigo: 'ACTIVA_REQUERIDA',
+      message: 'Falta indicar si la regla se prende o se apaga.',
+    });
+  });
+
+  it('los mensajes de rechazo son los del backend', async () => {
+    const repo = nuevo();
+    await expect(repo.setEstadoRegla('SustratoSaturadoRule', { activa: false })).rejects.toMatchObject({
+      message: 'Apagar una protección exige indicar el motivo.',
+    });
+    await expect(
+      repo.setEstadoRegla('SustratoSaturadoRule', { activa: false, motivo: 'x' }),
+    ).rejects.toMatchObject({ message: 'Apagar una protección exige confirmar la consecuencia.' });
+    await expect(
+      repo.setEstadoRegla('RiegoPorDeficitRule', { activa: false, motivo: 'x'.repeat(501) }),
+    ).rejects.toMatchObject({ message: 'El motivo no puede superar los 500 caracteres.' });
+  });
+
+  it('mismo estado (con fila): éxito sin validar motivo ni confirmación, aunque el motivo sea larguísimo', async () => {
+    const repo = nuevo();
+    await repo.setEstadoRegla('SustratoSaturadoRule', { activa: false, motivo: 'a', confirmaProteccion: true });
+    const [antes] = await repo.getHistory({ tipo: 'Configuración' });
+
+    const res = await repo.setEstadoRegla('SustratoSaturadoRule', { activa: false, motivo: 'x'.repeat(900) });
+
+    expect(res.activa).toBe(false);
+    expect((await repo.getHistory({ tipo: 'Configuración' }))[0]).toBe(antes);
+  });
+
+  it('apagar lo que sólo la siembra tiene apagado guarda el estado y deja el evento; repetirlo ya es un no-op', async () => {
+    const repo = nuevo();
+    expect(regla(await repo.getCatalogoReglas(), 'SupplyRule')).toMatchObject({ activa: false, estado: null });
+
+    const res = await repo.setEstadoRegla('SupplyRule', { activa: false, motivo: 'lo dejo apagada' });
+
+    expect(res.estado).toMatchObject({ motivo: 'lo dejo apagada' });
+    const eventos = await repo.getHistory({ tipo: 'Configuración' });
+    expect(eventos).toHaveLength(1);
+    await repo.setEstadoRegla('SupplyRule', { activa: false });
+    expect(await repo.getHistory({ tipo: 'Configuración' })).toHaveLength(1);
   });
 
   it('el esquema refleja el estado efectivo, el de fábrica y el código', async () => {
