@@ -1,5 +1,7 @@
 # Diferencias: motor de reglas implementado vs. `reglas_v2.md`
 
+> Nota 23/10/2026: el sketch `vivero_esp32_red` citado abajo se retiró; el riel y el resto lo maneja el firmware modular.
+>
 > Actualizado el 03/10/2026, sobre la rama `feat/implementar-nuevas-reglas` (HEAD `824a830`).
 > Fuente de verdad del lado del código: `Desarrollo/backend/src/main/java/com/yerbanalytics/backend/` (se abrevia `…/backend/`). Fuente del lado del documento: `docs-motor-reglas-e-integracion/reglas_v2.md` (v2, 28/09/2026).
 > Las citas `archivo:línea` fueron verificadas leyendo el archivo en HEAD. Sólo se describen diferencias; no hay recomendaciones.

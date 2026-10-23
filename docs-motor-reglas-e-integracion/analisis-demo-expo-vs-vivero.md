@@ -1,5 +1,8 @@
 # Demo Expo y vivero: cómo conviven
 
+> **23/10/2026:** el sketch `vivero_esp32_red` se retiró; el riel y el resto lo maneja el firmware modular
+> (`Desarrollo/embebido/`). Las menciones de abajo son históricas.
+
 > **Estado: análisis en curso.** Borrador del 08/10/2026, actualizado el 09/10. La ESP32 no está
 > disponible hasta el sábado 10/10: se puede adelantar código y contrato, pero nada se prueba con
 > hardware hasta entonces.
@@ -208,8 +211,8 @@ la pestaña Demo Expo y se sigue en vivo, igual que la pasada del riel.
 **Actualización (rama del ESP32-S3 integrada).** Se integró la rama `feat/prototipo-esp32-s3-acks`: el ACK de
 riego llega **al final del riego** (no al abrir) y el de la mediasombra al tocar el final de carrera, y el
 backend ya está adaptado a eso. Las secuencias corren sobre el firmware modular `nodo_combinado`
-(`Desarrollo/embebido/`), que además atiende `LEER_AHORA` con los sensores reales; `vivero_esp32_red` queda como
-banco de pruebas por serie y del riel. Lo de `vivero_esp32_red` mencionado arriba (bomba L298N como `valve`) ya
+(`Desarrollo/embebido/`), que además atiende `LEER_AHORA` con los sensores reales; `vivero_esp32_red` quedó como
+banco de pruebas por serie y del riel (retirado el 23/10). Lo de `vivero_esp32_red` mencionado arriba (bomba L298N como `valve`) ya
 no aplica al destino.
 
 ### 9.4 Lo que falta saber del hardware
@@ -259,7 +262,7 @@ hardware. El sector destino se resuelve por ahora como la zona de menor número 
 - Contrato MQTT: `Desarrollo/embebido/comun/contrato.h`; riel en `mqtt/ContratoRiel.java`.
 - Secuencias guionadas: `openspec/changes/add-secuencias-demo-expo/`; README del backend, sección
   "Secuencias de la Demo Expo".
-- Firmware de la expo: `Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/`.
+- Firmware de la expo: el modular, `Desarrollo/embebido/` (`nodo_combinado`).
 - Motor: `Desarrollo/backend/src/main/java/com/yerbanalytics/backend/engine/` (reglas en
   `engine/rules/`, catálogo en `engine/parametros/`).
 - Diferencias motor vs reglas v2: `diferencias-motor-reglas-vs-reglas-v2.md`.

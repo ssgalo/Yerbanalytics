@@ -9,9 +9,7 @@
 //  los módulos no debe contener literales de configuración.
 //
 //  Placa: ESP32-S3 DevKitC-1 N16R8 (flash 16 MB, PSRAM octal).
-//  Este archivo es la fuente de verdad del cableado:
-//  prototipo_hardware/vivero_esp32_red/config.example.h repite el bloque de pines
-//  con los mismos nombres. Si cambia acá, cambia allá.
+//  Este archivo es la fuente de verdad del cableado.
 // ============================================================================
 #ifndef CONFIG_H
 #define CONFIG_H

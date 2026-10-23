@@ -481,7 +481,7 @@ ni subir la versión del contrato. Dos clientes independientes contra la misma s
 evidencia de que el contrato sirve; dar de baja la PWA es una decisión posterior, no una deuda.
 
 **Quién pide las fotos.** Además del pedido manual, la **pasada del riel** (`POST /api/pasadas`,
-botón de Demo Expo) mueve el riel por MQTT (`vivero_esp32_red`), emite las órdenes de captura de dos
+botón de Demo Expo) mueve el riel por MQTT (firmware modular: `actuacion/act_riel`, en `nodo_combinado`/`nodo_actuador`), emite las órdenes de captura de dos
 sectores y vuelve a home. Probada con hardware el 03/10/2026; límites conocidos (final de carrera de
 home, fuente del motor) en el README del sketch.
 
@@ -607,5 +607,5 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Negocio / alcance | `Documentacion/` |
 | Reglas agronómicas y su estado en el motor | `docs-motor-reglas-e-integracion/` (`reglas_v2.md`, `diferencias-motor-reglas-vs-reglas-v2.md`) |
 | Secuencias de Demo Expo (riego, mediasombra, lectura) | `openspec/changes/add-secuencias-demo-expo/`, `Desarrollo/backend/README.md` ("Secuencias"), `docs-motor-reglas-e-integracion/analisis-demo-expo-vs-vivero.md` §9 |
-| Pasada del riel (backend) y firmware del riel | `Desarrollo/backend/README.md` ("Planificador de pasadas"), `Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/README.md`, `openspec/changes/add-pasada-riel/` |
+| Pasada del riel (backend) y firmware del riel | `Desarrollo/backend/README.md` ("Planificador de pasadas"), `Desarrollo/embebido/README.md` (sección "Riel"), `openspec/changes/add-pasada-riel/` |
 | Del sensor al motor / conectar el ESP32 | `docs-motor-reglas-e-integracion/circuito-sensado-a-motor.md`, `conectar-esp32.md` |

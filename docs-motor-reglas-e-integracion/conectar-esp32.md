@@ -60,18 +60,15 @@ probó con hardware real (03/10/2026) es el **riel de la cámara**, con otro ske
    - Actuador: publicar un comando a mano y mirar el ACK (ejemplos en
      `Desarrollo/embebido/README.md`).
 
-## El riel de la cámara (otro sketch, ya probado)
+## El riel de la cámara
 
-Lo de arriba es para el nodo modular. El **riel** lo maneja otro firmware,
-`Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/`, con su propio `config.h` y los tópicos
-`nursery/rail/command` y `nursery/rail/event`. La red y el broker son los mismos (pasos 1, 2 y 4).
-
-Ese sketch se compiló y flasheó con `arduino-cli` (ahora instalado en esa PC) y se probó con el ESP32,
-el riel y el backend: una pasada completa disparada desde la sección Demo Expo del dashboard recorre
-los dos sectores y trae los diagnósticos. Quedan dos problemas de hardware (final de carrera de home
-y fuente del motor sin detección) y un gotcha del puerto serie en Linux. Librerías, configuración,
-flasheo, prueba con `mosquitto_pub` y esos problemas: su
-[README](../Desarrollo/embebido/prototipo_hardware/vivero_esp32_red/README.md).
+El riel lo maneja el mismo firmware modular (`nodo_combinado` o `nodo_actuador`, módulo `actuacion/act_riel`),
+con los tópicos `nursery/rail/command` y `nursery/rail/event`; la red y el broker son los mismos (pasos 1, 2 y 4).
+Hay que flashear el firmware modular: ver `Desarrollo/embebido/README.md` §2. El riel se probó con hardware el
+03/10/2026 (con el sketch `vivero_esp32_red`, ya retirado): una pasada completa disparada desde Demo Expo recorre
+los dos sectores y trae los diagnósticos. Límites de hardware conocidos (final de carrera de home, fuente del
+motor sin detección, brownout) y el gotcha del puerto serie en Linux: sección "Riel" de
+`Desarrollo/embebido/README.md`.
 
 ## Lo que va a fallar aunque la red ande
 

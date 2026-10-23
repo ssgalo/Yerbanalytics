@@ -164,8 +164,7 @@ copiar `config.example.h` y pasá tus credenciales.
 
 ## 4. Cableado (ESP32-S3 DevKitC-1 N16R8)
 
-Fuente de verdad: `comun/config.example.h`. El sketch `prototipo_hardware/vivero_esp32_red` repite
-los mismos pines con los mismos nombres.
+Fuente de verdad: `comun/config.example.h`.
 
 | Componente | Señal | GPIO | Nodo(s) | Notas |
 |---|---|---|---|---|
@@ -314,7 +313,7 @@ El ack **final** sale **cuando termina** la acción, no cuando llega el comando.
 Secuencia: `[en_cola] → iniciado → final`. `en_cola` sólo sale si el comando no pudo arrancar al llegar; `posicion` (1 = el
 próximo) y `esperaMaxSec` son una cota superior de la espera. Un encolado que se descarta pasa directo a su final
 (`cancelado` / `reemplazado`). Los `OFF`, `sin_cambio` e inválidos sólo llevan el final. El backend nuevo sigue
-funcionando sin intermedios (firmware viejo, sketch `vivero_esp32_red`); **el backend viejo no entiende `EN_CURSO`
+funcionando sin intermedios (firmware viejo); **el backend viejo no entiende `EN_CURSO`
 (pierde el ack final): desplegar el backend antes que el firmware**. Los valores de `tipo` son:
 
 | Tipo | Cuándo sale |
@@ -373,11 +372,44 @@ Contrato completo en la sección "Riel" de `comun/contrato.h` y en
 - **Eventos:** `ACEPTADO`, después `LLEGO` o `ERROR`. Los errores llevan un `codigo`:
   `COMANDO_INVALIDO`, `HOME_NO_ENCONTRADO`, `FIN_DE_CARRERA` o `REEMPLAZADO`.
 - **Al arrancar** hace homing.
-- **Comportamiento:** el mismo que `prototipo_hardware/vivero_esp32_red`, ya probado con el riel
-  real:
+- **Comportamiento:** portado del sketch del prototipo `vivero_esp32_red` (retirado el 23/10/2026; queda en el
+  historial de git), que se probó con el riel real:
   - el último comando gana;
   - el mismo `commandId` se ignora o se republica su evento;
   - un evento que no se pudo publicar se reintenta al reconectar.
+
+### Límites conocidos del riel (probado con hardware el 03/10/2026)
+
+Una pasada completa desde Demo Expo anduvo con el ESP32 clásico (sector 1 ≈ 21,5 s, foto, sector 2 ≈ 22 s, foto).
+La versión S3 + firmware modular no tiene esa prueba por separado: confirmar en banco.
+
+- **Final de carrera de home.** En el ESP32 clásico el GPIO 34 no tiene pull-up interno y, sin el externo, un contacto
+  NC lee "activado" aunque el carro esté lejos. El homing da por hecho que ya está en home si el final marca
+  activado: `HOME` y el homing de arranque terminaban al instante (`LLEGO` con `pasos: 0`, ~0,2 s) y, tras una
+  pasada, había que llevar el carro a mano a home o la siguiente lo empujaba 42.000 pasos de más. En el S3 los
+  finales usan `INPUT_PULLUP`, así que debería estar resuelto. Chequeo: con el carro lejos de home, el estado
+  tiene que decir `libre`; si dice `ACTIVADO`, el contacto NC está abierto o hay un cable cortado (medir C–NC).
+  `ERROR: Home no encontrado` suele ser cableado, `FINES_CARRERA_NC` que no coincide con el contacto o
+  `RIEL_DIR_HACIA_HOME` invertido; `FIN_DE_CARRERA` yendo a la posición 2 indica `POSICION_SECTOR_2` (42000) más
+  largo que el riel.
+- **Fuente del motor sin detección.** El firmware no sabe si el DRV8825 tiene alimentación: con la fuente apagada y
+  el ESP32 por USB, una pasada responde `LLEGO` en el tiempo esperado sin que nada se mueva. Un `LLEGO` no
+  prueba que el carro se movió.
+- **Brownout.** El WiFi pide picos de ~300 mA y el motor tira la fuente abajo (`Brownout detector was triggered`,
+  reinicio). Alimentar el ESP32 aparte del DRV8825 con masas unidas, capacitor de 470–1000 µF en el driver y
+  100 µF entre 3V3 y GND del ESP32, cable USB corto.
+- **Puerto serie en Linux.** Con el chip CH9102 (`/dev/ttyACM0`), abrir el puerto con `cat`/`stty`/`termios` o
+  `arduino-cli monitor` sin TTY reinicia el ESP32 y lo deja sin arrancar; usar el monitor serie del Arduino IDE.
+  Recuperación: `esptool --chip esp32s3 -p /dev/ttyACM0 --after hard_reset chip_id`. Hace falta el grupo `dialout`.
+- **Relés activos en LOW.** Entre que el pin pasa a salida y se lo pone en "abierto" pasan microsegundos y el
+  relé no llega a cerrar; antes el pin flota y el módulo tiene su propio pull-up. Si los relés hacen lo contrario,
+  `RELE_ACTIVO_EN_LOW 0`.
+- **Pines del S3.** No usar 0, 3, 45, 46 (strapping), 19, 20 (USB), 26–37 (flash y PSRAM octal), 43, 44 (consola),
+  38 y 48 (LED RGB). Con WiFi sólo el ADC1 (GPIO 1–10) lee analógico. El GPIO 2 no es de strapping en el S3.
+- **Comandos de prueba del riel.** `mosquitto_pub -q 1 -t nursery/rail/command -m
+  '{"commandId":"t-1","actuador":"rail","accion":"IR_A","parametros":{"posicion":1}}'` mirando
+  `nursery/rail/#`. Usar un `commandId` nuevo en cada prueba (el firmware ignora los últimos 4); `HOME` con otro id
+  cancela un movimiento (el viejo termina en `ERROR REEMPLAZADO`).
 
 ### QoS
 
@@ -417,8 +449,7 @@ embebido/
   nodo_sensor/          setup() red + sensado
   nodo_actuador/        setup() red + actuación + riel
   nodo_combinado/       setup() red + sensado + actuación + riel (prototipo)
-  prototipo_hardware/   sketches de Arduino IDE del hardware real, para pruebas por monitor serie.
-                        vivero_esp32_red: riel por MQTT + riego por relés (ver su README)
+  prototipo_hardware/   diagnósticos de un solo sensor (caudalímetro, HC-SR04), sin red
 ```
 
 ---

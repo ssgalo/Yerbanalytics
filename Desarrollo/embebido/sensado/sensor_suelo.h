@@ -2,7 +2,7 @@
 //  sensor_suelo.h  -  Sonda de suelo NPK-pH-EC por RS-485 / Modbus RTU
 // ----------------------------------------------------------------------------
 //  Lee 9 registros holding (humedad, temp, EC, pH, N, P, K, salinidad, TDS)
-//  vía función Modbus 0x03. Portado de sensores_unificados.ino con validación
+//  vía función Modbus 0x03. Portado del sketch retirado sensores_unificados.ino con validación
 //  de trama y CRC, y resultado tipado.
 // ============================================================================
 #ifndef SENSOR_SUELO_H

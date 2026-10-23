@@ -3,8 +3,8 @@
 // ----------------------------------------------------------------------------
 //  Implementa el contrato nursery/rail/* (contrato.h, sección "Riel"): IR_A a la
 //  posición 1 o 2, HOME contra el final de carrera, eventos ACEPTADO / LLEGO /
-//  ERROR. Portado de prototipo_hardware/vivero_esp32_red (misma lógica de
-//  movimiento, homing e idempotencia).
+//  ERROR. Portado del sketch del prototipo vivero_esp32_red (retirado; queda
+//  en el historial de git): misma lógica de movimiento, homing e idempotencia.
 //
 //  Corre en su propia tarea (TASK_PRIO_RIEL, la más baja): los pasos se generan
 //  con espera activa y el resto de las tareas la interrumpe cuando la necesita
