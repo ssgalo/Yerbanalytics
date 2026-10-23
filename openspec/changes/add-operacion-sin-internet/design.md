@@ -51,3 +51,14 @@ Test de integración con reloj inyectado: el día del plan avanza y los horarios
 
 ### D-6 — Parámetros
 Ninguno nuevo (D-1). El TTL sigue siendo la propiedad `yerbanalytics.weather.cache-ttl-ms`.
+
+## Decisiones tomadas al implementar
+
+- **D-4: opción (a).** O-05 queda como **no aplicable** en `reglas_v2.md`, `ESTADO.md` y el README del backend, con el criterio para reabrirlo: que exista un destino remoto de eventos.
+- **`ForecastStatus`** (`AVAILABLE` / `EXPIRED` / `ABSENT`) vive en `engine/weather/`; `status()` no consulta la API ni lanza refrescos. El modo demo «sin pronóstico» cuenta como `ABSENT`.
+- **El supuesto se registra en `TrazaRegla.supuesto`** (nuevo componente al final; los constructores anteriores se conservan) y no como una acción: no es una decisión de la regla.
+  `Rule.supuestoSinPronostico()` se declaró sólo en R-03, la única `Rule` que usa el pronóstico. `DespachoRiego`, `ApplicationPreconditions` y `ApplicationService` no son
+  reglas: su supuesto está documentado y cubierto por tests.
+- **M-02 no existe** (`add-mediasombra-v2` cancelado): O-02 queda parcial, con `ShadingRule` saltando la protección UV.
+- **`ForecastModeMonitor`** avisa por transición entre «con pronóstico» y «sin pronóstico» (vencido y ausente cuentan igual) y pide el pronóstico sin esperar en cada chequeo.
+- **O-04** se prueba sobre `ShadingRule` (el plan global) con el reloj del contexto: no depende de ninguna red.

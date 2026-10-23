@@ -20,7 +20,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | 8 | `add-reglas-biotico` | ✅ | `feat/reglas-v2-reglas-biotico` | C, H, 4, 6 | F-F1, F-F2, F-P1, F-04, F-06. Reglas de sector `FungalDamageRule` y `FoliarPestRule` (esqueleto `BioticDiagnosisBase`) y de macro-zona `FungalConditionRule` y `OutbreakRule` (`biotic/`); el tope es una precondición más de `ApplicationPreconditions` con la revisión en `POST /api/sectores/{id}/revision-fitosanitario` (permiso `insumos.gestionar`, sin migración manual). El diagnóstico se da por usado al ejecutar la aplicación (D-4). Decisiones por defecto a validar con el vivero: el *Daño biótico* genérico no dispara nada (D-1) y los lindantes salen de la grilla visual (D-6). Dosis la del catálogo (10 ml). `SupplyRule`/`DailyDoseLimitRule` siguen retiradas: faltan F-C*/F-S* |
 | 9 | `add-reglas-clorosis-estres-solar` | 🚧 | `feat/reglas-v2-clorosis-estres-solar` | C, H, 5, 6 | **F-C1, F-C2, F-S1 y F-S3 ✅; F-S2 ⬜ bloqueada** por la cancelación de `add-mediasombra-v2` (cerrar la malla de la zona de 11 a 16 h por 3 días necesita un dueño de la malla por horario; hoy sólo `ShadingRule` la mueve en cada pulso). `ChlorosisNonNutritionalRule` corta la rama de insumos (retira también el pedido de F-C2 que esperaba), `ChlorosisNutritionalRule` fertiliza, `SolarStressRule` repone agua por el despacho y `SolarStressUnexplainedRule` avisa. Compuerta común `engine/DiagnosisGate`, rustificación con el plan **global** detrás de `HardeningPhase`. Sin migración manual. De paso: `RuleContext.metricRaw` ya no lanza ante una métrica sin lectura (sonda de CE/pH sin conectar) |
 | 10 | `add-efectividad-y-s06` | 🚧 | `feat/reglas-v2-efectividad-s06` | C, 6, 8, 9 | **E-01…E-03, S-06, F-05 y la revisión humana ✅**; falta el escenario «Riego efectivo» del simulador (la lectura fijada no puede subir después del riego). `EffectivenessJob` reemplaza a `FollowUpRule` (borrada); `IneffectiveActionRule` (prio 7) bloquea el riego de la zona y una precondición de `ApplicationPreconditions` bloquea los tratamientos del sector. El nodo testigo admite un sector opcional. `DailyDoseLimitRule` (retirada) pasó a la prioridad 28. Migración: `migracion-permisos-efectividad.sql` |
-| 11 | `add-operacion-sin-internet` | ⬜ | — | C, 5, 6 | O-01…O-05 |
+| 11 | `add-operacion-sin-internet` | ✅ | `feat/reglas-v2-sin-internet` | C, 5, 6 | **O-01, O-03, O-04 ✅; O-02 parcial** (M-02 no existe: `add-mediasombra-v2` se canceló; `ShadingRule` sin pronóstico sigue el plan); **O-05 no aplicable** (no hay destino remoto de eventos, ver `reglas_v2.md` §10). `WeatherService.status()` (`ForecastStatus`), `Rule.supuestoSinPronostico()` y `TrazaRegla.supuesto`, `ForecastModeMonitor` (un `INFO` al entrar y otro al salir) y el modificador `NO_FORECAST` del simulador. Sin migración manual |
 
 ## Reglas de reglas_v2 por estado
 
@@ -41,7 +41,9 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | F-C1, F-C2, F-S1, F-S3 | ✅ | 9 |
 | F-S2 | ❌ bloqueada (sin dueño de la malla por horario, ver la fila 9) | 9 |
 | E-01…E-03, F-05 | ✅ | 10 |
-| O-01…O-05 | ⬜ | 11 |
+| O-01, O-03, O-04 | ✅ | 11 |
+| O-02 | ⚠️ parcial (sin M-02) | 11 |
+| O-05 | ➖ no aplicable (sin destino remoto) | 11 |
 
 ## Infraestructura transversal
 

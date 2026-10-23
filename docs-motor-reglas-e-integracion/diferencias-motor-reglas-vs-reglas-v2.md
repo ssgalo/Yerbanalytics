@@ -170,9 +170,9 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 | E-01 | Efectividad del riego | Distinta | `FollowUpRule` + `HistorialService.evaluarSeguimiento` | `\|Δ humedad\| ≥ 5` a los 2 min (doc: ≥ +8 a los 30 min con lectura de verificación); no alimenta ninguna regla |
 | E-02 | Efectividad fertilizante | Ausente | — | Los eventos "Insumo" se evalúan con humedad de sustrato, no con diagnóstico |
 | E-03 | Efectividad fitosanitario | Ausente | — | Ídem; sin vecinos ni severidad |
-| O-01 | Riego sin pronóstico | Implementada | `PosponerPorLluviaRule` | Sin pronóstico o con datos incompletos, R-03 queda `SIN_DATO`, no pospone y R-01 riega (`rules/PosponerPorLluviaRule.java:91-94`) |
+| O-01 | Riego sin pronóstico | Implementada | `PosponerPorLluviaRule` | Sin pronóstico o con datos incompletos, R-03 queda `SIN_DATO`, no pospone y R-01 riega (`rules/PosponerPorLluviaRule.java:91-94`). Desde `add-operacion-sin-internet` el estado es explícito (`WeatherService.status()`), la regla declara su supuesto (`supuestoSinPronostico()`), la traza lo muestra y queda un `INFO` al entrar y salir del modo |
 | O-02 | Mediasombra sin pronóstico | Parcial | `ShadingRule` | Sin pronóstico se saltea la protección UV y sigue el plan; M-02 por lectura no existe |
-| O-03 | Aplicaciones sin pronóstico | Ausente | — | Al no existir P-D3/P-D4 no hay nada que degradar |
+| O-03 | Aplicaciones sin pronóstico | Implementada | `ApplicationPreconditions` / `ApplicationService` | P-D4 no bloquea sin pronóstico y P-D3 usa la última lectura de temperatura (el pronóstico sólo la reemplaza si la zona nunca reportó); hay tests de ambos |
 | O-04 | Plan sin internet | Implementada | `ShadingRule` | El plan depende sólo del reloj local y la fecha de siembra (`rules/ShadingRule.java:113-120`); es el plan del código, no el de §7 |
 | O-05 | Sincronización | Parcial | firmware + `NurseryService` | El nodo guarda hasta 50 lecturas con su timestamp y las sube en orden (`Desarrollo/embebido/sensado/buffer_offline.h:2-5`); el backend las normaliza e ignora las anteriores a la última guardada (`service/NurseryService.java:463-482`). Sólo telemetría, sin deduplicar timestamps iguales; sin probar con hardware |
 | §7 (no tiene ID) | Plan de rustificación | Distinta | `ShadingRule` + `rustificacion_etapa` | Ver punto 4.3 |

@@ -1186,6 +1186,27 @@ efectividad» **bloquea su repetición autónoma** hasta que alguien registre la
 - **Retirado.** Los parámetros de latencia y umbral de recuperación de la configuración agronómica (`getLatencyMs`, `getUmbralRecuperacion`) ya no los lee nadie.
 - **Migración manual:** `resources/migracion-permisos-efectividad.sql` (permiso `efectividad.revisar` para Ingeniero y Operario en una matriz ya sembrada).
 
+## Operación sin internet (`add-operacion-sin-internet` · reglas_v2 §10, HU-13)
+
+Lo único que se pierde sin conexión es el **pronóstico**; el broker y la base son locales. El supuesto seguro depende de la acción:
+
+| Regla | Sin pronóstico |
+|---|---|
+| O-01 Riego | R-03 no pospone (se asume que no llueve) y R-01 riega; el despacho tampoco pospone al revalidar |
+| O-02 Mediasombra | `ShadingRule` salta la protección UV y sigue el plan. **Parcial**: M-02 (decidir por la última lectura) no existe, `add-mediasombra-v2` se canceló |
+| O-03 Aplicaciones | P-D4 (lluvia) no bloquea y P-D3 usa la temperatura de la última lectura |
+| O-04 Rustificación | El plan avanza con el reloj, sin red (test con reloj inyectado) |
+| O-05 Sincronización | **No aplicable**: no hay destino remoto de eventos (ver `reglas_v2.md`) |
+
+- `WeatherService.status()` → `ForecastStatus`: `AVAILABLE` (el ficticio del modo demo, o el cacheado dentro de la vigencia utilizable, 4 × `yerbanalytics.weather.cache-ttl-ms`
+  = 60 min), `EXPIRED` (hubo uno que ya no sirve; las reglas lo reciben como `null`) y `ABSENT` (nunca hubo, o el modo demo «sin pronóstico» está activo). No hay
+  parámetro nuevo: se nombra la vigencia que ya existía.
+- `Rule.supuestoSinPronostico()` (vacío si la regla no usa el pronóstico): con el contexto sin pronóstico, `RuleOrchestrator` lo deja en `TrazaRegla.supuesto`
+  («Sin pronóstico: …») y el Inspector lo muestra. Hoy lo declara `PosponerPorLluviaRule`.
+- `engine/weather/ForecastModeMonitor`: cada `yerbanalytics.weather.monitor-interval-ms` (60 s) pide el pronóstico sin esperar y deja **un `INFO` al entrar y otro al
+  salir** del modo (global, zona «Sistema»). Pasar de vencido a ausente no es un evento. Si arranca sin conexión avisa una vez.
+- Desde el simulador: `PUT /api/demo/weather/offline` y el modificador `NO_FORECAST`.
+
 ## Historial de lecturas
 
 Casi todas las reglas de nutrición y de hongos/plagas/estrés de `reglas_v2` miran el **pasado** de las lecturas
