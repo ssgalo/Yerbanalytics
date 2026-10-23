@@ -220,6 +220,57 @@ class ApplicationPreconditionsTest {
         assertThat(check(withDiagnosis).isMet()).isTrue();
     }
 
+    // --- F-06: tope de fitosanitarios ---
+
+    private static ApplicationFacts withFungicidesInWindow(ApplicationFacts f, int count) {
+        return new ApplicationFacts(f.supply(), f.now(), f.diagnosis(), f.lastSameSupply(), f.lastAnySupply(),
+                f.airTemp(), f.soilMoisture(), f.moistureAt(), f.lastWatering(), f.rain(), count);
+    }
+
+    @Test
+    void theFourthFungicideInTheWindowIsRejectedAsCapReached() {
+        PreconditionResult r = check(withFungicidesInWindow(ok(Supply.FUNGICIDE, "08:00"), 3));
+
+        assertThat(r.verdict()).isEqualTo(PreconditionResult.Verdict.REJECT);
+        assertThat(r.capReached()).isTrue();
+        assertThat(r.reason()).contains("F-06").contains("tope").contains("revisión");
+    }
+
+    @Test
+    void belowTheCapTheFungicideGoesOn() {
+        assertThat(check(withFungicidesInWindow(ok(Supply.FUNGICIDE, "08:00"), 2)).isMet()).isTrue();
+    }
+
+    @Test
+    void theCapOnlyLimitsFungicides() {
+        assertThat(check(withFungicidesInWindow(ok(Supply.FERTILIZER, "08:00"), 5)).isMet()).isTrue();
+    }
+
+    @Test
+    void theSimulatorCanBypassTheCap() {
+        ApplicationFacts capped = withFungicidesInWindow(ok(Supply.FUNGICIDE, "08:00"), 3);
+
+        assertThat(check(capped, bypassing("cap")).isMet()).isTrue();
+    }
+
+    @Test
+    void anotherRejectionIsNotTheCap() {
+        ApplicationFacts f = ok(Supply.FUNGICIDE, "08:00");
+        ApplicationFacts staleDiagnosis = new ApplicationFacts(f.supply(), f.now(),
+                new ValidDiagnosis.Verdict(false, "el diagnóstico tiene 60 h"), null, null, f.airTemp(),
+                f.soilMoisture(), f.moistureAt(), null, null, 0);
+
+        assertThat(check(staleDiagnosis).capReached()).isFalse();
+    }
+
+    @Test
+    void theCapIsCheckedAfterTheDiagnosisAndBeforeTheRest() {
+        // Fuera de ventana Y con el tope alcanzado: gana el tope, que es un rechazo y no una espera.
+        PreconditionResult r = check(withFungicidesInWindow(ok(Supply.FUNGICIDE, "12:00"), 3));
+
+        assertThat(r.verdict()).isEqualTo(PreconditionResult.Verdict.REJECT);
+    }
+
     // --- Overrides del simulador ---
 
     private static RuleOverrides bypassing(String... keys) {
@@ -333,7 +384,7 @@ class ApplicationPreconditionsTest {
 
     @Test
     void declaresEveryBypassAndCooldownTheSimulatorNeeds() {
-        assertThat(preconditions.bypassKeys()).containsExactlyInAnyOrder("diagnosis", "daily", "window", "temperature",
+        assertThat(preconditions.bypassKeys()).containsExactlyInAnyOrder("diagnosis", "cap", "daily", "window", "temperature",
                 "rain", "moisture", "stock");
         assertThat(preconditions.cooldownKeys()).containsExactlyInAnyOrder("interval-fertilizer", "interval-fungicide");
     }

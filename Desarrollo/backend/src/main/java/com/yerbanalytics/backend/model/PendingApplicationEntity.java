@@ -55,4 +55,17 @@ public class PendingApplicationEntity {
     /** Por qué se difirió la última vez que se evaluó. */
     @Column(name = "last_reason", columnDefinition = "TEXT")
     private String lastReason;
+
+    /**
+     * {@code diagnosisTs} del diagnóstico que originó el pedido, si lo disparó uno. El diagnóstico se da por usado cuando la
+     * aplicación se ejecuta, no cuando se pide; y se usa ESTE, no el que tenga el sector cuando por fin se aplique.
+     */
+    @Column(name = "diagnosis_ts")
+    private Long diagnosisTs;
+
+    /** Sin diagnóstico de origen: el pedido de una regla que no decide con la IA. */
+    public PendingApplicationEntity(String id, String sectorId, String zoneId, Supply supply, String ruleName,
+                                    boolean requiresDiagnosis, Long createdTs, String lastReason) {
+        this(id, sectorId, zoneId, supply, ruleName, requiresDiagnosis, createdTs, lastReason, null);
+    }
 }
