@@ -29,7 +29,8 @@ import java.util.Set;
  * (30–32 °C) ninguna de las dos reglas actúa: es lo que dice la v2, y hay un test que lo fija para que no se «arregle» sin
  * querer. La luz se mide como en F-S1 (pico entre las 10 y las 16 h).
  *
- * <p>Está en la rama global y no en la de riego para que su aviso no dependa de los cortes de esa rama: no ordena nada.
+ * <p>Está en la rama de seguimiento y no en la de riego para que su aviso no dependa de los cortes de esa rama (ningún corte
+ * alcanza a la de seguimiento): no ordena nada. Tampoco en la global, que el grafo de reglas dibuja antes de todas las demás.
  *
  * <p><b>Simulador:</b> el bypass {@value #BYPASS_SAMPLES} usa la última lectura de luz y temperatura en lugar de las 48 h.
  */
@@ -65,7 +66,7 @@ public class SolarStressUnexplainedRule implements Rule {
 
     @Override
     public RuleBranch branch() {
-        return RuleBranch.GLOBAL;
+        return RuleBranch.SEGUIMIENTO;
     }
 
     /** Decide con el diagnóstico de IA: actúa una vez por diagnóstico nuevo. */

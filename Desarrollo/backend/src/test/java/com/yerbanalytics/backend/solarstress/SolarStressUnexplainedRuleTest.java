@@ -135,7 +135,7 @@ class SolarStressUnexplainedRuleTest {
         assertThat(rule.cooldownKeys()).isEmpty();
         assertThat(rule.name()).isEqualTo("SolarStressUnexplainedRule");
         assertThat(rule.label()).contains("F-S3");
-        assertThat(rule.branch()).isEqualTo(RuleBranch.GLOBAL);
+        assertThat(rule.branch()).isEqualTo(RuleBranch.SEGUIMIENTO);
         assertThat(rule.parametros()).extracting(DefinicionParametro::clave).containsExactlyInAnyOrder(
                 "diagnostico.confianza-minima", "diagnostico.vigencia-horas", "estres.luz-baja", "estres.temp-baja");
     }
