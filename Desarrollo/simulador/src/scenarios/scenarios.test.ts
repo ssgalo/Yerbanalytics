@@ -86,7 +86,7 @@ test('the registry keeps the order and keys of the original catalog', () => {
     [
       'R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE',
       'FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR', 'APPLICATION_PRECONDITIONS',
-      'NUTRITION_PLAN', 'LOW_EC',
+      'NUTRITION_PLAN', 'LOW_EC', 'FUNGAL_DAMAGE', 'FOLIAR_PEST', 'FUNGAL_CONDITION', 'OUTBREAK', 'FUNGICIDE_CAP',
     ],
   );
 });
@@ -103,8 +103,13 @@ test('every scenario is described and names the backend rules it exercises', () 
   }
 });
 
-test('only the diagnosis-driven scenario asks for a prior diagnosis', () => {
-  assert.deepEqual(SCENARIOS.filter((s) => s.needsDiagnosis).map((s) => s.key), ['SUPPLY']);
+test('only the diagnosis-driven scenarios ask for a prior diagnosis', () => {
+  assert.deepEqual(SCENARIOS.filter((s) => s.needsDiagnosis).map((s) => s.key), [
+    'SUPPLY',
+    'FUNGAL_DAMAGE',
+    'FOLIAR_PEST',
+    'FUNGICIDE_CAP',
+  ]);
 });
 
 /* ------------------------------------------------------------------ conflictos */
@@ -601,4 +606,157 @@ test('without the nutrition scenarios no bypass is asked for', () => {
   for (const key of ['R01', 'R02', 'SUPPLY', 'LOCK', 'APPLICATION_PRECONDITIONS']) {
     assert.deepEqual(calculateConditions([key], thresholds).bypassRules, {}, key);
   }
+});
+
+/* ------------------------------------------------------------------ reglas bióticas (F-F1, F-P1, F-F2, F-04, F-06) */
+
+/** Vapor pressure deficit (kPa) with the Tetens formula, as the backend computes it from T and ambient humidity. */
+function vaporPressureDeficit(tempC: number, humidityPct: number): number {
+  const saturation = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
+  return saturation * (1 - humidityPct / 100);
+}
+
+test('F-F1: a mild fungal diagnosis, the persistence bypass, tank stock and no weather or telemetry of its own', () => {
+  const r = calculateConditions(['FUNGAL_DAMAGE'], thresholds);
+
+  assert.equal(r.diagnostico?.estado, 'Daño fúngico');
+  assert.equal(r.diagnostico?.sev, 'Baja');
+  assert.ok((r.diagnostico?.conf ?? 0) > thresholds.confianzaMinima, 'clearly valid for P-D1');
+  assert.deepEqual(r.bypassRules, { FungalDamageRule: ['persistence'] });
+  assert.equal(r.ensureTankStock, true);
+  assert.equal(r.needsCooldownReset, true);
+  assert.equal(r.outbreak, null);
+  assert.deepEqual(r.pinnedMetrics, {});
+  assert.match(r.resumen.join(' | '), /persistence/);
+});
+
+test('F-F1 exercises FungalDamageRule on the supplies branch and needs a prior diagnosis', () => {
+  const scenario = SCENARIOS.find((s) => s.key === 'FUNGAL_DAMAGE')!;
+
+  assert.deepEqual(scenario.backendRules, ['FungalDamageRule']);
+  assert.equal(scenario.branch, 'INSUMO');
+  assert.equal(scenario.needsDiagnosis, true);
+});
+
+test('F-P1: hot and dry air pinned on the zone readings, a mild plague diagnosis and the temperature bypass', () => {
+  const r = calculateConditions(['FOLIAR_PEST'], thresholds);
+
+  assert.equal(r.diagnostico?.estado, 'Plaga foliar');
+  assert.equal(r.diagnostico?.sev, 'Baja');
+  assert.equal(r.pinnedMetrics.temp, 38);
+  assert.equal(r.pinnedMetrics.humAmb, 25);
+  assert.deepEqual(r.bypassRules, { ApplicationPreconditions: ['temperature'] });
+  assert.equal(r.ensureTankStock, true);
+});
+
+test('F-P1: the deficit clears the highest threshold an agronomist can set (3 kPa) in the catalog range', () => {
+  const r = calculateConditions(['FOLIAR_PEST'], thresholds);
+
+  assert.ok(vaporPressureDeficit(r.pinnedMetrics.temp, r.pinnedMetrics.humAmb) >= 3);
+});
+
+test('F-F2: saturated air at a mild temperature over wet substrate, one reading is enough, nothing is applied', () => {
+  const r = calculateConditions(['FUNGAL_CONDITION'], thresholds);
+
+  assert.deepEqual(r.bypassRules, { FungalConditionRule: ['readings'] });
+  assert.equal(r.diagnostico, null);
+  assert.equal(r.ensureTankStock, false);
+  const dpv = vaporPressureDeficit(r.pinnedMetrics.temp, r.pinnedMetrics.humAmb);
+  assert.ok(dpv < 0.1, `DPV ${dpv} under the lowest saturated-air threshold`);
+  assert.ok(r.pinnedMetrics.temp >= 18 && r.pinnedMetrics.temp <= 28, 'inside the predisposing temperatures');
+  assert.ok(r.pinnedMetrics.humSus >= thresholds.humedadPredisponente);
+});
+
+test('F-F2 follows the substrate humidity threshold of the catalog', () => {
+  const r = calculateConditions(['FUNGAL_CONDITION'], { ...thresholds, humedadPredisponente: 85 });
+
+  assert.ok(r.pinnedMetrics.humSus >= 85);
+  assert.ok(r.pinnedMetrics.humSus <= 100);
+});
+
+test('the predisposing humidity comes from the catalog and falls back to the v2 value', () => {
+  assert.equal(DEFAULT_THRESHOLDS['biotico.humedad-predisponente'], 75);
+  assert.equal(buildThresholds([]).humedadPredisponente, 75);
+  const fromCatalog = buildThresholds([
+    { clave: 'biotico.humedad-predisponente', valor: '80' } as unknown as Parameters<typeof buildThresholds>[0][number],
+  ]);
+  assert.equal(fromCatalog.humedadPredisponente, 80);
+});
+
+test('F-04: the same diagnosis goes on three sectors, with no diagnosis of its own on the target sector', () => {
+  const r = calculateConditions(['OUTBREAK'], thresholds);
+
+  assert.equal(r.outbreak?.sectors, 3);
+  assert.equal(r.outbreak?.diagnosis.estado, 'Daño fúngico');
+  assert.equal(r.outbreak?.diagnosis.sev, 'Baja', 'mild on purpose: only the outbreak acts');
+  assert.equal(r.diagnostico, null);
+  assert.equal(r.ensureTankStock, true);
+  assert.equal(r.needsCooldownReset, true);
+});
+
+test('F-06: a severe fungal diagnosis with the cap bypass', () => {
+  const r = calculateConditions(['FUNGICIDE_CAP'], thresholds);
+
+  assert.equal(r.diagnostico?.estado, 'Daño fúngico');
+  assert.equal(r.diagnostico?.sev, 'Alta');
+  assert.deepEqual(r.bypassRules, { ApplicationPreconditions: ['cap'] });
+  assert.deepEqual(SCENARIOS.find((s) => s.key === 'FUNGICIDE_CAP')?.backendRules, ['FungalDamageRule', 'ApplicationPreconditions']);
+});
+
+test('the scenarios that register their own diagnosis conflict with each other, once per pair, whatever the order', () => {
+  const diagnosisScenarios = ['SUPPLY', 'FUNGAL_DAMAGE', 'FOLIAR_PEST', 'FUNGICIDE_CAP', 'OUTBREAK'];
+  for (const a of diagnosisScenarios) {
+    for (const b of diagnosisScenarios) {
+      if (a === b) continue;
+      const r = calculateConditions([a, b], thresholds);
+
+      assert.equal(r.conflictos.length, 1, `${a}+${b}`);
+      assert.equal(r.diagnostico, null, 'with a conflict nothing is applied');
+      assert.deepEqual(r.bypassRules, {}, 'with a conflict nothing is applied');
+    }
+  }
+});
+
+test('every biotic scenario conflicts with a silent node and with a lock', () => {
+  for (const key of ['FUNGAL_DAMAGE', 'FOLIAR_PEST', 'FUNGAL_CONDITION', 'OUTBREAK', 'FUNGICIDE_CAP']) {
+    for (const other of ['NODE_OFFLINE', 'LOCK']) {
+      for (const selected of [[key, other], [other, key]]) {
+        assert.equal(calculateConditions(selected, thresholds).conflictos.length, 1, selected.join('+'));
+      }
+    }
+  }
+});
+
+test('F-F2 wants the substrate wet and the deficit-irrigation scenarios want it dry', () => {
+  for (const other of ['R01', 'R02']) {
+    assert.equal(calculateConditions(['FUNGAL_CONDITION', other], thresholds).conflictos.length, 1, other);
+  }
+});
+
+test('the biotic scenarios combine with the application preconditions modifier and with the nutrition ones', () => {
+  for (const key of ['FUNGAL_DAMAGE', 'OUTBREAK', 'FUNGICIDE_CAP']) {
+    assert.equal(calculateConditions([key, 'APPLICATION_PRECONDITIONS', 'NUTRITION_PLAN'], thresholds).conflictos.length, 0, key);
+  }
+});
+
+test('F-F1 and F-F2 combine: a diagnosis and an ambient that do not collide', () => {
+  const r = calculateConditions(['FUNGAL_DAMAGE', 'FUNGAL_CONDITION'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.deepEqual(r.bypassRules, { FungalDamageRule: ['persistence'], FungalConditionRule: ['readings'] });
+});
+
+test('F-P1 and F-F2 pin the same air metrics: the later one wins, so they are not meant to be combined but do not break', () => {
+  const r = calculateConditions(['FOLIAR_PEST', 'FUNGAL_CONDITION'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.pinnedMetrics.humAmb, 98, 'FUNGAL_CONDITION is applied after FOLIAR_PEST');
+});
+
+test('every backend rule of the biotic scenarios is known to the simulator, so none shows as "sin escenario"', () => {
+  const demoRules = ['FungalDamageRule', 'FoliarPestRule', 'FungalConditionRule', 'OutbreakRule'].map(
+    (name) => ({ name }) as unknown as DemoRule,
+  );
+
+  assert.deepEqual(rulesWithoutScenario(demoRules), []);
 });

@@ -20,6 +20,8 @@ export interface ThresholdMap {
   confianzaMinima: number;
   /** Substrate conductivity (dS/m) under which N-02 reads it as low. */
   ceBaja: number;
+  /** Substrate humidity (%) from which F-F2 reads the conditions as favorable to fungal diseases. */
+  humedadPredisponente: number;
   /** Physical upper limit of a humidity reading (%): above it the backend discards the reading (S-03). */
   humedadMaxima: number;
   /** Rereads the backend asks for after an out-of-range value, before discarding the metric (S-03). */
@@ -50,6 +52,11 @@ export interface ScenarioPatch {
   weather?: Partial<SimulatedWeather>;
   /** Diagnosis to register BEFORE the pulse. */
   diagnosis?: DiagnosisPlan;
+  /**
+   * The same diagnosis registered on several adjacent sectors of the target zone BEFORE the pulse (an outbreak, F-04). The
+   * simulator picks the sectors from the zone it already knows; it never edits the topology.
+   */
+  outbreak?: { diagnosis: DiagnosisPlan; sectors: number };
   /** Preview lines that are not about a metric. */
   notes?: string[];
   /** The target zone stops answering LEER_AHORA (and no telemetry is published for it). */
