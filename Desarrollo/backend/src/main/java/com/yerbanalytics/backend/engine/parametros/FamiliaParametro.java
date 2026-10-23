@@ -9,6 +9,7 @@ public enum FamiliaParametro {
     BIOTICO,
     CLOROSIS,
     ESTRES,
+    EFECTIVIDAD,
     MEDIASOMBRA,
     DIAGNOSTICO,
     READINGS,

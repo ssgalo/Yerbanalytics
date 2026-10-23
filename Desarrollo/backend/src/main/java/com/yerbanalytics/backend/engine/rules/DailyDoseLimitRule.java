@@ -38,7 +38,7 @@ import java.util.List;
 @Component
 public class DailyDoseLimitRule implements Rule {
 
-    private static final int PRIORITY = 7;
+    private static final int PRIORITY = 28;
     public static final String NAME = "DailyDoseLimitRule";
     /** Bypass key: ignores the daily dose limit. */
     public static final String BYPASS_DAILY_LIMIT = "daily-limit";

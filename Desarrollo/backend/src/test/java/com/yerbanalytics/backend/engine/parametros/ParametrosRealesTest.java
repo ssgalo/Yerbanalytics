@@ -69,7 +69,12 @@ class ParametrosRealesTest {
             Map.entry("estres.humedad-reposicion", 55.0),
             Map.entry("estres.luz-baja", 60.0),                      // F-S3
             Map.entry("estres.temp-baja", 30.0),
-            Map.entry("insumo.reingreso-horas", 24.0),               // reglas_v2 §8.3
+            Map.entry("efectividad.delta-riego", 8.0),              // reglas_v2 §9 E-01
+            Map.entry("efectividad.verificacion-min", 30.0),
+            Map.entry("efectividad.latencia-fertilizante-dias", 14.0),   // E-02
+            Map.entry("efectividad.latencia-fitosanitario-dias", 7.0),   // E-03
+            Map.entry("efectividad.espera-sin-diagnostico-horas", 48.0),
+            Map.entry("insumo.reingreso-horas", 24.0),              // reglas_v2 §8.3
             Map.entry("insumo.stock-aviso", 20.0),
             Map.entry("insumo.pendiente-vence-dias", 7.0),           // add-dosificacion-base D-5
             Map.entry("nutricion.intervalo-plan", 7.0),              // reglas_v2 §8.4 N-01
@@ -285,6 +290,27 @@ class ParametrosRealesTest {
             assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
             assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
             assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.5");
+        }
+    }
+
+    @Test
+    void losParametrosDeEfectividadSonLosDeReglasV2() {
+        record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica, Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("efectividad.delta-riego", TipoParametro.NUMERO, "%", "8", 3.0, 20.0),
+                new Esperado("efectividad.verificacion-min", TipoParametro.ENTERO, "min", "30", 15.0, 60.0),
+                new Esperado("efectividad.latencia-fertilizante-dias", TipoParametro.ENTERO, "d", "14", 7.0, 30.0),
+                new Esperado("efectividad.latencia-fitosanitario-dias", TipoParametro.ENTERO, "d", "7", 3.0, 21.0),
+                new Esperado("efectividad.espera-sin-diagnostico-horas", TipoParametro.ENTERO, "h", "48", 12.0, 96.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(FamiliaParametro.EFECTIVIDAD);
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
         }
     }
 

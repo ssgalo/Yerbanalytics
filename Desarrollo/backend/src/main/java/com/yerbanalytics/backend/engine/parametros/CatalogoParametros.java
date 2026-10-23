@@ -42,6 +42,7 @@ public class CatalogoParametros {
                 ParametrosBiotico.values(),
                 ParametrosClorosis.values(),
                 ParametrosEstres.values(),
+                ParametrosEfectividad.values(),
                 ParametrosMediasombra.values(),
                 ParametrosDiagnostico.values(),
                 ReadingParameters.values(),
