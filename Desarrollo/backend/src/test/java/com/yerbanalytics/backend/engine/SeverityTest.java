@@ -1,4 +1,4 @@
-package com.yerbanalytics.backend.biotic;
+package com.yerbanalytics.backend.engine;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

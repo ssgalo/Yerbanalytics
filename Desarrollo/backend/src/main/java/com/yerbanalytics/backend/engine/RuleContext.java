@@ -171,13 +171,14 @@ public record RuleContext(
 
     /**
      * Devuelve el valor raw de la métrica identificada por {@code key},
-     * o {@code null} si no está presente en el contexto.
+     * o {@code null} si no está presente en el contexto o la zona nunca la reportó (una sonda sin conectar llega como métrica
+     * sin valor).
      */
     public Double metricRaw(String key) {
         return metrics.stream()
                 .filter(m -> key.equals(m.key()))
-                .map(Metric::raw)
                 .findFirst()
+                .map(Metric::raw)
                 .orElse(null);
     }
 }

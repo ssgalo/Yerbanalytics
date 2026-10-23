@@ -1,10 +1,11 @@
-package com.yerbanalytics.backend.biotic;
+package com.yerbanalytics.backend.engine;
 
 import java.util.Optional;
 
 /**
- * La severidad de un diagnóstico en el vocabulario de reglas_v2 (leve / moderada / alta). La plataforma la guarda como
- * Baja / Media / Alta (CLAUDE.md §2): este es el único lugar donde se traduce, así ninguna regla compara textos.
+ * La severidad de un diagnóstico en el vocabulario de reglas_v2 (leve / moderada / alta); la usan todas las reglas por
+ * diagnóstico. La plataforma la guarda como Baja / Media / Alta (CLAUDE.md §2): este es el único lugar donde se traduce,
+ * así ninguna regla compara textos.
  */
 public enum Severity {
 
