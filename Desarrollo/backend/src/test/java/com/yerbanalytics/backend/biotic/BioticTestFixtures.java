@@ -63,14 +63,14 @@ final class BioticTestFixtures {
     /** Overrides con las claves de bypass activas en la regla. */
     static RuleOverrides bypass(String ruleName, String... keys) {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(ruleName, new RuleOverride(true, Map.of(), Set.of(keys)));
+        store.put(ruleName, new RuleOverride(Map.of(), Set.of(keys)));
         return store;
     }
 
     /** Overrides con un cooldown (en minutos) de la regla. */
     static RuleOverrides cooldown(String ruleName, String key, double minutes) {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(ruleName, new RuleOverride(true, Map.of(key, minutes), Set.of()));
+        store.put(ruleName, new RuleOverride(Map.of(key, minutes), Set.of()));
         return store;
     }
 

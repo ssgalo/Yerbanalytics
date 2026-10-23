@@ -675,7 +675,7 @@ class ApplicationServiceTest {
     void theCapBypassLetsTheFourthFungicideThrough() {
         threeFungicidesInTheWindow();
         overrides.put(ApplicationPreconditions.NAME,
-                new RuleOverride(true, Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_CAP)));
+                new RuleOverride(Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_CAP)));
 
         assertThat(requestFungicide().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
     }

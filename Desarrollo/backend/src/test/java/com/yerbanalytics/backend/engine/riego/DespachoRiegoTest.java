@@ -898,7 +898,7 @@ class DespachoRiegoTest {
     void elBypassDeVentanaDeF_S1HaceQueSuReposicionSalgaFueraDeLaVentana() {
         reloj.avanzar(Duration.ofHours(8));                           // 18:05
         TestRuleOverrides overrides = new TestRuleOverrides();
-        overrides.put(SolarStressRule.NAME, new RuleOverride(true, Map.of(), Set.of(SolarStressRule.BYPASS_WINDOW)));
+        overrides.put(SolarStressRule.NAME, new RuleOverride(Map.of(), Set.of(SolarStressRule.BYPASS_WINDOW)));
         despacho.setOverrides(overrides);
         pedirReposicion("MZ-2", 1, 600);
 
@@ -911,7 +911,7 @@ class DespachoRiegoTest {
     void elBypassDeVentanaDeF_S1NoAbreElRiegoPorDeficitDeR01() {
         reloj.avanzar(Duration.ofHours(8));                           // 18:05
         TestRuleOverrides overrides = new TestRuleOverrides();
-        overrides.put(SolarStressRule.NAME, new RuleOverride(true, Map.of(), Set.of(SolarStressRule.BYPASS_WINDOW)));
+        overrides.put(SolarStressRule.NAME, new RuleOverride(Map.of(), Set.of(SolarStressRule.BYPASS_WINDOW)));
         despacho.setOverrides(overrides);
         pedir("MZ-2", 1, 600);                                        // R-01
 

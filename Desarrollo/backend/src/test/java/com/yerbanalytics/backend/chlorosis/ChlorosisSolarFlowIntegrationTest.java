@@ -105,7 +105,7 @@ class ChlorosisSolarFlowIntegrationTest {
         sector = sectorRepository.findByZonaId(ZONE_ID).get(0);
         when(publisher.publicar(anyString(), anyString(), eq("pump"), eq("ON"), anyMap()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "cmd", null));
-        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(true, Map.of("interval-fertilizer", 0.0),
+        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(Map.of("interval-fertilizer", 0.0),
                 Set.of("window", "temperature", "rain", "moisture", "stock", "daily")));
         queue.limpiar();
     }

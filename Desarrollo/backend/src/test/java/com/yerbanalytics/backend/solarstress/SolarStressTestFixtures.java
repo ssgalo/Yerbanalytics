@@ -63,13 +63,13 @@ final class SolarStressTestFixtures {
 
     static RuleOverrides bypass(String ruleName, String... keys) {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(ruleName, new RuleOverride(true, Map.of(), Set.of(keys)));
+        store.put(ruleName, new RuleOverride(Map.of(), Set.of(keys)));
         return store;
     }
 
     static RuleOverrides cooldown(String ruleName, String key, double minutes) {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(ruleName, new RuleOverride(true, Map.of(key, minutes), Set.of()));
+        store.put(ruleName, new RuleOverride(Map.of(key, minutes), Set.of()));
         return store;
     }
 

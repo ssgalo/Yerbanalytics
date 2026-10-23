@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.biotic;
 
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
+import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
@@ -70,6 +71,8 @@ class BioticFlowIntegrationTest {
     private ApplicationRepository applications;
     @Autowired
     private RuleOverridesStore overrides;
+    @Autowired
+    private OperationalRuleStates states;
 
     @MockBean
     private ComandoActuadorPublisher publisher;
@@ -83,16 +86,21 @@ class BioticFlowIntegrationTest {
         sectors = sectorRepository.findByZonaId(ZONE_ID);
         when(publisher.publicar(anyString(), anyString(), eq("pump"), eq("ON"), anyMap()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "cmd", null));
-        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(true, Map.of("interval-fungicide", 0.0),
+        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(Map.of("interval-fungicide", 0.0),
                 Set.of("window", "temperature", "rain", "moisture", "stock", "daily")));
         // El plan de nutrición no es lo que se prueba acá.
-        overrides.put("NutritionPlanRule", new RuleOverride(false, Map.of(), Set.of()));
-        overrides.put("LowEcRule", new RuleOverride(false, Map.of(), Set.of()));
+        states.set("NutritionPlanRule", false, "test", "test");
+        states.set("LowEcRule", false, "test", "test");
+        states.reload();   // dentro de la transacción de prueba el commit no llega: se relee el cache a mano
     }
 
     @AfterEach
     void cleanOverrides() {
         overrides.clear();
+        // El cache es del contexto y sobrevive al rollback: se lo deja prendido y consistente con la base.
+        states.set("NutritionPlanRule", true, "test", "test");
+        states.set("LowEcRule", true, "test", "test");
+        states.reload();
     }
 
     private SectorEntity sector(int n) {
