@@ -1,0 +1,25 @@
+/* Historial: tabla (2/3) y detalle (1/3), los dos del alto de la pantalla.
+   140px = topbar (74) + relleno vertical del área de contenido (26 + 40). */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 18px;
+  height: calc(100dvh - 140px);
+  min-height: 480px;
+  animation: ybFade 0.4s both;
+}
+
+.state {
+  padding: 40px;
+  font-family: var(--font-body);
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+}

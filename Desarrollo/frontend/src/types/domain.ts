@@ -710,6 +710,11 @@ export interface RuleNode {
   branch: string;
   /** Claves del catálogo de parámetros que declara la regla; vacía en los nodos especiales. */
   parametros: string[];
+  /**
+   * `false` si la regla está apagada (las retiradas, `yerbanalytics.reglas.retiradas`): no corre y el
+   * historial no la dibuja. Los nodos especiales siempre vienen activos; ausente = activa.
+   */
+  activa?: boolean;
 }
 
 /** Arista dirigida entre dos nodos del DAG. Espejo de `RuleEdgeDto` del backend. */
