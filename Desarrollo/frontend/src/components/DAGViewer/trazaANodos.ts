@@ -28,7 +28,8 @@ export type EstadoNodo =
   | 'sinTraza';
 
 const BLOQUEANTES = new Set(['ABORT_RIEGO', 'ABORT_INSUMO', 'ABORT_MEDIASOMBRA', 'ABORT_ALL']);
-const EJECUTORAS = new Set(['ACTIVAR_VALVULA', 'ACTIVAR_BOMBA', 'MOVER_MEDIASOMBRA']);
+/** `UPDATE_NUTRITION_PLAN` es de las reglas de macro-zona: iniciar, adelantar o cerrar el plan de nutrición. */
+const EJECUTORAS = new Set(['ACTIVAR_VALVULA', 'ACTIVAR_BOMBA', 'MOVER_MEDIASOMBRA', 'UPDATE_NUTRITION_PLAN']);
 
 /** Estado visual de una regla según su traza. Si emite varias acciones manda la más fuerte. */
 export function clasificarRegla(r: TrazaRegla): EstadoNodo {

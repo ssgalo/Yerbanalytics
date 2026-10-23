@@ -5,6 +5,7 @@ public enum FamiliaParametro {
     SEGURIDAD,
     RIEGO,
     INSUMO,
+    NUTRICION,
     MEDIASOMBRA,
     DIAGNOSTICO,
     READINGS,

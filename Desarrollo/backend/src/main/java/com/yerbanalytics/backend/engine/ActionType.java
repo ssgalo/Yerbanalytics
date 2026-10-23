@@ -25,6 +25,12 @@ public enum ActionType {
      */
     MOVER_MEDIASOMBRA,
 
+    /**
+     * Cambiar el estado del plan de nutrición de una macro-zona (iniciar la tanda, adelantarla o darla por completa).
+     * Sólo la emiten las {@code ZoneRule}; el cambio viaja en {@link DetalleNutritionPlan}.
+     */
+    UPDATE_NUTRITION_PLAN,
+
     // --- Bloqueantes ---
     /** Abortar el riego (la evaluación de reglas ejecutoras de riego se detiene). */
     ABORT_RIEGO,

@@ -28,6 +28,7 @@ export const DEFAULT_THRESHOLDS: Record<string, number> = {
   'riego.lluvia-probabilidad': 70,
   'riego.lluvia-mm': 5,
   'mediasombra.uv-umbral': 7,
+  'nutricion.ce-baja': 0.5,
   'diagnostico.confianza-minima': 70,
   'seguridad.rango-hum-max': 100,
   'seguridad.relecturas-invalidas': 2,
@@ -47,6 +48,7 @@ export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
     lluviaProbabilidad: get('riego.lluvia-probabilidad'),
     lluviaMm: get('riego.lluvia-mm'),
     uvUmbral: get('mediasombra.uv-umbral'),
+    ceBaja: get('nutricion.ce-baja'),
     confianzaMinima: get('diagnostico.confianza-minima'),
     humedadMaxima: get('seguridad.rango-hum-max'),
     relecturasInvalidas: get('seguridad.relecturas-invalidas'),
@@ -79,6 +81,8 @@ export interface RuleConditionResult {
   needsFaultyDevice: boolean;
   /** The target zone's input tanks need stock before the pulse (registered if missing, topped up if low). */
   ensureTankStock: boolean;
+  /** Bypass keys to turn on before the pulse, by backend rule name; empty if no selected scenario asks for any. */
+  bypassRules: Record<string, string[]>;
   conflictos: string[];
   resumen: string[];
 }
@@ -148,6 +152,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       repair: null,
       needsFaultyDevice: false,
       ensureTankStock: false,
+      bypassRules: {},
       conflictos,
       resumen: [],
     };
@@ -161,6 +166,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
   let repair: { detail: string } | null = null;
   let needsFaultyDevice = false;
   let ensureTankStock = false;
+  const bypassRules: Record<string, Set<string>> = {};
   const notes: string[] = [];
   let weather: Partial<SimulatedWeather> | null = null;
   let diagnostico: DiagnosisPlan | null = null;
@@ -189,6 +195,9 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     repair = patch.repair ?? repair;
     needsFaultyDevice = needsFaultyDevice || (patch.needsFaultyDevice ?? false);
     ensureTankStock = ensureTankStock || (patch.ensureTankStock ?? false);
+    for (const [rule, keys] of Object.entries(patch.bypassRules ?? {})) {
+      bypassRules[rule] = new Set([...(bypassRules[rule] ?? []), ...keys]);
+    }
     notes.push(...(patch.notes ?? []));
   }
 
@@ -218,6 +227,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     repair,
     needsFaultyDevice,
     ensureTankStock,
+    bypassRules: Object.fromEntries(Object.entries(bypassRules).map(([rule, keys]) => [rule, [...keys]])),
     conflictos,
     resumen,
   };

@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.zone.ZoneRule;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
@@ -39,6 +40,10 @@ class ReglasParametrosCatalogoRealTest {
 
     @Autowired
     private List<Rule> reglasRegistradas;
+
+    /** Las reglas de macro-zona (plan de nutrición) figuran en el mismo catálogo que las de sector. */
+    @Autowired
+    private List<ZoneRule> reglasDeZona;
 
     /** Quien lee parámetros: las reglas y también lo que ejecuta sin serlo (el despacho de riego). */
     @Autowired
@@ -153,6 +158,8 @@ class ReglasParametrosCatalogoRealTest {
         // Toda regla registrada figura, una vez, con exactamente los parámetros que declara.
         Map<String, List<String>> declarado = new LinkedHashMap<>();
         reglasRegistradas.forEach(r -> declarado.put(r.name(),
+                r.parametros().stream().map(DefinicionParametro::clave).toList()));
+        reglasDeZona.forEach(r -> declarado.put(r.name(),
                 r.parametros().stream().map(DefinicionParametro::clave).toList()));
         Map<String, List<String>> enJson = new LinkedHashMap<>();
         json.get("reglas").forEach(r -> {

@@ -1,7 +1,7 @@
 # Change: add-plan-nutricion
 
 > Rama: `feat/reglas-v2-plan-nutricion`. Cubre **N-01** y **N-02** (`reglas_v2` §8.4). Índice: `reglas-v2-overview/README.md`.
-> **Depende de:** `add-control-demo-reglas`, `add-historial-lecturas`, `add-dosificacion-base`, `ZoneRuleEngine` (`add-mediasombra-v2`).
+> **Depende de:** `add-control-demo-reglas`, `add-historial-lecturas`, `add-dosificacion-base`. El `ZoneRuleEngine` lo crea este cambio (`add-mediasombra-v2` se canceló).
 
 ## Why
 

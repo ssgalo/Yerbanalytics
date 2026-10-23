@@ -1,6 +1,6 @@
 package com.yerbanalytics.backend.engine.traza;
 
-import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException;
 import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  *
  * <p>Se crea una por regla por ciclo, la usa un solo hilo y se descarta: es mutable a propósito
  * y NO es thread-safe. Sólo deja leer los parámetros que la regla declaró en
- * {@link Rule#parametros()}; cualquier otro lanza {@link ParametroNoDeclaradoException}.
+ * {@link ConsumidorParametros#parametros()}; cualquier otro lanza {@link ParametroNoDeclaradoException}.
  */
 public final class Evaluacion {
 
@@ -31,7 +31,7 @@ public final class Evaluacion {
     private final ParametrosVigentes vigentes;
     private final List<Comparacion> comparaciones = new ArrayList<>(3);
 
-    public Evaluacion(Rule rule, ParametrosVigentes vigentes) {
+    public Evaluacion(ConsumidorParametros rule, ParametrosVigentes vigentes) {
         this.regla = rule.name();
         this.declarados = rule.parametros().stream()
                 .map(DefinicionParametro::clave)

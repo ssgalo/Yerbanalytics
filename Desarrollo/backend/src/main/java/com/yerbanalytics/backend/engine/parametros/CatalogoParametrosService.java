@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.dto.CatalogoReglasDto;
 import com.yerbanalytics.backend.dto.ParametroDto;
 import com.yerbanalytics.backend.dto.ReglaCatalogoDto;
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.zone.ZoneRule;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
 import com.yerbanalytics.backend.sensing.SensingCadence;
@@ -104,6 +105,11 @@ public class CatalogoParametrosService {
 
         List<ReglaCatalogoDto> reglas = new ArrayList<>();
         for (Rule r : catalogo.reglas()) {
+            reglas.add(new ReglaCatalogoDto(r.name(), r.label(), r.branch().name(), r.priority(),
+                    r.parametros().stream().map(DefinicionParametro::clave).toList()));
+        }
+        // Las reglas de macro-zona figuran después de las de sector: tienen sus propios umbrales y se editan igual.
+        for (ZoneRule r : catalogo.reglasDeZona()) {
             reglas.add(new ReglaCatalogoDto(r.name(), r.label(), r.branch().name(), r.priority(),
                     r.parametros().stream().map(DefinicionParametro::clave).toList()));
         }

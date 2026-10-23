@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.dto.TopologiaVivero;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
+import com.yerbanalytics.backend.engine.zone.ZoneTraceStore;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.TopologiaLayoutEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -67,6 +68,7 @@ public class TopologiaService {
     private final HistorialRepository historialRepository;
     private final TopologiaLayoutRepository layoutRepository;
     private final TrazaEvaluacionStore trazaStore;
+    private final ZoneTraceStore zoneTraces;
     private final DespachoRiego despacho;
     private final ActionExecutor actionExecutor;
 
@@ -76,6 +78,7 @@ public class TopologiaService {
                             HistorialRepository historialRepository,
                             TopologiaLayoutRepository layoutRepository,
                             TrazaEvaluacionStore trazaStore,
+                            ZoneTraceStore zoneTraces,
                             DespachoRiego despacho,
                             ActionExecutor actionExecutor) {
         this.zonaRepository = zonaRepository;
@@ -84,6 +87,7 @@ public class TopologiaService {
         this.historialRepository = historialRepository;
         this.layoutRepository = layoutRepository;
         this.trazaStore = trazaStore;
+        this.zoneTraces = zoneTraces;
         this.despacho = despacho;
         this.actionExecutor = actionExecutor;
     }
@@ -226,12 +230,14 @@ public class TopologiaService {
                 @Override
                 public void afterCommit() {
                     trazaStore.limpiar();
+                    zoneTraces.clear();
                     despacho.reiniciarEstado();
                     actionExecutor.reiniciarEstado();
                 }
             });
         } else {
             trazaStore.limpiar();
+            zoneTraces.clear();
             despacho.reiniciarEstado();
             actionExecutor.reiniciarEstado();
         }

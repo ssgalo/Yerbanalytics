@@ -18,6 +18,8 @@ export interface ThresholdMap {
   uvUmbral: number;
   /** Minimum diagnosis confidence (%) for the diagnosis-driven rules to act. */
   confianzaMinima: number;
+  /** Substrate conductivity (dS/m) under which N-02 reads it as low. */
+  ceBaja: number;
   /** Physical upper limit of a humidity reading (%): above it the backend discards the reading (S-03). */
   humedadMaxima: number;
   /** Rereads the backend asks for after an out-of-range value, before discarding the metric (S-03). */
@@ -86,6 +88,11 @@ export interface ScenarioPatch {
    * empty tank. The simulator registers or tops up what is missing through the public tank API.
    */
   ensureTankStock?: boolean;
+  /**
+   * Bypass keys to turn on BEFORE the pulse, by backend rule name (`GET /api/demo/rules`). They are added to the ones the
+   * operator already has active, never replace them, and need the backend in demo mode.
+   */
+  bypassRules?: Record<string, string[]>;
 }
 
 export interface ScenarioConflict {

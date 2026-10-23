@@ -11,6 +11,7 @@ import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
 import com.yerbanalytics.backend.engine.traza.TrazaRegla;
+import com.yerbanalytics.backend.engine.zone.ZoneTraceStore;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,9 @@ class ReglasEvaluacionesControllerTest {
 
     @MockBean
     private SectorRepository sectorRepository;
+
+    @MockBean
+    private ZoneTraceStore zoneTraces;
 
     private static TrazaEvaluacion traza(OrigenEvaluacion origen, long epochMs) {
         TrazaRegla riego = new TrazaRegla("IrrigationRule", RuleBranch.RIEGO, 10, EstadoRegla.EVALUADA,
@@ -125,5 +129,32 @@ class ReglasEvaluacionesControllerTest {
 
         mockMvc.perform(get("/api/rules/evaluaciones/MZ-2-006").param("origen", "OTRO"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void laTrazaDelSectorTraeAlFinalLasReglasDeSuMacroZona() throws Exception {
+        when(sectorRepository.existsById("MZ-2-006")).thenReturn(true);
+        when(store.masReciente("MZ-2-006")).thenReturn(java.util.Optional.of(traza(OrigenEvaluacion.TELEMETRIA, 1000)));
+        TrazaRegla plan = new TrazaRegla("NutritionPlanRule", RuleBranch.INSUMO, 23, EstadoRegla.EVALUADA,
+                List.of(), List.of(new AccionTrazada(ActionType.UPDATE_NUTRITION_PLAN, "tanda iniciada")), null);
+        when(zoneTraces.latest("MZ-2")).thenReturn(java.util.Optional.of(List.of(plan)));
+
+        mockMvc.perform(get("/api/rules/evaluaciones/MZ-2-006"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reglas.length()").value(3))
+                .andExpect(jsonPath("$.reglas[2].ruleId").value("NutritionPlanRule"))
+                .andExpect(jsonPath("$.reglas[2].rama").value("INSUMO"))
+                .andExpect(jsonPath("$.reglas[2].acciones[0].tipo").value("UPDATE_NUTRITION_PLAN"));
+    }
+
+    @Test
+    void siLaZonaTodaviaNoSeEvaluoLaTrazaQuedaTalCual() throws Exception {
+        when(sectorRepository.existsById("MZ-2-006")).thenReturn(true);
+        when(store.masReciente("MZ-2-006")).thenReturn(java.util.Optional.of(traza(OrigenEvaluacion.TELEMETRIA, 1000)));
+        when(zoneTraces.latest("MZ-2")).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/rules/evaluaciones/MZ-2-006"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reglas.length()").value(2));
     }
 }

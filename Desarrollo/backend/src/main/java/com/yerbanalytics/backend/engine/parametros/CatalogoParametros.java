@@ -1,6 +1,7 @@
 package com.yerbanalytics.backend.engine.parametros;
 
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.zone.ZoneRule;
 import com.yerbanalytics.backend.engine.riego.CalculoRiego;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -37,6 +38,7 @@ public class CatalogoParametros {
                 ParametrosSeguridad.values(),
                 ParametrosRiego.values(),
                 ParametrosInsumo.values(),
+                ParametrosNutricion.values(),
                 ParametrosMediasombra.values(),
                 ParametrosDiagnostico.values(),
                 ReadingParameters.values(),
@@ -50,6 +52,7 @@ public class CatalogoParametros {
     private final List<DefinicionParametro> definicionesEnOrden;
     private final List<RestriccionCruzada> restricciones;
     private final List<Rule> reglas;
+    private final List<ZoneRule> reglasDeZona;
     private final Map<String, ValorParametro> fabricas;
     private final Map<String, List<String>> usadoPor;
 
@@ -151,8 +154,11 @@ public class CatalogoParametros {
         // Los consumidores que no son reglas (el despacho de riego) van después, en el orden dado.
         List<Rule> ordenadas = consumidores.stream().filter(Rule.class::isInstance).map(Rule.class::cast)
                 .sorted(Comparator.comparingInt(Rule::priority)).toList();
+        List<ZoneRule> deZona = consumidores.stream().filter(ZoneRule.class::isInstance).map(ZoneRule.class::cast)
+                .sorted(Comparator.comparingInt(ZoneRule::priority)).toList();
         List<ConsumidorParametros> lectores = new ArrayList<>(ordenadas);
-        consumidores.stream().filter(c -> !(c instanceof Rule)).forEach(lectores::add);
+        lectores.addAll(deZona);
+        consumidores.stream().filter(c -> !(c instanceof Rule) && !(c instanceof ZoneRule)).forEach(lectores::add);
         Map<String, List<String>> usos = new LinkedHashMap<>();
         for (ConsumidorParametros lector : lectores) {
             for (DefinicionParametro p : lector.parametros()) {
@@ -168,6 +174,7 @@ public class CatalogoParametros {
         this.definicionesEnOrden = List.copyOf(mapa.values());
         this.restricciones = List.copyOf(restricciones);
         this.reglas = ordenadas;
+        this.reglasDeZona = deZona;
         this.fabricas = Map.copyOf(fab);
         this.usadoPor = Map.copyOf(usos);
     }
@@ -182,6 +189,11 @@ public class CatalogoParametros {
 
     public List<Rule> reglas() {
         return reglas;
+    }
+
+    /** Las reglas que deciden sobre una macro-zona entera (plan de nutrición), por prioridad. */
+    public List<ZoneRule> reglasDeZona() {
+        return reglasDeZona;
     }
 
     public List<RestriccionCruzada> restricciones() {

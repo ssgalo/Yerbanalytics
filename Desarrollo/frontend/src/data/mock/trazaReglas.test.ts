@@ -36,7 +36,7 @@ const regla = (t: TrazaEvaluacion, id: string): TrazaRegla => {
 };
 
 describe('evaluarMotor · forma de la traza', () => {
-  it('trae las 16 reglas, en orden de prioridad, con el origen y el sector', () => {
+  it('trae las 18 reglas, en orden de prioridad, con el origen y el sector', () => {
     const t = evaluarMotor(catalogo, base);
 
     expect(t.reglas.map((r) => r.ruleId)).toEqual(catalogo.reglas.map((r) => r.id));
@@ -44,7 +44,7 @@ describe('evaluarMotor · forma de la traza', () => {
     expect(t.zonaId).toBe('MZ-1');
     expect(t.origen).toBe('TELEMETRIA');
     expect(t.ts).toBe(base.ts);
-    expect(t.reglas).toHaveLength(16);
+    expect(t.reglas).toHaveLength(18);
   });
 
   it('es determinística', () => {
@@ -399,7 +399,10 @@ describe('evaluarMotor · bloqueos por rama', () => {
       resultado: 'CUMPLE',
     });
     expect(tipos(regla(t, 'ManualLockRule'))).toEqual(['ABORT_ALL']);
-    for (const r of t.reglas.filter((x) => x.ruleId !== 'ManualLockRule')) {
+    // Las reglas de la macro-zona no son de la cadena del sector: el corte no las alcanza.
+    const deLaCadena = t.reglas.filter((x) => x.ruleId !== 'ManualLockRule' && !['LowEcRule', 'NutritionPlanRule'].includes(x.ruleId));
+    expect(deLaCadena.length).toBeGreaterThan(0);
+    for (const r of deLaCadena) {
       expect(r).toMatchObject({ estado: 'NO_ALCANZADA', bloqueadaPor: 'ManualLockRule' });
     }
   });
@@ -485,5 +488,38 @@ describe('evaluarMotor · reglas de falla de hardware (S-05)', () => {
 
     expect(orden.indexOf('HydraulicFaultRule')).toBeLessThan(orden.indexOf('DeficitCriticoRule'));
     expect(orden.indexOf('ShadeFaultRule')).toBeLessThan(orden.indexOf('ShadingRule'));
+  });
+});
+
+describe('evaluarMotor · reglas de macro-zona (plan de nutrición)', () => {
+  const ZONA = ['LowEcRule', 'NutritionPlanRule'];
+
+  it('N-02 y N-01 van al final de la rama de insumos, en reposo y en ese orden', () => {
+    const t = evaluarMotor(catalogo, base);
+    const orden = t.reglas.map((r) => r.ruleId);
+
+    expect(orden.indexOf('LowEcRule')).toBeLessThan(orden.indexOf('NutritionPlanRule'));
+    for (const id of ZONA) {
+      const r = regla(t, id);
+      expect(r.rama).toBe('INSUMO');
+      expect(r.estado).toBe('EVALUADA');
+      expect(r.acciones.map((a) => a.tipo)).toEqual(['NOOP_INFO']);
+    }
+  });
+
+  it('un corte de la rama de insumos del sector no apaga las reglas de la zona', () => {
+    // Con las dosis del día agotadas, DailyDoseLimitRule corta la rama INSUMO del sector.
+    const t = evaluarMotor(catalogo, { ...base, dosis24h: 5 });
+
+    expect(regla(t, 'DailyDoseLimitRule').acciones.map((a) => a.tipo)).toContain('ABORT_INSUMO');
+    expect(regla(t, 'SupplyRule').estado).toBe('OMITIDA_RAMA_BLOQUEADA');
+    for (const id of ZONA) expect(regla(t, id).estado).toBe('EVALUADA');
+  });
+
+  it('un bloqueo manual (ABORT_ALL) del sector tampoco las apaga', () => {
+    const t = evaluarMotor(catalogo, { ...base, bloqueoManual: true });
+
+    expect(regla(t, 'ManualLockRule').acciones.map((a) => a.tipo)).toContain('ABORT_ALL');
+    for (const id of ZONA) expect(regla(t, id).estado).toBe('EVALUADA');
   });
 });

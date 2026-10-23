@@ -6,6 +6,8 @@ import com.yerbanalytics.backend.engine.riego.DespachoRiego;
 import com.yerbanalytics.backend.engine.traza.OrigenEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaEvaluacionStore;
+import com.yerbanalytics.backend.engine.traza.TrazaRegla;
+import com.yerbanalytics.backend.engine.zone.ZoneTraceStore;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.when;
 class TopologiaServiceTrazaTest {
 
     private TrazaEvaluacionStore store;
+    private ZoneTraceStore zoneTraces;
     private TopologiaService service;
     private DespachoRiego despacho;
     private ActionExecutor executor;
@@ -40,6 +43,7 @@ class TopologiaServiceTrazaTest {
     @BeforeEach
     void setUp() {
         store = new TrazaEvaluacionStore();
+        zoneTraces = new ZoneTraceStore();
         despacho = mock(DespachoRiego.class);
         executor = mock(ActionExecutor.class);
         ZonaRepository zonas = mock(ZonaRepository.class);
@@ -47,8 +51,9 @@ class TopologiaServiceTrazaTest {
         TopologiaLayoutRepository layout = mock(TopologiaLayoutRepository.class);
         when(layout.findById(1)).thenReturn(Optional.empty());
         service = new TopologiaService(zonas, mock(SectorRepository.class), mock(DispositivoRepository.class),
-                mock(HistorialRepository.class), layout, store, despacho, executor);
+                mock(HistorialRepository.class), layout, store, zoneTraces, despacho, executor);
         store.guardar(new TrazaEvaluacion("MZ-1-001", "MZ-1", OrigenEvaluacion.TELEMETRIA, Instant.EPOCH, "h", List.of()));
+        zoneTraces.save("MZ-1", List.<TrazaRegla>of());
     }
 
     @AfterEach
@@ -103,5 +108,27 @@ class TopologiaServiceTrazaTest {
         }
         verify(despacho).reiniciarEstado();
         verify(executor).reiniciarEstado();
+    }
+
+    @Test
+    void regenerar_tambienDescartaLaTrazaDeLasReglasDeMacroZona() {
+        assertThat(zoneTraces.latest("MZ-1")).isPresent();
+
+        service.generar(regenerar());
+
+        assertThat(zoneTraces.latest("MZ-1")).isEmpty();
+    }
+
+    @Test
+    void regenerar_conTransaccionDescartaLaTrazaDeZonaDespuesDelCommitYNoAntes() {
+        TransactionSynchronizationManager.initSynchronization();
+
+        service.generar(regenerar());
+        assertThat(zoneTraces.latest("MZ-1")).isPresent();
+
+        for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
+            s.afterCommit();
+        }
+        assertThat(zoneTraces.latest("MZ-1")).isEmpty();
     }
 }

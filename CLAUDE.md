@@ -109,6 +109,9 @@ hardware real.
 - **Tanque (de insumo)**: stock de un insumo por macro-zona; lo carga el operario y cada aplicación lo descuenta. Un tanque sin registrar
   es un stock desconocido, no un tanque lleno. **Reingreso**: tras un fitosanitario el sector queda 24 h con el reingreso restringido
   (`Sector.reentryUntil`); sólo informa, no bloquea actuadores.
+- **Plan de nutrición**: fertilizante foliar en **todos los sectores de la macro-zona cada N días** (3–30, fábrica 7; lo fija el agrónomo en el
+  detalle de la zona), sin mirar lo que se mide (N-01), y adelantado si la CE media baja de 0,5 dS/m sin fertilizar en 5 días (N-02). El motor
+  lo pide en una **tanda** (un pedido por sector) y el intervalo corre desde que se aplicó el último sector (`nutrition/`).
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
@@ -302,6 +305,8 @@ cd Desarrollo/backend
 - `POST /api/pulsos {ejecutarMotor}` → pulso de sensado manual de todas las zonas, sólo por API; `409` si hay
   uno en curso. En Demo Expo, la lectura con motor es la secuencia `LECTURA` con `ejecutarMotor` (sólo la zona
   de la secuencia). Ver "Pulso de sensado" en el README del backend.
+- `PUT /api/zonas/{zona}/plan-nutricion {intervalDays}` → intervalo del plan de nutrición de la macro-zona (permiso `configuracion.editar`; 3–30
+  días). El plan se lee de `GET /api/nursery` → `zonas[].nutritionPlan`. Ver "Plan de nutrición" en el README del backend.
 - `GET /api/tanques`, `POST /api/tanques/{zona}/{insumo}/recarga {liters, capacityLiters?}` → tanques de insumo por macro-zona y
   registro de sus cargas (permisos `insumos.ver` / `insumos.gestionar`). Ver "Aplicación de insumos" en el README del backend.
 - `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{id}` → bloqueo manual de la actuación autónoma por sector o
@@ -357,7 +362,8 @@ cd Desarrollo/backend
   `ApplicationPreconditions` (P-D1…P-D5, `DemoControllable`), el stock del tanque, registra y descuenta. El backend manda **mililitros** (el
   firmware convierte a tiempo y corta solo; tope 50 ml por comando = `ContratoNodo.BOMBA_ML_MAX`) y hay una bomba por sector: el comando
   no lleva el insumo. **`SupplyRule` y `DailyDoseLimitRule` están retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`) hasta que
-  entren las reglas N-*/F-*: hoy ninguna regla productiva pide una aplicación. Detalle en el README del backend.
+  entren las reglas por diagnóstico F-*, que son las que las reemplazan: hoy sólo el plan de nutrición (N-01) pide aplicaciones, y no decide con
+  el diagnóstico. Detalle en el README del backend.
 - **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y
@@ -373,6 +379,11 @@ cd Desarrollo/backend
   `spring.config.import`): el Administrador (`YERBANALYTICS_ADMIN_*`) y una lista genérica
   `YERBANALYTICS_USUARIOS_INICIALES` (`usuario:ROL:clave,…`). Se crean si no existen y nunca se pisan.
   Sus claves de desarrollo coinciden con los `env.example` del simulador y de la inferencia.
+- **Las reglas que deciden sobre una macro-zona entera son `ZoneRule`** (`engine/zone/`), no `Rule`: el plan de nutrición (N-01, N-02) es de la zona
+  y la CE que lo adelanta también (hay un nodo testigo por zona). `ZoneRuleEngine` las corre **una vez por zona**, en `updateTelemetry` después de los
+  sectores y sólo con el motor encendido (pulso con motor); decide la regla y ejecuta `ZoneActionExecutor`/`NutritionPlanService`, igual que el
+  reparto del riego. Son `DemoControllable` y declaran sus umbrales en el catálogo como cualquier regla, y su traza se suma a la del sector en el
+  Inspector. Antes de escribir una regla nueva, decidir si es de sector (`Rule`) o de zona (`ZoneRule`). Detalle en el README del backend ("Plan de nutrición").
 - **Patrón para agregar una nueva regla agronómica**:
   - Toda pieza que decide una acción (regla por sector, por macro-zona o servicio) es un **`DemoControllable`** (`engine/overrides/`; `Rule` ya lo extiende): así aparece en `GET /api/demo/rules`, se apaga y declara sus `cooldownKeys()`/`bypassKeys()`. Las reglas nuevas también necesitan su escenario en el simulador (`Desarrollo/simulador/src/scenarios/`; ver su README).
   - Toda regla nueva debe seguir estrictamente el patrón de las existentes: implementar `Rule`, anotarse como `@Component`, definir `priority()` ascendente, `name()`, `label()` legible para el usuario, `branch()` (GLOBAL, RIEGO, INSUMO, MEDIASOMBRA, SEGUIMIENTO) y declarar sus umbrales en `parametros()`.

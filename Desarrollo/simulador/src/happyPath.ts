@@ -14,6 +14,7 @@
      REAL_NODE  no inyecta nada (sensor real, pronóstico real, diagnóstico de una pasada del riel previa):
                 sólo se asegura de no dejar un clima simulado vivo y dispara el pulso.
    ============================================================ */
+import { withBypasses } from './bypassFlow';
 import { SHADE_DEPLOY_BELOW_OPENING_PCT } from '../server/contract';
 import { buildThresholds, calculateConditions, type RuleConditionResult, type ThresholdMap } from './ruleConditions';
 import { runPulses } from './pulseChain';
@@ -84,11 +85,8 @@ export function buildSimulatorPlan(thresholds: ThresholdMap): { conditions: Rule
   return { conditions: calculateConditions(HAPPY_PATH_SCENARIOS, thresholds) };
 }
 
-/** Lista de bypasses con `keys` agregadas, o `null` si ya estaban todas (no hace falta tocar nada). */
-export function withBypasses(rule: DemoRule, keys: string[]): string[] | null {
-  const missing = keys.filter((k) => !rule.bypassed.includes(k));
-  return missing.length === 0 ? null : [...rule.bypassed, ...missing];
-}
+// Vive en `bypassFlow.ts` (lo comparte con los escenarios que piden bypasses); se re-exporta por compatibilidad.
+export { withBypasses };
 
 /** Lista de bypasses con `window` agregado, o `null` si ya estaba (no hace falta tocar nada). */
 export function withWindowBypass(rule: DemoRule): string[] | null {

@@ -4,7 +4,9 @@ import com.yerbanalytics.backend.dto.DagSchemaDto;
 import com.yerbanalytics.backend.dto.RuleEdgeDto;
 import com.yerbanalytics.backend.dto.RuleNodeDto;
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.zone.ZoneRuleEngine;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,10 +41,15 @@ import java.util.List;
 @RequestMapping("/api/rules")
 public class RuleEngineSchemaController {
 
-    private final RuleOrchestrator ruleOrchestrator;
+    /** Lo que el grafo necesita de una regla, sea por sector o de macro-zona. */
+    private record RuleView(String name, String label, RuleBranch branch, int priority, List<String> parameters) {}
 
-    public RuleEngineSchemaController(RuleOrchestrator ruleOrchestrator) {
+    private final RuleOrchestrator ruleOrchestrator;
+    private final ZoneRuleEngine zoneRuleEngine;
+
+    public RuleEngineSchemaController(RuleOrchestrator ruleOrchestrator, ZoneRuleEngine zoneRuleEngine) {
         this.ruleOrchestrator = ruleOrchestrator;
+        this.zoneRuleEngine = zoneRuleEngine;
     }
 
     /**
@@ -56,7 +63,14 @@ public class RuleEngineSchemaController {
      */
     @GetMapping("/schema")
     public ResponseEntity<DagSchemaDto> getSchema() {
-        List<Rule> rules = ruleOrchestrator.getRules(); // ya vienen ordenadas por priority()
+        // Las de sector y las de macro-zona (plan de nutrición) comparten el grafo, ordenadas por prioridad.
+        List<RuleView> rules = new ArrayList<>();
+        for (Rule rule : ruleOrchestrator.getRules()) {
+            rules.add(new RuleView(rule.name(), rule.label(), rule.branch(), rule.priority(), claves(rule.parametros())));
+        }
+        zoneRuleEngine.getRules().forEach(rule ->
+                rules.add(new RuleView(rule.name(), rule.label(), rule.branch(), rule.priority(), claves(rule.parametros()))));
+        rules.sort(java.util.Comparator.comparingInt(RuleView::priority));
 
         List<RuleNodeDto> nodes = new ArrayList<>();
         List<RuleEdgeDto> edges = new ArrayList<>();
@@ -75,17 +89,17 @@ public class RuleEngineSchemaController {
         }
 
         // Agrupar reglas por rama, preservando el orden de prioridad interno
-        java.util.Map<com.yerbanalytics.backend.engine.RuleBranch, List<Rule>> rulesByBranch = new java.util.EnumMap<>(com.yerbanalytics.backend.engine.RuleBranch.class);
-        for (Rule rule : rules) {
+        java.util.Map<com.yerbanalytics.backend.engine.RuleBranch, List<RuleView>> rulesByBranch = new java.util.EnumMap<>(com.yerbanalytics.backend.engine.RuleBranch.class);
+        for (RuleView rule : rules) {
             rulesByBranch.computeIfAbsent(rule.branch(), k -> new ArrayList<>()).add(rule);
         }
 
         // 1. Cadena Global
         String lastGlobalId = "start";
-        List<Rule> globalRules = rulesByBranch.getOrDefault(com.yerbanalytics.backend.engine.RuleBranch.GLOBAL, List.of());
-        for (Rule rule : globalRules) {
+        List<RuleView> globalRules = rulesByBranch.getOrDefault(com.yerbanalytics.backend.engine.RuleBranch.GLOBAL, List.of());
+        for (RuleView rule : globalRules) {
             String ruleId = rule.name();
-            nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), "GLOBAL", claves(rule)));
+            nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), "GLOBAL", rule.parameters()));
             edges.add(new RuleEdgeDto("e_" + lastGlobalId + "_" + ruleId, lastGlobalId, ruleId, "Continúa"));
             edges.add(new RuleEdgeDto("e_" + ruleId + "_abort", ruleId, "abort-GLOBAL", "Bloquea"));
             lastGlobalId = ruleId;
@@ -95,14 +109,14 @@ public class RuleEngineSchemaController {
         for (com.yerbanalytics.backend.engine.RuleBranch branch : com.yerbanalytics.backend.engine.RuleBranch.values()) {
             if (branch == com.yerbanalytics.backend.engine.RuleBranch.GLOBAL) continue;
 
-            List<Rule> branchRules = rulesByBranch.getOrDefault(branch, List.of());
+            List<RuleView> branchRules = rulesByBranch.getOrDefault(branch, List.of());
             if (branchRules.isEmpty()) continue; // Si no hay reglas en esta rama, no la dibujamos
 
             String prevNodeId = lastGlobalId;
 
-            for (Rule rule : branchRules) {
+            for (RuleView rule : branchRules) {
                 String ruleId = rule.name();
-                nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), branch.name(), claves(rule)));
+                nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), branch.name(), rule.parameters()));
                 
                 // Arista: prevNodeId -> esta regla
                 edges.add(new RuleEdgeDto("e_" + prevNodeId + "_" + ruleId, prevNodeId, ruleId, "Continúa"));
@@ -121,7 +135,7 @@ public class RuleEngineSchemaController {
     }
 
     /** Claves de los parámetros del catálogo que declara la regla. */
-    private static List<String> claves(Rule rule) {
-        return rule.parametros().stream().map(DefinicionParametro::clave).toList();
+    private static List<String> claves(List<DefinicionParametro> parametros) {
+        return parametros.stream().map(DefinicionParametro::clave).toList();
     }
 }

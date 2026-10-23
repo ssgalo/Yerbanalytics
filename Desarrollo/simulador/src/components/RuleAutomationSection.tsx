@@ -5,6 +5,7 @@
    telemetry values needed to trigger them (reading current thresholds from the backend),
    and executes the full cycle in one click:
      1. Zeroes demo cooldowns (if in demo mode and the rules need it).
+     1b. Turns on the bypasses a scenario asks for (N-02's `samples`), on top of the ones already active.
      2. Injects simulated weather when needed (R-03 / ShadingRule).
      3. Publishes the calculated MQTT telemetry for the target sensor.
      4. Registers the prior AI diagnosis (SupplyRule only acts on a NEW one).
@@ -31,6 +32,7 @@ import { buildThresholds, calculateConditions } from '../ruleConditions';
 import { shadeMarked, valveMarked, waitUntil } from '../faultFlow';
 import { faultyDevicesOf, sectorsWithValve, sectorsWithoutValve, type HardwareDevice } from '../hardwareCoverage';
 import { runPulses } from '../pulseChain';
+import { applyBypassRules } from '../bypassFlow';
 import { ensureTankStock } from '../tankStock';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
@@ -202,6 +204,17 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
       if (conditions.needsCooldownReset && demoEnabled) {
         await api.zeroDemoCooldowns();
         log.push('✓ Cooldowns de demo → 0');
+        setExecLog([...log]);
+      }
+
+      // Step 1b: bypasses a scenario needs (they go on top of the ones the operator already has). Without the backend in
+      // demo mode there is no bypass to turn on: the run goes on and says so, because the rule may not decide without it.
+      if (Object.keys(conditions.bypassRules).length > 0) {
+        if (demoEnabled) {
+          log.push(...(await applyBypassRules(conditions.bypassRules, { getRules: api.getDemoRules, updateRule: api.updateDemoRule })));
+        } else {
+          log.push('⚠ El backend no está en modo demo: no se pueden activar los bypasses que pide el escenario, y la regla puede no decidir');
+        }
         setExecLog([...log]);
       }
 

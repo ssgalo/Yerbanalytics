@@ -81,6 +81,8 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
 const DIR_ENGINE = resolve(__dirname, '../../../../backend/src/main/java/com/yerbanalytics/backend/engine');
 const DIR_PARAMETROS = resolve(DIR_ENGINE, 'parametros');
 const DIR_REGLAS = resolve(DIR_ENGINE, 'rules');
+/** Las reglas de macro-zona (plan de nutrición) viven con su feature, no con las de sector. */
+const DIR_REGLAS_DE_ZONA = resolve(DIR_ENGINE, '..', 'nutrition');
 
 interface EntradaEnum {
   /** `Clase.CONSTANTE` en el código Java (p. ej. `ParametrosRiego.UMBRAL_HUMEDAD`): lo que usan las reglas. */
@@ -164,15 +166,17 @@ export function parametrosPorRegla(
 
 function leerReglasDelBackend(): Record<string, string> {
   const fuentes: Record<string, string> = {};
-  for (const f of readdirSync(DIR_REGLAS).filter((n) => /^\w+Rule\.java$/.test(n))) {
-    fuentes[f.replace('.java', '')] = readFileSync(resolve(DIR_REGLAS, f), 'utf8');
+  for (const dir of [DIR_REGLAS, DIR_REGLAS_DE_ZONA]) {
+    for (const f of readdirSync(dir).filter((n) => /^\w+Rule\.java$/.test(n))) {
+      fuentes[f.replace('.java', '')] = readFileSync(resolve(dir, f), 'utf8');
+    }
   }
   return fuentes;
 }
 
 /**
  * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
- * escalamiento del nodo, el guard de lectura inválida, el servicio de fallas del hardware y los de aplicación de insumos): también
+ * escalamiento del nodo, el guard de lectura inválida, el servicio de fallas del hardware, los de aplicación de insumos y el plan de nutrición): también
  * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
@@ -185,6 +189,7 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   ApplicationPreconditions: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationPreconditions.java'),
   ApplicationService: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationService.java'),
   TankService: resolve(DIR_ENGINE, '..', 'supply', 'TankService.java'),
+  NutritionPlanService: resolve(DIR_ENGINE, '..', 'nutrition', 'NutritionPlanService.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
@@ -215,7 +220,7 @@ describe('parametrosPorRegla (el lector del anti-drift)', () => {
   });
 });
 
-describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS))(
+describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS) || !existsSync(DIR_REGLAS_DE_ZONA))(
   'catalogoReglas.fixture.json · reglas y usadoPor contra el código del backend',
   () => {
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));

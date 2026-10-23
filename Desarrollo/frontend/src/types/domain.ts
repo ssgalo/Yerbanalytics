@@ -141,6 +141,25 @@ export interface NodoTestigo {
 
 
 
+/**
+ * Plan de nutrición de una macro-zona (reglas_v2 §8.4): fertilizante foliar en todos sus sectores cada
+ * `intervalDays`. Espejo del DTO `NutritionPlan`. Lo ejecuta el motor; el agrónomo sólo fija el intervalo.
+ */
+export interface NutritionPlan {
+  /** Días entre dos aplicaciones: el de la zona o, si no fijó uno, el del catálogo. */
+  intervalDays: number;
+  /** La zona fijó su propio intervalo (no rige el general). */
+  customInterval: boolean;
+  /** epoch ms en que terminó la última tanda del plan; `null` si nunca hubo una. */
+  lastApplicationTs: number | null;
+  /** epoch ms desde el que el plan está vencido; `null` si ya lo está (nunca se aplicó) o hay una tanda en curso. */
+  nextDueTs: number | null;
+  /** El plan ya pidió el fertilizante y algún sector espera su ventana. */
+  batchOpen: boolean;
+  /** La CE baja (N-02) adelantó el plan y todavía no se ejecutó. */
+  advanced: boolean;
+}
+
 /** Macro-zona (100 sectores). Dueña de la lectura sensada. */
 export interface Zona {
   id: string;
@@ -153,6 +172,8 @@ export interface Zona {
   total: number;
   lectura: LecturaZona;
   nodo: NodoTestigo;
+  /** `null` si el snapshot no lo trae. */
+  nutritionPlan?: NutritionPlan | null;
 }
 
 /** KPIs y conteos globales del vivero. */

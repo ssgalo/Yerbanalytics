@@ -16,7 +16,7 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | 4 | `add-metrica-dpv` | ✅ | `feat/reglas-v2-metrica-dpv` | C, H | §1.4. `VaporPressureDeficit` (puro) y `VaporPressureBand`; la ingesta lo calcula con T y HR de la lectura y lo guarda en `zona.dpv`/`dpv_ts` y `zone_reading.dpv` (sin migración manual). `GET /api/nursery` → `lectura.dpv`; fila informativa en el detalle de zona. Habilita 8 (F-F1, F-F2, F-P1) |
 | 5 | `add-mediasombra-v2` | ❌ cancelado | — | C | Cancelado: se borró su documentación OpenSpec. M-01, M-02, §7 y el `ZoneRuleEngine` quedan sin dueño; `ShadingRule` sigue moviendo la malla |
 | 6 | `add-dosificacion-base` | ✅ | `feat/reglas-v2-dosificacion-base` | C, 2 | §8.1–8.3 y P-D1…P-D5. `ApplicationService` (único camino para aplicar), `ApplicationPreconditions` (`DemoControllable`), `TankService` y API `/api/tanques`, reingreso del sector, aplicaciones diferidas. Decisiones: **una bomba por sector** (D-2 b: sin tocar contrato ni firmware), tanque por insumo y por MZ, **`SupplyRule`/`DailyDoseLimitRule` retiradas pero no borradas** (arrancan apagadas: aún no hay N-*/F-*). Dosis 10 ml de fábrica, máx 50 (tope del firmware). Migraciones manuales: `migracion-permisos-insumos.sql`, `migracion-dosis-por-insumo.sql`. Pendiente en 7/8/9: que sus reglas pidan la aplicación; el borrado de la v1 |
-| 7 | `add-plan-nutricion` | ⬜ | — | C, H, 6, 5 | N-01, N-02 |
+| 7 | `add-plan-nutricion` | ✅ | `feat/reglas-v2-plan-nutricion` | C, H, 6 | N-01, N-02. Crea el **`ZoneRuleEngine`** (`engine/zone/`: `ZoneRule`, `ZoneActionExecutor`, `ZoneTraceStore`; las reglas de macro-zona corren una vez por zona al cierre del pulso con motor) y `nutrition/` (`NutritionPlanRule`, `LowEcRule`, `NutritionPlanService`). Una *tanda* pide fertilizante en cada sector a `ApplicationService` y el intervalo corre desde que se aplicó el último; intervalo por zona (3–30 d) en el detalle de la macro-zona (`PUT /api/zonas/{zona}/plan-nutricion`). Sin migración manual (columnas nuevas de `zona`). Escenarios `NUTRITION_PLAN` y `LOW_EC` en el simulador. Dosis la del catálogo (10 ml), no 100 mL. Efecto a conocer: con N-01 encendida el primer pulso de cada zona pide la tanda, y con el tanque sin registrar se descarta |
 | 8 | `add-reglas-biotico` | ⬜ | — | C, H, 4, 6 | F-F1, F-F2, F-P1, F-04, F-06 |
 | 9 | `add-reglas-clorosis-estres-solar` | ⬜ | — | C, H, 5, 6 | F-C1, F-C2, F-S1, F-S2, F-S3 |
 | 10 | `add-efectividad-y-s06` | ⬜ | — | C, 6, 8, 9 | E-01…E-03, S-06, F-05 |
@@ -35,8 +35,8 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | S-06 | ⬜ | 10 |
 | §1.4 DPV | ✅ | 4 |
 | M-01, M-02, §7 | ❌ cancelado | 5 |
-| §8.1–8.3 | ✅ (maquinaria; ninguna regla productiva la pide todavía) | 6 |
-| N-01, N-02 | ⬜ | 7 |
+| §8.1–8.3 | ✅ (la pide N-01; las reglas por diagnóstico F-* todavía no) | 6 |
+| N-01, N-02 | ✅ | 7 |
 | F-F1, F-F2, F-P1, F-04, F-06 | ⬜ | 8 |
 | F-C1, F-C2, F-S1, F-S2, F-S3 | ⬜ | 9 |
 | E-01…E-03, F-05 | ⬜ | 10 |
@@ -51,6 +51,6 @@ Leyenda: ✅ implementado · 🚧 en curso · ⬜ pendiente
 | Clima simulado con marcas horarias, `uvMaxDia` y temperatura por hora | ✅ |
 | Modo "sin pronóstico" (`PUT /api/demo/weather/offline`) | ✅ |
 | Escenarios por regla en el simulador (`src/scenarios/`) | ✅ (6 reglas actuales migradas) |
-| Escenarios de las reglas nuevas | 🚧 (S-01 `LOCK`, S-03 `INVALID_READING`, S-04 `INCOMPLETE_HARDWARE`, S-05 `FAULT_NO_FLOW`/`FAULT_OVERFLOW`/`FAULT_SHADE_LIMIT`/`REPAIR` y el modificador `APPLICATION_PRECONDITIONS` hechos; cada cambio agrega el suyo) |
-| Retiro de reglas v1 (`ShadingRule`, `SupplyRule`, `DailyDoseLimitRule`, `FollowUpRule`) | 🚧 `SupplyRule` y `DailyDoseLimitRule` **retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`), sin borrar hasta que entre la primera regla N/F; `ShadingRule` y `FollowUpRule` siguen (ver tabla del índice) |
+| Escenarios de las reglas nuevas | 🚧 (S-01 `LOCK`, S-03 `INVALID_READING`, S-04 `INCOMPLETE_HARDWARE`, S-05 `FAULT_NO_FLOW`/`FAULT_OVERFLOW`/`FAULT_SHADE_LIMIT`/`REPAIR`, N-01 `NUTRITION_PLAN`, N-02 `LOW_EC` y el modificador `APPLICATION_PRECONDITIONS` hechos; cada cambio agrega el suyo) |
+| Retiro de reglas v1 (`ShadingRule`, `SupplyRule`, `DailyDoseLimitRule`, `FollowUpRule`) | 🚧 `SupplyRule` y `DailyDoseLimitRule` **retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`), sin borrar hasta que entren las reglas por diagnóstico F-* (N-01 no decide con el diagnóstico, no las reemplaza); `ShadingRule` y `FollowUpRule` siguen (ver tabla del índice) |
 | Escenarios previos del simulador (R-01…R-04, `SHADING`, `SUPPLY`, `LOCK`) con lecturas determinísticas | ⚠️ **Pendiente.** Publican la telemetría *antes* del pulso, pero la respuesta al pulso (la que decide el motor) la arma la emisión automática al azar y la pisa: pueden no disparar. Se arregla fijando sus lecturas con `pinnedReadings`, como ya hacen `INVALID_READING` e `INCOMPLETE_HARDWARE` (no se tocó en `add-seguridad-lectura-hardware`) |

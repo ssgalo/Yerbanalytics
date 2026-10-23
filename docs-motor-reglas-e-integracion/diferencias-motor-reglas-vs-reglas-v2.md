@@ -20,6 +20,11 @@
 > - §8.1–8.3 (dosis por insumo, stock de tanques con aviso al 20 %, reingreso de 24 h, aplicaciones diferidas a la próxima ventana) quedan implementadas. Dosis de fábrica 10 ml (la spec decía 100 ml; el firmware no acepta más de 50 ml por comando). Hay una sola bomba por sector y el comando no lleva el insumo (ver el README del backend).
 > - Los conteos y las citas `archivo:línea` del resto del documento no se recalcularon.
 
+> **Actualización parcial del 22/10/2026** (`add-plan-nutricion`):
+> - **N-01 pasa de Ausente a Parcial y N-02 a Implementada** (tablas de abajo). Son las primeras reglas **de macro-zona**: `ZoneRule` (`engine/zone/`), que `ZoneRuleEngine` corre una vez por zona al cierre de la evaluación de sus sectores, y `NutritionPlanRule` / `LowEcRule` (`nutrition/`). Cada aplicación pide el insumo al `ApplicationService`: N-01 es hoy **el único camino productivo que pide una aplicación** (sigue sin haber reglas F-*).
+> - N-01 es **Parcial** porque pide la dosis del catálogo (10 ml de fábrica, tope del firmware 50 ml) y no los 100 mL de la v2, y porque deja fuera de la tanda al sector con bloqueo manual, sin bomba o con falla hidráulica. El intervalo del plan es por zona (`zona.nutrition_plan_interval_days`, 3–30 días, fábrica 7; `PUT /api/zonas/{zona}/plan-nutricion`).
+> - Los conteos de cobertura y las citas `archivo:línea` del resto del documento no se recalcularon.
+
 Abreviaturas de ruta: `engine/` = `…/backend/engine/`; `rules/` = `…/backend/engine/rules/`; `riego/` = `…/backend/engine/riego/`; `param/` = `…/backend/engine/parametros/`; `traza/` = `…/backend/engine/traza/`; `service/` = `…/backend/service/`; `res/` = `Desarrollo/backend/src/main/resources/`.
 
 ---
@@ -132,8 +137,8 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 | R-06 | Pausa post-aplicación | Parcial | `PausaTrasAplicacionRule` | Coincide la regla (6 h, no afecta a R-02; el despacho la revalida); la "aplicación" es el último evento "Insumo", y el enganche "Dosificando" impide registrar más de uno por sector |
 | M-01 | Horario base | Distinta | `ShadingRule` | Plan por día de ciclo en % de apertura (no horario abierta/cerrada); sin perfil de crecimiento ni cierre nocturno; requiere fecha de siembra |
 | M-02 | Protección por calor | Distinta | `ShadingRule` | Sólo UV pronosticado ≥ 7 → apertura 30 %; sin temperatura/luz, sin ventana 11-16, sin retención hasta las 16:00, sin alertas |
-| N-01 | Plan de nutrición | Ausente | — | No hay aplicación periódica de fertilizante |
-| N-02 | CE baja | Ausente | — | Ninguna regla usa la CE (ni media de 24 h) |
+| N-01 | Plan de nutrición | Parcial | `NutritionPlanRule` (`nutrition/`, de macro-zona) | Intervalo por zona (7 d de fábrica, 3–30), tanda con un pedido por sector al `ApplicationService`, `INFO`; la dosis es la del catálogo (10 ml, tope del firmware 50 ml), no 100 mL, y quedan fuera de la tanda los sectores bloqueados, sin bomba o con falla hidráulica |
+| N-02 | CE baja | Implementada | `LowEcRule` (`nutrition/`, de macro-zona) | Media de las últimas 6 lecturas de pulso (`ReadingHistory`) < 0,5 dS/m y sin fertilizar en 5 días (plan o correctiva): adelanta N-01 y deja el `INFO` del doc; una alerta por evento |
 | F-C1 | Clorosis no nutricional | Ausente | — | No se evalúan causas (humedad, CE, pH) ni se bloquea fertilizante |
 | F-C2 | Clorosis nutricional | Distinta | `SupplyRule` | Sin distinción por clase: cualquier sector `critical` con confianza ≥ 85 % dosifica |
 | F-F1 | Daño fúngico | Distinta | `SupplyRule` | Idem F-C2; sin severidad/ambiente/3 capturas |
@@ -292,8 +297,8 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 
 ### 4.4 Nutrición (N)
 
-- **N-01** (plan cada 7 días por MZ, 100 mL, próxima ventana apta): no existe. No hay registro del "último plan", ni intervalo por MZ, ni dosis en mL.
-- **N-02** (CE media 24 h < 0,5 dS/m y sin fertilización en 5 días → adelantar N-01): no existe. La CE es una métrica que afecta estado (`afectaEstado = true`, `constant/NurseryConstants.java:64`) pero no hay regla que la use. No hay media de 24 h ni historial de lecturas.
+- **N-01** (plan cada 7 días por MZ, 100 mL, próxima ventana apta): **implementada (parcial)** en `nutrition/NutritionPlanRule` + `NutritionPlanService`. Registra el «último plan» y el intervalo por MZ en la zona (`last_plan_application_ts`, `nutrition_plan_interval_days`), y la tanda queda abierta hasta que ningún sector espere su ventana. La dosis es la del catálogo (no 100 mL).
+- **N-02** (CE media 24 h < 0,5 dS/m y sin fertilización en 5 días → adelantar N-01): **implementada** en `nutrition/LowEcRule`, sobre el historial de lecturas (`ReadingHistory.latest`, lecturas de pulso). «Sin fertilizar» cuenta cualquier aplicación de fertilizante en la zona.
 
 ### 4.5 Reglas por diagnóstico (F) — 🔶 Sin revisar en el doc (§8.5)
 
@@ -471,7 +476,7 @@ Los valores de fábrica y rangos del doc coinciden con los del catálogo (`param
 |---|---|---|
 | Dosis de fertilizante / fitosanitario | 100 mL / 100 mL | No hay dosis en el comando; `insumoDosisMax24hMl` = 15 sólo informativo |
 | Intervalo mínimo | 5 / 7 días | `insumo.max-dosis-24h` = 1 dosis en 24 h (1-10) |
-| Intervalo del plan de nutrición | 7 días por MZ | No existe |
+| Intervalo del plan de nutrición | 7 días por MZ | `nutricion.intervalo-plan` (7 d, 3–30) como valor inicial; cada zona fija el suyo (`PUT /api/zonas/{zona}/plan-nutricion`) |
 | Ventanas de aplicación | 07-10 y 17-19 | Sin ventana |
 | Temperatura máxima para aplicar | 30 °C | Sin chequeo |
 | Humedad mínima para aplicar | 45 % | Sin chequeo |

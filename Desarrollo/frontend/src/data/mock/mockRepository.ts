@@ -8,6 +8,7 @@ import { PasadaRechazadaError } from '@/data/pasadaError';
 import { SecuenciaRechazadaError } from '@/data/secuenciaError';
 import { ManualLockError } from '@/data/manualLockError';
 import { TankLoadError } from '@/data/tankError';
+import { NutritionPlanError } from '@/data/nutritionPlanError';
 import { PlanRustificacionError } from '@/data/planRustificacionError';
 import type {
   ActionRecord,
@@ -34,6 +35,7 @@ import type {
   NewTankLoad,
   Supply,
   TankLevel,
+  NutritionPlan,
   NuevoPlanRustificacion,
   PlanRustificacion,
 } from '@/types/domain';
@@ -45,6 +47,8 @@ import { ETAPAS_SUGERIDAS, planErrors, planVigente, progreso } from '@/lib/planR
 import { buildConfig, mockStaleThresholdSeconds } from './config';
 import { buildNursery, type TopologiaGrid } from './generators';
 import { buildHistory } from './history';
+import { buildMockNutritionPlan } from './nutritionPlanMock';
+import { nutritionIntervalError } from '@/lib/nutritionPlan';
 import {
   buildRuleSchema,
   catalogoVigente,
@@ -89,6 +93,8 @@ export class MockRepository implements DataRepository {
   private nextLockId = 1;
   /** Tanques de insumo de la sesión; arranca sin ninguno registrado, como un backend recién instalado. */
   private tanks: TankLevel[] = [];
+  /** Intervalos del plan de nutrición que el usuario fijó en la sesión, por macro-zona; sin entrada rige el general. */
+  private readonly nutritionIntervals = new Map<string, number>();
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
 
@@ -115,6 +121,10 @@ export class MockRepository implements DataRepository {
         this.topologiaOverride ?? undefined,
         this.disposicionOverride ?? undefined,
       );
+      const now = Date.now();
+      this.cache.zonas.forEach((z, i) => {
+        z.nutritionPlan = buildMockNutritionPlan(i, this.nutritionIntervals.get(z.id) ?? null, now);
+      });
     }
     return this.cache;
   }
@@ -319,6 +329,18 @@ export class MockRepository implements DataRepository {
       (a, b) => a.zoneId.localeCompare(b.zoneId) || a.supply.localeCompare(b.supply),
     );
     return structuredClone(tank);
+  }
+
+  async setNutritionPlanInterval(zoneId: string, intervalDays: number): Promise<NutritionPlan> {
+    const error = nutritionIntervalError(String(intervalDays));
+    if (error) throw new NutritionPlanError(error);
+    const nursery = await this.getNursery();
+    const index = nursery.zonas.findIndex((z) => z.id === zoneId);
+    if (index < 0) throw new NutritionPlanError(`La macro-zona ${zoneId} no existe.`);
+    this.nutritionIntervals.set(zoneId, intervalDays);
+    const plan = buildMockNutritionPlan(index, intervalDays, Date.now());
+    nursery.zonas[index].nutritionPlan = plan;
+    return structuredClone(plan);
   }
 
   private fleet(): RawDispositivo[] {

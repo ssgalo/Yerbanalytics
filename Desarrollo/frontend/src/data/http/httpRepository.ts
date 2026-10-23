@@ -11,6 +11,7 @@ import { apiFetch } from './apiFetch';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { ManualLockError } from '@/data/manualLockError';
 import { TankLoadError } from '@/data/tankError';
+import { NutritionPlanError } from '@/data/nutritionPlanError';
 import { PasadaRechazadaError } from '@/data/pasadaError';
 import { PlanRustificacionError } from '@/data/planRustificacionError';
 import { HORARIO_MEDIASOMBRA_DEFAULT } from '@/lib/planRustificacion';
@@ -35,6 +36,7 @@ import type {
   ManualLock,
   NewManualLock,
   NewTankLoad,
+  NutritionPlan,
   Supply,
   TankLevel,
   Pasada,
@@ -247,6 +249,23 @@ export class HttpRepository implements DataRepository {
       throw new Error(`Error ${res.status} al registrar la carga del tanque`);
     }
     return (await res.json()) as TankLevel;
+  }
+
+  async setNutritionPlanInterval(zoneId: string, intervalDays: number): Promise<NutritionPlan> {
+    const res = await apiFetch(`${this.baseUrl}/zonas/${encodeURIComponent(zoneId)}/plan-nutricion`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intervalDays }),
+    });
+    // 400 y 404 traen { error } y son rechazos esperables (fuera de rango, zona inexistente), no una falla.
+    if (res.status === 400 || res.status === 404) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new NutritionPlanError(err?.error ?? 'No se pudo guardar el intervalo del plan de nutrición.');
+    }
+    if (!res.ok) {
+      throw new Error(`Error ${res.status} al guardar el intervalo del plan de nutrición`);
+    }
+    return (await res.json()) as NutritionPlan;
   }
 
   async getHardware(): Promise<HardwareData> {

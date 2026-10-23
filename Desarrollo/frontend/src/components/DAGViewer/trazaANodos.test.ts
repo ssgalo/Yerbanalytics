@@ -136,7 +136,8 @@ describe('trazaANodos', () => {
     expect(e['RiegoPorDeficitRule']).toBe('noAlcanzada');
     // Ninguna regla de la rama llegó a evaluarse: el terminal no dice "no se regó", dice que no se alcanzó.
     expect(e['success-RIEGO']).toBe('noAlcanzada');
-    expect(e['success-INSUMO']).toBe('noAlcanzada');
+    // La rama de insumos sí se evaluó, aunque no por el sector: las reglas de la macro-zona (plan de nutrición) corren igual.
+    expect(e['success-INSUMO']).toBe('noAccion');
   });
 
   it('lectura vieja: el terminal de la rama de riego queda omitido, no "no accionó"', () => {
@@ -188,5 +189,24 @@ describe('colorArista', () => {
     expect(colorArista('paso', 'accion')).toEqual({ color: 'var(--ok)', activa: true });
     expect(colorArista('accion', 'accion')).toEqual({ color: 'var(--info)', activa: true });
     expect(colorArista('pospuso', 'noAccion')).toEqual({ color: 'var(--warn)', activa: true });
+  });
+});
+
+describe('trazaANodos · plan de nutrición', () => {
+  it('una regla de macro-zona que inicia, adelanta o cierra el plan cuenta como acción', () => {
+    const regla = (tipo: string) =>
+      clasificarRegla({
+        ruleId: 'NutritionPlanRule',
+        rama: 'INSUMO',
+        prioridad: 23,
+        estado: 'EVALUADA',
+        comparaciones: [],
+        acciones: [{ tipo, motivo: 'm' }],
+        bloqueadaPor: null,
+        error: null,
+      });
+
+    expect(regla('UPDATE_NUTRITION_PLAN')).toBe('accion');
+    expect(regla('NOOP_INFO')).toBe('paso');
   });
 });
