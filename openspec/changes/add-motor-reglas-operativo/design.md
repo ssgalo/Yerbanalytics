@@ -347,17 +347,41 @@ capa de demo).
 
 ## Adaptación de los PRs de reglas v2
 
-Este cambio entra primero. Cada PR de la pila de Agustín (no mergeados) adapta lo suyo al rebasear:
+**Hecho (backend, rama `integ/motor-reglas-v2`).** La pila #64–#68 se mergeó sobre este cambio con `git merge --no-ff`.
+Lo resuelto:
 
-| PR | Rama | Qué adapta |
-|---|---|---|
-| #64 | `feat/reglas-v2-reglas-biotico` | `label()` sin emoji ni código en `FungalDamageRule` (F-F1), `FoliarPestRule` (F-P1), `FungalConditionRule` (F-F2), `OutbreakRule` (F-04); `code()` de cada una; `objective() = SANITY`; `effect()` (F-F2 avisa si sólo alerta: a confirmar con su lógica). Familia `BIOTICO`: sus parámetros compartidos (`diagnostico.*`) se editan en el bloque Compartidos de Sanidad. Fixture y tests de etiquetas |
-| #65 | `feat/reglas-v2-clorosis-estres-solar` | Igual para `ChlorosisNonNutritionalRule` (F-C1), `ChlorosisNutritionalRule` (F-C2), `SolarStressRule` (F-S1), `SolarStressUnexplainedRule` (F-S3): sin emoji, `code()`, `objective()` (F-C2 → `NUTRITION` o `SANITY`, a decidir), `effect()`. Familias `CLOROSIS`, `ESTRES` |
-| #67 | `feat/reglas-v2-efectividad-s06` | `IneffectiveActionRule` (S-06): sin emoji, `code() = "S-06"`, **`protection()` con su consecuencia** ("una acción que no surte efecto se repite sin freno") y `effect() = PROTECTS`. `EffectivenessService`: sin emoji, `objective() = FOLLOW_UP`. Borra `FollowUpRule`: la fila huérfana de `regla_estado` se ignora (D-1). **Reemplaza `seguimiento.latencia-min` / `seguimiento.delta-min`** por `efectividad.verificacion-min` / `efectividad.delta-riego`: borra los dos parámetros, deja de declararlos en `HistorialService` y su migración copia los overrides de `parametro_regla` (`seguimiento.*` → `efectividad.*`) antes de borrarlos. `migracion-permisos-efectividad.sql` no cambia (el permiso de reglas no se tocó). `DailyDoseLimitRule` (lo toca): sin emoji |
-| #68 | `feat/reglas-v2-sin-internet` | `PosponerPorLluviaRule`: conserva la limpieza de etiqueta de este cambio al resolver el conflicto. `Rule.supuestoSinPronostico()` convive con los métodos nuevos de `DemoControllable` |
+- **Conflictos.** `FollowUpRule` queda borrada (#67) y `HistorialService` toma la estructura de #67 (`FollowUpPolicy`,
+  `EffectivenessJob`, `withIrrigationFollowUp` / `withTreatmentFollowUp`) y conserva lo de este cambio:
+  `guardarDelMotor` (guarda `reglasInactivas` en todo evento con regla: riego, alerta, insumo —también el que abre un
+  seguimiento de efectividad—, mediasombra), el evento `Configuración` de `registrarEstadoRegla` y el constructor con
+  `RuleOverrides`. Se quitó `SectorRepository` y el catálogo del constructor (ya no hay evaluación propia del seguimiento).
+- **`seguimiento.*` obsoleto.** Se borraron `ParametrosSeguimiento`, la familia `SEGUIMIENTO` de `FamiliaParametro`, la
+  declaración de parámetros de `HistorialService` y sus tests; la efectividad usa `efectividad.*`. En
+  `migracion-umbrales-al-motor.sql` ya no se copian los valores de seguimiento a `parametro_regla`: se borran las columnas
+  de `configuracion_operativa` (y `insumo_dosis_max_24h_ml`) y se limpian filas `seguimiento.*` si existieran. La fila
+  huérfana de `regla_estado` de `FollowUpRule` se ignora y se loguea (D-1).
+- **Declaración de las piezas del stack** (fijada por `ReglasArquitecturaTest`), sin emoji ni código en el label:
 
-En los cuatro: las pruebas de etiqueta y los fixtures del frontend se rehacen sin emoji, y las reglas nuevas aparecen
-solas en su grupo de la pantalla (no hay mapa que tocar en el frontend).
+| Pieza | `code()` | `objective()` | `effect()` | `protection()` |
+|---|---|---|---|---|
+| `FungalDamageRule` | F-F1 | SANITY | ACTS | no |
+| `FoliarPestRule` | F-P1 | SANITY | ACTS | no |
+| `FungalConditionRule` | F-F2 | SANITY | WARNS | no |
+| `OutbreakRule` | F-04 | SANITY | ACTS | no |
+| `ChlorosisNonNutritionalRule` | F-C1 | NUTRITION | WARNS (corta la rama de insumos y avisa; no manda a ningún actuador) | no |
+| `ChlorosisNutritionalRule` | F-C2 | NUTRITION | ACTS | no |
+| `SolarStressRule` | F-S1 | IRRIGATION | ACTS | no |
+| `SolarStressUnexplainedRule` | F-S3 | SANITY | WARNS | no |
+| `IneffectiveActionRule` | S-06 | PROTECTION | PROTECTS | sí: el motor repite el riego o tratamiento que ya no funcionó |
+| `EffectivenessService` | E-01, E-02, E-03, F-05 | FOLLOW_UP | WARNS | no |
+
+- **Despacho (D-10).** Sigue valiendo con el bypass de ventana de F-S1 en `DespachoRiego`: ambos usan
+  `overrides.skipsGuard(...)`; los tests de #65 se pasaron a `TestRuleOverrides`.
+- **Prioridades.** Siguen únicas (`ReglasArquitecturaTest`).
+
+**Pendiente para la integración del frontend:** el dashboard todavía conoce la familia `SEGUIMIENTO` y las claves
+`seguimiento.*`; los fixtures y tests de etiquetas con emoji de #64/#65/#67 se rehacen sin emoji; la pantalla Motor de
+reglas muestra las diez piezas nuevas en su grupo sin tocar mapas.
 
 ## Riesgos
 
@@ -378,7 +402,7 @@ solas en su grupo de la pantalla (no hay mapa que tocar en el frontend).
 - **Cambiar `yerbanalytics.reglas.retiradas`** sólo afecta a las piezas sin fila. Una retirada que alguien prendió a mano
   sigue prendida aunque la lista cambie: es lo esperado (decidió una persona), pero hay que saberlo.
 - **Migración manual** obligatoria para borrar las columnas (D-14).
-- **PRs abiertos**: cuatro rebases con conflictos en etiquetas, fixtures y tests (tabla de arriba).
+- **PRs abiertos**: el merge de la pila ya está resuelto del lado backend (sección anterior); falta el frontend.
 
 ## Preguntas resueltas
 
