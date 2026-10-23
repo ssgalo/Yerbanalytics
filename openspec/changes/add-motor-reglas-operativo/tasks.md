@@ -67,8 +67,8 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 9.5 GREEN: `ReglasTab`, `ReglaCard`, diálogo de confirmación, bloque de compartidos, sobre `src/components/ui/` y tokens; sin prioridades visibles.
 
 ## 10. Frontend: historial (D-11)
-- [ ] 10.1 RED: `historyGraphModel.test`: regla apagada hoy y activa entonces se dibuja; regla en `reglasInactivas` no; evento sin `reglasInactivas` excluye `activaPorDefecto: false`; la que decidió siempre aparece.
-- [ ] 10.2 GREEN: `historyGraphModel` sin `plainLabel` ni filtro por `activa`.
+- [x] 10.1 RED: `historyGraphModel.test`: regla apagada hoy y activa entonces se dibuja; regla en `reglasInactivas` no; evento sin `reglasInactivas` excluye `activaPorDefecto: false`; la que decidió siempre aparece.
+- [x] 10.2 GREEN: `historyGraphModel` sin `plainLabel` ni filtro por `activa`.
 
 ## 11. Frontend: Configuración (D-14)
 - [ ] 11.1 RED: `ConfiguracionPage.test`: sólo bandas de métricas, sin seguimiento, límites de insumos ni mediasombra, sin enlace a Motor de reglas.

@@ -29,13 +29,50 @@ const event = (e: Partial<ActionRecord> = {}): ActionRecord => ({
 
 const stateOf = (g: ReturnType<typeof historyGraph>, id: string) => g.nodes.find((n) => n.id === id)?.state;
 
+/** El esquema de hoy con estas reglas apagadas (como las informa `/api/rules/schema`: `activa` es el estado efectivo). */
+const apagadasHoy = (...ids: string[]) => {
+  const hoy = structuredClone(schema);
+  for (const n of hoy.nodes) if (ids.includes(n.id)) n.activa = false;
+  return hoy;
+};
+const idsDe = (g: ReturnType<typeof historyGraph>) => g.nodes.map((n) => n.id);
+
 describe('historyGraph', () => {
-  it('sólo dibuja reglas activas: las retiradas no aparecen', () => {
-    const ids = historyGraph(schema, event({ regla: 'RiegoPorDeficitRule' })).nodes.map((n) => n.id);
+  it('un evento sin `reglasInactivas` (anterior al registro) no dibuja las retiradas de fábrica', () => {
+    const ids = idsDe(historyGraph(schema, event({ regla: 'RiegoPorDeficitRule' })));
 
     expect(ids).toContain('RiegoPorDeficitRule');
     expect(ids).not.toContain('SupplyRule');
     expect(ids).not.toContain('DailyDoseLimitRule');
+  });
+
+  it('una regla apagada hoy que estaba activa entonces se dibuja como ejecutada', () => {
+    const hoy = apagadasHoy('PosponerPorLluviaRule');
+
+    const g = historyGraph(hoy, event({ regla: 'RiegoPorDeficitRule', reglasInactivas: [] }));
+
+    expect(stateOf(g, 'PosponerPorLluviaRule')).toBe('executed');
+  });
+
+  it('también en un evento viejo: lo que cuenta es la fábrica, no el estado de hoy', () => {
+    const hoy = apagadasHoy('PosponerPorLluviaRule');
+
+    const g = historyGraph(hoy, event({ regla: 'RiegoPorDeficitRule', reglasInactivas: null }));
+
+    expect(stateOf(g, 'PosponerPorLluviaRule')).toBe('executed');
+  });
+
+  it('una regla que estaba apagada al decidir no se dibuja, aunque hoy esté prendida', () => {
+    const g = historyGraph(schema, event({ regla: 'RiegoPorDeficitRule', reglasInactivas: ['FueraDeVentanaRiegoRule'] }));
+
+    expect(idsDe(g)).not.toContain('FueraDeVentanaRiegoRule');
+    expect(idsDe(g)).toContain('PausaTrasAplicacionRule');
+  });
+
+  it('una retirada que estaba prendida entonces (reglasInactivas vacío) sí se dibuja', () => {
+    const g = historyGraph(schema, event({ tipo: 'Insumo', regla: 'SupplyRule', reglasInactivas: [] }));
+
+    expect(stateOf(g, 'SupplyRule')).toBe('decided');
   });
 
   it('un riego por R-02: las globales y las de riego hasta R-02 se ejecutaron, R-02 decidió, el resto no', () => {
@@ -87,8 +124,20 @@ describe('decidingRule', () => {
     expect(decidingRule(schema, event({ tipo: 'Alerta', sectorId: '—', regla: 'SustratoSaturadoRule' }))).toBeNull();
   });
 
-  it('una regla apagada no puede haber decidido', () => {
-    expect(decidingRule(schema, event({ tipo: 'Insumo', regla: 'SupplyRule' }))).toBeNull();
+  it('la regla que decidió siempre se encuentra y se dibuja, esté o no apagada hoy o de fábrica', () => {
+    const hoy = apagadasHoy('RiegoPorDeficitRule');
+    expect(decidingRule(hoy, event({ regla: 'RiegoPorDeficitRule' }))?.id).toBe('RiegoPorDeficitRule');
+
+    const retirada = event({ tipo: 'Insumo', regla: 'SupplyRule' });
+    expect(decidingRule(schema, retirada)?.id).toBe('SupplyRule');
+    expect(stateOf(historyGraph(schema, retirada), 'SupplyRule')).toBe('decided');
+    // Aunque el registro la diera por apagada, la que decidió corrió.
+    const g = historyGraph(hoy, event({ regla: 'RiegoPorDeficitRule', reglasInactivas: ['RiegoPorDeficitRule'] }));
+    expect(stateOf(g, 'RiegoPorDeficitRule')).toBe('decided');
+  });
+
+  it('un cambio de configuración (prender o apagar una regla) no es una decisión del motor: sin grafo', () => {
+    expect(decidingRule(schema, event({ tipo: 'Configuración', sectorId: '—', regla: 'RiegoPorDeficitRule' }))).toBeNull();
   });
 });
 
