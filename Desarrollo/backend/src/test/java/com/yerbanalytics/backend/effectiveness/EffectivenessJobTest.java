@@ -216,6 +216,9 @@ class EffectivenessJobTest {
             assertThat(riego.getEvoDelta()).isEqualTo("+4");
             assertThat(riego.isBloqueoRepeticion()).isTrue();
             assertThat(riego.getEvoMotivo()).contains("44").contains("48");
+            verify(historial).registrarAlerta(eq("MZ-1"), eq("Macro-zona 1"), eq("EffectivenessService"),
+                    org.mockito.ArgumentMatchers.argThat((DetalleAlerta d) -> d.nivel() == NivelAlerta.CRITICAL
+                            && d.texto().contains("toda la macro-zona MZ-1") && d.texto().contains("revisión")), anyLong());
         }
 
         @Test
@@ -286,6 +289,9 @@ class EffectivenessJobTest {
 
             assertThat(e.getEvoVerdict()).isEqualTo("Sin efectividad");
             assertThat(e.isBloqueoRepeticion()).isTrue();
+            verify(historial).registrarAlerta(eq("MZ-1"), eq("Macro-zona 1"), eq("EffectivenessService"),
+                    org.mockito.ArgumentMatchers.argThat((DetalleAlerta d) -> d.nivel() == NivelAlerta.CRITICAL
+                            && d.texto().contains("en el sector MZ-1-045")), anyLong());
         }
 
         @Test

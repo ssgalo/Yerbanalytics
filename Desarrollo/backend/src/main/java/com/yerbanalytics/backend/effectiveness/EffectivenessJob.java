@@ -247,6 +247,24 @@ public class EffectivenessJob {
         event.setEvoEvaluadoTs(now);
         event.setBloqueoRepeticion(!effective);
         event.setRes(VERDICT_EFFECTIVE);
+        if (!effective) {
+            warnIneffective(event, result, now);
+        }
+    }
+
+    /**
+     * S-06: una acción sin efectividad bloquea su repetición hasta que alguien la revise en persona, y se avisa una sola vez, en el
+     * momento del veredicto, a la macro-zona. El bloqueo mismo lo aplican {@code IneffectiveActionRule} (riego) y las
+     * precondiciones de aplicación (tratamientos).
+     */
+    private void warnIneffective(HistorialEventoEntity event, Evaluation result, long now) {
+        EffectivenessKind kind = EffectivenessKind.parse(event.getEfectividadTipo()).orElse(EffectivenessKind.IRRIGATION);
+        String scope = kind.isZoneScoped()
+                ? "en toda la macro-zona " + event.getZonaId()
+                : "en el sector " + event.getSectorId();
+        historial.registrarAlerta(event.getZonaId(), event.getZonaName(), EffectivenessService.NAME,
+                new DetalleAlerta(NivelAlerta.CRITICAL, kind.label() + " sin efectividad (" + result.reason()
+                        + ") Se bloquea su repetición autónoma " + scope + " hasta que se registre la revisión física."), now);
     }
 
     /**
