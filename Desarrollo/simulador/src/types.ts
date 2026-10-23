@@ -144,12 +144,8 @@ export interface DemoRule {
   label: string;
   branch: string;
   priority: number;
-  /** Capa de demo: `false` sólo si el simulador la apagó explícitamente. No es lo que corre. */
+  /** Si la regla corre ahora: lo decidió el vivero en Motor de reglas (sólo lectura: el simulador no lo escribe). */
   enabled: boolean;
-  /** Lo que decidió el vivero en Motor de reglas (sólo lectura: el simulador no lo escribe). */
-  operationalActive: boolean;
-  /** Si la regla corre ahora: el override explícito de demo gana; si no, el estado operativo. */
-  effectiveEnabled: boolean;
   /** Cooldown keys this rule declares (one numeric input per key). */
   cooldownKeys: string[];
   /** Bypass keys this rule declares (one toggle per key). */
@@ -160,9 +156,8 @@ export interface DemoRule {
   bypassed: string[];
 }
 
-/** Body for PUT /api/demo/rules/{ruleName}. All fields optional. */
+/** Body for PUT /api/demo/rules/{ruleName}. All fields optional. El encendido no se manda: el backend lo rechaza (400). */
 export interface DemoRuleUpdate {
-  enabled?: boolean;
   cooldownMinutes?: Record<string, number>;
   bypassed?: string[];
 }

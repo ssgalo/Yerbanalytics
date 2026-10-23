@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
 import type { DemoRule } from '../types';
-import { nextEnabled, operationalLegend } from '../ruleToggleModel';
+import { stateLegend } from '../ruleToggleModel';
 
 export function RuleToggles() {
   const [rules, setRules] = useState<DemoRule[]>([]);
@@ -23,19 +23,6 @@ export function RuleToggles() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  const toggleEnabled = async (rule: DemoRule) => {
-    setSaving(rule.name);
-    setError(null);
-    try {
-      const updated = await api.updateDemoRule(rule.name, { enabled: nextEnabled(rule) });
-      setRules((prev) => prev.map((r) => (r.name === rule.name ? updated : r)));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(null);
-    }
-  };
 
   const setCooldown = async (rule: DemoRule, key: string, value: number) => {
     setSaving(`${rule.name}-cd-${key}`);
@@ -97,29 +84,24 @@ export function RuleToggles() {
         </button>
       </div>
       <p className="hint">
-        Apagá reglas o reducí sus cooldowns para demostrar el ciclo ciberfísico sin esperar los
-        tiempos de producción. Los cambios viven en memoria: un reinicio del backend los resetea.
+        Reducí cooldowns o salteá guardas para demostrar el ciclo ciberfísico sin esperar los
+        tiempos de producción. Prender o apagar una regla se hace sólo en Motor de reglas del dashboard: acá se
+        ve su estado. Los cambios viven en memoria: un reinicio del backend los resetea.
       </p>
 
       {error && <p className="errorMsg">{error}</p>}
 
       <div className="ruleList">
         {rules.map((rule) => (
-          <div key={rule.name} className={`ruleRow ${rule.effectiveEnabled ? '' : 'ruleDisabled'}`}>
+          <div key={rule.name} className={`ruleRow ${rule.enabled ? '' : 'ruleDisabled'}`}>
             <div className="ruleHeader">
-              <label className="ruleToggle">
-                <input
-                  type="checkbox"
-                  checked={rule.effectiveEnabled}
-                  disabled={saving !== null}
-                  onChange={() => void toggleEnabled(rule)}
-                />
+              <div className="ruleToggle">
                 <span className="ruleLabel">{rule.label}</span>
-                {operationalLegend(rule) && <span className="ruleMeta">{operationalLegend(rule)}</span>}
+                <span className="ruleMeta" data-state={rule.enabled ? 'on' : 'off'}>{stateLegend(rule)}</span>
                 <span className="ruleMeta">
                   {rule.branch} · prioridad {rule.priority}
                 </span>
-              </label>
+              </div>
             </div>
 
             {rule.cooldownKeys.length > 0 && (

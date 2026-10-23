@@ -482,7 +482,7 @@ test('the confidence default is the v2 value (70), not the old 85', () => {
 
 function demoRule(name: string): DemoRule {
   return {
-    name, label: name, branch: 'RIEGO', priority: 1, enabled: true, operationalActive: true, effectiveEnabled: true,
+    name, label: name, branch: 'RIEGO', priority: 1, enabled: true,
     cooldownKeys: [], bypassKeys: [], cooldownMinutes: {}, bypassed: [],
   };
 }

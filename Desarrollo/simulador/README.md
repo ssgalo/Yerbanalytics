@@ -56,10 +56,10 @@ simulador (punto ámbar, con el motivo).
   for that zone (only simulated macro-zones, only while on).
 - **Topología** — regenera la grilla (N macro-zonas × M sectores) para que coincida con el
   hardware a simular.
-- **Control de reglas y automatización** — con el backend en modo demo, apaga reglas y acorta sus
-  cooldowns (*Telemetría → Control de reglas*; **en modo demo su interruptor gana sobre el estado operativo**: si el vivero
-  apagó una regla en Motor de reglas, el simulador la ve con la leyenda «Apagada en el vivero» y puede prenderla igual; el
-  simulador nunca escribe el estado operativo), inyecta clima (con marcas horarias, UV máximo del día y
+- **Control de reglas y automatización** — con el backend en modo demo, acorta cooldowns y saltea
+  guardas de las reglas (*Telemetría → Control de reglas*; **el encendido no es de la demo**: Motor de reglas del dashboard es la
+  única fuente de verdad, y acá cada regla muestra su estado en sólo lectura, «Prendida en el vivero» o «Apagada en el vivero —
+  se cambia en Motor de reglas»; el backend responde 400 si se le manda `enabled`), inyecta clima (con marcas horarias, UV máximo del día y
   un modo "sin pronóstico") y arma las condiciones para que una regla dispare en el siguiente pulso
   (*Automatización*). Ver "Cómo agregar el escenario de una regla".
 - **Fuente de telemetría** — con el backend en modo demo, **toda** la telemetría del simulador sale por
@@ -67,7 +67,7 @@ simulador (punto ámbar, con el motivo).
   ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
   actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
 - **Happy path de la demo** (pestaña *Demo Expo*, junto a la pasada del riel y las secuencias) — un botón que evalúa
-  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. Con la fuente en **Simulador** enciende la dosificación (`SupplyRule`, que el backend arranca retirada o que el vivero pudo apagar; decide por `effectiveEnabled`), saltea la ventana horaria y el límite diario de aplicación y asegura stock en los tanques de la zona (ver «Aplicación de insumos»); con la fuente en **ESP32 real** no toca ninguna regla y sólo avisa si la dosificación sigue apagada. No espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
+  riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. Con la fuente en **Simulador** saltea la ventana horaria y el límite diario de aplicación y asegura stock en los tanques de la zona (ver «Aplicación de insumos»); **no enciende la dosificación** (`SupplyRule`, que el backend arranca retirada): si está apagada en el vivero avisa «Prendé «Dosificación de insumo» en Motor de reglas…» y saltea sólo ese tramo; con la fuente en **ESP32 real** no toca ninguna regla y sólo avisa lo mismo. No espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente
   en **Simulador** genera todo: lectura (`humSus` entre el umbral crítico y el de riego, `humAmb` crítica), diagnóstico de
   IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
@@ -193,7 +193,7 @@ automática tampoco puede leer el intervalo de sensado (`configuracion.ver`) y u
 
 ## Cómo agregar el escenario de una regla
 
-Una regla del backend se **apaga** desde el panel con sólo existir (`GET /api/demo/rules` lista toda
+Una regla del backend aparece en el panel (con sus cooldowns y bypass) con sólo existir (`GET /api/demo/rules` lista toda
 pieza de decisión, también las que corren por macro-zona o como servicio). Para poder **accionarla** el
 simulador necesita su *escenario*: qué telemetría, clima y diagnóstico previo hacen que dispare en el
 siguiente pulso. Mientras no lo tenga, el panel la muestra en gris ("sin escenario").
@@ -220,7 +220,7 @@ declaran el nodo fuera de servicio y ordenan el estado seguro. Con los plazos de
 ~3 min en darse por perdido; para acortarlo, bajar `sensado.espera-respuesta` y `sensado.reintentos` en el
 dashboard. La zona sigue muda hasta pulsar «Volver a responder» (`PUT /api/silenced-zones/{zona}`), y la
 **emisión automática tiene que estar activa**: con la emisión apagada ninguna zona contesta, silenciada o no.
-Los controles de la pieza `EscalamientoNodo` (apagar, bypass `safe-state`, cooldown `retry-offline`) están en
+Los controles de la pieza `EscalamientoNodo` (bypass `safe-state`, cooldown `retry-offline`) están en
 Telemetría → Control de reglas.
 
 **Bloqueo manual (S-01).** El escenario `LOCK` (accionable sobre `ManualLockRule`) publica el sustrato seco de R-01 y
@@ -237,9 +237,10 @@ las precondiciones P-D1…P-D5 (diagnóstico vigente, intervalo y una por día, 
 de sustrato ≥ 45 %) y el stock del tanque antes de publicar la orden de bomba. Lo que no cumple queda pendiente y se reintenta.
 
 - **`SupplyRule` y `DailyDoseLimitRule` arrancan retiradas** en el backend (`yerbanalytics.reglas.retiradas`, estado operativo
-  por defecto): figuran «deshabilitadas» en la traza hasta que las reglas de aplicación de la v2 las reemplacen. Con el modo demo
-  encendido se las vuelve a encender desde Telemetría → Control de reglas (el override del simulador gana) (el happy path en modo Simulador lo hace solo).
-- **`ApplicationPreconditions`** es una pieza controlable más (Control de reglas): se apaga (no se aplica nada), se saltea cada
+  por defecto): figuran «deshabilitadas» en la traza hasta que las reglas de aplicación de la v2 las reemplacen. Para probar el tramo de insumo hay que
+  prenderlas en Motor de reglas del dashboard: la demo no las enciende (el happy path en modo Simulador avisa «Prendé «Dosificación
+  de insumo» en Motor de reglas…» y saltea sólo ese tramo).
+- **`ApplicationPreconditions`** es una pieza controlable más (Control de reglas): se saltea cada
   guarda (`diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture`, `stock`) y se acortan los intervalos
   (`interval-fertilizer`, `interval-fungicide`, en minutos; 0 los elimina).
 - El escenario **`APPLICATION_PRECONDITIONS`** es un *modificador*: no acciona una regla sino que deja cumplidas P-D3…P-D5 (`temp`
@@ -253,7 +254,7 @@ de sustrato ≥ 45 %) y el stock del tanque antes de publicar la orden de bomba.
 
 **Plan de nutrición (add-plan-nutricion · N-01 y N-02).** Son reglas **de macro-zona**: el motor las corre una vez por zona,
 después de evaluar sus sectores, en el pulso con motor. Aparecen en Telemetría → Control de reglas como cualquier otra pieza
-(`NutritionPlanRule` y `LowEcRule`, rama `INSUMO`) y se pueden apagar.
+(`NutritionPlanRule` y `LowEcRule`, rama `INSUMO`) y se apagan desde Motor de reglas.
 
 | Escenario | Qué hace | Qué se ve |
 |---|---|---|
@@ -283,7 +284,7 @@ todas inválidas y se ve el flujo entero. El backend pide hasta `seguridad.relec
 el ciclo (R-01…R-06 quedan «sin dato») y deja un `WARNING` «Lectura inválida en Humedad de sustrato». El `CRITICAL` aparece si la
 métrica vuelve a fallar en el **ciclo de lectura siguiente** (por defecto, 4 h después; dos pulsos del mismo ciclo cuentan como
 uno). No se combina con R-01…R-04, el bloqueo manual, el nodo mudo ni «Hardware incompleto». Los controles de la pieza
-`ReadingValidationGuard` (apagar, bypass `retries`) están en Telemetría → Control de reglas.
+`ReadingValidationGuard` (bypass `retries`) están en Telemetría → Control de reglas.
 
 **Hardware incompleto (S-04).** El escenario `INCOMPLETE_HARDWARE` (accionable sobre `IncompleteHardwareRule`) fija el sustrato
 seco de R-01 y le pide a la zona destino **un sector sin electroválvula registrada**: el pulso debe abortarle el riego con
@@ -293,7 +294,7 @@ la suya (el `data.sql` de desarrollo equipa pocos, así que suelen sobrar) y los
 Motor de reglas → Inspector. Si la zona no tiene ninguno, o el backend rechaza la lectura, el panel lo dice y no deja ejecutar. Necesita
 que la cuenta de rol Servicio tenga `hardware.ver` (viene en la matriz por defecto; en una base ya sembrada, correr
 `migracion-permisos-hardware-servicio.sql` del backend). No se combina con R-02, R-04, el bloqueo manual, el nodo mudo ni
-«Lectura inválida»: la causa de que no se riegue sería ambigua. Los controles de la regla (apagar, bypass `hardware`) están en
+«Lectura inválida»: la causa de que no se riegue sería ambigua. Los controles de la regla (bypass `hardware`) están en
 Telemetría → Control de reglas.
 
 **Fallas del nodo (S-05).** El ESP32 real detecta una falla, corta el actuador por su cuenta y la publica **una vez** en
@@ -316,7 +317,7 @@ y `hardware.reparar` (vienen en la matriz por defecto; en una base ya sembrada, 
 `migracion-permisos-hardware-reparar.sql` del backend). Las fallas de caudal necesitan la emisión automática activa (el sustrato viaja
 en la respuesta al pulso). No se combinan con R-02, R-04, el bloqueo manual, el nodo mudo, «Lectura inválida» ni «Hardware incompleto»
 (la falla de la mediasombra, sólo con el bloqueo, el nodo mudo y «Hardware incompleto»); «Sin caudal» y «Caudal excesivo» entre sí
-tampoco, ni ninguna falla con la reparación. Los controles de las piezas (apagar el receptor `HardwareFaultService`, bypass `fault` de
+tampoco, ni ninguna falla con la reparación. Los controles de las piezas (bypass `fault` de
 `HydraulicFaultRule` y `ShadeFaultRule`) están en Telemetría → Control de reglas.
 
 ---
