@@ -144,13 +144,24 @@ function objetivoDe(id: string, piezas: Map<string, ReglaCatalogo>): ObjetivoReg
 }
 
 /**
- * Dónde se edita un parámetro compartido: el primer grupo, en el orden de la pantalla, donde aparece uno de sus
- * consumidores. Se decide con el catálogo entero (no con lo filtrado) para que no salte de lugar al buscar.
+ * Dónde se edita un parámetro compartido: el grupo con MÁS consumidores con interruptor (los que son reglas); si
+ * empatan, el primero en el orden de la pantalla. Los consumidores sin interruptor (despacho, purga…) no votan, salvo
+ * que sean los únicos: entonces, el primer grupo donde aparece uno. Se decide con el catálogo entero (no con lo
+ * filtrado) para que no salte de lugar al buscar.
  */
 function objetivoDeCompartido(
   p: ParametroRegla,
   piezas: Map<string, ReglaCatalogo>,
 ): ObjetivoRegla | null {
+  const votos = new Map<ObjetivoRegla, number>();
+  for (const id of p.usadoPor) {
+    const o = piezas.get(id)?.objetivo;
+    if (o) votos.set(o, (votos.get(o) ?? 0) + 1);
+  }
+  if (votos.size > 0) {
+    const maximo = Math.max(...votos.values());
+    return ORDEN_OBJETIVOS.find((o) => votos.get(o) === maximo) ?? null;
+  }
   const objetivos = p.usadoPor
     .map((id) => objetivoDe(id, piezas))
     .filter((o): o is ObjetivoRegla => o !== null);

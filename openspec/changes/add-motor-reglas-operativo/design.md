@@ -290,7 +290,8 @@ Pestañas: **Reglas** (reemplaza a *Parámetros*) e **Inspector**. `?tab=` se co
 - **Umbrales en línea**: cada parámetro propio con `Field` + `InputUnit` (unidad), rango y valor de fábrica como `hint`,
   marca de modificado. Reutiliza `ParametroField`.
 - **Compartidos**: un parámetro con `usadoPor.length > 1` se edita **una sola vez**, en el bloque "Compartidos del grupo"
-  del primer grupo (en el orden de arriba) donde aparece uno de sus consumidores. En cada tarjeta que lo usa figura en
+  del grupo con **más consumidores con interruptor** (empate: el primero en el orden de arriba; los consumidores sin
+  interruptor, como el despacho, no votan salvo que sean los únicos: entonces, el primer grupo donde aparece uno). En cada tarjeta que lo usa figura en
   sólo lectura con "Compartido con N reglas" y un enlace al bloque. `riego.umbral-humedad` (R-01, R-03, R-05, R-06,
   `HardwareFaultService`) vive en Riego; los `diagnostico.*` de las F-* vivirán en Sanidad.
 - **Consumidores sin interruptor** (`DespachoRiego`, `ReadingPurge`, `PulsoSensado`, `ApplicationService`, `TankService`,
