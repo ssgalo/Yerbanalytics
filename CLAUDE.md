@@ -294,6 +294,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   base ya sembrada (la matriz sólo se siembra si está vacía).
 > - `resources/migracion-permisos-servicio-simulador.sql` — agrega `reglas.ver`, `pasadas.ver` y `pasadas.operar` al rol
 >   Servicio (catálogo y traza del motor, pulsos, secuencias y pasadas); sin ellas dan 403.
+> - `resources/migracion-permisos-simulacion-servicio.sql` — agrega `simulacion.gestionar` al rol Servicio (el simulador usa `/api/demo/**`); sin él da 403.
 > - `resources/migracion-permisos-hardware-servicio.sql` — agrega `hardware.ver` al rol Servicio (el simulador lo lee
 >   para su escenario de hardware incompleto); sólo lectura.
 > - `resources/migracion-permisos-hardware-reparar.sql` — agrega `hardware.reparar` (Ingeniero, Operario y Servicio) y

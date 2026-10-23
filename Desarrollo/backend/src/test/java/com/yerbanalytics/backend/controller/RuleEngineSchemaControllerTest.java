@@ -10,6 +10,7 @@ import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosNutricion;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.rules.IncompleteHardwareRule;
 import com.yerbanalytics.backend.engine.zone.ZoneRule;
 import com.yerbanalytics.backend.engine.zone.ZoneRuleContext;
@@ -47,6 +48,9 @@ class RuleEngineSchemaControllerTest {
 
     @MockBean
     private ZoneRuleEngine zoneRuleEngine;
+
+    @MockBean
+    private RuleOverrides overrides;
 
     private static Rule regla(String nombre, int prioridad, RuleBranch rama, DefinicionParametro... params) {
         return new Rule() {
@@ -107,6 +111,22 @@ class RuleEngineSchemaControllerTest {
                 .andExpect(jsonPath("$.nodes[?(@.id=='NutritionPlanRule')].parametros[*]", contains("nutricion.intervalo-plan")))
                 .andExpect(jsonPath("$.edges[?(@.source=='SupplyRule' && @.target=='NutritionPlanRule')]", hasSize(1)))
                 .andExpect(jsonPath("$.edges[?(@.source=='NutritionPlanRule' && @.target=='success-INSUMO')]", hasSize(1)));
+    }
+
+    @Test
+    void cadaNodoDeReglaDiceSiEstaActiva_yLosEspecialesSiempreLoEstan() throws Exception {
+        when(orchestrator.getRules()).thenReturn(List.of(
+                regla("ManualLockRule", 0, RuleBranch.GLOBAL),
+                regla("SupplyRule", 12, RuleBranch.INSUMO)));
+        when(overrides.isEnabled("ManualLockRule")).thenReturn(true);
+        when(overrides.isEnabled("SupplyRule")).thenReturn(false);
+
+        mockMvc.perform(get("/api/rules/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[?(@.id=='ManualLockRule')].activa", contains(true)))
+                .andExpect(jsonPath("$.nodes[?(@.id=='SupplyRule')].activa", contains(false)))
+                .andExpect(jsonPath("$.nodes[?(@.id=='start')].activa", contains(true)))
+                .andExpect(jsonPath("$.nodes[?(@.id=='success-INSUMO')].activa", contains(true)));
     }
 
     private static ZoneRule reglaDeZona(String nombre, int prioridad, RuleBranch rama, DefinicionParametro... params) {
