@@ -12,6 +12,7 @@ import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
@@ -298,6 +299,30 @@ public class HistorialService {
         e.setLectura(dispositivo + " con falla registrada: " + NodeErrorType.describe(falla) + ".");
         e.setDecision("Reparación registrada por " + usuario + ": " + detalle);
         e.setAccion("Falla levantada: el dispositivo vuelve a lo autónomo en el siguiente pulso.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra la revisión de un sector que había alcanzado el tope de fitosanitarios (F-06): quién la hizo, cuándo (el
+     * reloj del vivero) y qué constató. Levanta el bloqueo de la siguiente aplicación.
+     */
+    @Transactional
+    public void registrarRevisionFitosanitaria(String usuario, SectorEntity sector, String detalle) {
+        ZonaEntity zona = sector.getZona();
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(sector.getId());
+        e.setZonaId(zona.getId());
+        e.setZonaName(zona.getName() != null ? zona.getName() : zona.getId());
+        e.setTipo("Revisión");
+        e.setTs(reloj.millis());
+        e.setLectura("Sector con el tope de fitosanitarios alcanzado.");
+        e.setDecision("Revisión registrada por " + usuario + ": " + detalle);
+        e.setAccion("Bloqueo levantado: el sector puede recibir fitosanitarios otra vez.");
         e.setRes("Efectiva");
         e.setSev(EMDASH);
         e.setEvoShow(false);

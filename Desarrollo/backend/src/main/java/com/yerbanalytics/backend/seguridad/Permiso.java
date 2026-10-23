@@ -43,7 +43,7 @@ public enum Permiso {
     BLOQUEOS_VER("bloqueos.ver", "Bloqueo manual", "Ver los bloqueos manuales vigentes", null),
     BLOQUEOS_GESTIONAR("bloqueos.gestionar", "Bloqueo manual", "Bloquear y reanudar la actuación autónoma", BLOQUEOS_VER),
     INSUMOS_VER("insumos.ver", "Insumos", "Ver los tanques de insumo y su stock", null),
-    INSUMOS_GESTIONAR("insumos.gestionar", "Insumos", "Registrar la carga de los tanques de insumo", INSUMOS_VER),
+    INSUMOS_GESTIONAR("insumos.gestionar", "Insumos", "Registrar la carga de los tanques y la revisión de un sector que alcanzó el tope de fitosanitarios", INSUMOS_VER),
     DEMO_EXPO_CONFIGURAR("demo-expo.configurar", "Demo Expo", "Mostrar u ocultar la pestaña Demo Expo", null),
     SIMULACION_GESTIONAR("simulacion.gestionar", "Simulación", "Controlar reglas, cooldowns y clima en modo demo", null),
     USUARIOS_GESTIONAR("usuarios.gestionar", "Seguridad", "Usuarios, matriz de permisos y política de sesión", null),
