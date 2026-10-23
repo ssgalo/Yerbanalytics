@@ -90,6 +90,21 @@ class HistorialServiceReglasInactivasTest {
     }
 
     @Test
+    @DisplayName("una aplicación con seguimiento de efectividad (E-02, E-03) guarda las piezas apagadas")
+    void unTratamientoConSeguimientoLoGuarda() {
+        when(overrides.inactiveNames()).thenReturn(Set.of("IneffectiveActionRule"));
+        var followUp = new com.yerbanalytics.backend.effectiveness.FollowUp(
+                com.yerbanalytics.backend.effectiveness.EffectivenessKind.FUNGICIDE,
+                new com.yerbanalytics.backend.effectiveness.TreatmentBaseline("Daño fúngico", null, Set.of()));
+
+        service.registrarInsumo(sector, 10, "Fungicida", "FungalDamageRule", followUp);
+
+        HistorialEventoEntity e = guardado();
+        assertThat(e.getReglasInactivas()).isEqualTo("IneffectiveActionRule");
+        assertThat(e.getEfectividadTipo()).isEqualTo("FUNGICIDE");
+    }
+
+    @Test
     @DisplayName("un evento que no es una decisión del motor no lo guarda")
     void lasConfiguracionesNoLoGuardan() {
         when(overrides.inactiveNames()).thenReturn(Set.of("SupplyRule"));
