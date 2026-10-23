@@ -1,12 +1,14 @@
 package com.yerbanalytics.backend.engine.zone;
 
 import com.yerbanalytics.backend.engine.DetalleAlerta;
+import com.yerbanalytics.backend.engine.DetalleMediasombra;
 import com.yerbanalytics.backend.engine.DetalleNutritionPlan;
 import com.yerbanalytics.backend.engine.DetalleOutbreakTreatment;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.nutrition.NutritionPlanService;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.service.HistorialService;
+import com.yerbanalytics.backend.mediasombra.MediasombraService;
 import com.yerbanalytics.backend.supply.ApplicationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +25,8 @@ import java.util.List;
  *   <li>{@code ACTIVAR_BOMBA}: el tratamiento de un sector que decidió una regla de zona (el foco, F-04). Se le pide al
  *       {@link ApplicationService}, que verifica las precondiciones, publica la orden y descuenta el tanque. Sin
  *       {@code P-D1}: los lindantes de un foco no tienen diagnóstico.</li>
+ *   <li>{@code MOVER_MEDIASOMBRA}: la orden a la malla de la zona la publica el {@link MediasombraService}.</li>
+ *   <li>{@code ABORT_MEDIASOMBRA}: el corte ya lo aplicó el {@link ZoneRuleEngine}; acá sólo se loguea.</li>
  *   <li>{@code ALERTA}: se persiste como evento «Alerta» de la macro-zona. Sin deduplicación por ciclo: una regla de
  *       zona se evalúa una vez por pulso y sólo alerta al cambiar de estado (principio 8 de la v2).</li>
  *   <li>{@code NOOP_INFO}: no se persiste. A diferencia del sector, la zona no tiene fila de historial que hable por ella
@@ -37,12 +41,14 @@ public class ZoneActionExecutor {
     private final NutritionPlanService nutritionPlan;
     private final HistorialService history;
     private final ApplicationService applications;
+    private final MediasombraService mediasombra;
 
     public ZoneActionExecutor(NutritionPlanService nutritionPlan, HistorialService history,
-                              ApplicationService applications) {
+                              ApplicationService applications, MediasombraService mediasombra) {
         this.nutritionPlan = nutritionPlan;
         this.history = history;
         this.applications = applications;
+        this.mediasombra = mediasombra;
     }
 
     public void execute(List<RuleAction> actions, ZoneRuleContext ctx) {
@@ -66,6 +72,15 @@ public class ZoneActionExecutor {
                         log.warn("Zona {}: ALERTA de {} sin detalle: se ignora.", ctx.zone().getId(), action.ruleName());
                     }
                 }
+                case MOVER_MEDIASOMBRA -> {
+                    if (action.detalle() instanceof DetalleMediasombra posicion) {
+                        mediasombra.mover(ctx.zone(), posicion.abrir(), action.ruleName(), action.motivo());
+                    } else {
+                        log.warn("Zona {}: MOVER_MEDIASOMBRA de {} sin posición: no se mueve.",
+                                ctx.zone().getId(), action.ruleName());
+                    }
+                }
+                case ABORT_MEDIASOMBRA -> log.debug("Zona {}: ABORT_MEDIASOMBRA — {}", ctx.zone().getId(), action.motivo());
                 case NOOP_INFO -> log.debug("Zona {}: NOOP_INFO — {}", ctx.zone().getId(), action.motivo());
                 default -> log.warn("Zona {}: una regla de zona emitió {}, que no ejecuta: se ignora.",
                         ctx.zone().getId(), action.type());

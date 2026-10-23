@@ -28,7 +28,7 @@ class RuleContextFaultsTest {
     @Test
     @DisplayName("las fallas dadas se conservan, también al cambiar los overrides")
     void seConservan() {
-        HardwareFaults faults = new HardwareFaults("SIN_CAUDAL", "MEDIASOMBRA_FIN_DE_CARRERA");
+        HardwareFaults faults = new HardwareFaults("SIN_CAUDAL");
 
         assertThat(con(faults).faults()).isEqualTo(faults);
         assertThat(con(faults).withOverrides(RuleOverrides.NONE).faults()).isEqualTo(faults);
@@ -47,13 +47,10 @@ class RuleContextFaultsTest {
     }
 
     @Test
-    @DisplayName("HardwareFaults distingue la falla hidráulica del sector de la de la malla de la zona")
+    @DisplayName("HardwareFaults: la falla hidráulica del sector (la de la malla es de la zona)")
     void alcances() {
         assertThat(HardwareFaults.NONE.hasHydraulic()).isFalse();
-        assertThat(HardwareFaults.NONE.hasShade()).isFalse();
-        assertThat(new HardwareFaults("SIN_CAUDAL", null).hasHydraulic()).isTrue();
-        assertThat(new HardwareFaults("SIN_CAUDAL", null).hasShade()).isFalse();
-        assertThat(new HardwareFaults(null, "MEDIASOMBRA_FIN_DE_CARRERA").hasShade()).isTrue();
-        assertThat(new HardwareFaults(" ", null).hasHydraulic()).as("una falla en blanco no es una falla").isFalse();
+        assertThat(new HardwareFaults("SIN_CAUDAL").hasHydraulic()).isTrue();
+        assertThat(new HardwareFaults(" ").hasHydraulic()).as("una falla en blanco no es una falla").isFalse();
     }
 }

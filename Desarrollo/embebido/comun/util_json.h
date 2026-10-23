@@ -19,10 +19,11 @@ size_t serializarTelemetria(const PaqueteTelemetria& p, char* buf, size_t n);
 bool parsearComando(const char* payload, unsigned int len, Comando& out);
 
 // Resultado de parsear un comando de zona (nursery/zone/{zona}/command).
-enum class ResultadoComandoZona { LEER_AHORA, ACCION_DESCONOCIDA, INVALIDO };
+enum class ResultadoComandoZona { LEER_AHORA, ACTUADOR, ACCION_DESCONOCIDA, INVALIDO };
 
 // Parsea un comando de zona. 'commandId' (>= 40 bytes) recibe el id para el log ("" si no vino).
-// Hoy la única acción válida es LEER_AHORA (sin distinguir mayúsculas).
+// LEER_AHORA (sin distinguir mayúsculas) o ACTUADOR: trae "actuador" (hoy sólo la mediasombra, que es de la
+// macro-zona), y se parsea como un comando de actuador con parsearComando.
 ResultadoComandoZona parsearComandoZona(const char* payload, unsigned int len, char* commandId, size_t n);
 
 // Serializa un Ack (status SUCCESS/ERROR + detalle). Escribe en buf.

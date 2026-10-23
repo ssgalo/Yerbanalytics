@@ -20,6 +20,7 @@ import {
   ackTopic,
   errorsTopic,
   isReadNow,
+  isZoneShadeCommand,
   parseCommandTopic,
   parseZoneCommandTopic,
   telemetryTopicFor,
@@ -37,7 +38,10 @@ import { listSensors } from './store.ts';
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
 const COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/sector/+/command';
 
-/** Wildcard topic for zone-level commands (LEER_AHORA). Mirrors contrato.h :: contratoTopicComandoZona. */
+/**
+ * Wildcard topic for zone-level commands: LEER_AHORA and the shade mesh's `shade SET` (the mesh is the macro-zone's).
+ * Mirrors contrato.h :: contratoTopicComandoZona.
+ */
 const ZONE_COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/command';
 
 /** How long to wait for a publish acknowledgement before giving up. */
@@ -139,7 +143,10 @@ export function connect(): void {
   });
 }
 
-/** Routes a zone-level command: a LEER_AHORA is answered by the emission; anything else is ignored. */
+/**
+ * Routes a zone-level command: a LEER_AHORA is answered by the emission; a `shade SET` goes to the simulated node of the
+ * zone, which acks it on the zone ack topic (the mesh has no sector); anything else is ignored.
+ */
 function handleZoneCommand(topic: string, message: Buffer): void {
   const target = parseZoneCommandTopic(topic);
   if (!target) return;
@@ -148,6 +155,17 @@ function handleZoneCommand(topic: string, message: Buffer): void {
     payload = JSON.parse(message.toString());
   } catch {
     console.warn(`[simulator] ← ZONE COMMAND topic=${topic} (unparseable payload, ignored)`);
+    return;
+  }
+  if (isZoneShadeCommand(payload)) {
+    console.log(
+      `[simulator] ← COMMAND topic=${topic} actuador=shade accion=${payload.accion ?? '?'}` +
+        (payload.parametros ? ' params=' + JSON.stringify(payload.parametros) : '') +
+        ` commandId=${payload.commandId ?? '?'}`,
+    );
+    if (listSensors().some((s) => s.zonaId === target.zonaId)) {
+      simulatedNodes.receive(target.zonaId, '', payload);
+    }
     return;
   }
   if (!isReadNow(payload)) {

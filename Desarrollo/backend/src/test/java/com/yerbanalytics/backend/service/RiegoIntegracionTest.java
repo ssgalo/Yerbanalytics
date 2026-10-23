@@ -160,7 +160,7 @@ class RiegoIntegracionTest {
                 new PosponerPorLluviaRule(), new RiegoPorDeficitRule()));
         TrazaEvaluacionStore trazas = new TrazaEvaluacionStore();
         RuleOrchestrator orquestador = new RuleOrchestrator(reglas, catalogo, trazas);
-        ActionExecutor executor = new ActionExecutor(historialService, publisher, cola, mock(com.yerbanalytics.backend.supply.ApplicationService.class));
+        ActionExecutor executor = new ActionExecutor(historialService, cola, mock(com.yerbanalytics.backend.supply.ApplicationService.class));
         ManualLockRepository bloqueos = mock(ManualLockRepository.class);
         clima = mock(WeatherService.class);                // sin pronóstico, como el primer mensaje tras arrancar
         ConfiguracionService configuracion = mock(ConfiguracionService.class);

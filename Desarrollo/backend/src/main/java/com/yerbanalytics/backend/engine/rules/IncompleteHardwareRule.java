@@ -26,12 +26,12 @@ import java.util.Set;
  *   <li><b>Riego:</b> la electroválvula del sector y el nodo testigo de su macro-zona (sin él no hay humedad).</li>
  *   <li><b>Insumos:</b> la bomba peristáltica del sector. El hardware admite una sola por sector; cuando
  *       {@code add-dosificacion-base} registre una por insumo, exigirá todas.</li>
- *   <li><b>Mediasombra:</b> al menos una registrada en algún sector de la macro-zona (la v2 la exige por MZ; el
- *       hardware las registra por sector).</li>
  * </ul>
  *
- * <p><b>Acciones:</b> aborta sólo la rama a la que le falta algo ({@code ABORT_RIEGO}, {@code ABORT_INSUMO},
- * {@code ABORT_MEDIASOMBRA}), nunca {@code ABORT_ALL}: un sector sin bomba sí puede regarse. Sin falta, {@code NOOP_INFO}.
+ * <p>La mediasombra es de la macro-zona: si falta, lo ve la regla de zona {@code ShadeFaultRule}, no ésta.
+ *
+ * <p><b>Acciones:</b> aborta sólo la rama a la que le falta algo ({@code ABORT_RIEGO}, {@code ABORT_INSUMO}),
+ * nunca {@code ABORT_ALL}: un sector sin bomba sí puede regarse. Sin falta, {@code NOOP_INFO}.
  * No emite alertas: ya se avisó al configurar el hardware. No lleva marca de cancelación del riego encolado: la
  * solicitud ya decidida vence sola a los dos ciclos y el despacho la revalida.
  *
@@ -84,10 +84,6 @@ public class IncompleteHardwareRule implements Rule {
         if (!ev.compararFijo("Bomba peristáltica del sector mapeada", hardware.canDose(), Operador.EQ, true)) {
             aborts.add(RuleAction.of(ActionType.ABORT_INSUMO, NAME, "Hardware incompleto: el sector " + sectorId
                     + " no tiene bomba peristáltica registrada. La dosificación autónoma del sector queda anulada."));
-        }
-        if (!ev.compararFijo("Mediasombra de la macro-zona mapeada", hardware.canShade(), Operador.EQ, true)) {
-            aborts.add(RuleAction.of(ActionType.ABORT_MEDIASOMBRA, NAME, "Hardware incompleto: ningún sector de la "
-                    + "macro-zona del sector " + sectorId + " tiene mediasombra registrada. El control de la malla queda anulado."));
         }
 
         return aborts.isEmpty()

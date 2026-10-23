@@ -16,7 +16,9 @@ describe('plan de rustificación', () => {
     expect(progreso(plan, '2026-09-29')).toMatchObject({ dia: 0, faltan: 2, etapa: null, terminado: false });
     expect(progreso(plan, '2026-10-01')).toMatchObject({ dia: 1, etapa: { orden: 1 } });
     expect(progreso(plan, '2026-10-08')).toMatchObject({ dia: 8, etapa: { orden: 2 } });
-    expect(progreso(plan, '2026-10-15')).toMatchObject({ dia: 14, etapa: null, terminado: true });
+    // Pasada la última etapa, la última se sostiene hasta que se elimine el plan.
+    expect(progreso(plan, '2026-10-15')).toMatchObject({ dia: 14, etapa: { orden: 2 }, terminado: true });
+    expect(progreso(plan, '2026-12-31')).toMatchObject({ etapa: { orden: 2 }, terminado: true });
   });
 
   it('valida fecha, duración y horario de cada etapa', () => {

@@ -122,7 +122,7 @@ class NurseryServiceZoneRulesTest {
         telemetry();
 
         verify(zoneRules).evaluate(eq(zone), eq(sectors), eq(NOW), eq(Map.of("MZ-1-001", HardwareCoverage.COMPLETE)),
-                eq(Map.of("MZ-1-001", HardwareFaults.NONE)));
+                eq(Map.of("MZ-1-001", HardwareFaults.NONE)), any(), any());
     }
 
     @Test
@@ -133,7 +133,7 @@ class NurseryServiceZoneRulesTest {
 
         telemetry();
 
-        verify(zoneRules, never()).evaluate(any(), any(), any(), any(), any());
+        verify(zoneRules, never()).evaluate(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -143,7 +143,7 @@ class NurseryServiceZoneRulesTest {
 
         telemetry();
 
-        verify(zoneRules, never()).evaluate(any(), any(), any(), any(), any());
+        verify(zoneRules, never()).evaluate(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

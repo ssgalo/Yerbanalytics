@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
+import com.yerbanalytics.backend.mediasombra.MediasombraService;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher.Resultado;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.model.DispositivoEntity;
@@ -38,6 +39,7 @@ class ZoneSafeStateTest {
     private DispositivoRepository devices;
     private ComandoActuadorPublisher publisher;
     private ZoneSafeState safeState;
+    private MediasombraService mediasombra;
 
     private static SectorEntity sector(String id) {
         SectorEntity s = new SectorEntity();
@@ -60,34 +62,62 @@ class ZoneSafeStateTest {
         publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(anyString(), anyString(), anyString(), anyString(), any()))
                 .thenReturn(new Resultado(true, "c", null));
+        when(publisher.publicarZona(anyString(), anyString(), anyString(), any()))
+                .thenReturn(new Resultado(true, "c", null));
         when(sectors.findByZonaId("MZ-2")).thenReturn(List.of(sector("MZ-2-001"), sector("MZ-2-002")));
-        safeState = new ZoneSafeState(sectors, new ActuatorShutdown(devices, publisher));
+        mediasombra = mock(MediasombraService.class);
+        safeState = new ZoneSafeState(sectors, new ActuatorShutdown(devices, publisher, mediasombra));
     }
 
+    /** Equipos registrados: los de sector van por sector; la mediasombra, por la zona (como el nodo testigo). */
     private void registered(DispositivoEntity... registered) {
-        when(devices.findBySectorIdInAndTipoIn(anyCollection(), anyCollection())).thenReturn(List.of(registered));
+        List<DispositivoEntity> deSector = java.util.Arrays.stream(registered)
+                .filter(d -> !HardwareService.MEDIASOMBRA.equals(d.getTipo())).toList();
+        List<DispositivoEntity> mallas = java.util.Arrays.stream(registered)
+                .filter(d -> HardwareService.MEDIASOMBRA.equals(d.getTipo())).toList();
+        when(devices.findBySectorIdInAndTipoIn(anyCollection(), anyCollection())).thenReturn(deSector);
+        when(devices.findByZonaIdAndTipo("MZ-2", HardwareService.MEDIASOMBRA)).thenReturn(mallas);
+    }
+
+    private static DispositivoEntity mallaDeZona() {
+        DispositivoEntity d = new DispositivoEntity();
+        d.setId("DEV-012");
+        d.setTipo(HardwareService.MEDIASOMBRA);
+        d.setZonaId("MZ-2");
+        return d;
     }
 
     @Test
-    @DisplayName("cierra la válvula, detiene la bomba y cierra la mediasombra de cada sector con ese equipo registrado")
+    @DisplayName("cierra la válvula y detiene la bomba de cada sector con ese equipo, y cierra la mediasombra de la zona")
     void ordersEveryRegisteredActuator() {
         registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
                 device(HardwareService.BOMBA, "MZ-2-001"),
-                device(HardwareService.MEDIASOMBRA, "MZ-2-002"));
+                mallaDeZona());
 
         ActuatorShutdown.Result result = safeState.order("MZ-2");
 
         verify(publisher).publicar("MZ-2", "MZ-2-001", "valve", "OFF", Map.of());
         verify(publisher).publicar("MZ-2", "MZ-2-001", "pump", "OFF", Map.of());
-        verify(publisher).publicar("MZ-2", "MZ-2-002", "shade", "SET",
-                Map.of("targetPct", 0, "prioridad", "INMEDIATA"));
+        verify(publisher).publicarZona("MZ-2", "shade", "SET", Map.of("targetPct", 0, "prioridad", "INMEDIATA"));
+        verify(mediasombra).registrarPosicion("MZ-2", false);
         assertThat(result).isEqualTo(new ActuatorShutdown.Result(3, 0));
+    }
+
+    @Test
+    @DisplayName("una zona sin mediasombra registrada no recibe orden de malla")
+    void withoutAShadeNoShadeOrder() {
+        registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"));
+
+        safeState.order("MZ-2");
+
+        verify(publisher, never()).publicarZona(anyString(), anyString(), anyString(), any());
+        verify(mediasombra, never()).registrarPosicion(anyString(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
     @DisplayName("publica los OFF primero y la mediasombra al final, aunque el repositorio la devuelva antes; la malla va con prioridad INMEDIATA")
     void closesWaterFirstAndShadeLastWithPriority() {
-        registered(device(HardwareService.MEDIASOMBRA, "MZ-2-002"),
+        registered(mallaDeZona(),
                 device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
                 device(HardwareService.BOMBA, "MZ-2-001"),
                 device(HardwareService.ELECTROVALVULA, "MZ-2-002"));
@@ -98,13 +128,13 @@ class ZoneSafeStateTest {
         orden.verify(publisher, org.mockito.Mockito.times(3))
                 .publicar(anyString(), anyString(), org.mockito.ArgumentMatchers.argThat(a -> !"shade".equals(a)),
                         eq("OFF"), any());
-        orden.verify(publisher).publicar("MZ-2", "MZ-2-002", "shade", "SET",
+        orden.verify(publisher).publicarZona("MZ-2", "shade", "SET",
                 Map.of(ContratoNodo.PARAM_PRIORIDAD, ContratoNodo.PRIORIDAD_INMEDIATA, "targetPct", 0));
         orden.verifyNoMoreInteractions();
     }
 
     @Test
-    @DisplayName("busca los equipos sólo entre los sectores de la zona y sólo de los tres tipos de actuador")
+    @DisplayName("busca válvulas y bombas sólo entre los sectores de la zona; la malla, por la zona")
     void looksOnlyAtTheZoneActuators() {
         registered();
 
@@ -116,8 +146,8 @@ class ZoneSafeStateTest {
         ArgumentCaptor<Collection<String>> types = ArgumentCaptor.forClass(Collection.class);
         verify(devices).findBySectorIdInAndTipoIn(ids.capture(), types.capture());
         assertThat(ids.getValue()).containsExactlyInAnyOrder("MZ-2-001", "MZ-2-002");
-        assertThat(types.getValue()).containsExactlyInAnyOrder(
-                HardwareService.ELECTROVALVULA, HardwareService.BOMBA, HardwareService.MEDIASOMBRA);
+        assertThat(types.getValue()).containsExactlyInAnyOrder(HardwareService.ELECTROVALVULA, HardwareService.BOMBA);
+        verify(devices).findByZonaIdAndTipo("MZ-2", HardwareService.MEDIASOMBRA);
     }
 
     @Test
@@ -145,11 +175,10 @@ class ZoneSafeStateTest {
     @Test
     @DisplayName("una orden que no sale se cuenta como fallida y no frena a las demás")
     void aFailedOrderDoesNotStopTheRest() {
-        registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
-                device(HardwareService.MEDIASOMBRA, "MZ-2-002"));
+        registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"), mallaDeZona());
         when(publisher.publicar(eq("MZ-2"), eq("MZ-2-001"), eq("valve"), anyString(), any()))
                 .thenReturn(new Resultado(false, "c", "broker caído"));
-        when(publisher.publicar(eq("MZ-2"), eq("MZ-2-002"), eq("shade"), anyString(), any()))
+        when(publisher.publicarZona(eq("MZ-2"), eq("shade"), anyString(), any()))
                 .thenThrow(new RuntimeException("explotó"));
 
         ActuatorShutdown.Result result = safeState.order("MZ-2");
@@ -165,9 +194,8 @@ class ZoneSafeStateTest {
                 Clock.systemUTC(), 90_000L, mock(org.springframework.context.ApplicationEventPublisher.class));
         ComandoActuadorPublisher real = new ComandoActuadorPublisher(
                 mock(MqttCommandGateway.class), new ObjectMapper(), followUp);
-        ZoneSafeState withFollowUp = new ZoneSafeState(sectors, new ActuatorShutdown(devices, real));
-        registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"),
-                device(HardwareService.MEDIASOMBRA, "MZ-2-002"));
+        ZoneSafeState withFollowUp = new ZoneSafeState(sectors, new ActuatorShutdown(devices, real, mock(MediasombraService.class)));
+        registered(device(HardwareService.ELECTROVALVULA, "MZ-2-001"), mallaDeZona());
 
         withFollowUp.order("MZ-2");
 

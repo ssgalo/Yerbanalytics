@@ -50,6 +50,16 @@ public class ConfiguracionOperativaEntity {
     @Column(name = "pasada_diaria_hora", length = 5)
     private String pasadaDiariaHora;
 
+    /**
+     * Horario por defecto de la mediasombra (hora local del vivero, {@code HH:mm}): abierta de una a otra, cerrada el
+     * resto del día, en las macro-zonas sin plan de rustificación. Nullables: se leen como los de fábrica.
+     */
+    @Column(name = "mediasombra_abierta_desde", length = 5)
+    private String mediasombraAbiertaDesde;
+
+    @Column(name = "mediasombra_abierta_hasta", length = 5)
+    private String mediasombraAbiertaHasta;
+
     // --- Auditoría (HU-15 CA-02) ---
     @Column(name = "updated_by")
     private String updatedBy;

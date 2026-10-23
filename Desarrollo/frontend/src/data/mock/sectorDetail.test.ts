@@ -12,6 +12,18 @@ const filaValvula = (valve: string) => {
   return buildSectorDetail(sector, zona.lectura).actsRows[0];
 };
 
+describe('buildSectorDetail · mediasombra de la macro-zona', () => {
+  const { zonas } = buildNursery(SEED);
+  const fila = (pos: 'abierta' | 'cerrada' | null) =>
+    buildSectorDetail(zonas[0].sectors[0], zonas[0].lectura, undefined, null, pos).actsRows[2];
+
+  it('muestra la posición de la malla de su zona, no una apertura del sector', () => {
+    expect(fila('abierta')).toMatchObject({ name: 'Mediasombra (de la macro-zona)', state: 'Abierta', active: true });
+    expect(fila('cerrada')).toMatchObject({ state: 'Cerrada', active: false });
+    expect(fila(null).state).toBe('Sin órdenes');
+  });
+});
+
 describe('buildSectorDetail · estado de la válvula (13.5)', () => {
   it('"En cola" se muestra tal cual, sin pasar por abierta ni por cerrada', () => {
     const fila = filaValvula('En cola');

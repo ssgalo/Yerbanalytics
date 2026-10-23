@@ -50,14 +50,14 @@ class IncompleteHardwareRuleTest {
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);
         assertThat(acciones.get(0).motivo()).containsIgnoringCase("completo");
-        assertThat(ev.comparaciones()).hasSize(3)
+        assertThat(ev.comparaciones()).hasSize(2)
                 .allSatisfy(c -> assertThat(c.resultado()).isEqualTo(ResultadoComparacion.CUMPLE));
     }
 
     @Test
     @DisplayName("sector sin electroválvula → ABORT_RIEGO 'hardware incompleto'; no toca insumos ni mediasombra")
     void sinElectrovalvula() {
-        List<RuleAction> acciones = rule.evaluate(ctx(new HardwareCoverage(false, true, true, true)), ev(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx(new HardwareCoverage(false, true, true)), ev(rule));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
         assertThat(acciones.get(0).motivo()).containsIgnoringCase("hardware incompleto")
@@ -67,7 +67,7 @@ class IncompleteHardwareRuleTest {
     @Test
     @DisplayName("zona sin nodo testigo → ABORT_RIEGO (sin lectura no hay con qué regar), con el motivo correcto")
     void sinNodoTestigo() {
-        List<RuleAction> acciones = rule.evaluate(ctx(new HardwareCoverage(true, true, false, true)), ev(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx(new HardwareCoverage(true, true, false)), ev(rule));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO);
         assertThat(acciones.get(0).motivo()).containsIgnoringCase("nodo testigo");
@@ -76,20 +76,14 @@ class IncompleteHardwareRuleTest {
     @Test
     @DisplayName("sector sin bomba → ABORT_INSUMO; el riego del sector sí procede")
     void sinBomba() {
-        assertThat(tipos(new HardwareCoverage(true, false, true, true))).containsExactly(ActionType.ABORT_INSUMO);
+        assertThat(tipos(new HardwareCoverage(true, false, true))).containsExactly(ActionType.ABORT_INSUMO);
     }
 
     @Test
-    @DisplayName("zona sin mediasombra → ABORT_MEDIASOMBRA; riego e insumos no se tocan")
-    void sinMediasombra() {
-        assertThat(tipos(new HardwareCoverage(true, true, true, false))).containsExactly(ActionType.ABORT_MEDIASOMBRA);
-    }
-
-    @Test
-    @DisplayName("sin nada mapeado se abortan las tres ramas, nunca ABORT_ALL")
+    @DisplayName("sin nada mapeado se abortan riego e insumos, nunca ABORT_ALL (la malla es de la zona)")
     void sinNada() {
         assertThat(tipos(HardwareCoverage.NONE))
-                .containsExactly(ActionType.ABORT_RIEGO, ActionType.ABORT_INSUMO, ActionType.ABORT_MEDIASOMBRA)
+                .containsExactly(ActionType.ABORT_RIEGO, ActionType.ABORT_INSUMO)
                 .doesNotContain(ActionType.ABORT_ALL);
     }
 
@@ -105,10 +99,10 @@ class IncompleteHardwareRuleTest {
     void trazaPorAlcance() {
         Evaluacion ev = ev(rule);
 
-        rule.evaluate(ctx(new HardwareCoverage(true, false, true, true)), ev);
+        rule.evaluate(ctx(new HardwareCoverage(true, false, true)), ev);
 
         assertThat(ev.comparaciones()).extracting(c -> c.resultado()).containsExactly(
-                ResultadoComparacion.CUMPLE, ResultadoComparacion.NO_CUMPLE, ResultadoComparacion.CUMPLE);
+                ResultadoComparacion.CUMPLE, ResultadoComparacion.NO_CUMPLE);
     }
 
     @Test

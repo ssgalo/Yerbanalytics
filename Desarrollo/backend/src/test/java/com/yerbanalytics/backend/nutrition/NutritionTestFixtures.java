@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
 final class NutritionTestFixtures {
 
     static final Instant NOW = Instant.parse("2026-10-22T10:00:00Z");
-    static final HardwareCoverage WITH_PUMP = new HardwareCoverage(true, true, true, true);
+    static final HardwareCoverage WITH_PUMP = new HardwareCoverage(true, true, true);
 
     private NutritionTestFixtures() {
     }
