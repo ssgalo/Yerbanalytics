@@ -283,6 +283,22 @@ fitosanitarios (F-06) es una precondición más de `ApplicationPreconditions`. T
   en «Lecturas fijadas».
 - Los lindantes de `OUTBREAK` salen de la disposición por fila de la topología (`sectoresPorFila`): es un supuesto a validar con el vivero (ver el README del backend).
 
+**Clorosis y estrés solar (add-reglas-clorosis-estres-solar · F-C1, F-C2, F-S1 y F-S3).** Cuatro reglas **de sector** que actúan una vez por
+diagnóstico nuevo (`ChlorosisNonNutritionalRule`, `ChlorosisNutritionalRule`, `SolarStressRule`, `SolarStressUnexplainedRule`); aparecen en Telemetría →
+Control de reglas y se pueden apagar. **F-S2 (estrés solar extendido, malla de la zona) no está implementada**, así que no hay escenario `SOLAR_STRESS_WIDE`.
+
+| Escenario | Qué hace | Qué se ve |
+|---|---|---|
+| `CHLOROSIS_NUTRITIONAL` «Clorosis nutricional (F-C2)» | Registra *Clorosis* de severidad Media y fija sustrato 60 %, CE 0,8 dS/m y pH 5,5 en la **respuesta al pulso**; asegura stock en los tanques y lleva los cooldowns a 0 | Ninguna causa descarta el fertilizante: el pulso lo pide para el sector y deja un `WARNING`. Se aplica en su próxima ventana apta (combinalo con «Precondiciones de aplicación» y el bypass `window`) |
+| `CHLOROSIS_NON_NUTRITIONAL` «Clorosis con causa no nutricional (F-C1)» | Registra el mismo diagnóstico y fija el pH en el umbral `clorosis.ph-ferrica` + 0,3 (6,8 de fábrica), con el resto normal | F-C1 corta la rama de insumos del sector: **no se aplica fertilizante** y queda un `WARNING` «…clorosis férrica por pH alto…». En la traza F-C2 figura omitida por F-C1 |
+| `SOLAR_STRESS` «Estrés solar con radiación alta (F-S1)» | Registra *Estrés solar* Media y fija luz 88 % (umbral `estres.luz-alta` + 8) y sustrato 50 % (sobre el umbral de riego y bajo el de reposición); activa los bypasses `window` y `samples` de `SolarStressRule` y lleva los cooldowns a 0 | El pulso riega el sector con el volumen de la fórmula (R-01) y deja un `WARNING`. R-01 no actúa: el sustrato está sobre su umbral |
+| `SOLAR_STRESS_UNEXPLAINED` «Estrés solar sin radiación alta (F-S3)» | Registra *Estrés solar* Media y fija luz 40 % y 24 °C; activa el bypass `samples` de `SolarStressUnexplainedRule` | No se riega ni se mueve la malla: sólo queda el `WARNING` «Síntoma no explicado por radiación…». El aviso figura en la rama de seguimiento del Inspector |
+
+- Los cuatro **no se combinan con «Nodo sin respuesta» ni con «Bloqueo manual»**, ni entre sí ni con los demás escenarios que registran su propio diagnóstico (un
+  sector tiene un solo diagnóstico). `SOLAR_STRESS` tampoco con `R01`, `R02`, `R04` ni `FUNGAL_CONDITION`: necesita el sustrato apenas bajo el nivel de reposición.
+- Las lecturas viajan en la **respuesta al pulso** (`pinnedReadings`): la emisión automática tiene que estar activa y, al terminar, soltá la zona en «Lecturas fijadas».
+- `bypassRules` se **suman** a los que el operador ya tenía activos y necesitan el backend en modo demo (`src/bypassFlow.ts`).
+
 **Lecturas fijadas.** La respuesta a un `LEER_AHORA` es la lectura con la que decide el motor, y la emisión automática la
 arma al azar: una lectura que el escenario publicó antes del pulso queda pisada por ella. Por eso un escenario puede pedir
 `pinnedReadings`: métricas que viajan en **cada** respuesta de la zona destino (`PUT /api/pinned-readings/{zona}`, en memoria,

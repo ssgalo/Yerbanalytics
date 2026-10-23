@@ -50,3 +50,32 @@ se "arregle" sin querer.
 | `estres.luz-baja` / `estres.temp-baja` | 60 % / 30 °C | 40–80 / 25–32 |
 | `estres.pct-sectores-mz` / `estres.dias-proteccion` | 10 % / 3 d | 5–50 / 1–7 |
 Restricción cruzada: luz-baja < luz-alta; temp-baja < temp-alta.
+
+## Decisiones tomadas al implementar
+
+Los nombres de clases y métodos de la spec ya estaban en inglés y se mantienen. Todo vive en `chlorosis/` (F-C1, F-C2) y `solarstress/` (F-S1, F-S3), más
+`hardening/` para la rustificación.
+
+- **F-S2 no se implementa.** Depende de `add-mediasombra-v2` (cancelado): «la mediasombra de la MZ queda cerrada de 11:00 a 16:00 durante 3 días» necesita quien
+  retenga la malla por horario. Hoy sólo `ShadingRule` la mueve, sector por sector, en cada pulso (cada 4 h) por el pico de UV o por el plan global, así que una
+  versión parcial cerraría la malla a destiempo (el pulso de las 10 h es antes de las 11 y el de las 14 h la cerraría hasta las 18 h) o la dejaría cerrada. Se necesita un
+  dueño de la malla (estado de protección por zona + un planificador horario + que `ShadingRule` lo respete), que es justo lo que ese cambio iba a crear. Quedan sin hacer
+  `estres.pct-sectores-mz`, `estres.dias-proteccion`, el escenario `SOLAR_STRESS_WIDE` y las llaves `protection` y `quorum`. **D-5 queda sin objeto.**
+- **D-2, F-C1 decide y F-C2 ejecuta**: F-C1 emite `ABORT_INSUMO` + `WARNING`; el detalle `CancelPendingApplication` retira además el pedido de F-C2 que hubiera quedado
+  pendiente (el `ActionExecutor` llama a `ApplicationService.cancelPending(sector, insumo, regla)`, que sólo borra si el pedido es de esa regla).
+- **D-3, rustificación**: en lugar de dejar la condición en falso se usa el plan **global** (fecha de siembra + etapas de `rustificacion_etapa`, el mismo dato que lee
+  `ShadingRule`) detrás de la interfaz `HardeningPhase`; «en curso o finalizado» = desde el primer día de la primera etapa. Sin fecha de siembra, con una ilegible o sin
+  etapas no cuenta. Cuando llegue el plan por macro-zona se reemplaza la implementación.
+- **Compuerta del diagnóstico compartida**: `engine/DiagnosisGate` + `engine/Severity` (movida desde `biotic/`) para las bióticas, la clorosis y el estrés solar.
+- **D-4, F-S1 por el despacho**: la orden entra a la cola con `regla = SolarStressRule`. `DespachoRiego` ya trataba toda solicitud que no es R-02 como riego común (ventana,
+  R-06, lluvia, ciclo); se sumó que el bypass `window` de F-S1 también lo salte el despacho. La regla vive en la rama de riego, después de R-01, así los cortes de
+  seguridad la dejan sin alcanzar; y comprueba por su cuenta la ventana y la pausa, porque R-05 y R-06 sólo actúan cuando aplica R-01 y F-S1 riega también de 45 a 55 %.
+  Si R-01 también pide riego en el mismo pulso, gana la primera orden de la cola (la de R-01).
+- **Luz y temperatura (D-1)**: `SolarExposure` es la única consulta al historial; F-S3 mide la luz con la misma franja 10–16 h que F-S1 (la v2 no define otra y así la zona gris
+  queda bien definida).
+- **F-S3 en la rama de seguimiento**: no ordena nada y su aviso no debe depender de los cortes de riego. En la rama global el grafo de reglas lo dibujaría antes que todas las
+  demás (el grafo cuelga cada rama del último nodo global).
+- **F-C2 sin cooldown `interval` propio**: el intervalo mínimo lo respeta P-D2 y el cooldown que lo acorta es `interval-fertilizer` de `ApplicationPreconditions`.
+- **Las 48 h y la franja 10–16 h son constantes** (la v2 no las hace configurables): sólo `clorosis.humedad-horas` es un parámetro.
+- **Bug de paso**: `RuleContext.metricRaw` lanzaba `NullPointerException` ante una métrica que la zona nunca reportó (llega con `raw = null`: una sonda de CE o pH sin
+  conectar); ahora la lee como ausente.

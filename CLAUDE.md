@@ -119,6 +119,11 @@ hardware real.
   sus **lindantes** (grilla `sectoresPorFila`, supuesto a validar con el vivero). El *Daño biótico* genérico no dispara nada (D-1).
 - **Tope de fitosanitarios** (F-06): un sector con 3 fitosanitarios en 30 días no recibe otro hasta que alguien **registra la revisión**
   (`POST /api/sectores/{id}/revision-fitosanitario`); es una precondición más de la aplicación (`ApplicationPreconditions`).
+- **Clorosis y estrés solar** (`chlorosis/`, `solarstress/`): la clorosis es un síntoma con varias causas; **F-C1** descarta las que el fertilizante no
+  corrige (sustrato > 80 % medio en 48 h, CE ≥ 2,0, pH ≥ 6,5) cortando la rama de insumos del sector con un `WARNING` que dice la causa, y **F-C2**
+  fertiliza si no hay ninguna. El estrés solar no usa químicos: **F-S1** (luz ≥ 80 % entre las 10 y las 16 h, o ≥ 32 °C, en 48 h) repone agua con un
+  riego del sector si el sustrato está < 55 %; **F-S3** (luz < 60 % y < 30 °C) sólo avisa «síntoma no explicado por radiación». La luz es el % de un
+  LDR. **F-S2 (cerrar la malla de la zona) no está implementada**: depende de un dueño de la malla por horario que la cancelación de `add-mediasombra-v2` dejó sin hacer.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
@@ -371,8 +376,12 @@ cd Desarrollo/backend
   `ApplicationPreconditions` (P-D1…P-D5, `DemoControllable`), el stock del tanque, registra y descuenta. El backend manda **mililitros** (el
   firmware convierte a tiempo y corta solo; tope 50 ml por comando = `ContratoNodo.BOMBA_ML_MAX`) y hay una bomba por sector: el comando
   no lleva el insumo. **`SupplyRule` y `DailyDoseLimitRule` están retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`) hasta que
-  entren las reglas por diagnóstico F-C*/F-S* (clorosis y estrés solar), que son las que faltan para reemplazarlas: hoy piden aplicaciones el plan
-  de nutrición (N-01, no decide con el diagnóstico) y las reglas bióticas (F-F1, F-P1, F-04; las dos primeras sí). Detalle en el README del backend.
+  entren las reglas por diagnóstico F-*, que son las que las reemplazan (ya están todas las que aplican insumos: bióticas y F-C2; **no se borraron**
+  todavía): hoy piden aplicaciones el plan de nutrición (N-01, no decide con el diagnóstico), las bióticas (F-F1, F-P1, F-04) y la clorosis nutricional
+  (F-C2). Detalle en el README del backend.
+- **Las reglas por diagnóstico comparten la compuerta P-D1** (`engine/DiagnosisGate`) y la lectura de la severidad (`engine/Severity`): una regla nueva que decide
+  con el diagnóstico la usa y declara `DiagnosisGate.PARAMETERS` en su `parametros()`. «Durante la rustificación» se pregunta a `hardening/HardeningPhase`,
+  que hoy resuelve el plan global. Una regla de insumo que descarta la aplicación de otra la corta con `ABORT_INSUMO` y `CancelPendingApplication`.
 - **Las reglas bióticas por sector comparten un esqueleto** (`biotic/BioticDiagnosisBase`, template method): F-F1 y F-P1 deciden igual (diagnóstico
   del tipo y vigente, y alguna de tres razones) y sólo difieren en qué ambiente favorece al problema. Cada regla concreta declara **su**
   `parametros()` con un `List.of(...)` literal (el test anti-drift del frontend lo lee del código fuente). El foco no cuenta nada por su cuenta:

@@ -1107,6 +1107,49 @@ sector** (corren en la cadena del `RuleOrchestrator`, rama `INSUMO`, sólo con u
   `add-reglas-clorosis-estres-solar` son las que faltan para borrarlas). Con el motor encendido, un sector con daño fúngico o plaga que no tiene
   el tanque de fitosanitario registrado rechaza la aplicación (y gasta el diagnóstico): cargá los tanques antes de la primera pasada.
 
+## Clorosis y estrés solar (`add-reglas-clorosis-estres-solar` · reglas_v2 §8.5)
+
+Las dos familias de diagnóstico **no biótico**. Cuatro reglas **de sector** que actúan una vez por diagnóstico nuevo; **F-S2 (estrés solar
+extendido de la macro-zona) no está implementada**: ver abajo.
+
+| Regla | Prioridad · rama | Qué decide |
+|---|---|---|
+| `ChlorosisNonNutritionalRule` (F-C1) | 24 · `INSUMO` | Diagnóstico *Clorosis* vigente (P-D1) y alguna causa que el fertilizante no corrige: humedad de sustrato **media** de las últimas `clorosis.humedad-horas` (48) h **>** `clorosis.humedad-asfixia` (80 %) → **asfixia radicular**; CE **≥** `clorosis.ce-salinidad` (2,0 dS/m) → **salinidad**; pH **≥** `clorosis.ph-ferrica` (6,5) → **clorosis férrica**. No aplica nada: emite `ABORT_INSUMO` (corta la rama del sector) y un `WARNING` con la causa (las dice todas) |
+| `ChlorosisNutritionalRule` (F-C2) | 25 · `INSUMO` | Clorosis vigente **sin** causa de F-C1 (lo garantiza la cadena: si F-C1 cortó, esta queda `OMITIDA_RAMA_BLOQUEADA`): pide fertilizante y deja un `WARNING` (`CRITICAL` con severidad Alta). Durante la rustificación sólo cuenta la severidad Media/Alta |
+| `SolarStressRule` (F-S1) | 26 · `RIEGO` | Diagnóstico *Estrés solar* vigente y, en las últimas 48 h, luz **≥** `estres.luz-alta` (80 %) en alguna lectura **entre las 10 y las 16 h** **o** temperatura **≥** `estres.temp-alta` (32 °C), con el sustrato **<** `estres.humedad-reposicion` (55 %), dentro de la ventana de riego y fuera de la pausa tras una aplicación (R-06): **riego de reposición** del sector con la fórmula de R-01 + `WARNING` (`CRITICAL` si Alta) |
+| `SolarStressUnexplainedRule` (F-S3) | 27 · `SEGUIMIENTO` | Estrés solar vigente con luz **<** `estres.luz-baja` (60 %) **y** temperatura **<** `estres.temp-baja` (30 °C) en 48 h: no actúa y avisa «Síntoma no explicado por radiación… Inspeccionar» |
+
+- **Decide la compuerta, ejecuta F-C2.** F-C1 no aplica nada; corta la rama de insumos con `ABORT_INSUMO` y, con el detalle `CancelPendingApplication`, el
+  `ActionExecutor` retira de `pending_application` el pedido de F-C2 que hubiera quedado esperando su ventana (sólo el de F-C2: el del plan de nutrición
+  no es de quien corta). El corte también significa que **F-F1/F-P1 y las demás reglas de insumo no se evalúan** para ese sector en ese ciclo.
+- **Compuerta compartida.** `engine/DiagnosisGate` es la única implementación de «el diagnóstico es del estado de la regla y está vigente (P-D1)» para las
+  bióticas, la clorosis y el estrés solar. La regla que la usa declara `DiagnosisGate.PARAMETERS`.
+- **Qué lee F-S1/F-S3.** `solarstress/SolarExposure` es la única pregunta al historial de lecturas: el pico de luz **entre las 10 y las 16 h** de las últimas
+  48 h y el de temperatura. La luz es el **% de un LDR**, no radiación. Sin lecturas no hay pico y la regla no decide. La **zona gris** (luz 60–80 % o
+  30–32 °C) no es de ninguna de las dos reglas: lo dice la v2 y hay un test que lo fija.
+- **F-S1 es un riego del despacho, no R-01.** Entra a la cola con `regla = SolarStressRule` y la abre el `DespachoRiego`, que la trata como riego común y la
+  revalida al abrir cada válvula (ventana, R-06, lluvia y un riego por ciclo); su bypass `window` también lo respeta el despacho. Está en la rama de riego
+  después de R-01…R-06, así que un corte de seguridad (sustrato saturado, sensor sin datos, falla hidráulica, bloqueo) la deja sin alcanzar. Comprueba por su
+  cuenta la ventana y la pausa porque R-05 y R-06 sólo actúan cuando aplica R-01 (humedad bajo el umbral de riego) y F-S1 también riega de 45 a 55 %.
+- **Durante la rustificación (D-3).** `hardening/HardeningPhase` responde si la zona está en rustificación («plan en curso o finalizado»). Hoy lo resuelve el
+  plan **global** (`GlobalPlanHardeningPhase`: la fecha de siembra `yerbanalytics.nursery.fecha-siembra-iso` y las etapas de `rustificacion_etapa`); sin fecha
+  de siembra, con una ilegible o sin etapas no cuenta. Cuando llegue el plan por macro-zona (`add-rustificacion-por-macrozona`) se reemplaza esa implementación
+  y ninguna regla cambia.
+- **Sin cooldown propio en F-C2.** El intervalo mínimo entre fertilizaciones del sector (5 días) lo respeta el `ApplicationService` (P-D2): la regla vuelve a
+  pedir con cada diagnóstico y el pedido queda diferido hasta cumplirlo. El cooldown que acorta el simulador es `interval-fertilizer` de `ApplicationPreconditions`.
+- **Una métrica sin lectura no rompe nada.** `RuleContext.metricRaw` devolvía `NullPointerException` para una métrica que la zona nunca reportó (una sonda
+  de CE o pH sin conectar llega como métrica sin valor); ahora la lee como ausente y las reglas no deciden con ella.
+- **Parámetros** (editables en Motor de reglas → Parámetros): familia `CLOROSIS` (`clorosis.humedad-asfixia`, `humedad-horas`, `ce-salinidad`, `ph-ferrica`) y
+  `ESTRES` (`estres.luz-alta`, `temp-alta`, `humedad-reposicion`, `luz-baja`, `temp-baja`), con las restricciones cruzadas luz baja < luz alta y temperatura
+  baja < temperatura alta. Los rangos los propone el equipo (la v2 sólo da el valor de fábrica). Sin migración manual.
+- **Control desde el simulador** (`/api/demo/rules`): las cuatro se apagan; `SolarStressRule` tiene los bypass `window` (ignora la ventana de riego, también en el
+  despacho) y `samples` (la última lectura cuenta como las 48 h); `SolarStressUnexplainedRule`, `samples`. Escenarios `CHLOROSIS_NUTRITIONAL`,
+  `CHLOROSIS_NON_NUTRITIONAL`, `SOLAR_STRESS` y `SOLAR_STRESS_UNEXPLAINED` en el simulador.
+- **F-S2 queda sin implementar.** Cerrar la mediasombra de la macro-zona de 11 a 16 h durante 3 días necesita un dueño de la malla por horario (el cambio
+  `add-mediasombra-v2`, cancelado): hoy sólo `ShadingRule` la mueve, sector por sector, en cada pulso (cada 4 h), por el pico de UV o por el plan global, sin
+  una hora de apertura ni de cierre que se pueda retener 5 horas. Sin ese dueño, una versión «parcial» cerraría la malla a destiempo o la dejaría cerrada. Los
+  parámetros `estres.pct-sectores-mz` y `estres.dias-proteccion` de la spec tampoco se crearon.
+
 ## Historial de lecturas
 
 Casi todas las reglas de nutrición y de hongos/plagas/estrés de `reglas_v2` miran el **pasado** de las lecturas

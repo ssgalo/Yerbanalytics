@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+> **Implementado sin F-S2.** `SolarStressWideRule`, sus llaves `protection` y `quorum` y el escenario «Estrés solar extendido» no existen (ver el `design.md` del cambio). F-C2 no declara el cooldown `interval`: el intervalo mínimo lo respeta P-D2 y se acorta con `interval-fertilizer` de `ApplicationPreconditions`.
+
 ### Requirement: Control de clorosis y estrés solar desde el simulador
 `ChlorosisNonNutritionalRule`, `ChlorosisNutritionalRule`, `SolarStressRule`, `SolarStressUnexplainedRule` y `SolarStressWideRule` SHALL ser
 `DemoControllable` apagables. F-C2 SHALL tener el cooldown `interval` (minutos entre fertilizaciones correctivas), F-S1 el bypass `window` (ignora la
