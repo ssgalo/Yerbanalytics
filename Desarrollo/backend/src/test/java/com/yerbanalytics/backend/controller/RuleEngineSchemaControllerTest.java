@@ -10,6 +10,7 @@ import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosNutricion;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.rules.IncompleteHardwareRule;
 import com.yerbanalytics.backend.engine.zone.ZoneRule;
@@ -52,6 +53,9 @@ class RuleEngineSchemaControllerTest {
     @MockBean
     private RuleOverrides overrides;
 
+    @MockBean
+    private OperationalRuleStates states;
+
     private static Rule regla(String nombre, int prioridad, RuleBranch rama, DefinicionParametro... params) {
         return new Rule() {
             @Override public int priority() { return prioridad; }
@@ -72,7 +76,10 @@ class RuleEngineSchemaControllerTest {
         mockMvc.perform(get("/api/rules/schema"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].branch", contains("GLOBAL")))
-                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].label", contains("🧰 Hardware incompleto (S-04)")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].label", contains("Hardware incompleto")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].codigo", contains("S-04")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='ManualLockRule')].codigo", contains("")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='start')].codigo", contains("")))
                 .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].parametros[*]", empty()))
                 .andExpect(jsonPath("$.edges[?(@.source=='ManualLockRule' && @.target=='IncompleteHardwareRule')]", hasSize(1)))
                 .andExpect(jsonPath("$.edges[?(@.source=='IncompleteHardwareRule' && @.target=='StaleSensorRule')]", hasSize(1)));
@@ -127,6 +134,22 @@ class RuleEngineSchemaControllerTest {
                 .andExpect(jsonPath("$.nodes[?(@.id=='SupplyRule')].activa", contains(false)))
                 .andExpect(jsonPath("$.nodes[?(@.id=='start')].activa", contains(true)))
                 .andExpect(jsonPath("$.nodes[?(@.id=='success-INSUMO')].activa", contains(true)));
+    }
+
+    @Test
+    void cadaNodoDeReglaDiceSiEstaActivaPorDefecto_ParaPintarLosEventosViejosDelHistorial() throws Exception {
+        when(orchestrator.getRules()).thenReturn(List.of(
+                regla("ManualLockRule", 0, RuleBranch.GLOBAL),
+                regla("SupplyRule", 12, RuleBranch.INSUMO)));
+        when(states.activeByDefault("ManualLockRule")).thenReturn(true);
+        when(states.activeByDefault("SupplyRule")).thenReturn(false);
+
+        mockMvc.perform(get("/api/rules/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[?(@.id=='ManualLockRule')].activaPorDefecto", contains(true)))
+                .andExpect(jsonPath("$.nodes[?(@.id=='SupplyRule')].activaPorDefecto", contains(false)))
+                .andExpect(jsonPath("$.nodes[?(@.id=='start')].activaPorDefecto", contains(true)))
+                .andExpect(jsonPath("$.nodes[?(@.id=='success-INSUMO')].activaPorDefecto", contains(true)));
     }
 
     private static ZoneRule reglaDeZona(String nombre, int prioridad, RuleBranch rama, DefinicionParametro... params) {

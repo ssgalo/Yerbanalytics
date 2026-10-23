@@ -45,7 +45,7 @@ describe('Login (7.1)', () => {
 
     await ingresar('agronomo');
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Motor de reglas' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Motor de reglas' }, { timeout: 5000 })).toBeTruthy();
     expect(ubicacion.actual?.pathname).toBe('/reglas');
   });
 

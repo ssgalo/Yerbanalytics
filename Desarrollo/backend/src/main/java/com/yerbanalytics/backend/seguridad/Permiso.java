@@ -29,7 +29,7 @@ public enum Permiso {
     CONFIGURACION_VER("configuracion.ver", "Configuración", "Ver la configuración agronómica", null),
     CONFIGURACION_EDITAR("configuracion.editar", "Configuración", "Editar la configuración agronómica", CONFIGURACION_VER),
     REGLAS_VER("reglas.ver", "Motor de reglas", "Ver el grafo de reglas, las trazas y los parámetros", null),
-    REGLAS_EDITAR("reglas.editar", "Motor de reglas", "Editar el catálogo de parámetros", REGLAS_VER),
+    REGLAS_EDITAR("reglas.editar", "Motor de reglas", "Editar los parámetros del motor y prender o apagar reglas", REGLAS_VER),
     HARDWARE_VER("hardware.ver", "Hardware", "Ver el estado del hardware", null),
     HARDWARE_GESTIONAR("hardware.gestionar", "Hardware", "Alta y recambio de dispositivos", HARDWARE_VER),
     HARDWARE_REPARAR("hardware.reparar", "Hardware", "Registrar la reparación de un dispositivo averiado", HARDWARE_VER),
@@ -43,7 +43,8 @@ public enum Permiso {
     BLOQUEOS_VER("bloqueos.ver", "Bloqueo manual", "Ver los bloqueos manuales vigentes", null),
     BLOQUEOS_GESTIONAR("bloqueos.gestionar", "Bloqueo manual", "Bloquear y reanudar la actuación autónoma", BLOQUEOS_VER),
     INSUMOS_VER("insumos.ver", "Insumos", "Ver los tanques de insumo y su stock", null),
-    INSUMOS_GESTIONAR("insumos.gestionar", "Insumos", "Registrar la carga de los tanques de insumo", INSUMOS_VER),
+    INSUMOS_GESTIONAR("insumos.gestionar", "Insumos", "Registrar la carga de los tanques y la revisión de un sector que alcanzó el tope de fitosanitarios", INSUMOS_VER),
+    EFECTIVIDAD_REVISAR("efectividad.revisar", "Efectividad", "Registrar la revisión de una acción sin efectividad y levantar su bloqueo", HISTORIAL_VER),
     DEMO_EXPO_CONFIGURAR("demo-expo.configurar", "Demo Expo", "Mostrar u ocultar la pestaña Demo Expo", null),
     SIMULACION_GESTIONAR("simulacion.gestionar", "Simulación", "Controlar reglas, cooldowns y clima en modo demo", null),
     USUARIOS_GESTIONAR("usuarios.gestionar", "Seguridad", "Usuarios, matriz de permisos y política de sesión", null),
@@ -106,10 +107,11 @@ public enum Permiso {
         return switch (rol) {
             case ADMINISTRADOR -> EnumSet.allOf(Permiso.class);
             case INGENIERO_AGRONOMO -> con(LECTURAS, CONFIGURACION_EDITAR, REGLAS_EDITAR, BLOQUEOS_GESTIONAR, HARDWARE_REPARAR,
-                    INSUMOS_GESTIONAR);
+                    INSUMOS_GESTIONAR, EFECTIVIDAD_REVISAR);
             case PRODUCTOR_VIVERISTA -> con(LECTURAS, PASADAS_OPERAR);
             case OPERARIO -> EnumSet.of(VIVERO_VER, DIAGNOSTICOS_VER, HISTORIAL_VER, CAPTURAS_VER, PASADAS_VER,
-                    BLOQUEOS_VER, BLOQUEOS_GESTIONAR, HARDWARE_VER, HARDWARE_REPARAR, INSUMOS_VER, INSUMOS_GESTIONAR);
+                    BLOQUEOS_VER, BLOQUEOS_GESTIONAR, HARDWARE_VER, HARDWARE_REPARAR, INSUMOS_VER, INSUMOS_GESTIONAR,
+                    EFECTIVIDAD_REVISAR);
             case SERVICIO -> EnumSet.of(VIVERO_VER, TOPOLOGIA_VER, CAPTURAS_VER, CAPTURAS_ORDENAR,
                     DIAGNOSTICOS_VER, DIAGNOSTICOS_REGISTRAR, CAMARA_GESTIONAR, BLOQUEOS_VER, BLOQUEOS_GESTIONAR,
                     SIMULACION_GESTIONAR, HARDWARE_VER, HARDWARE_REPARAR, REGLAS_VER, PASADAS_VER, PASADAS_OPERAR,

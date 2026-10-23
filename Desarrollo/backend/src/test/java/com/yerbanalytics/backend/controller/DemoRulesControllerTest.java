@@ -3,6 +3,10 @@ package com.yerbanalytics.backend.controller;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
 import com.yerbanalytics.backend.engine.overrides.DemoRuleControlService;
+import com.yerbanalytics.backend.engine.overrides.EffectiveRuleOverrides;
+import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
+import com.yerbanalytics.backend.engine.overrides.RuleStateEntity;
+import com.yerbanalytics.backend.engine.overrides.RuleStateRepository;
 import com.yerbanalytics.backend.engine.overrides.FakeControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,12 +43,22 @@ class DemoRulesControllerTest {
         DemoControllable regla() {
             return FakeControllable.of("StaleSensorRule", 10);
         }
+
+        /** En el vivero, "StaleSensorRule" está apagada; "ZoneShading" no tiene fila (rige la siembra: prendida). */
+        @Bean
+        RuleStateRepository reglaEstadoRepository() {
+            RuleStateRepository repository = org.mockito.Mockito.mock(RuleStateRepository.class);
+            org.mockito.Mockito.when(repository.findAll())
+                    .thenReturn(java.util.List.of(new RuleStateEntity("StaleSensorRule", false, "recalibrando", "Ana", 1L)));
+            return repository;
+        }
     }
 
     @Nested
     @WebMvcTest(DemoRulesController.class)
     @AutoConfigureMockMvc(addFilters = false)
-    @Import({Piezas.class, DemoControllableRegistry.class, DemoRuleControlService.class, RuleOverridesStore.class})
+    @Import({Piezas.class, DemoControllableRegistry.class, DemoRuleControlService.class, RuleOverridesStore.class,
+            OperationalRuleStates.class, EffectiveRuleOverrides.class})
     @TestPropertySource(properties = "yerbanalytics.demo.enabled=true")
     class ModoDemo {
 
@@ -71,20 +85,39 @@ class DemoRulesControllerTest {
         }
 
         @Test
-        void apagaUnaPiezaPorZona() throws Exception {
-            mvc.perform(put("/api/demo/rules/ZoneShading")
-                            .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.enabled").value(false));
+        void informaElEstadoOperativoDeCadaPieza() throws Exception {
+            mvc.perform(get("/api/demo/rules"))
+                    .andExpect(jsonPath("$[0].name").value("StaleSensorRule"))
+                    .andExpect(jsonPath("$[0].enabled").value(false))
+                    .andExpect(jsonPath("$[0].operationalActive").doesNotExist())
+                    .andExpect(jsonPath("$[0].effectiveEnabled").doesNotExist())
+                    .andExpect(jsonPath("$[1].enabled").value(true));
+        }
+
+        @Test
+        void elEncendidoNoSeCambiaDesdeLaDemo() throws Exception {
+            mvc.perform(put("/api/demo/rules/StaleSensorRule")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Motor de reglas")));
 
             mvc.perform(get("/api/demo/rules"))
-                    .andExpect(jsonPath("$[1].enabled").value(false));
+                    .andExpect(jsonPath("$[0].enabled").value(false));
+        }
+
+        @Test
+        void cooldownsYBypassNoCambianElEstado() throws Exception {
+            mvc.perform(put("/api/demo/rules/StaleSensorRule")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"bypassed\":[\"window\"]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.enabled").value(false))
+                    .andExpect(jsonPath("$.bypassed[0]").value("window"));
         }
 
         @Test
         void nombreDesconocidoEs404() throws Exception {
             mvc.perform(put("/api/demo/rules/NoExiste")
-                            .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"cooldownMinutes\":{}}"))
                     .andExpect(status().isNotFound());
         }
 

@@ -39,6 +39,10 @@ public class CatalogoParametros {
                 ParametrosRiego.values(),
                 ParametrosInsumo.values(),
                 ParametrosNutricion.values(),
+                ParametrosBiotico.values(),
+                ParametrosClorosis.values(),
+                ParametrosEstres.values(),
+                ParametrosEfectividad.values(),
                 ParametrosMediasombra.values(),
                 ParametrosDiagnostico.values(),
                 ReadingParameters.values(),
@@ -76,7 +80,16 @@ public class CatalogoParametros {
         restricciones.add(rangoFisico("pH", ParametrosSeguridad.RANGO_PH_MIN, ParametrosSeguridad.RANGO_PH_MAX));
         restricciones.add(rangoFisico("conductividad", ParametrosSeguridad.RANGO_CE_MIN, ParametrosSeguridad.RANGO_CE_MAX));
         restricciones.add(rangoFisico("luz", ParametrosSeguridad.RANGO_LUZ_MIN, ParametrosSeguridad.RANGO_LUZ_MAX));
+        restricciones.add(menorQue(ParametrosEstres.LOW_LIGHT, ParametrosEstres.HIGH_LIGHT,
+                "La luz baja del estrés solar debe ser menor que la luz alta."));
+        restricciones.add(menorQue(ParametrosEstres.LOW_TEMP, ParametrosEstres.HIGH_TEMP,
+                "La temperatura baja del estrés solar debe ser menor que la alta."));
         return List.copyOf(restricciones);
+    }
+
+    private static RestriccionCruzada menorQue(DefinicionParametro menor, DefinicionParametro mayor, String mensaje) {
+        return new RestriccionCruzada(List.of(menor.clave(), mayor.clave()),
+                v -> v.numero(menor.clave()) < v.numero(mayor.clave()), mensaje);
     }
 
     private static RestriccionCruzada rangoFisico(String magnitud, DefinicionParametro min, DefinicionParametro max) {

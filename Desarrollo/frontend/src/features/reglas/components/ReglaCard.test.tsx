@@ -1,83 +1,140 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { ReglaCard } from './ReglaCard';
-import { catalogoDeFabrica, conValor } from '../__fixtures__/catalogos';
+import { catalogoDeFabrica } from '../__fixtures__/catalogos';
 import { indicePorClave } from '../catalogoView';
-import type { CatalogoReglas } from '@/types/domain';
+import type { CatalogoReglas, ReglaCatalogo } from '@/types/domain';
 
 afterEach(cleanup);
 
-function montar(catalogo: CatalogoReglas, id: string, abierta = false, onToggle = vi.fn()) {
-  const regla = catalogo.reglas.find((r) => r.id === id)!;
-  return render(
+function montar(
+  id: string,
+  cambios: Partial<ReglaCatalogo> = {},
+  extra: Partial<Parameters<typeof ReglaCard>[0]> = {},
+  c: CatalogoReglas = catalogoDeFabrica(),
+) {
+  const regla = { ...c.reglas.find((r) => r.id === id)!, ...cambios };
+  const props = {
+    onCambiarEstado: vi.fn(),
+    onEditar: vi.fn(),
+    onRestablecer: vi.fn(),
+  };
+  render(
     <ReglaCard
       regla={regla}
-      indice={indicePorClave(catalogo)}
-      nombresReglas={Object.fromEntries(catalogo.reglas.map((r) => [r.id, r.label]))}
+      indice={indicePorClave(c)}
       borrador={new Map()}
       erroresCliente={new Map()}
       erroresServidor={new Map()}
-      abierta={abierta}
-      onToggle={onToggle}
-      onEditar={() => undefined}
-      onRestablecer={() => undefined}
+      {...props}
+      {...extra}
     />,
   );
+  return props;
 }
 
 describe('ReglaCard', () => {
-  it('colapsada muestra el nombre, la prioridad y el resumen "N parámetros · M modificados"', () => {
-    montar(conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40'), 'RiegoPorDeficitRule');
+  it('muestra el nombre y el código, el chip de efecto y el interruptor prendido', () => {
+    montar('RiegoPorDeficitRule');
 
-    expect(screen.getByText('💦 Riego por déficit hídrico (R-01)')).toBeTruthy();
-    expect(screen.getByText('6 parámetros · 1 modificado')).toBeTruthy();
-    // Cerrada no renderiza los campos...
-    expect(screen.queryByLabelText(/Umbral de riego/)).toBeNull();
+    expect(screen.getByRole('heading', { name: /Riego por déficit hídrico · R-01/ })).toBeTruthy();
+    expect(screen.getByText('Actúa')).toBeTruthy();
+    const sw = screen.getByRole('switch', { name: 'Apagar Riego por déficit hídrico' });
+    expect(sw.getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByText('Retirada')).toBeNull();
   });
 
-  it('colapsada deja ver el valor vigente de cada parámetro sin abrirla', () => {
-    montar(conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40'), 'RiegoPorDeficitRule');
-
-    const resumen = screen.getByTestId('valores-RiegoPorDeficitRule');
-    expect(resumen.textContent).toContain('40 %');
-    expect(resumen.textContent).toContain('30 L/h');
+  it('una pieza sin código muestra sólo el nombre', () => {
+    montar('CicloLecturaRiegoRule');
+    expect(screen.getByRole('heading').textContent).toBe('Un riego por ciclo de lectura');
   });
 
-  it('el encabezado abre y cierra la tarjeta', () => {
-    const onToggle = vi.fn();
-    montar(catalogoDeFabrica(), 'RiegoPorDeficitRule', false, onToggle);
-
-    const cabecera = screen.getByRole('button', { name: /Riego/ });
-    expect(cabecera.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(cabecera);
-    expect(onToggle).toHaveBeenCalledOnce();
+  it('el chip de efecto distingue Protege y Avisa', () => {
+    montar('SustratoSaturadoRule');
+    expect(screen.getByText('Protege')).toBeTruthy();
+    cleanup();
+    montar('FungalConditionRule');
+    expect(screen.getByText('Avisa')).toBeTruthy();
   });
 
-  it('abierta lista cada parámetro con su valor, unidad, rango, fábrica y referencia', () => {
-    montar(catalogoDeFabrica(), 'RiegoPorDeficitRule', true);
+  it('una retirada lo dice y arranca apagada con su aviso', () => {
+    montar('SupplyRule');
 
-    expect((screen.getByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('45');
-    expect(screen.getByText(/Rango 35–60 %/)).toBeTruthy();
-    expect(screen.getAllByText(/Fábrica 45 %/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/reglas_v2 §5 R-01/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Retirada')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('switch', { name: 'Prender Dosificación de insumo' })
+        .getAttribute('aria-checked'),
+    ).toBe('false');
+    expect(screen.getByText(/Apagada de fábrica/)).toBeTruthy();
   });
 
-  it('una regla sin parámetros lo dice, abierta o cerrada', () => {
-    const { unmount } = montar(catalogoDeFabrica(), 'ManualLockRule');
-    expect(screen.getByText('Sin parámetros configurables')).toBeTruthy();
-    unmount();
+  it('una regla de acción apagada muestra quién, cuándo y el motivo en un aviso neutro', () => {
+    montar('RiegoPorDeficitRule', {
+      activa: false,
+      estado: {
+        motivo: 'riego manual esta semana',
+        updatedBy: 'Ana López',
+        updatedTs: new Date(2026, 9, 22, 14, 5).getTime(),
+      },
+    });
 
-    montar(catalogoDeFabrica(), 'ManualLockRule', true);
-    expect(screen.getAllByText('Sin parámetros configurables').length).toBeGreaterThanOrEqual(1);
+    const aviso = screen.getByText(/Apagada por Ana López el 22\/10 14:05/);
+    expect(aviso.textContent).toContain('Motivo: riego manual esta semana');
+    expect(aviso.textContent).not.toContain('Consecuencia');
   });
 
-  it('un parámetro modificado se marca y ofrece restablecer a fábrica', () => {
-    montar(conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40'), 'RiegoPorDeficitRule', true);
+  it('una protección apagada agrega la consecuencia', () => {
+    montar('SustratoSaturadoRule', {
+      activa: false,
+      estado: {
+        motivo: 'sonda en recalibración',
+        updatedBy: 'Ana López',
+        updatedTs: new Date(2026, 9, 22, 14, 5).getTime(),
+      },
+    });
 
-    expect(screen.getByText('Modificado')).toBeTruthy();
-    expect(screen.getByText(/Fábrica 45 %/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Restablecer/ })).toBeTruthy();
-    expect(screen.getByText(/Ingeniero Agrónomo/)).toBeTruthy();
+    const aviso = screen.getByText(/Apagada por Ana López/);
+    expect(aviso.textContent).toContain('Consecuencia: Se riega con el sustrato saturado.');
+  });
+
+  it('un clic en el interruptor pide el cambio con el botón como ancla', () => {
+    const { onCambiarEstado } = montar('RiegoPorDeficitRule');
+
+    fireEvent.click(screen.getByRole('switch'));
+
+    expect(onCambiarEstado).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'RiegoPorDeficitRule' }),
+      false,
+      screen.getByRole('switch'),
+    );
+  });
+
+  it('sin permiso el interruptor está deshabilitado', () => {
+    montar('RiegoPorDeficitRule', {}, { soloLectura: true });
+    expect((screen.getByRole('switch') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('sus parámetros propios se editan en línea con su unidad, sin el texto de rango y fábrica debajo', () => {
+    const { onEditar } = montar('ShadingRule');
+
+    const campo = screen.getByLabelText(/Índice UV de protección/) as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: '8' } });
+
+    expect(onEditar).toHaveBeenCalledWith(
+      expect.objectContaining({ clave: 'mediasombra.uv-umbral' }),
+      '8',
+    );
+    expect(screen.queryByText(/fábrica \d/)).toBeNull();
+  });
+
+  it('un parámetro compartido va en sólo lectura con "Compartido con N" y el enlace al bloque', () => {
+    montar('RiegoPorDeficitRule');
+
+    const fila = document.querySelector('[data-clave="riego.umbral-humedad"]') as HTMLElement;
+    expect(within(fila).getByText('Compartido con 5 reglas')).toBeTruthy();
+    expect(within(fila).queryByRole('spinbutton')).toBeNull();
+    expect(within(fila).getByRole('button', { name: /Editar en Compartidos/ })).toBeTruthy();
   });
 });

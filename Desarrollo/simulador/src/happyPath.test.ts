@@ -230,7 +230,7 @@ function fakeDeps(over: Partial<HappyPathDeps> = {}) {
   const deps: HappyPathDeps = {
     zeroCooldowns: async () => void calls.push('zero'),
     getRules: async () => [windowRule([]), rule_('SupplyRule', false, []), rule_('ApplicationPreconditions', true, [])],
-    updateRule: async (name, u) => void calls.push(`update:${name}:${u.enabled !== undefined ? 'enabled' : `bypass=${u.bypassed?.join(',')}`}`),
+    updateRule: async (name, u) => void calls.push(`update:${name}:bypass=${u.bypassed?.join(',')}`),
     ensureTankStock: async () => (calls.push('stock'), []),
     setWeather: async () => void calls.push('weather'),
     clearWeather: async () => void calls.push('clearWeather'),
@@ -267,19 +267,18 @@ test('real node: exactly ONE pulse, no rule toggled, nothing waited for', async 
   const { deps, calls } = fakeDeps({ sleep: async (ms) => void sleeps.push(ms) });
   const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
   assert.deepEqual(calls, ['clearWeather', 'offline:false', 'pin:MZ-1:none', 'pulse1']);
-  assert.ok(!calls.some((c) => c.endsWith(':enabled')), 'no rule is switched on or off');
   assert.ok(!calls.includes('stock'), 'the real tanks are not touched');
   assert.deepEqual(sleeps, [], 'no pause between steps, no wait for an action to finish');
   assert.equal(out.readout?.allActed, true);
 });
 
 test('simulator: setup, diagnosis BEFORE the single pulse, cleanup at the end', async () => {
-  const { deps, calls } = fakeDeps();
+  const { deps, calls } = fakeDeps({ getRules: async () => [windowRule([]), rule_('SupplyRule', true, []), rule_('ApplicationPreconditions', true, [])] });
   const out = await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
   assert.deepEqual(calls, [
     'zero', 'update:FueraDeVentanaRiegoRule:bypass=window',
-    // La dosificación arranca retirada: se enciende, se saltea la ventana y el límite diario, y se asegura el stock.
-    'update:SupplyRule:enabled', 'update:ApplicationPreconditions:bypass=window,daily', 'stock',
+    // Con la dosificación prendida en el vivero: se saltea la ventana y el límite diario, y se asegura el stock.
+    'update:ApplicationPreconditions:bypass=window,daily', 'stock',
     'weather', 'pin:MZ-1:reading', 'emission:true',
     'diagnosis', 'pulse1',
     'pin:MZ-1:none', 'emission:false',
@@ -291,7 +290,7 @@ test('simulator: setup, diagnosis BEFORE the single pulse, cleanup at the end', 
 test('real node warns when the supply rule is still retired, because the input would never act', async () => {
   const { deps, calls } = fakeDeps();
   const out = await runHappyPath('REAL_NODE', real, thresholds, deps, opts);
-  assert.ok(out.warnings.some((w) => /SupplyRule/.test(w)));
+  assert.ok(out.warnings.some((w) => /Motor de reglas/.test(w)));
   assert.ok(!calls.some((c) => c.startsWith('update:')), 'it only warns, it does not switch anything');
 });
 
@@ -462,4 +461,18 @@ test('progress ignores a snapshot without the sector, and readProgress survives 
 
 test('defaults stay in sync', () => {
   assert.equal(DEFAULT_THRESHOLDS['riego.umbral-humedad'], 45);
+});
+
+test('simulator: SupplyRule apagada en el vivero no se prende desde la demo: avisa y saltea sólo el tramo del insumo', async () => {
+  const logs: string[] = [];
+  const { deps, calls } = fakeDeps({ log: (l) => void logs.push(l) });
+  const out = await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
+  assert.ok(!calls.some((c) => c.startsWith('update:SupplyRule')), 'the demo never switches a rule');
+  assert.ok(!calls.some((c) => c.startsWith('update:ApplicationPreconditions')), 'the supply leg is skipped');
+  assert.ok(!calls.includes('stock'), 'the supply leg is skipped');
+  assert.ok(calls.includes('update:FueraDeVentanaRiegoRule:bypass=window'), 'the rest of the setup runs');
+  assert.ok(calls.includes('weather') && calls.includes('pulse1'), 'the rest of the happy path runs');
+  const message = 'Prendé «Dosificación de insumo» en Motor de reglas para probar el tramo de insumo';
+  assert.ok(out.warnings.some((w) => w.includes(message)));
+  assert.ok(logs.some((l) => l.includes(message)));
 });

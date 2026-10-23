@@ -50,7 +50,7 @@ public class ShadingRule implements ZoneRule {
 
     @Override
     public String label() {
-        return "⛅ Control de mediasombra";
+        return "Control de mediasombra";
     }
 
     @Override

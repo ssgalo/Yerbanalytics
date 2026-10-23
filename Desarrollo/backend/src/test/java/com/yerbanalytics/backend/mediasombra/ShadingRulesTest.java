@@ -8,7 +8,7 @@ import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
@@ -56,8 +56,8 @@ class ShadingRulesTest {
 
     /** Overrides con un bypass encendido para una regla. */
     private static RuleOverrides bypass(String regla, String clave) {
-        RuleOverridesStore store = new RuleOverridesStore();
-        store.put(regla, new RuleOverride(true, Map.of(), Set.of(clave)));
+        TestRuleOverrides store = new TestRuleOverrides();
+        store.put(regla, new RuleOverride(Map.of(), Set.of(clave)));
         return store;
     }
 

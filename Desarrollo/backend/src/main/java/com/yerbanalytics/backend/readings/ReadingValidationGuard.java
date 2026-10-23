@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.readings;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
@@ -98,7 +100,22 @@ public class ReadingValidationGuard implements ConsumidorParametros, DemoControl
 
     @Override
     public String label() {
-        return "🧪 Lectura inválida (S-03)";
+        return "Lectura inválida";
+    }
+
+    @Override
+    public String code() {
+        return "S-03";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Se aceptan lecturas fuera del rango físico y el motor decide con ellas.");
     }
 
     @Override

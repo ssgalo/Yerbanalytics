@@ -13,6 +13,7 @@ import { PlanRustificacionError } from '@/data/planRustificacionError';
 import type {
   ActionRecord,
   CambioParametro,
+  CambioEstadoRegla,
   CatalogoReglas,
   Configuracion,
   DagSchema,
@@ -20,6 +21,7 @@ import type {
   DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
+  RevisionEfectividad,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
@@ -38,6 +40,7 @@ import type {
   NutritionPlan,
   NuevoPlanRustificacion,
   PlanRustificacion,
+  ReglaCatalogo,
 } from '@/types/domain';
 import { validateConfig } from '@/lib/configValidation';
 import { criteriaErrors, defaultDiagnosisCriteria } from '@/lib/diagnosisCriteria';
@@ -46,13 +49,17 @@ import { addDays, todayIso } from '@/lib/horario';
 import { ETAPAS_SUGERIDAS, planErrors, planVigente, progreso } from '@/lib/planRustificacion';
 import { buildConfig, mockStaleThresholdSeconds } from './config';
 import { buildNursery, type TopologiaGrid } from './generators';
-import { buildHistory } from './history';
+import { buildHistory, buildRuleStateEvent } from './history';
 import { buildMockNutritionPlan } from './nutritionPlanMock';
 import { nutritionIntervalError } from '@/lib/nutritionPlan';
 import {
   buildRuleSchema,
   catalogoVigente,
+  soloReglasDeLaCadena,
+  exigirActiva,
+  validarCambioEstado,
   validarCambios,
+  type EstadoRegla,
   type OverrideParametro,
 } from './reglasMock';
 import { evaluarMotor } from './trazaReglas';
@@ -97,6 +104,8 @@ export class MockRepository implements DataRepository {
   private readonly nutritionIntervals = new Map<string, number>();
   /** Parámetros del motor editados en la sesión; vacío = valores de fábrica. */
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
+  /** Interruptores de las reglas cambiados en la sesión; sin entrada rige el estado de fábrica (las retiradas apagadas). */
+  private readonly estadosReglas = new Map<string, EstadoRegla>();
 
   /** Criterio de diagnóstico guardado en la sesión; arranca con el de fábrica, como el backend. */
   private diagnosisCriteria: DiagnosisCriteria = defaultDiagnosisCriteria();
@@ -371,6 +380,11 @@ export class MockRepository implements DataRepository {
     return buildHardware(this.fleet());
   }
 
+  async registerEffectivenessReview(): Promise<RevisionEfectividad> {
+    // La demo estática no evalúa efectividad: ninguna acción queda bloqueada, así que no hay nada que revisar.
+    throw new Error('La demo estática no tiene acciones bloqueadas por falta de efectividad.');
+  }
+
   /** Topología actual: la generada por el Administrador o, por defecto, el seed 6 × 100. */
   private topologia(): TopologiaGrid {
     return (
@@ -450,7 +464,7 @@ export class MockRepository implements DataRepository {
   }
 
   async getCatalogoReglas(): Promise<CatalogoReglas> {
-    return catalogoVigente(this.parametrosEditados);
+    return catalogoVigente(this.parametrosEditados, this.estadosReglas);
   }
 
   async saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas> {
@@ -470,11 +484,45 @@ export class MockRepository implements DataRepository {
         });
       }
     }
-    return catalogoVigente(this.parametrosEditados);
+    return catalogoVigente(this.parametrosEditados, this.estadosReglas);
+  }
+
+  async setEstadoRegla(nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo> {
+    const catalogo = await this.getCatalogoReglas();
+    const regla = catalogo.reglas.find((r) => r.id === nombre);
+    if (!regla) throw new Error(`Error 404: la regla ${nombre} no existe`);
+    // Mismo orden que el backend (ReglasEstadoService): activa requerida; mismo estado = éxito sin validar motivo ni
+    // confirmación; recién entonces se validan. Excepción: apagar lo que sólo la siembra tiene apagado (sin fila) es una
+    // decisión explícita y se registra.
+    exigirActiva(cambio);
+    const apagadaSoloPorLaSiembra = !cambio.activa && !this.estadosReglas.has(nombre);
+    if (regla.activa === cambio.activa && !apagadaSoloPorLaSiembra) return regla;
+    validarCambioEstado(regla, cambio);
+
+    const motivo = cambio.motivo?.trim() || null;
+    const usuario = 'Ingeniero Agrónomo';
+    const ts = Date.now();
+    this.estadosReglas.set(nombre, { activa: cambio.activa, motivo, updatedBy: usuario, updatedTs: ts });
+
+    await this.getHistory(); // arma la caché antes de sumarle el evento
+    this.historyCache!.unshift(
+      buildRuleStateEvent({
+        id: `HE-CFG-${ts}`,
+        regla: nombre,
+        etiqueta: regla.label,
+        codigo: regla.codigo,
+        activa: cambio.activa,
+        usuario,
+        motivo,
+        consecuencia: !cambio.activa ? regla.proteccion : null,
+        ts,
+      }),
+    );
+    return (await this.getCatalogoReglas()).reglas.find((r) => r.id === nombre)!;
   }
 
   async getRuleSchema(): Promise<DagSchema> {
-    return buildRuleSchema();
+    return buildRuleSchema(this.estadosReglas);
   }
 
   async getTrazaEvaluacion(
@@ -510,7 +558,7 @@ export class MockRepository implements DataRepository {
     const regando = sector.actuadores.valve === 'Regando';
     const ultimoRiegoMs = regando ? ref - 60_000 : ultimo(delSector('Riego'));
 
-    return evaluarMotor(await this.getCatalogoReglas(), {
+    return evaluarMotor(soloReglasDeLaCadena(await this.getCatalogoReglas()), {
       sectorId,
       zonaId: sector.zona,
       origen,

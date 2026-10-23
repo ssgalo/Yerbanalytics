@@ -3,14 +3,13 @@ package com.yerbanalytics.backend.engine.parametros;
 import com.yerbanalytics.backend.dto.CatalogoReglasDto;
 import com.yerbanalytics.backend.dto.ParametroDto;
 import com.yerbanalytics.backend.dto.ReglaCatalogoDto;
-import com.yerbanalytics.backend.engine.Rule;
-import com.yerbanalytics.backend.engine.zone.ZoneRule;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
 import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -59,6 +58,11 @@ public class CatalogoParametrosService {
     private final HistorialService historialService;
     private final TransactionTemplate transaccion;
     private final ConfiguracionOperativaRepository operativaRepository;
+    /**
+     * Lazy: arma la lista de piezas desde el registro de todos los {@code DemoControllable}, y varios de ellos (los
+     * servicios que deciden) dependen de este servicio para leer sus parámetros.
+     */
+    private final ReglasCatalogo reglasCatalogo;
 
     /** Serializa los guardados: cada uno valida contra la base, así que no pueden solaparse. */
     private final Object escritura = new Object();
@@ -77,7 +81,8 @@ public class CatalogoParametrosService {
                                      ParametroReglaRepository repository,
                                      HistorialService historialService,
                                      PlatformTransactionManager transactionManager,
-                                     ConfiguracionOperativaRepository operativaRepository) {
+                                     ConfiguracionOperativaRepository operativaRepository,
+                                     @Lazy ReglasCatalogo reglasCatalogo) {
         this.transaccion = new TransactionTemplate(transactionManager);
         // Transacción propia: el lock de guardar tiene que soltarse DESPUÉS del commit.
         this.transaccion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -85,6 +90,7 @@ public class CatalogoParametrosService {
         this.repository = repository;
         this.historialService = historialService;
         this.operativaRepository = operativaRepository;
+        this.reglasCatalogo = reglasCatalogo;
     }
 
     // ------------------------------------------------------------------
@@ -103,16 +109,8 @@ public class CatalogoParametrosService {
     public CatalogoReglasDto catalogo() {
         Estado e = estado();
 
-        List<ReglaCatalogoDto> reglas = new ArrayList<>();
-        for (Rule r : catalogo.reglas()) {
-            reglas.add(new ReglaCatalogoDto(r.name(), r.label(), r.branch().name(), r.priority(),
-                    r.parametros().stream().map(DefinicionParametro::clave).toList()));
-        }
-        // Las reglas de macro-zona figuran después de las de sector: tienen sus propios umbrales y se editan igual.
-        for (ZoneRule r : catalogo.reglasDeZona()) {
-            reglas.add(new ReglaCatalogoDto(r.name(), r.label(), r.branch().name(), r.priority(),
-                    r.parametros().stream().map(DefinicionParametro::clave).toList()));
-        }
+        // Todo lo que se puede prender o apagar (reglas por sector, de macro-zona y servicios que deciden), no sólo las Rule.
+        List<ReglaCatalogoDto> reglas = reglasCatalogo.reglas();
 
         List<ParametroDto> parametros = new ArrayList<>();
         for (DefinicionParametro d : catalogo.definiciones()) {

@@ -1,4 +1,6 @@
 /* Panel lateral del Inspector: el detalle completo de una regla evaluada. */
+import { MarcaResultado } from '@/components/DAGViewer/MarcaResultado';
+import { Chip } from '@/components/ui/Chip';
 import { clasificarRegla, type EstadoNodo } from '@/components/DAGViewer/trazaANodos';
 import type { TrazaRegla } from '@/types/domain';
 import { formatoComparacion } from './lecturaTraza';
@@ -61,6 +63,7 @@ export function NodoPanel({ regla, label, tieneParametros, nombreDe, onEditar, o
         <p className={styles.panelNota}>No alcanzada: el motor se detuvo en {corto} antes de llegar acá.</p>
       )}
       {regla.estado === 'ERROR' && <p className={styles.panelError}>{regla.error}</p>}
+      {regla.supuesto && <p className={styles.panelNota}>{regla.supuesto}</p>}
 
       {regla.comparaciones.length > 0 && (
         <section>
@@ -74,9 +77,7 @@ export function NodoPanel({ regla, label, tieneParametros, nombreDe, onEditar, o
                   <span className={f.resultado === 'SIN_DATO' ? styles.sinDato : undefined}>{f.recibido}</span>
                   <span className={styles.operador}>{f.operador}</span>
                   <span>{f.umbral}</span>
-                  <span className={styles.marca} data-resultado={c.resultado}>
-                    {f.marca}
-                  </span>
+                  <MarcaResultado resultado={f.resultado} className={styles.marca} />
                 </div>
                 <div className={styles.filaClave}>
                   {c.configurable && c.clave ? c.clave : 'Condición fija: no se edita'}
@@ -92,9 +93,11 @@ export function NodoPanel({ regla, label, tieneParametros, nombreDe, onEditar, o
           <h4 className={styles.panelSeccion}>Acción y motivo</h4>
           {regla.acciones.map((a, i) => (
             <div key={i} className={styles.accion}>
-              <code className={styles.accionTipo} data-alerta={a.tipo === 'ALERTA'}>
-                {a.tipo === 'ALERTA' ? '⚠ ALERTA' : a.tipo}
-              </code>
+              {a.tipo === 'ALERTA' ? (
+                <Chip tone="warning">Alerta</Chip>
+              ) : (
+                <code className={styles.accionTipo}>{a.tipo}</code>
+              )}
               <p className={styles.accionMotivo}>{a.motivo}</p>
             </div>
           ))}

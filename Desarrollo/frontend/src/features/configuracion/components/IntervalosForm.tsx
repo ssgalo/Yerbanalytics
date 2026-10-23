@@ -1,4 +1,4 @@
-/* Intervalo del pulso de sensado y evaluación: el único que marca cuándo se lee y cuándo decide el motor. */
+/* Intervalo del pulso de sensado: el único que marca cuándo se leen los nodos. */
 import { useId, useState, type ReactNode } from 'react';
 import type { ConfigOperativa } from '@/types/domain';
 import { PULSE_MAX_MINUTES, PULSE_MIN_MINUTES, pulseIntervalValid } from '@/lib/configValidation';
@@ -80,8 +80,8 @@ export function IntervalosForm({ value, saved, onChange }: IntervalosFormProps) 
         label="Intervalo de sensado y evaluación"
         hint={
           <>
-            En cada franja, anclada a las 02:00, se leen los sensores de todas las macro-zonas y se evalúa
-            el motor de reglas. Rango {PULSE_MIN_MINUTES} a {PULSE_MAX_MINUTES} min.
+            En cada franja, anclada a las 02:00, se leen los sensores de todas las macro-zonas.
+            Rango {PULSE_MIN_MINUTES} a {PULSE_MAX_MINUTES} min.
             {/* El umbral lo calcula el backend al guardar; el navegador no repite la fórmula. */}
             {stale != null &&
               ` Umbral de lectura vieja (calculado por el backend): ${stale} s (${formatDuration(Math.round(stale / 60))}).`}

@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.dto.Metric;
 import com.yerbanalytics.backend.dto.MetricSpec;
+import com.yerbanalytics.backend.effectiveness.EffectivenessBlocks;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
@@ -74,7 +75,13 @@ public record RuleContext(
          * Qué actuadores del sector y su macro-zona están marcados como averiados (S-05), armado UNA vez por zona.
          * {@link HardwareFaults#NONE} si el llamador no lo arma. Nunca {@code null}.
          */
-        HardwareFaults faults
+        HardwareFaults faults,
+
+        /**
+         * Qué acciones tiene bloqueadas el sector por haber quedado «sin efectividad» (S-06), armado UNA vez por zona.
+         * {@link EffectivenessBlocks#NONE} si el llamador no lo arma. Nunca {@code null}.
+         */
+        EffectivenessBlocks effectiveness
 
 ) {
     public RuleContext {
@@ -82,6 +89,17 @@ public record RuleContext(
         invalidMetrics = invalidMetrics == null ? Set.of() : Set.copyOf(invalidMetrics);
         hardware = hardware == null ? HardwareCoverage.COMPLETE : hardware;
         faults = faults == null ? HardwareFaults.NONE : faults;
+        effectiveness = effectiveness == null ? EffectivenessBlocks.NONE : effectiveness;
+    }
+
+    /** Constructor sin bloqueos de efectividad: mantiene la firma de antes de S-06. */
+    public RuleContext(SectorEntity sector, ZonaEntity zona, List<MetricSpec> specs, List<Metric> metrics,
+                       ConfiguracionOperativaEntity config, String finalStatus, Instant now,
+                       WeatherForecast forecast, boolean bloqueoManualActivo, ContextoRiego riego,
+                       RuleOverrides overrides, Set<String> invalidMetrics, HardwareCoverage hardware,
+                       HardwareFaults faults) {
+        this(sector, zona, specs, metrics, config, finalStatus, now, forecast, bloqueoManualActivo, riego,
+                overrides, invalidMetrics, hardware, faults, EffectivenessBlocks.NONE);
     }
 
     /** Constructor sin fallas: mantiene la firma de antes de S-05. */
@@ -130,7 +148,7 @@ public record RuleContext(
     /** Copia de este contexto con otros overrides. Lo usa el orquestador: el llamador no los conoce. */
     public RuleContext withOverrides(RuleOverrides nuevos) {
         return new RuleContext(sector, zona, specs, metrics, config, finalStatus, now, forecast,
-                bloqueoManualActivo, riego, nuevos, invalidMetrics, hardware, faults);
+                bloqueoManualActivo, riego, nuevos, invalidMetrics, hardware, faults, effectiveness);
     }
 
     /**
@@ -171,13 +189,14 @@ public record RuleContext(
 
     /**
      * Devuelve el valor raw de la métrica identificada por {@code key},
-     * o {@code null} si no está presente en el contexto.
+     * o {@code null} si no está presente en el contexto o la zona nunca la reportó (una sonda sin conectar llega como métrica
+     * sin valor).
      */
     public Double metricRaw(String key) {
         return metrics.stream()
                 .filter(m -> key.equals(m.key()))
-                .map(Metric::raw)
                 .findFirst()
+                .map(Metric::raw)
                 .orElse(null);
     }
 }

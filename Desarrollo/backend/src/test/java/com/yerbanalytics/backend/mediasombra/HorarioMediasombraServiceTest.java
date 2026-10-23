@@ -2,7 +2,7 @@ package com.yerbanalytics.backend.mediasombra;
 
 import com.yerbanalytics.backend.engine.MallaZona;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.model.EtapaPlanRustificacion;
 import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.PlanRustificacionEntity;
@@ -77,7 +77,7 @@ class HorarioMediasombraServiceTest {
     private final Reloj reloj = new Reloj(LocalTime.of(7, 0));
     private final List<PlanRustificacionEntity> vigentes = new ArrayList<>();
     private final List<ManualLockEntity> bloqueos = new ArrayList<>();
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private ZonaEntity zona;
     private HardwareService hardware;
     private MediasombraService mediasombra;
@@ -212,7 +212,7 @@ class HorarioMediasombraServiceTest {
     @Test
     @DisplayName("apagado desde el simulador no hace nada")
     void apagado() {
-        overrides.put(HorarioMediasombraService.NAME, new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff(HorarioMediasombraService.NAME);
         a(9, 0);
 
         verify(mediasombra, never()).mover(any(), anyBoolean(), anyString(), anyString());

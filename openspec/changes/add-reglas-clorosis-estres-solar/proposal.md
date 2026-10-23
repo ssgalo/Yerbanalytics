@@ -1,6 +1,6 @@
 # Change: add-reglas-clorosis-estres-solar
 
-> Rama: `feat/reglas-v2-clorosis-estres-solar`. Cubre **F-C1**, **F-C2**, **F-S1**, **F-S2** y **F-S3** (`reglas_v2` §8.5).
+> Rama: `feat/reglas-v2-clorosis-estres-solar`. **Implementadas F-C1, F-C2, F-S1 y F-S3; F-S2 no** (se bloqueó por la cancelación de `add-mediasombra-v2`; desde #66 está desbloqueada, ver el design). Cubre **F-C1**, **F-C2**, **F-S1**, **F-S2** y **F-S3** (`reglas_v2` §8.5).
 > Índice: `reglas-v2-overview/README.md`.
 > **Depende de:** `add-control-demo-reglas`, `add-historial-lecturas`, `add-dosificacion-base`, `add-mediasombra-v2` (F-S2).
 

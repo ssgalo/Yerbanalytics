@@ -10,7 +10,8 @@ import java.util.Set;
  * @param label          human-readable label
  * @param branch         the rule's branch (GLOBAL, RIEGO, INSUMO, …)
  * @param priority       evaluation order (lower = higher priority)
- * @param enabled        whether the rule runs ({@code false} → OMITIDA_DESHABILITADA in the trace)
+ * @param enabled        read only: whether the rule runs now ({@code false} → OMITIDA_DESHABILITADA in the trace). It is
+ *                       the operational state, the one changed from Motor de reglas: the demo cannot write it
  * @param cooldownKeys   cooldown keys this rule declares (one input per key in the simulator UI)
  * @param bypassKeys     bypass keys this rule declares (one toggle per key in the simulator UI)
  * @param cooldownMinutes current cooldown overrides by key (empty in production)

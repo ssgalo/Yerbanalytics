@@ -64,10 +64,17 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
     expect(umbralError(cfg.umbrales[0])).not.toBeNull();
   });
 
-  it('rechaza límites operativos no positivos', () => {
+  it('rechaza un intervalo de sensado fuera de rango', () => {
     const cfg = buildConfig();
-    cfg.operativa = { ...cfg.operativa, insumoDosisMax24hMl: 0 };
+    cfg.operativa = { ...cfg.operativa, intervaloSensadoMinutos: 0 };
     expect(operativaErrors(cfg.operativa).length).toBeGreaterThan(0);
+  });
+
+  it('la configuración operativa ya no trae la dosis de insumo ni el seguimiento (son del motor de reglas)', () => {
+    const op = buildConfig().operativa;
+    expect(op).not.toHaveProperty('insumoDosisMax24hMl');
+    expect(op).not.toHaveProperty('seguimientoLatenciaMin');
+    expect(op).not.toHaveProperty('seguimientoDeltaMin');
   });
 
   it('el horario por defecto de la mediasombra es válido y exige cierre posterior a la apertura', () => {

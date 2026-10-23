@@ -45,6 +45,11 @@
   --warn-ink: #7a5310;
   --warn-line: #f0dcae;
 
+  /* compartidos: parámetros que usan varias reglas. Naranja suave propio; no es estado ni acento. */
+  --shared-soft: #fff1e0;
+  --shared-line: #f0c28f;
+  --shared-ink: #85470d; /* texto sobre --shared-soft (6,6:1) */
+
   --crit: #d2462e;
   --crit-soft: #fbe3dd;
   --crit-ink: #9a2b17;
@@ -97,6 +102,9 @@
   --art-line: #39433d;
   --on-art: #ffffff;
   --on-art-muted: #a9b5ae;
+
+  /* velo detrás de un diálogo modal */
+  --scrim: rgba(21, 35, 27, 0.42);
 
   /* tipografía: Archivo, una familia variable en tres anchos */
   --font-display: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;

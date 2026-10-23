@@ -39,6 +39,12 @@ const ESTADOS: [string, string, string][] = [
   ['--info', '#2D6FB5', 'El sistema actuó: riego, acciones, traza'],
 ];
 
+const COMPARTIDO: [string, string, string][] = [
+  ['--shared-soft', '#FFF1E0', 'Fondo de «Compartido» (parámetro que usan varias reglas)'],
+  ['--shared-line', '#F0C28F', 'Borde de «Compartido»'],
+  ['--shared-ink', '#85470D', 'Texto sobre --shared-soft (6,6:1)'],
+];
+
 const CLASES_DIAGNOSTICO: [string, string, string][] = [
   ['--dx-sano', '#57965F', 'Sano'],
   ['--dx-clorosis', '#C2B14E', 'Clorosis'],
@@ -114,6 +120,8 @@ export function SistemaDisenoPage() {
           <Swatches items={BASE} />
           <h3 className={styles.h3}>Estados (los únicos colores saturados)</h3>
           <Swatches items={ESTADOS} />
+          <h3 className={styles.h3}>Compartido (Motor de reglas; no es un estado)</h3>
+          <Swatches items={COMPARTIDO} />
           <h3 className={styles.h3}>Clases de diagnóstico (sólo composición, nunca texto)</h3>
           <Swatches items={CLASES_DIAGNOSTICO} />
           <h3 className={styles.h3}>Cajas de detección (sólo superpuestas a una fotografía)</h3>

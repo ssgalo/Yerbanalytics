@@ -10,6 +10,7 @@
    ============================================================ */
 import type {
   ActionRecord,
+  CambioEstadoRegla,
   CambioParametro,
   CatalogoReglas,
   Configuracion,
@@ -18,10 +19,12 @@ import type {
   DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
+  RevisionEfectividad,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  ReglaCatalogo,
   ManualLock,
   NewManualLock,
   NewTankLoad,
@@ -89,6 +92,11 @@ export interface DataRepository {
    * autónomo. El detalle es obligatorio; devuelve la flota actualizada o rechaza con el motivo.
    */
   registerRepair(id: string, detalle: string): Promise<HardwareData>;
+  /**
+   * Registra la revisión de una acción que quedó sin efectividad (S-06): levanta el bloqueo de su repetición autónoma. El
+   * detalle es obligatorio; rechaza con el motivo si el evento no existe o ya no bloquea.
+   */
+  registerEffectivenessReview(eventId: string, detail: string): Promise<RevisionEfectividad>;
   /** Devuelve el resumen de la topología cargada en el vivero (HU-18 CA-01). */
   getTopologia(): Promise<TopologiaVivero>;
   /** Genera (o regenera) la grilla lógica del vivero y devuelve el resumen resultante (HU-18 CA-01). */
@@ -111,6 +119,11 @@ export interface DataRepository {
    * restablece el valor de fábrica. Si algo es inválido rechaza con `ParametrosInvalidosError`.
    */
   saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas>;
+  /**
+   * Prende o apaga una pieza del motor, en el momento (no entra al borrador de parámetros). Devuelve la pieza
+   * actualizada. Rechaza con `EstadoReglaError` si falta el motivo o la confirmación de una protección.
+   */
+  setEstadoRegla(nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo>;
   /** Esquema base del DAG del motor (topología estática, con los parámetros de cada regla). */
   getRuleSchema(): Promise<DagSchema>;
   /**

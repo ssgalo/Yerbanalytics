@@ -50,12 +50,16 @@ public class DemoRulesController {
     }
 
     /**
-     * Updates the enabled flag, cooldown overrides and/or bypass set of a single piece. {@code 404} if it does not
-     * exist; {@code 400} if a cooldown or bypass key is not one the piece declares.
+     * Updates the cooldown overrides and/or bypass set of a single piece. {@code 404} if it does not exist;
+     * {@code 400} if a cooldown or bypass key is not one the piece declares, or if the body carries {@code enabled}
+     * (on/off is changed only from Motor de reglas).
      */
     @PutMapping("/{ruleName}")
     public DemoRuleDto update(@PathVariable String ruleName, @RequestBody DemoRuleUpdateDto body) {
-        return toDto(service.update(ruleName, body.enabled(), body.cooldownMinutes(), body.bypassed()));
+        if (body.enabled() != null) {
+            throw new EnabledNotOverridableException();
+        }
+        return toDto(service.update(ruleName, body.cooldownMinutes(), body.bypassed()));
     }
 
     /** Shortcut: sets every declared cooldown of every piece to 0 (no wait between consecutive evaluations). */
@@ -74,6 +78,18 @@ public class DemoRulesController {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(EnabledNotOverridableException.class)
+    public ResponseEntity<Map<String, String>> handleEnabled(EnabledNotOverridableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    /** The body asked to switch a rule on or off: that is not a demo power. */
+    static class EnabledNotOverridableException extends RuntimeException {
+        EnabledNotOverridableException() {
+            super("El encendido se cambia en Motor de reglas.");
+        }
+    }
+
     private static DemoRuleDto toDto(ControllableState state) {
         DemoControllable controllable = state.controllable();
         RuleOverride override = state.override();
@@ -82,7 +98,7 @@ public class DemoRulesController {
                 controllable.label(),
                 controllable.branch().name(),
                 controllable.priority(),
-                override.enabled(),
+                state.enabled(),
                 controllable.cooldownKeys(),
                 controllable.bypassKeys(),
                 override.cooldownMinutes(),

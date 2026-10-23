@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { NodoPanel } from './NodoPanel';
 import type { TrazaRegla } from '@/types/domain';
 
@@ -46,6 +46,7 @@ const regla = (p: Partial<TrazaRegla> = {}): TrazaRegla => ({
   acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Humedad de sustrato 38% bajo el umbral de riego (45%).' }],
   bloqueadaPor: null,
   error: null,
+  supuesto: null,
   ...p,
 });
 
@@ -55,9 +56,9 @@ const montar = (r: TrazaRegla, extra: Partial<React.ComponentProps<typeof NodoPa
   render(
     <NodoPanel
       regla={r}
-      label="💦 Riego"
+      label="Riego"
       tieneParametros
-      nombreDe={(id) => (id === 'PosponerPorLluviaRule' ? '🌧️ Condición climática (lluvia)' : id)}
+      nombreDe={(id) => (id === 'PosponerPorLluviaRule' ? 'Condición climática (lluvia)' : id)}
       onEditar={onEditar}
       onCerrar={onCerrar}
       {...extra}
@@ -75,8 +76,8 @@ describe('NodoPanel', () => {
     expect(filas[0].textContent).toContain('Humedad de sustrato');
     expect(filas[0].textContent).toContain('38 %');
     expect(filas[0].textContent).toContain('45 %');
-    expect(filas[0].textContent).toContain('✓');
-    expect(filas[1].textContent).toContain('✗');
+    expect(within(filas[0]).getByText('Se cumple')).toBeTruthy();
+    expect(within(filas[1]).getByText('No se cumple')).toBeTruthy();
   });
 
   it('muestra la clave del parámetro de las configurables y marca las fijas', () => {
@@ -105,7 +106,8 @@ describe('NodoPanel', () => {
     );
 
     expect(screen.getByText('ACTIVAR_VALVULA')).toBeTruthy();
-    expect(screen.getByText('⚠ ALERTA')).toBeTruthy();
+    expect(screen.getByText('Alerta')).toBeTruthy();
+    expect(screen.queryByText('ALERTA')).toBeNull();
     expect(screen.getByText(/bajo el umbral crítico/)).toBeTruthy();
   });
 
@@ -157,7 +159,7 @@ describe('NodoPanel', () => {
     montar(regla({ estado: 'OMITIDA_RAMA_BLOQUEADA', comparaciones: [], acciones: [], bloqueadaPor: 'PosponerPorLluviaRule' }));
 
     expect(screen.getByText(/Omitida: la rama la cortó/)).toBeTruthy();
-    expect(screen.getByText(/🌧️ Condición climática \(lluvia\)/)).toBeTruthy();
+    expect(screen.getByText(/Condición climática \(lluvia\)/)).toBeTruthy();
     expect(screen.queryAllByTestId('fila-comparacion')).toHaveLength(0);
   });
 
@@ -172,6 +174,18 @@ describe('NodoPanel', () => {
   it('una con error muestra el mensaje', () => {
     montar(regla({ estado: 'ERROR', comparaciones: [], acciones: [], error: 'IllegalStateException: boom' }));
     expect(screen.getByText(/IllegalStateException: boom/)).toBeTruthy();
+  });
+
+  it('una regla que asumió algo por falta de pronóstico lo dice', () => {
+    montar(regla({ supuesto: 'Sin pronóstico: se asume que no llueve: no se pospone el riego' }));
+
+    expect(screen.getByText(/Sin pronóstico: se asume que no llueve/)).toBeTruthy();
+  });
+
+  it('con pronóstico no muestra ningún supuesto', () => {
+    montar(regla({ supuesto: null }));
+
+    expect(screen.queryByText(/Sin pronóstico/)).toBeNull();
   });
 
   it('SIN_DATO se lee "sin dato"', () => {

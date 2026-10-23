@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -103,7 +104,22 @@ public class HardwareFaultService implements ConsumidorParametros, DemoControlla
 
     @Override
     public String label() {
-        return "📟 Errores del nodo (S-05)";
+        return "Errores del nodo";
+    }
+
+    @Override
+    public String code() {
+        return "S-05";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Los errores que publica el nodo se ignoran: ninguna falla se marca.");
     }
 
     @Override

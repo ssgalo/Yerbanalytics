@@ -5,9 +5,11 @@
    comparaciones. El clic y el panel con todo el detalle los resuelve quien lo monta.
    ============================================================ */
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import { Icon } from '@/components/ui/Icon';
 import { formatoComparacion } from '@/features/reglas/inspector/lecturaTraza';
 import type { TrazaRegla } from '@/types/domain';
 import type { EstadoNodo } from './trazaANodos';
+import { MarcaResultado } from './MarcaResultado';
 import styles from './ReglaNode.module.css';
 
 /** Cantidad de comparaciones que caben en el nodo; el resto está en el panel. */
@@ -72,10 +74,10 @@ export function ReglaNodeView({ data }: { data: ReglaNodeData }) {
                 <span
                   className={styles.candado}
                   role="img"
-                  aria-label="No configurable"
+                  aria-label="Condición fija: no se edita"
                   title="Condición fija: no se edita"
                 >
-                  🔒
+                  <Icon name="lock" size={11} />
                 </span>
               )}
               {c.etiqueta}
@@ -86,9 +88,10 @@ export function ReglaNodeView({ data }: { data: ReglaNodeData }) {
               </span>
               <span className={styles.operador}>{f.operador}</span>
               <span>{f.umbral}</span>
-              <span className={`${styles.marca} ${styles[MARCA_CLASE[f.resultado]]}`}>
-                {f.marca}
-              </span>
+              <MarcaResultado
+                resultado={f.resultado}
+                className={`${styles.marca} ${styles[MARCA_CLASE[f.resultado]]}`}
+              />
             </div>
           </div>
         );

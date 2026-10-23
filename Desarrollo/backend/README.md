@@ -438,8 +438,33 @@ y el intervalo del pulso de sensado y evaluación (configuración operativa).
   nuevo figura `OMITIDA_SIN_DIAGNOSTICO_NUEVO`.
 - `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros` y `activa` (`false` en las apagadas, como las retiradas: el historial no las dibuja).
 
-El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Parámetros* (edición
-del catálogo) e *Inspector* (el grafo coloreado con la última evaluación de un sector).
+El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Reglas* (cada regla con su
+interruptor y sus parámetros, agrupadas por objetivo) e *Inspector* (el grafo coloreado con la última evaluación de un
+sector).
+
+#### Estado operativo de las reglas (`add-motor-reglas-operativo`)
+
+Prender o apagar una regla es una **decisión del vivero**, no un control de demo:
+
+- `PUT /api/rules/{name}/estado` (`reglas.editar`; cuerpo `{activa, motivo, confirmaProteccion}`) cambia el interruptor.
+  Se persiste en `regla_estado` (con quién, cuándo y por qué), vale también en modo `REAL`, sobrevive reinicios y deja un
+  evento en el historial. `404` si la pieza no existe; `400` con `error` = `ACTIVA_REQUERIDA`, `MOTIVO_REQUERIDO`,
+  `CONFIRMACION_REQUERIDA` (trae la `consecuencia`) o `MOTIVO_DEMASIADO_LARGO`. Si ya estaba así, no escribe.
+- **Sin fila rige la siembra**: apagada si figura en `yerbanalytics.reglas.retiradas`, prendida si no. La fila nace
+  cuando una persona toca el interruptor (`OperationalRuleStates`).
+- **Protecciones**: apagar una protección (`protection()` de la regla: p. ej. `StaleSensorRule`, `DailyDoseLimitRule`)
+  exige motivo y `confirmaProteccion: true`. R-03, R-05 y R-06 no lo son: son frenos agronómicos de R-01.
+- **Fuente única del encendido**: el motor consulta un único bean, `EffectiveRuleOverrides`, y su `isEnabled` es **siempre el
+  estado operativo**: la demo no tiene interruptor y sólo conserva cooldowns y bypass. En `GET /api/demo/rules`, `enabled` es
+  ese estado (sólo lectura, lo que corre); `PUT /api/demo/rules/{name}` con `enabled` responde `400` («El encendido se cambia
+  en Motor de reglas.»). El catálogo (`GET /api/rules/parametros`) no trae `apagadaPorDemo`. El simulador no tiene
+  `reglas.editar`: no escribe el estado operativo.
+
+> **Migración manual pendiente · umbrales al motor.** `resources/migracion-umbrales-al-motor.sql`: el seguimiento
+> post-acción (`seguimiento_latencia_min`, `seguimiento_delta_min`) pasa al catálogo y se borra
+> `insumo_dosis_max_24h_ml` de `configuracion_operativa`. **Hay que arrancar el backend nuevo una vez** (crea
+> `parametro_regla` y `regla_estado`), detenerlo, correr el script y volver a arrancar. Es idempotente; sin correrlo
+> el backend arranca, pero crear una fila operativa nueva falla por el `NOT NULL` de las columnas viejas.
 
 ### Pulso de sensado: el único momento en que decide el motor
 
@@ -460,7 +485,7 @@ backend caído no se recupera.
   Pide a todas las zonas y sólo se usa por API: Demo Expo usa la secuencia `LECTURA` con `ejecutarMotor`,
   que emite un pulso con motor sólo de su zona (ver "Secuencias"). No corre las franjas. Un programado
   que encuentra uno en curso se omite (queda en el log).
-- **Reintentos** (parámetros `sensado.*` del catálogo, editables en Motor de reglas → Parámetros): a una
+- **Reintentos** (parámetros `sensado.*` del catálogo, editables en Motor de reglas → Reglas): a una
   zona pendiente se le reenvía el pedido tras `sensado.espera-respuesta` (60 s) y después cada
   `sensado.espera-reintento` (1 min), hasta `sensado.reintentos` (2) reintentos; vencido el último plazo
   queda sin respuesta en ese pulso y no se evalúa. Un cambio guardado rige en el tick siguiente. Se
@@ -885,7 +910,7 @@ Suspende la actuación autónoma sobre un **sector** o una **macro-zona**. Se cr
 - `ManualLockRule` (prioridad 0, `ABORT_ALL`) corta la cadena del sector. La mediasombra es de la zona: un bloqueo **de la
   zona** corta su rama en las reglas de zona (`ShadeFaultRule`) y frena también al horario de la mediasombra; un bloqueo de
   un solo sector no la toca.
-- Desde el simulador: apagar la regla, el bypass `lock` y el escenario «Bloqueo manual» (README del simulador).
+- Desde el simulador: el bypass `lock` (la regla se apaga en Motor de reglas) y el escenario «Bloqueo manual» (README del simulador).
 
 ## Lectura inválida (S-03) y hardware incompleto (S-04)
 
@@ -911,7 +936,7 @@ rango del catálogo (`seguridad.rango-hum|temp|ph|ce|luz-min|max`; bordes inclui
    Una lectura válida reinicia la cuenta.
 
 - El contador de relecturas es por (zona, métrica, ciclo) y vive en memoria; la racha vive en la base y sobrevive a un reinicio.
-- Desde el simulador: apagar la pieza `ReadingValidationGuard` (acepta cualquier valor), el bypass `retries` (no pide
+- Desde el simulador: el bypass `retries` de `ReadingValidationGuard` (apagarla, para que acepte cualquier valor, se hace en Motor de reglas) (no pide
   relecturas) y el escenario «Lectura inválida».
 - El guard es consumidor de parámetros y depende con `@Lazy` del catálogo **y** del servicio de configuración (éste depende
   del catálogo): sin eso el contexto no arranca (`ReadingValidationGuardWiringTest`).
@@ -959,7 +984,7 @@ y `simulador/server/contract.ts`).
   sin activar (quedó abierta) pide **cubrir a mano**.
 - **Un mismo hecho por dos caminos (D-6):** la falla de la malla llega por el tópico y por el ack `falla_mecanica`
   (`SeguimientoComandosService` la entrega al mismo servicio). Mientras la marca siga con el mismo tipo, el segundo aviso es
-  `DUPLICATE` y no alerta. Con el receptor apagado desde el simulador, el ack alerta como antes.
+  `DUPLICATE` y no alerta. Con el receptor apagado en Motor de reglas, el ack alerta como antes.
 - **Reparación (D-5):** `POST /api/hardware/{id}/reparacion {detalle}` (permiso `hardware.reparar`; el detalle es obligatorio; `400`
   sin detalle o dispositivo inexistente, `409` si no tiene falla) limpia la marca, deja el evento
   **«Reparación»** en el historial con usuario y detalle y una alerta `INFO`. En el siguiente pulso el sector vuelve a evaluarse.
@@ -1001,7 +1026,7 @@ Dos cosas mueven la malla, y no se pisan:
   - `GET /api/zonas/{zona}/rustificacion` → plan vigente o `204` (permiso `vivero.ver`).
   - `POST /api/zonas/{zona}/rustificacion {fechaInicio, etapas: [{dias, abiertaDesde, abiertaHasta}]}` → `400`/`409 {error}`.
   - `POST /api/zonas/{zona}/rustificacion/cancelar` (eliminar) → `409` si no hay plan. Los dos con `configuracion.editar`.
-- **Simulador:** `HorarioMediasombraService` es `DemoControllable` (se apaga); `ShadeFaultRule` admite los bypass `fault` y
+- **Simulador:** `HorarioMediasombraService` es `DemoControllable` (se apaga desde Motor de reglas); `ShadeFaultRule` admite los bypass `fault` y
   `hardware`. Las secuencias de Demo Expo (abrir / cerrar / desplegar-esperar-enrollar) siguen igual, ahora por el comando de zona.
 
 ## Aplicación de insumos (`add-dosificacion-base` · reglas_v2 §8.1–8.3)
@@ -1043,11 +1068,11 @@ fertilizante o fitosanitario emite `ACTIVAR_BOMBA` con un `DetalleInsumo(supply,
 - **API de tanques.** `GET /api/tanques` (`insumos.ver`) y `POST /api/tanques/{zona}/{insumo}/recarga` (`insumos.gestionar`) con
   `{liters, capacityLiters?}`: la primera carga declara la capacidad; una carga que desborda el tanque se rechaza (`400`). La carga queda en
   el historial de la macro-zona con el usuario.
-- **Control desde el simulador** (`/api/demo/rules/ApplicationPreconditions`): apagada, no se aplica nada y queda constancia; bypass
+- **Control desde el simulador** (`/api/demo/rules/ApplicationPreconditions`): apagada (en Motor de reglas), no se aplica nada y queda constancia; bypass
   `diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture` y `stock`; cooldowns `interval-fertilizer` e `interval-fungicide`.
 
 > **La dosificación v1 queda retirada pero no borrada.** `SupplyRule` (estado crítico + confianza) y `DailyDoseLimitRule` (1 dosis cada 24 h)
-> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `RuleOverridesStore`; en la traza figuran «deshabilitadas»). Hoy el único camino
+> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `OperationalRuleStates`; en la traza figuran «deshabilitadas»). Hoy el único camino
 > productivo que pide aplicaciones es el **plan de nutrición** (N-01, ver abajo), que no decide con el diagnóstico de IA: lo que reemplaza a
 > `SupplyRule` son las reglas por diagnóstico F-* (todavía no están), así que borrarla dejaría al vivero sin dosificación por diagnóstico. Para
 > probarla de punta a punta: `YERBANALYTICS_REGLAS_RETIRADAS=ninguna` (cualquier valor que no sea el nombre de una regla; un valor
@@ -1093,13 +1118,166 @@ Fertilizante foliar **en todos los sectores de la macro-zona cada N días**, sin
   `batchOpen`, `advanced`).
 - **Dosis.** Las aplica el `ApplicationService` con `insumo.dosis-fertilizante` (10 ml de fábrica, 1–50): la v2 dice 100 ml por sector, pero el
   firmware sólo acepta 50 ml por comando (ver «Aplicación de insumos»). El plan no tiene una dosis propia.
-- **Parámetros** (familia `NUTRICION`, editables en Motor de reglas → Parámetros): `nutricion.intervalo-plan`, `nutricion.ce-baja`,
+- **Parámetros** (familia `NUTRICION`, editables en Motor de reglas → Reglas): `nutricion.intervalo-plan`, `nutricion.ce-baja`,
   `nutricion.ce-lecturas`, `nutricion.sin-fertilizar-dias`.
 - **Si una regla de zona lanza**, la excepción se propaga como en las de sector (la ingesta revierte y el pulso siguiente lo reintenta) y antes
   se guarda la traza parcial con esa regla en `ERROR`.
 - **Control desde el simulador** (`/api/demo/rules`): `NutritionPlanRule` (cooldown `interval`, minutos entre aplicaciones del plan; 0 lo
   vence ya) y `LowEcRule` (cooldown `no-fertilized`; bypass `samples`: la última lectura de CE cuenta como la media). Las dos se apagan.
   Escenarios `NUTRITION_PLAN` y `LOW_EC` en el simulador.
+
+## Reglas bióticas (`add-reglas-biotico` · reglas_v2 §8.5)
+
+Cinco decisiones sobre hongos y plagas, todas con fitosanitario y todas por el `ApplicationService` (nunca publican la bomba). Dos son **de
+sector** (corren en la cadena del `RuleOrchestrator`, rama `INSUMO`, sólo con un **diagnóstico nuevo**) y dos **de macro-zona** (las corre el
+`ZoneRuleEngine`, antes que el plan de nutrición: sanidad antes que rutina). El tope es una precondición más de la aplicación.
+
+| Regla | Prioridad | Qué decide |
+|---|---|---|
+| `FungalDamageRule` (F-F1) | 15 · sector | Diagnóstico *Daño fúngico* vigente (P-D1) **y** (severidad Media/Alta **o** sustrato > `biotico.humedad-hongo` (80 %) **o** DPV < `biotico.dpv-saturado` (0,3 kPa) en las **2 últimas lecturas de pulso, de las últimas 24 h** **o** el mismo diagnóstico en `biotico.capturas-seguidas` (3) capturas de días seguidos): pide fitosanitario y deja un `WARNING` «Alta probabilidad de hongo» (`CRITICAL` con severidad Alta). Si no, espera a las próximas capturas |
+| `FoliarPestRule` (F-P1) | 16 · sector | Lo mismo para *Plaga foliar* y *Ácaro* (que es una plaga foliar), con DPV ≥ `biotico.dpv-calor-seco` (2 kPa) en alguna lectura de las últimas `biotico.horas-dpv-acaros` (72) horas como razón ambiental. Si no se cumple ninguna deja un `INFO` y espera |
+| `FungalConditionRule` (F-F2) | 17 · zona | DPV < `biotico.dpv-saturado` en 2 lecturas de pulso seguidas, temperatura entre `biotico.temp-predisponente-min` y `-max` (18–28 °C) y sustrato ≥ `biotico.humedad-predisponente` (75 %): `WARNING` «Condiciones favorables a enfermedades fúngicas». **No aplica nada** y no mira el diagnóstico |
+| `OutbreakRule` (F-04) | 18 · zona | `biotico.sectores-foco` (3) o más sectores de la zona con el mismo tipo de daño biótico vigente dentro de `biotico.horas-foco` (72 h): pide fitosanitario para los **lindantes** de cada afectado (aunque estén sanos) y deja un `CRITICAL` «Foco de [diagnóstico] en MZ-N» |
+| Tope (F-06) | precondición | Un sector que ya recibió `insumo.tope-fitosanitario` (3) fitosanitarios en `insumo.tope-fitosanitario-dias` (30) días **no recibe otro** hasta que alguien registre la revisión: `ApplicationPreconditions` rechaza (motivo «F-06 … tope») y deja un `WARNING` por sector, una vez |
+
+- **Qué decide la regla y qué el servicio.** La regla decide *si* corresponde tratar; *cuándo* se aplica lo resuelve el `ApplicationService` con
+  P-D1…P-D5 (ventana, temperatura, lluvia, humedad, intervalo de 7 días y una por día). Lo diferido queda en `pending_application` y se reintenta.
+  La dosis es la del catálogo (`insumo.dosis-fitosanitario`, 10 ml de fábrica, máx. 50): la v2 dice 100 ml, el firmware acepta 50 por comando.
+- **Mapa de estados (D-1).** *Daño fúngico* → F-F1; *Plaga foliar* y *Ácaro* → F-P1 (y cuentan juntos en el foco); el *Daño biótico* genérico
+  **no es de ninguno** (no se sabe qué condición lo justifica): sólo queda en el Registro de Inacción. Es la decisión por defecto del diseño,
+  **a validar con el vivero**. Severidad: Baja = leve, Media = moderada, Alta = alta (`biotic/Severity`).
+- **Capturas seguidas (D-3).** `biotic/ConsecutiveCaptures`: de cada día vale la última captura, y la racha corre hacia atrás desde la más nueva
+  sin saltear ningún día (una pasada que faltó la corta). Cuentan sólo las del tipo de daño y con la confianza mínima del catálogo.
+- **Un diagnóstico, una aplicación (D-4).** Una regla que pide una aplicación por el diagnóstico **no lo gasta**: lo gasta el `ApplicationService`
+  cuando la aplicación se ejecuta (o se rechaza, porque no se reintenta). La fila diferida guarda `diagnosis_ts` (columna nueva de
+  `pending_application`, sin migración manual) y al ejecutarse se marca ESE diagnóstico, no el que tenga entonces el sector: uno más nuevo sigue
+  siendo nuevo. Mientras espera, la regla se reevalúa en cada pulso y vuelve a pedir lo mismo (la fila es única por sector e insumo).
+  `ResultadoEvaluacion.usoDiagnostico` es `false` si alguna regla pidió una aplicación por el diagnóstico.
+- **El foco (D-6).** Cuenta, por tipo de daño, los sectores **de la zona** con diagnóstico vigente (concluyente y con la confianza mínima) **dentro
+  de la ventana del foco**, que puede ser más larga que la vigencia de P-D1 (48 h). Los lindantes son los hasta 8 de la grilla de la zona
+  calculada con `sectoresPorFila` de la topología (`biotic/GridNeighbors`, `biotic/SectorGrid`); los del borde sólo tienen los que existen, y los
+  de otra macro-zona no se tratan. **Supuesto a validar con el vivero:** esa disposición es visual, no un mapa de adyacencia física. Un foco, un
+  tratamiento: no se le pide a un lindante que ya recibió fitosanitario dentro de la ventana ni al que ya lo tiene en cola, y si no queda ninguno
+  por tratar no se repiten ni las órdenes ni la alerta. Un lindante bloqueado (S-01), sin bomba (S-04) o con falla hidráulica (S-05) queda fuera
+  de la tanda pero el foco se avisa igual.
+- **Una alerta por evento (F-F2).** La regla no guarda estado: avisa cuando la condición se cumple con las últimas lecturas y **no** se cumplía
+  con las mismas lecturas corridas una hacia atrás, es decir, cuando el evento empieza.
+- **Revisión del sector (F-06).** `POST /api/sectores/{sectorId}/revision-fitosanitario {"detail": "..."}` (permiso `insumos.gestionar`,
+  que ya tienen el Ingeniero, el Operario y el Servicio; sin migración) registra quién revisó y qué constató (evento «Revisión» en el historial
+  del sector) y fija `sector.fungicide_review_ts`: desde ahí el conteo del tope vuelve a cero. El detalle es obligatorio (`400`); un sector
+  inexistente da `404`. Es el único camino que levanta el bloqueo. El tope cuenta las aplicaciones de la tabla `application`, sea cual sea la
+  regla que las pidió.
+- **Parámetros** (editables en Motor de reglas → Parámetros): familia `BIOTICO` (`biotico.dpv-saturado`, `dpv-calor-seco`, `humedad-hongo`,
+  `temp-predisponente-min`/`-max`, `humedad-predisponente`, `capturas-seguidas`, `horas-dpv-acaros`, `sectores-foco`, `horas-foco`) e `INSUMO`
+  (`insumo.tope-fitosanitario`, `insumo.tope-fitosanitario-dias`). Los rangos de las temperaturas predisponentes y de las ventanas los propone el
+  equipo: la v2 fija el valor de fábrica pero no cuánto se puede mover.
+- **Control desde el simulador** (`/api/demo/rules`): `FungalDamageRule` y `FoliarPestRule` (bypass `persistence`: el diagnóstico cuenta como
+  visto en las capturas seguidas), `FungalConditionRule` (bypass `readings`: basta una lectura de DPV bajo el umbral), `OutbreakRule` (cooldown
+  `window`, en minutos: la ventana del foco) y `ApplicationPreconditions` (bypass `cap`: el tope de fitosanitarios no se aplica). Las cuatro reglas
+  se apagan. Escenarios `FUNGAL_DAMAGE`, `FOLIAR_PEST`, `FUNGAL_CONDITION`, `OUTBREAK` y `FUNGICIDE_CAP` en el simulador.
+- **Efecto a conocer.** `SupplyRule` y `DailyDoseLimitRule` siguen retiradas: estas reglas **no las reemplazan** (las F-C*/F-S* de
+  `add-reglas-clorosis-estres-solar` son las que faltan para borrarlas). Con el motor encendido, un sector con daño fúngico o plaga que no tiene
+  el tanque de fitosanitario registrado rechaza la aplicación (y gasta el diagnóstico): cargá los tanques antes de la primera pasada.
+
+## Clorosis y estrés solar (`add-reglas-clorosis-estres-solar` · reglas_v2 §8.5)
+
+Las dos familias de diagnóstico **no biótico**. Cuatro reglas **de sector** que actúan una vez por diagnóstico nuevo; **F-S2 (estrés solar
+extendido de la macro-zona) no está implementada**: ver abajo.
+
+| Regla | Prioridad · rama | Qué decide |
+|---|---|---|
+| `ChlorosisNonNutritionalRule` (F-C1) | 24 · `INSUMO` | Diagnóstico *Clorosis* vigente (P-D1) y alguna causa que el fertilizante no corrige: humedad de sustrato **media** de las últimas `clorosis.humedad-horas` (48) h **>** `clorosis.humedad-asfixia` (80 %) → **asfixia radicular**; CE **≥** `clorosis.ce-salinidad` (2,0 dS/m) → **salinidad**; pH **≥** `clorosis.ph-ferrica` (6,5) → **clorosis férrica**. No aplica nada: emite `ABORT_INSUMO` (corta la rama del sector) y un `WARNING` con la causa (las dice todas) |
+| `ChlorosisNutritionalRule` (F-C2) | 25 · `INSUMO` | Clorosis vigente **sin** causa de F-C1 (lo garantiza la cadena: si F-C1 cortó, esta queda `OMITIDA_RAMA_BLOQUEADA`): pide fertilizante y deja un `WARNING` (`CRITICAL` con severidad Alta). Durante la rustificación sólo cuenta la severidad Media/Alta |
+| `SolarStressRule` (F-S1) | 26 · `RIEGO` | Diagnóstico *Estrés solar* vigente y, en las últimas 48 h, luz **≥** `estres.luz-alta` (80 %) en alguna lectura **entre las 10 y las 16 h** **o** temperatura **≥** `estres.temp-alta` (32 °C), con el sustrato **<** `estres.humedad-reposicion` (55 %), dentro de la ventana de riego y fuera de la pausa tras una aplicación (R-06): **riego de reposición** del sector con la fórmula de R-01 + `WARNING` (`CRITICAL` si Alta) |
+| `SolarStressUnexplainedRule` (F-S3) | 27 · `SEGUIMIENTO` | Estrés solar vigente con luz **<** `estres.luz-baja` (60 %) **y** temperatura **<** `estres.temp-baja` (30 °C) en 48 h: no actúa y avisa «Síntoma no explicado por radiación… Inspeccionar» |
+
+- **Decide la compuerta, ejecuta F-C2.** F-C1 no aplica nada; corta la rama de insumos con `ABORT_INSUMO` y, con el detalle `CancelPendingApplication`, el
+  `ActionExecutor` retira de `pending_application` el pedido de F-C2 que hubiera quedado esperando su ventana (sólo el de F-C2: el del plan de nutrición
+  no es de quien corta). El corte también significa que **F-F1/F-P1 y las demás reglas de insumo no se evalúan** para ese sector en ese ciclo.
+- **Compuerta compartida.** `engine/DiagnosisGate` es la única implementación de «el diagnóstico es del estado de la regla y está vigente (P-D1)» para las
+  bióticas, la clorosis y el estrés solar. La regla que la usa declara `DiagnosisGate.PARAMETERS`.
+- **Qué lee F-S1/F-S3.** `solarstress/SolarExposure` es la única pregunta al historial de lecturas: el pico de luz **entre las 10 y las 16 h** de las últimas
+  48 h y el de temperatura. La luz es el **% de un LDR**, no radiación. Sin lecturas no hay pico y la regla no decide. La **zona gris** (luz 60–80 % o
+  30–32 °C) no es de ninguna de las dos reglas: lo dice la v2 y hay un test que lo fija.
+- **F-S1 es un riego del despacho, no R-01.** Entra a la cola con `regla = SolarStressRule` y la abre el `DespachoRiego`, que la trata como riego común y la
+  revalida al abrir cada válvula (ventana, R-06, lluvia y un riego por ciclo); su bypass `window` también lo respeta el despacho. Está en la rama de riego
+  después de R-01…R-06, así que un corte de seguridad (sustrato saturado, sensor sin datos, falla hidráulica, bloqueo) la deja sin alcanzar. Comprueba por su
+  cuenta la ventana y la pausa porque R-05 y R-06 sólo actúan cuando aplica R-01 (humedad bajo el umbral de riego) y F-S1 también riega de 45 a 55 %.
+- **Durante la rustificación (D-3).** `hardening/HardeningPhase` responde si la zona está en rustificación («plan en curso o finalizado»). Lo resuelve el
+  plan de la macro-zona (`ZonePlanHardeningPhase`): hay rustificación si hoy rige una etapa del plan, la misma consulta (`PlanRustificacionService.etapaDe`)
+  con la que `HorarioMediasombraService` mueve la malla. Pasada la última etapa sigue rigiendo la última hasta que se elimina el plan; sin plan, o con uno
+  programado a futuro, no cuenta. Efecto a conocer: **un plan que nadie elimina tras el trasplante deja a F-C2 sin fertilizar las clorosis leves de esa zona**.
+- **Sin cooldown propio en F-C2.** El intervalo mínimo entre fertilizaciones del sector (5 días) lo respeta el `ApplicationService` (P-D2): la regla vuelve a
+  pedir con cada diagnóstico y el pedido queda diferido hasta cumplirlo. El cooldown que acorta el simulador es `interval-fertilizer` de `ApplicationPreconditions`.
+- **Una métrica sin lectura no rompe nada.** `RuleContext.metricRaw` devolvía `NullPointerException` para una métrica que la zona nunca reportó (una sonda
+  de CE o pH sin conectar llega como métrica sin valor); ahora la lee como ausente y las reglas no deciden con ella.
+- **Parámetros** (editables en Motor de reglas → Parámetros): familia `CLOROSIS` (`clorosis.humedad-asfixia`, `humedad-horas`, `ce-salinidad`, `ph-ferrica`) y
+  `ESTRES` (`estres.luz-alta`, `temp-alta`, `humedad-reposicion`, `luz-baja`, `temp-baja`), con las restricciones cruzadas luz baja < luz alta y temperatura
+  baja < temperatura alta. Los rangos los propone el equipo (la v2 sólo da el valor de fábrica). Sin migración manual.
+- **Control desde el simulador** (`/api/demo/rules`): las cuatro se apagan; `SolarStressRule` tiene los bypass `window` (ignora la ventana de riego, también en el
+  despacho) y `samples` (la última lectura cuenta como las 48 h); `SolarStressUnexplainedRule`, `samples`. Escenarios `CHLOROSIS_NUTRITIONAL`,
+  `CHLOROSIS_NON_NUTRITIONAL`, `SOLAR_STRESS` y `SOLAR_STRESS_UNEXPLAINED` en el simulador.
+- **F-S2 queda sin implementar.** Cerrar la mediasombra de la macro-zona de 11 a 16 h durante 3 días necesitaba un dueño de la malla por horario,
+  que no existía cuando se escribió este cambio. Con `add-rustificacion-por-macrozona` (#66) ese dueño existe: `HorarioMediasombraService` abre y cierra la
+  malla de cada zona en los bordes de su ventana. F-S2 queda **desbloqueada**: falta sumarle una ventana de protección (cerrada de 11 a 16 h por N días) que
+  ese servicio respete. Los parámetros `estres.pct-sectores-mz` y `estres.dias-proteccion` de la spec tampoco se crearon.
+
+## Efectividad de las acciones y S-06 (`add-efectividad-y-s06` · reglas_v2 §4 y §9)
+
+Cada acción que se puede juzgar abre un **seguimiento** en el historial y, pasada su espera, el servicio de efectividad la evalúa. Una acción «sin
+efectividad» **bloquea su repetición autónoma** hasta que alguien registre la revisión (S-06).
+
+| Pieza | Qué hace |
+|---|---|
+| `effectiveness/EffectivenessJob` | `@Scheduled` (`yerbanalytics.historial.eval-interval-ms`, 30 s). Recorre los seguimientos abiertos y los cierra. Reemplaza al `@Scheduled` de `HistorialService` y a `FollowUpRule` (borrada: era un delegador que repetía una consulta global por cada sector evaluado) |
+| `effectiveness/EffectivenessService` | Política: esperas, delta de E-01, qué es un diagnóstico vigente para comparar y qué aplicaciones abren seguimiento. Es `DemoControllable` (apagable) y `FollowUpPolicy` |
+| `IrrigationEvaluator` · `CorrectiveFertilizerEvaluator` · `FungicideEvaluator` | Lógica pura de E-01, E-02 y E-03 |
+| `effectiveness/EffectivenessBlockService` | Lado de consulta de S-06: qué está bloqueado en una zona o un sector |
+| `engine/rules/IneffectiveActionRule` (S-06) | Prioridad 7 · `RIEGO`, **después de R-02**: con el último riego de la zona sin efectividad corta la rama de riego de todos los sectores y retira lo encolado salvo el déficit crítico |
+| `effectiveness/EffectivenessReviewService` | `POST /api/efectividad/{eventId}/revision {detail}` (permiso `efectividad.revisar`): baja la marca de bloqueo y deja un evento «Revisión» |
+
+- **E-01 (riego).** `efectividad.verificacion-min` (30 min) **después de que cierra la válvula** el servicio pide `LEER_AHORA` a la zona; esa lectura
+  (`VerificationReads`) se guarda con origen `OTHER`, **no corre el motor ni cuenta como respuesta al pulso** (principio 7 de la v2). El riego es
+  «Efectiva» si la humedad **subió** `efectividad.delta-riego` (8) puntos o más: el delta lleva signo (antes se usaba `Math.abs`, y un riego que bajaba la
+  humedad contaba como efectivo). Si el nodo testigo tiene **sector registrado** (opcional en el alta de hardware, `dispositivo.sector_id`), sólo se verifica el
+  riego de ese sector; sin él, cualquier riego de la zona.
+- **E-02 (fertilizante correctivo, F-C2).** `efectividad.latencia-fertilizante-dias` (14) desde la **primera** aplicación de la racha: Efectiva si el sector
+  es Sano o la severidad bajó al menos un nivel. El plan de nutrición (N-01/N-02) no se evalúa ni se bloquea.
+- **E-03 (fitosanitario).** `efectividad.latencia-fitosanitario-dias` (7): Efectiva si la severidad no aumentó y **ningún lindante nuevo** tiene el mismo
+  diagnóstico (los lindantes de la grilla de F-04; se guardan los que ya lo tenían al aplicar en `historial_evento.vecinos_antes`).
+- **F-05.** Un diagnóstico Sano vigente y posterior al tratamiento cierra el seguimiento como «Efectiva» antes de la espera, con un `INFO`.
+- **Sin diagnóstico vigente** al vencer la espera: el seguimiento queda abierto `efectividad.espera-sin-diagnostico-horas` (48) y después es «Sin efectividad
+  por falta de dato».
+- **Alcance del bloqueo.** Riego: toda la macro-zona (`IneffectiveActionRule`). Fertilizante correctivo y fitosanitario: el sector, como **precondición** más de
+  `ApplicationPreconditions` (rechaza, no difiere), porque toda aplicación pasa por ahí. La mediasombra nunca se bloquea.
+- **Aviso.** El `CRITICAL` lo emite `EffectivenessJob` **una vez, al dar el veredicto** (no la regla en cada ciclo, que repetiría el mismo evento).
+- **R-02 (D-7).** Se mantiene el tope de un riego cada `riego.exceptuado-bloqueo` (12 h) **siempre**, no sólo con S-06 en pie: sin caudalímetro un sensor
+  roto que marca «seco» dispararía R-02 en cada ciclo. Es la desviación consciente de la decisión (a) de `align-reglas-existentes-v2`; se conserva.
+- **Eventos de antes.** Los seguimientos abiertos sin tipo se reubican en el primer ciclo: los de riego se evalúan como riego, los demás se cierran sin
+  veredicto. El `bloqueo_repeticion` histórico no bloquea (sólo cuentan los eventos con `efectividad_tipo`).
+- **Retirado.** Los parámetros de latencia y umbral de recuperación de la configuración agronómica (`getLatencyMs`, `getUmbralRecuperacion`) ya no los lee nadie.
+- **Migración manual:** `resources/migracion-permisos-efectividad.sql` (permiso `efectividad.revisar` para Ingeniero y Operario en una matriz ya sembrada).
+
+## Operación sin internet (`add-operacion-sin-internet` · reglas_v2 §10, HU-13)
+
+Lo único que se pierde sin conexión es el **pronóstico**; el broker y la base son locales. El supuesto seguro depende de la acción:
+
+| Regla | Sin pronóstico |
+|---|---|
+| O-01 Riego | R-03 no pospone (se asume que no llueve) y R-01 riega; el despacho tampoco pospone al revalidar |
+| O-02 Mediasombra | La `ShadingRule` de zona no cierra por UV (la comparación queda `SIN_DATO`) y la malla sigue el horario de `HorarioMediasombraService` (plan de rustificación u horario por defecto), que no usa el pronóstico. **Parcial**: M-02 (decidir por la última lectura) no existe, y el supuesto no figura en la traza porque `supuestoSinPronostico()` es de `Rule` y la `ShadingRule` es una `ZoneRule` |
+| O-03 Aplicaciones | P-D4 (lluvia) no bloquea y P-D3 usa la temperatura de la última lectura |
+| O-04 Rustificación | El plan por macro-zona avanza por fechas con el reloj del vivero (`HorarioMediasombraService`, `PlanRustificacionService.etapaDe`): no depende del pronóstico ni de la red |
+| O-05 Sincronización | **No aplicable**: no hay destino remoto de eventos (ver `reglas_v2.md`) |
+
+- `WeatherService.status()` → `ForecastStatus`: `AVAILABLE` (el ficticio del modo demo, o el cacheado dentro de la vigencia utilizable, 4 × `yerbanalytics.weather.cache-ttl-ms`
+  = 60 min), `EXPIRED` (hubo uno que ya no sirve; las reglas lo reciben como `null`) y `ABSENT` (nunca hubo, o el modo demo «sin pronóstico» está activo). No hay
+  parámetro nuevo: se nombra la vigencia que ya existía.
+- `Rule.supuestoSinPronostico()` (vacío si la regla no usa el pronóstico): con el contexto sin pronóstico, `RuleOrchestrator` lo deja en `TrazaRegla.supuesto`
+  («Sin pronóstico: …») y el Inspector lo muestra. Hoy lo declara `PosponerPorLluviaRule`.
+- `engine/weather/ForecastModeMonitor`: cada `yerbanalytics.weather.monitor-interval-ms` (60 s) pide el pronóstico sin esperar y deja **un `INFO` al entrar y otro al
+  salir** del modo (global, zona «Sistema»). Pasar de vencido a ausente no es un evento. Si arranca sin conexión avisa una vez.
+- Desde el simulador: `PUT /api/demo/weather/offline` y el modificador `NO_FORECAST`.
 
 ## Historial de lecturas
 
@@ -1160,8 +1338,11 @@ simulación. Los usa el simulador (`Desarrollo/simulador/`), nunca el dashboard.
   de decisión: `name`, `label`, `branch`, `priority`, `cooldownKeys()` y `bypassKeys()`. `Rule` lo extiende, y
   también lo implementan las reglas por macro-zona y los servicios que deciden fuera de la cadena por sector.
   `DemoControllableRegistry` las reúne a todas; nombres duplicados hacen fallar el arranque.
-- `PUT /api/demo/rules/{nombre}` apaga o enciende una pieza y fija sus cooldowns (minutos; `0` los elimina) y
-  bypass. `404` si el nombre no existe; `400` si una clave de cooldown o bypass no la declara la pieza.
+- **La demo no prende ni apaga** (ver «Estado operativo de las reglas»): el encendido es sólo del estado que fijó el vivero en
+  Motor de reglas. `GET /api/demo/rules` trae `enabled` (ese estado, sólo lectura), los cooldowns y los bypass.
+- `PUT /api/demo/rules/{nombre}` fija los cooldowns de una pieza (minutos; `0` los elimina) y sus
+  bypass. `404` si el nombre no existe; `400` si una clave de cooldown o bypass no la declara la pieza, o si el cuerpo trae
+  `enabled`.
   `PUT /api/demo/rules/cooldowns/zero` alcanza a todas, no sólo a las de la cadena por sector. Los overrides
   viven en memoria: un reinicio los borra.
 - Quien decide consulta `RuleOverrides` **antes de actuar**: apagada no actúa ni corta nada y lo deja en su

@@ -2,10 +2,12 @@ package com.yerbanalytics.backend.nutrition;
 
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
+import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
+import com.yerbanalytics.backend.engine.traza.TrazaRegla;
 import com.yerbanalytics.backend.engine.zone.ZoneRuleContext;
 import com.yerbanalytics.backend.engine.zone.ZoneRuleEngine;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -67,6 +69,8 @@ class NutritionPlanFlowIntegrationTest {
     private PendingApplicationRepository pending;
     @Autowired
     private RuleOverridesStore overrides;
+    @Autowired
+    private OperationalRuleStates states;
 
     @MockBean
     private ComandoActuadorPublisher publisher;
@@ -86,20 +90,26 @@ class NutritionPlanFlowIntegrationTest {
         // La orden de bomba sale bien salvo que el test diga otra cosa.
         when(publisher.publicar(anyString(), anyString(), eq("pump"), eq("ON"), anyMap()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "cmd", null));
-        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(true,
-                Map.of("interval-fertilizer", 0.0),
+        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(Map.of("interval-fertilizer", 0.0),
                 Set.of("window", "temperature", "rain", "moisture", "stock", "daily")));
     }
 
     @AfterEach
     void cleanOverrides() {
         overrides.clear();
+        // El cache es del contexto y sobrevive al rollback: se lo deja prendido y consistente con la base.
+        states.set(NutritionPlanRule.NAME, true, "test", "test");
+        states.reload();
     }
 
     private ZoneRuleContext context(Instant now) {
         Map<String, HardwareCoverage> hardware = new HashMap<>();
         sectors.forEach(s -> hardware.put(s.getId(), HardwareCoverage.COMPLETE));
         return new ZoneRuleContext(zone, sectors, now, hardware, Map.of(), false, Set.of(), RuleOverrides.NONE);
+    }
+
+    private static TrazaRegla traceOf(List<TrazaRegla> trace, String ruleName) {
+        return trace.stream().filter(t -> t.ruleId().equals(ruleName)).findFirst().orElseThrow();
     }
 
     private long planApplications() {
@@ -119,10 +129,11 @@ class NutritionPlanFlowIntegrationTest {
         assertThat(planApplications()).isEqualTo(100);
         assertThat(zone.getNutritionBatchStartTs()).as("la tanda se cerró en el mismo ciclo").isNull();
         assertThat(zone.getLastPlanApplicationTs()).isNotNull();
-        assertThat(trace).extracting(t -> t.ruleId()).containsExactly("LowEcRule", "NutritionPlanRule");
-        assertThat(trace.get(1).estado()).isEqualTo(EstadoRegla.EVALUADA);
-        assertThat(trace.get(1).acciones()).extracting(a -> a.tipo().name())
-                .contains("UPDATE_NUTRITION_PLAN", "ALERTA");
+        assertThat(trace).extracting(t -> t.ruleId())
+                .containsExactly("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule");
+        var plan = traceOf(trace, NutritionPlanRule.NAME);
+        assertThat(plan.estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(plan.acciones()).extracting(a -> a.tipo().name()).contains("UPDATE_NUTRITION_PLAN", "ALERTA");
     }
 
     @Test
@@ -141,7 +152,7 @@ class NutritionPlanFlowIntegrationTest {
     @Test
     @DisplayName("con los tanques sin registrar cada aplicación se rechaza y la tanda se cierra descartada")
     void unregisteredTanksDiscardTheBatch() {
-        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(true, Map.of("interval-fertilizer", 0.0),
+        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(Map.of("interval-fertilizer", 0.0),
                 Set.of("window", "temperature", "rain", "moisture", "daily")));   // sin el bypass de stock
 
         engine.evaluate(context(Instant.now()));
@@ -206,20 +217,21 @@ class NutritionPlanFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("con el motor de zonas apagado desde el simulador no se pide nada")
-    void disabledFromTheSimulator() {
-        overrides.put(NutritionPlanRule.NAME, new RuleOverride(false, Map.of(), Set.of()));
+    @DisplayName("con la regla apagada en Motor de reglas no se pide nada")
+    void disabledFromTheEngine() {
+        states.set(NutritionPlanRule.NAME, false, "test", "test");
+        states.reload();   // dentro de la transacción de prueba el commit no llega: se relee el cache a mano
 
         var trace = nutricion(engine.evaluate(context(Instant.now())));
 
         assertThat(planApplications()).isZero();
-        assertThat(trace.get(1).estado()).isEqualTo(EstadoRegla.OMITIDA_DESHABILITADA);
+        assertThat(traceOf(trace, NutritionPlanRule.NAME).estado()).isEqualTo(EstadoRegla.OMITIDA_DESHABILITADA);
     }
 
     @Test
     @DisplayName("un sector que ya recibió fertilizante (P-D2) queda pendiente sin frenar a los demás")
     void aSectorThatAlreadyReceivedToday() {
-        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(true, Map.of(),
+        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(Map.of(),
                 Set.of("window", "temperature", "rain", "moisture", "stock")));   // sin acortar el intervalo de P-D2
         SectorEntity first = sectors.get(0);
         applicationService.request(first, Supply.FERTILIZER, "SupplyRule", false);
@@ -232,9 +244,9 @@ class NutritionPlanFlowIntegrationTest {
         assertThat(planApplications()).isEqualTo(99);
         assertThat(zone.getNutritionBatchStartTs()).isNotNull();
     }
-    /** La traza de las reglas del plan (el motor de zonas también corre las de la mediasombra). */
+    /** La traza de las reglas del plan y las bióticas que lo preceden (el motor de zonas también corre las de la mediasombra). */
     private static List<com.yerbanalytics.backend.engine.traza.TrazaRegla> nutricion(
             List<com.yerbanalytics.backend.engine.traza.TrazaRegla> trace) {
-        return trace.stream().filter(t -> t.ruleId().equals("LowEcRule") || t.ruleId().equals("NutritionPlanRule")).toList();
+        return trace.stream().filter(t -> java.util.Set.of("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule").contains(t.ruleId())).toList();
     }
 }

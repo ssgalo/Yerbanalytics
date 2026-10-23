@@ -36,9 +36,6 @@ export function buildConfig(): Configuracion {
       provisional: !s.afectaEstado,
     })),
     operativa: {
-      insumoDosisMax24hMl: 15,
-      seguimientoLatenciaMin: 2,
-      seguimientoDeltaMin: 5,
       intervaloSensadoMinutos: DEFAULT_PULSE_MINUTES,
       effectiveStaleThresholdSeconds: mockStaleThresholdSeconds(DEFAULT_PULSE_MINUTES),
       pasadaDiariaActiva: false,

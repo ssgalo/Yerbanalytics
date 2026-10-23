@@ -1,8 +1,8 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,14 +26,11 @@ class HistorialServiceReparacionTest {
 
     @Mock
     private HistorialRepository historialRepository;
-    @Mock
-    private SectorRepository sectorRepository;
-    @Mock
+@Mock
     private ConfiguracionService configuracionService;
 
     private HistorialEventoEntity registrar(String sectorId) {
-        HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                configuracionService, 120000, "2 min", 5, Clock.fixed(AHORA, ZoneOffset.UTC));
+        HistorialService service = new HistorialService(historialRepository, kind -> 1_800_000L, Clock.fixed(AHORA, ZoneOffset.UTC));
 
         service.registrarReparacion("Ana", "Electroválvula DEV-101", sectorId, "MZ-1", "Macro-zona 1",
                 "SIN_CAUDAL", "Se destapó el emisor");

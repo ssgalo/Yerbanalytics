@@ -33,12 +33,14 @@ const GESTION: NavItem[] = [
   { to: '/historial', vista: VISTAS.historial, icon: 'history', label: 'Historial' },
 ];
 
-/* Grupo desplegable "Configuración": todo lo que ajusta cómo opera el sistema. Umbrales y
-   Preferencias editan partes de la misma configuración agronómica (Umbrales sigue en
-   /configuracion); el criterio de diagnóstico es otro recurso, con su propia ruta. Los planes de
-   rustificación no están acá: son de cada macro-zona. */
+/* Grupo desplegable "Configuración": todo lo que ajusta cómo opera el sistema. Umbrales,
+   Rustificación y Preferencias editan partes de la misma configuración agronómica (Umbrales sigue en
+   /configuracion); el criterio de diagnóstico es otro recurso, con su propia ruta. Rustificación trae el
+   horario por defecto de la mediasombra y un resumen del plan de cada macro-zona; el plan se inicia y se
+   elimina en el detalle de la zona. */
 const CONFIGURACION: NavItem[] = [
   { to: '/configuracion', vista: VISTAS.configuracion, icon: 'gauge', label: 'Umbrales' },
+  { to: '/rustificacion', vista: VISTAS.rustificacion, icon: 'sun', label: 'Rustificación' },
   {
     to: '/criterio-diagnostico',
     vista: VISTAS.criterioDiagnostico,

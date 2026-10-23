@@ -33,22 +33,24 @@ const barra = () => screen.queryByRole('region', { name: 'Cambios sin guardar' }
 
 /** Ensucia el borrador de Umbrales con un cambio válido. */
 const ensuciarUmbrales = async () => {
-  const campo = (await screen.findByLabelText('Latencia de seguimiento')) as HTMLInputElement;
-  fireEvent.change(campo, { target: { value: String(Number(campo.value) + 1) } });
+  const campo = (await screen.findByRole('spinbutton', { name: 'Humedad ambiental · Ideal hasta' })) as HTMLInputElement;
+  fireEvent.change(campo, { target: { value: String(Number(campo.value) - 1) } });
 };
 
 describe('Umbrales (ConfiguracionPage)', () => {
-  it('trae umbrales, insumos, seguimiento y mediasombra; la rustificación y las frecuencias ya no', async () => {
-    montar(ConfiguracionPage);
+  it('trae sólo las bandas de las 10 métricas: sin seguimiento, límites de insumos ni mediasombra, y sin hablar del motor', async () => {
+    const { container } = montar(ConfiguracionPage);
 
     await screen.findByText('Umbrales de métricas');
-    expect(screen.getByText('Límites de insumos')).toBeTruthy();
-    expect(screen.getByText('Seguimiento post-acción')).toBeTruthy();
-    expect(screen.getByText('Mediasombra')).toBeTruthy();
-    expect(screen.queryByText('Plan de rustificación')).toBeNull();
+    expect(container.querySelectorAll('ul > li')).toHaveLength(10);
+    expect(screen.queryByText('Límites de insumos')).toBeNull();
+    expect(screen.queryByText('Seguimiento post-acción')).toBeNull();
+    expect(screen.queryByText('Mediasombra')).toBeNull();
+    expect(screen.queryByLabelText('Latencia de seguimiento')).toBeNull();
+    expect(screen.queryByLabelText('Abierta desde')).toBeNull();
     expect(screen.queryByText('Frecuencia operativa')).toBeNull();
-    expect(screen.queryByRole('switch', { name: /Mostrar Demo Expo/ })).toBeNull();
-    expect(screen.getByRole('link', { name: /Motor de reglas/ })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Motor de reglas/ })).toBeNull();
+    expect(screen.queryByText(/motor/i)).toBeNull();
   });
 
   it('no depende del catálogo del motor para guardar', async () => {
@@ -62,7 +64,7 @@ describe('Umbrales (ConfiguracionPage)', () => {
 
   it('la barra de guardado cuenta los cambios y "Descartar" vuelve a lo guardado', async () => {
     montar(ConfiguracionPage);
-    const campo = (await screen.findByLabelText('Delta mín. de recuperación')) as HTMLInputElement;
+    const campo = (await screen.findByRole('spinbutton', { name: 'Humedad ambiental · Ideal desde' })) as HTMLInputElement;
     const antes = campo.value;
     expect(barra()).toBeNull();
 
@@ -78,9 +80,10 @@ describe('Umbrales (ConfiguracionPage)', () => {
 
   it('un valor inválido bloquea Guardar', async () => {
     montar(ConfiguracionPage);
-    const campo = await screen.findByLabelText('Latencia de seguimiento');
+    // Ideal hasta por debajo de ideal desde: las bandas quedan desordenadas.
+    const campo = await screen.findByRole('spinbutton', { name: 'Humedad ambiental · Ideal hasta' });
 
-    fireEvent.change(campo, { target: { value: '0' } });
+    fireEvent.change(campo, { target: { value: '1' } });
 
     expect(guardar().disabled).toBe(true);
     expect(barra()!.textContent).toMatch(/para corregir/);
@@ -88,9 +91,9 @@ describe('Umbrales (ConfiguracionPage)', () => {
 
   it('restablecer de fábrica sólo toca lo de la vista', async () => {
     montar(ConfiguracionPage);
-    const campo = (await screen.findByLabelText('Latencia de seguimiento')) as HTMLInputElement;
+    const campo = (await screen.findByRole('spinbutton', { name: 'Humedad ambiental · Ideal hasta' })) as HTMLInputElement;
     const fabrica = campo.value;
-    fireEvent.change(campo, { target: { value: '9' } });
+    fireEvent.change(campo, { target: { value: '80' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Restablecer/ }));
 
@@ -98,22 +101,10 @@ describe('Umbrales (ConfiguracionPage)', () => {
     expect(barra()).toBeNull();
   });
 
-  it('edita el horario por defecto de la mediasombra y bloquea un cierre anterior a la apertura', async () => {
-    montar(ConfiguracionPage);
-    const desde = (await screen.findByLabelText('Abierta desde')) as HTMLInputElement;
-    const hasta = screen.getByLabelText('Abierta hasta') as HTMLInputElement;
-    expect([desde.value, hasta.value]).toEqual(['08:00', '17:00']);
-
-    fireEvent.change(hasta, { target: { value: '07:00' } });
-
-    expect(screen.getByRole('alert').textContent).toMatch(/cierre debe ser posterior/);
-    expect(guardar().disabled).toBe(true);
-  });
-
   it('sin configuracion.editar: campos deshabilitados y sin botones de guardar (7.5)', async () => {
     montar(ConfiguracionPage, 'PRODUCTOR_VIVERISTA');
 
-    const campo = await screen.findByLabelText('Latencia de seguimiento');
+    const campo = await screen.findByRole('spinbutton', { name: 'Humedad ambiental · Ideal hasta' });
     // Lo deshabilita el <fieldset disabled> que lo envuelve: la propiedad del input no cambia.
     expect(campo.matches(':disabled')).toBe(true);
     expect(screen.queryByRole('button', { name: /Guardar cambios/ })).toBeNull();

@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.ContextoRiego;
 import com.yerbanalytics.backend.engine.Rule;
@@ -62,7 +64,17 @@ public class CicloLecturaRiegoRule implements Rule {
 
     @Override
     public String label() {
-        return "🔁 Un riego por ciclo de lectura";
+        return "Un riego por ciclo de lectura";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Un sector puede regarse más de una vez por ciclo de lectura.");
     }
 
     @Override

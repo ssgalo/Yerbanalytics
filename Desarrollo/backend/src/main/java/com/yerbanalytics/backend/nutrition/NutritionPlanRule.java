@@ -68,7 +68,12 @@ public class NutritionPlanRule implements ZoneRule {
 
     @Override
     public String label() {
-        return "🌱 Plan de nutrición (N-01)";
+        return "Plan de nutrición";
+    }
+
+    @Override
+    public String code() {
+        return "N-01";
     }
 
     @Override

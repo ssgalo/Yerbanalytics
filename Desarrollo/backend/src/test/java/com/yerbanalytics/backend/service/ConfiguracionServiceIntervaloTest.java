@@ -62,7 +62,7 @@ class ConfiguracionServiceIntervaloTest {
                 sp.label(), sp.unit(), sp.dec(), sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1],
                 sp.crit()[0], sp.crit()[1], false)).toList();
         return new Configuracion(umbrales,
-                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, "x", 1L, pasadaActiva, pasadaHora, null));
+                new ConfiguracionOperativa(intervaloSensadoMinutos, "x", 1L, pasadaActiva, pasadaHora, null));
     }
 
     private ConfiguracionOperativaEntity savedEntity() {

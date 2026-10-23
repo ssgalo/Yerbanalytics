@@ -24,6 +24,7 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
 
   // El nodo testigo y la mediasombra son de la macro-zona; los demás actuadores, de un sector.
   const deZona = esTipoDeZona(esRecambio ? device?.tipo : tipo);
+  const esNodo = (esRecambio ? device?.tipo : tipo) === NODO_TESTIGO;
   const equipoDeZona = tipo === NODO_TESTIGO ? 'del nodo testigo' : 'de la mediasombra';
 
   /** Validación en cliente, espejo del backend (HU-18 CA-02). */
@@ -58,7 +59,9 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
           serial: serial.trim(),
           tipo,
           zonaId: deZona ? zonaId.trim() : null,
-          sectorId: deZona ? null : sectorId.trim(),
+          // El sector del nodo testigo es opcional: E-01 verifica el riego del sector donde está instalado.
+          // La mediasombra es de la macro-zona y no lleva sector.
+          sectorId: deZona ? (esNodo ? sectorId.trim() || null : null) : sectorId.trim(),
         };
     try {
       await onSubmit(payload);
@@ -113,20 +116,34 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
             </div>
 
             {deZona ? (
-              <div className={styles.group}>
-                <label className={styles.label}>Macro-zona</label>
-                <select
-                  className={styles.select}
-                  value={zonaId}
-                  onChange={(e) => setZonaId(e.target.value)}
-                >
-                  {ZONA_IDS.map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <>
+                <div className={styles.group}>
+                  <label className={styles.label}>Macro-zona</label>
+                  <select
+                    className={styles.select}
+                    value={zonaId}
+                    onChange={(e) => setZonaId(e.target.value)}
+                  >
+                    {ZONA_IDS.map((z) => (
+                      <option key={z} value={z}>
+                        {z}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {esNodo && (
+                  <div className={styles.group}>
+                    <label className={styles.label}>Sector del nodo (opcional)</label>
+                    <input
+                      className={styles.input}
+                      type="text"
+                      placeholder="ej. MZ-1-045"
+                      value={sectorId}
+                      onChange={(e) => setSectorId(e.target.value)}
+                    />
+                  </div>
+                )}
+              </>
             ) : (
               <div className={styles.group}>
                 <label className={styles.label}>Sector</label>

@@ -1,85 +1,83 @@
 /* ============================================================
-   Vistas derivadas del catálogo: agrupación por rama, resúmenes y filtros. Todo en memoria y
-   O(reglas + parámetros): el catálogo llega normalizado (cada parámetro una vez), así que
-   escala a decenas de reglas sin cambios.
+   Vistas derivadas del catálogo para la pestaña Reglas: grupos por objetivo, consumidores sin
+   interruptor, parámetros compartidos y filtros. Todo en memoria y O(piezas + parámetros): el
+   catálogo llega normalizado (cada parámetro una vez), así que escala a decenas de reglas sin cambios.
+   Una regla nueva del backend trae su objetivo: no hay un mapa que tocar acá.
    ============================================================ */
-import type { CatalogoReglas, ParametroRegla, RamaRegla, ReglaCatalogo } from '@/types/domain';
+import type { CatalogoReglas, ObjetivoRegla, ParametroRegla, ReglaCatalogo } from '@/types/domain';
 
-/** Orden de las ramas del motor, de la más general a la más específica. */
-export const ORDEN_RAMAS: RamaRegla[] = ['GLOBAL', 'RIEGO', 'INSUMO', 'MEDIASOMBRA', 'SEGUIMIENTO'];
+/** Orden de los grupos de la pantalla. */
+export const ORDEN_OBJETIVOS: ObjetivoRegla[] = [
+  'IRRIGATION',
+  'NUTRITION',
+  'SANITY',
+  'SHADE',
+  'FOLLOW_UP',
+  'PROTECTION',
+];
 
-export const NOMBRE_RAMA: Record<RamaRegla, string> = {
-  GLOBAL: 'Global',
-  RIEGO: 'Riego',
-  INSUMO: 'Insumos',
-  MEDIASOMBRA: 'Mediasombra',
-  SEGUIMIENTO: 'Seguimiento',
+export const NOMBRE_OBJETIVO: Record<ObjetivoRegla, string> = {
+  IRRIGATION: 'Riego',
+  NUTRITION: 'Nutrición',
+  SANITY: 'Sanidad',
+  SHADE: 'Mediasombra',
+  FOLLOW_UP: 'Seguimiento',
+  PROTECTION: 'Protecciones',
 };
 
-/** Qué hace cada rama, para el encabezado del grupo. */
-export const DESCRIPCION_RAMA: Record<RamaRegla, string> = {
-  GLOBAL: 'Corren primero y aplican a todo el motor',
-  RIEGO: 'Electroválvulas',
-  INSUMO: 'Bombas peristálticas',
-  MEDIASOMBRA: 'Techo móvil',
-  SEGUIMIENTO: 'Evaluación posterior a la acción',
+/** Qué cubre cada grupo, para su encabezado. */
+export const DESCRIPCION_OBJETIVO: Record<ObjetivoRegla, string> = {
+  IRRIGATION: 'Cuándo y cuánto se riega',
+  NUTRITION: 'Fertilizantes y fitosanitarios',
+  SANITY: 'Plagas, hongos y otros daños de las plantas',
+  SHADE: 'Cuándo se abre y se cierra la malla',
+  FOLLOW_UP: 'Si lo que hizo el motor surtió efecto',
+  PROTECTION: 'Frenos de seguridad y de calidad de los datos',
 };
 
 /**
- * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
- * escalamiento del nodo, el guard de lectura inválida, el servicio de fallas del hardware y los de aplicación de insumos): el backend los lista en
- * `usadoPor` junto a las reglas. Se muestran en su propio grupo de la pestaña Parámetros.
+ * Consumidores de parámetros que no son piezas con interruptor (el despacho de riego, la purga del historial, el
+ * pulso de sensado, los servicios de insumos, el seguimiento…): el backend los lista en `usadoPor` junto a las reglas.
+ * Se muestran como tarjetas de "Ejecución", sin `Switch`: ejecutan lo que las reglas deciden.
  */
-export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string; rama: RamaRegla }> = {
+export const CONSUMIDORES: Record<
+  string,
+  { titulo: string; descripcion: string; objetivo: ObjetivoRegla }
+> = {
   DespachoRiego: {
     titulo: 'Ejecución del riego',
     descripcion: 'Cómo se reparten los riegos ordenados entre los sectores de una macro-zona',
-    rama: 'RIEGO',
+    objetivo: 'IRRIGATION',
   },
   ReadingPurge: {
-    titulo: 'Historial de lecturas',
-    descripcion: 'Cuánto tiempo se conservan las lecturas de cada macro-zona que consultan las reglas',
-    rama: 'GLOBAL',
+    titulo: 'Ejecución: historial de lecturas',
+    descripcion:
+      'Cuánto tiempo se conservan las lecturas de cada macro-zona que consultan las reglas',
+    objetivo: 'PROTECTION',
   },
   PulsoSensado: {
-    titulo: 'Lectura de los nodos',
-    descripcion: 'Cuánto se espera la lectura de cada macro-zona y cuántas veces se reintenta en cada pulso',
-    rama: 'GLOBAL',
-  },
-  EscalamientoNodo: {
-    titulo: 'Nodo sin respuesta',
-    descripcion: 'Cada cuánto se insiste con un nodo que ya quedó fuera de servicio',
-    rama: 'GLOBAL',
-  },
-  ReadingValidationGuard: {
-    titulo: 'Lectura inválida',
-    descripcion: 'Hasta dónde llega lo físicamente posible para cada métrica y cuántas veces se vuelve a leer un valor fuera de rango',
-    rama: 'GLOBAL',
-  },
-  HardwareFaultService: {
-    titulo: 'Alerta de falla hidráulica',
-    descripcion: 'Con qué humedad de sustrato la alerta de una falla hidráulica pide el riego manual del sector',
-    rama: 'GLOBAL',
-  },
-  ApplicationPreconditions: {
-    titulo: 'Cuándo se puede aplicar un insumo',
-    descripcion: 'Intervalos entre aplicaciones, ventanas horarias y los límites de temperatura, lluvia y humedad de sustrato',
-    rama: 'INSUMO',
+    titulo: 'Ejecución: lectura de los nodos',
+    descripcion:
+      'Cuánto se espera la lectura de cada macro-zona y cuántas veces se reintenta en cada pulso',
+    objetivo: 'PROTECTION',
   },
   ApplicationService: {
-    titulo: 'Aplicación de insumos',
-    descripcion: 'Dosis, reingreso tras un fitosanitario y cuánto espera una aplicación diferida antes de descartarse',
-    rama: 'INSUMO',
+    titulo: 'Ejecución de la aplicación de insumos',
+    descripcion:
+      'Dosis, reingreso tras un fitosanitario y cuánto espera una aplicación diferida antes de descartarse',
+    objetivo: 'NUTRITION',
   },
   TankService: {
-    titulo: 'Tanques de insumo',
+    titulo: 'Ejecución: tanques de insumo',
     descripcion: 'Con qué nivel se avisa que hay que reponer el insumo de un tanque',
-    rama: 'INSUMO',
+    objetivo: 'NUTRITION',
+  },
+  NutritionPlanService: {
+    titulo: 'Ejecución del plan de nutrición',
+    descripcion: 'Cada cuánto se aplica el plan de nutrición de una macro-zona',
+    objetivo: 'NUTRITION',
   },
 };
-
-/** Rama a la que pertenece un consumidor que no es una regla (el despacho riega: RIEGO). */
-export const ramaDeConsumidor = (id: string): RamaRegla | undefined => CONSUMIDORES[id]?.rama;
 
 export const nombreConsumidor = (id: string): string => CONSUMIDORES[id]?.titulo ?? id;
 
@@ -90,110 +88,175 @@ export interface GrupoConsumidor {
   parametros: ParametroRegla[];
 }
 
-/**
- * Parámetros agrupados por el consumidor que no es una regla (los de `usadoPor` que no están en `reglas`).
- * Sólo los que NINGUNA regla usa: el despacho también lee, para revalidar antes de abrir cada válvula, parámetros
- * que ya son de una regla (antigüedad de la lectura, saturación, ventana horaria). Esos se editan bajo su regla
- * (donde figura "Compartido con Ejecución del riego"); listarlos acá los duplicaría.
- */
-export function agruparPorConsumidor(catalogo: CatalogoReglas, parametros: ParametroRegla[] = catalogo.parametros): GrupoConsumidor[] {
-  const ids = new Set(catalogo.reglas.map((r) => r.id));
-  const grupos = new Map<string, ParametroRegla[]>();
-  for (const p of parametros) {
-    if (p.usadoPor.some((x) => ids.has(x))) continue;
-    for (const u of p.usadoPor) grupos.set(u, [...(grupos.get(u) ?? []), p]);
-  }
-  return [...grupos].map(([id, params]) => ({
-    id,
-    titulo: nombreConsumidor(id),
-    descripcion: CONSUMIDORES[id]?.descripcion ?? 'Lee estos parámetros fuera del motor de reglas',
-    parametros: params,
-  }));
-}
-
-export interface GrupoRama {
-  rama: RamaRegla;
+export interface GrupoObjetivo {
+  objetivo: ObjetivoRegla;
+  titulo: string;
+  descripcion: string;
   reglas: ReglaCatalogo[];
+  consumidores: GrupoConsumidor[];
+  /** Parámetros que usan varias piezas y se editan acá, una sola vez. */
+  compartidos: ParametroRegla[];
+  /** Piezas apagadas del grupo (sin contar los filtros). */
+  apagadas: number;
 }
 
-/** Reglas agrupadas por rama (en el orden del motor) y, dentro de cada rama, por prioridad. */
-export function agruparPorRama(reglas: ReglaCatalogo[]): GrupoRama[] {
-  return ORDEN_RAMAS.map((rama) => ({
-    rama,
-    reglas: reglas.filter((r) => r.rama === rama).sort((a, b) => a.prioridad - b.prioridad),
-  })).filter((g) => g.reglas.length > 0);
+export interface Filtros {
+  busqueda: string;
+  soloApagadas: boolean;
+  soloProtecciones: boolean;
+  soloConCambios: boolean;
 }
+
+export const SIN_FILTROS: Filtros = {
+  busqueda: '',
+  soloApagadas: false,
+  soloProtecciones: false,
+  soloConCambios: false,
+};
+
+export const hayFiltros = (f: Filtros): boolean =>
+  f.busqueda.trim() !== '' || f.soloApagadas || f.soloProtecciones || f.soloConCambios;
 
 export function indicePorClave(catalogo: CatalogoReglas): Map<string, ParametroRegla> {
   return new Map(catalogo.parametros.map((p) => [p.clave, p]));
 }
 
-export interface ResumenRegla {
-  total: number;
-  modificados: number;
-}
-
-export function resumenRegla(regla: ReglaCatalogo, indice: Map<string, ParametroRegla>): ResumenRegla {
-  const params = regla.parametros.map((c) => indice.get(c)).filter((p): p is ParametroRegla => !!p);
-  return { total: params.length, modificados: params.filter((p) => p.modificado).length };
-}
-
-/** "3 parámetros · 1 modificado". */
-export function textoResumen({ total, modificados }: ResumenRegla): string {
-  if (total === 0) return 'Sin parámetros configurables';
-  const params = `${total} ${total === 1 ? 'parámetro' : 'parámetros'}`;
-  const mods = `${modificados} ${modificados === 1 ? 'modificado' : 'modificados'}`;
-  return `${params} · ${mods}`;
-}
-
-export interface Filtros {
-  busqueda: string;
-  rama: RamaRegla | 'TODAS';
-  soloModificados: boolean;
-}
-
-export const SIN_FILTROS: Filtros = { busqueda: '', rama: 'TODAS', soloModificados: false };
-
 /** Minúsculas y sin tildes, para que "condicion" encuentre "Condición". */
-const normalizar = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const normalizar = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
 
-const textoRegla = (r: ReglaCatalogo) => normalizar(`${r.label} ${r.id}`);
-const textoParametro = (p: ParametroRegla) => normalizar(`${p.etiqueta} ${p.clave} ${p.descripcion}`);
+const textoRegla = (r: ReglaCatalogo) => normalizar(`${r.label} ${r.codigo} ${r.id}`);
+const textoParametro = (p: ParametroRegla) =>
+  normalizar(`${p.etiqueta} ${p.clave} ${p.descripcion}`);
 
-/** Reglas que pasan los filtros. Una regla coincide por su nombre o por el de alguno de sus parámetros. */
-export function filtrarReglas(catalogo: CatalogoReglas, f: Filtros): ReglaCatalogo[] {
-  const q = normalizar(f.busqueda.trim());
+/** Objetivo de un consumidor: el de la pieza si es una regla, el declarado si es un servicio sin interruptor. */
+function objetivoDe(id: string, piezas: Map<string, ReglaCatalogo>): ObjetivoRegla | null {
+  return piezas.get(id)?.objetivo ?? CONSUMIDORES[id]?.objetivo ?? null;
+}
+
+/**
+ * Dónde se edita un parámetro compartido: el grupo con MÁS consumidores con interruptor (los que son reglas); si
+ * empatan, el primero en el orden de la pantalla. Los consumidores sin interruptor (despacho, purga…) no votan, salvo
+ * que sean los únicos: entonces, el primer grupo donde aparece uno. Se decide con el catálogo entero (no con lo
+ * filtrado) para que no salte de lugar al buscar.
+ */
+function objetivoDeCompartido(
+  p: ParametroRegla,
+  piezas: Map<string, ReglaCatalogo>,
+): ObjetivoRegla | null {
+  const votos = new Map<ObjetivoRegla, number>();
+  for (const id of p.usadoPor) {
+    const o = piezas.get(id)?.objetivo;
+    if (o) votos.set(o, (votos.get(o) ?? 0) + 1);
+  }
+  if (votos.size > 0) {
+    const maximo = Math.max(...votos.values());
+    return ORDEN_OBJETIVOS.find((o) => votos.get(o) === maximo) ?? null;
+  }
+  const objetivos = p.usadoPor
+    .map((id) => objetivoDe(id, piezas))
+    .filter((o): o is ObjetivoRegla => o !== null);
+  return ORDEN_OBJETIVOS.find((o) => objetivos.includes(o)) ?? null;
+}
+
+export type OrdenPiezas = 'codigo' | 'prioridad';
+
+/** Primer código de una pieza ("S-01, S-04" → "S-01"); "" si no tiene. */
+const primerCodigo = (r: ReglaCatalogo): string => r.codigo.split(',')[0].trim();
+
+/** Por código en orden natural (R-02 antes que R-10), sin código al final por label; o por prioridad del motor. */
+export function comparadorPiezas(
+  orden: OrdenPiezas,
+): (a: ReglaCatalogo, b: ReglaCatalogo) => number {
+  const porPrioridad = (a: ReglaCatalogo, b: ReglaCatalogo) =>
+    a.prioridad - b.prioridad || a.id.localeCompare(b.id);
+  if (orden === 'prioridad') return porPrioridad;
+  return (a, b) => {
+    const ca = primerCodigo(a);
+    const cb = primerCodigo(b);
+    if (ca && cb) {
+      return ca.localeCompare(cb, 'es', { numeric: true }) || porPrioridad(a, b);
+    }
+    if (ca) return -1;
+    if (cb) return 1;
+    return a.label.localeCompare(b.label, 'es') || porPrioridad(a, b);
+  };
+}
+
+/**
+ * Las piezas del catálogo en sus grupos, con sus consumidores sin interruptor y los parámetros compartidos del grupo.
+ * Un grupo sin nada que mostrar (tras los filtros o de fábrica) no sale. `editadas` son las claves con cambios sin guardar.
+ */
+export function agruparPorObjetivo(
+  catalogo: CatalogoReglas,
+  filtros: Filtros = SIN_FILTROS,
+  editadas: ReadonlySet<string> = new Set(),
+  orden: OrdenPiezas = 'codigo',
+): GrupoObjetivo[] {
   const indice = indicePorClave(catalogo);
+  const piezas = new Map(catalogo.reglas.map((r) => [r.id, r]));
+  const q = normalizar(filtros.busqueda.trim());
+  const filtraPiezas = filtros.soloApagadas || filtros.soloProtecciones;
 
-  return catalogo.reglas.filter((r) => {
-    if (f.rama !== 'TODAS' && r.rama !== f.rama) return false;
-    const params = r.parametros.map((c) => indice.get(c)).filter((p): p is ParametroRegla => !!p);
-    if (f.soloModificados && !params.some((p) => p.modificado)) return false;
+  const paramsDe = (r: ReglaCatalogo) =>
+    r.parametros.map((c) => indice.get(c)).filter((p): p is ParametroRegla => !!p);
+
+  const pasaRegla = (r: ReglaCatalogo): boolean => {
+    if (filtros.soloApagadas && r.activa) return false;
+    if (filtros.soloProtecciones && r.efecto !== 'PROTECTS') return false;
+    const params = paramsDe(r);
+    if (filtros.soloConCambios && !params.some((p) => editadas.has(p.clave))) return false;
     if (q === '') return true;
     return textoRegla(r).includes(q) || params.some((p) => textoParametro(p).includes(q));
-  });
-}
+  };
 
-/** Parámetros que pasan los filtros, cada uno una sola vez (vista "por parámetro"). */
-export function filtrarParametros(catalogo: CatalogoReglas, f: Filtros): ParametroRegla[] {
-  const q = normalizar(f.busqueda.trim());
-  const reglas = new Map(catalogo.reglas.map((r) => [r.id, r]));
-
-  return catalogo.parametros.filter((p) => {
-    const usuarias = p.usadoPor.map((id) => reglas.get(id)).filter((r): r is ReglaCatalogo => !!r);
-    // Los consumidores que no son reglas (despacho de riego) cuentan con la rama que declaran.
-    const ramas = [
-      ...usuarias.map((r) => r.rama),
-      ...p.usadoPor.filter((id) => !reglas.has(id)).map((id) => CONSUMIDORES[id]?.rama),
-    ];
-    if (f.rama !== 'TODAS' && !ramas.includes(f.rama)) return false;
-    if (f.soloModificados && !p.modificado) return false;
+  /** Parámetros sueltos (compartidos o de un consumidor): sin interruptor, no entran en Apagadas ni Protecciones. */
+  const pasaParametro = (p: ParametroRegla, extra = ''): boolean => {
+    if (filtraPiezas) return false;
+    if (filtros.soloConCambios && !editadas.has(p.clave)) return false;
     if (q === '') return true;
-    const consumidores = p.usadoPor.filter((id) => !reglas.has(id)).map((id) => normalizar(nombreConsumidor(id)));
+    const consumidores = p.usadoPor
+      .map((id) => normalizar(piezas.get(id)?.label ?? nombreConsumidor(id)))
+      .join(' ');
     return (
-      textoParametro(p).includes(q) ||
-      usuarias.some((r) => textoRegla(r).includes(q)) ||
-      consumidores.some((c) => c.includes(q))
+      textoParametro(p).includes(q) || consumidores.includes(q) || normalizar(extra).includes(q)
     );
-  });
+  };
+
+  const compartidos = catalogo.parametros.filter((p) => p.usadoPor.length > 1);
+  // Parámetros que lee un servicio sin interruptor y que ninguna pieza ni otro consumidor comparte.
+  const propiosDeConsumidor = catalogo.parametros.filter(
+    (p) => p.usadoPor.length === 1 && !piezas.has(p.usadoPor[0]),
+  );
+
+  return ORDEN_OBJETIVOS.map((objetivo): GrupoObjetivo => {
+    const delGrupo = catalogo.reglas.filter((r) => r.objetivo === objetivo);
+    const consumidores = new Map<string, ParametroRegla[]>();
+    for (const p of propiosDeConsumidor) {
+      const id = p.usadoPor[0];
+      if (CONSUMIDORES[id]?.objetivo !== objetivo) continue;
+      consumidores.set(id, [...(consumidores.get(id) ?? []), p]);
+    }
+    return {
+      objetivo,
+      titulo: NOMBRE_OBJETIVO[objetivo],
+      descripcion: DESCRIPCION_OBJETIVO[objetivo],
+      reglas: delGrupo.filter(pasaRegla).sort(comparadorPiezas(orden)),
+      consumidores: [...consumidores]
+        .map(([id, parametros]) => ({
+          id,
+          titulo: nombreConsumidor(id),
+          descripcion: CONSUMIDORES[id]?.descripcion ?? '',
+          parametros: parametros.filter((p) => pasaParametro(p, nombreConsumidor(id))),
+        }))
+        .filter((c) => c.parametros.length > 0),
+      compartidos: compartidos
+        .filter((p) => objetivoDeCompartido(p, piezas) === objetivo)
+        .filter((p) => pasaParametro(p)),
+      apagadas: delGrupo.filter((r) => !r.activa).length,
+    };
+  }).filter((g) => g.reglas.length + g.consumidores.length + g.compartidos.length > 0);
 }

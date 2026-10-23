@@ -42,7 +42,12 @@ public class FueraDeVentanaRiegoRule implements Rule {
 
     @Override
     public String label() {
-        return "🌙 Riego fuera de ventana horaria (R-05)";
+        return "Riego fuera de ventana horaria";
+    }
+
+    @Override
+    public String code() {
+        return "R-05";
     }
 
     @Override

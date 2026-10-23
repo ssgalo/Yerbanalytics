@@ -59,6 +59,23 @@ class RuleContextMetricValidityTest {
     }
 
     @Test
+    @DisplayName("una métrica que la zona nunca reportó (sonda sin conectar) se lee como ausente y no rompe la evaluación")
+    void metricaSinLecturaSeLeeComoAusente() {
+        SectorEntity sector = RuleContextTestFactory.sectorBasico("MZ-1-001");
+        ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-1");
+        List<Metric> metricas = List.of(
+                new Metric("humSus", "Humedad de sustrato", "%", 30.0, "30", "ok", "#000", null),
+                new Metric("ce", "CE", "dS/m", null, "—", "offline", "#000", null));
+        RuleContext ctx = new RuleContext(sector, zona, List.of(), metricas, RuleContextTestFactory.defaultConfig(), "ok",
+                Instant.now(), null, false);
+
+        assertThat(ctx.metricRaw("ce")).isNull();
+        assertThat(ctx.validMetricRaw("ce")).isNull();
+        assertThat(ctx.metricRaw("humSus")).isEqualTo(30.0);
+        assertThat(ctx.metricRaw("noExiste")).isNull();
+    }
+
+    @Test
     @DisplayName("al cambiar los overrides se conservan las métricas descartadas")
     void conservaAlCambiarOverrides() {
         RuleContext ctx = contexto(Set.of("humSus")).withOverrides(RuleOverrides.NONE);

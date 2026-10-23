@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+> **F-S2 (Estrés solar extendido) no está implementada**: depende de `add-mediasombra-v2` (cancelado), ver el `design.md` del cambio. Los demás requisitos sí.
+
 ### Requirement: F-C1 Clorosis con causa no nutricional
 El motor SHALL NO aplicar fertilizante correctivo en el sector y SHALL emitir `WARNING` con la causa probable ante un
 diagnóstico Clorosis vigente cuando se cumpla alguna de estas causas: humedad de sustrato media de las últimas 48 h

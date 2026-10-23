@@ -4,7 +4,7 @@ import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.SensingParameters;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
@@ -41,7 +41,7 @@ class EscalamientoNodoServiceTest {
     private ZonaRepository zonas;
     private HistorialService historial;
     private ZoneSafeState safeState;
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private EscalamientoNodoService service;
     private ZonaEntity mz3;
 
@@ -82,7 +82,7 @@ class EscalamientoNodoServiceTest {
     @Test
     @DisplayName("apagado no cuenta, no alerta y no ordena nada")
     void turnedOffDoesNothing() {
-        overrides.put("EscalamientoNodo", new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff("EscalamientoNodo");
 
         service.registrarSinRespuesta("MZ-3");
         service.registrarSinRespuesta("MZ-3");
@@ -96,7 +96,7 @@ class EscalamientoNodoServiceTest {
     @Test
     @DisplayName("bypass safe-state: el nodo cae y alerta, pero no se ordena el estado seguro")
     void safeStateBypassed() {
-        overrides.put("EscalamientoNodo", new RuleOverride(true, Map.of(), Set.of("safe-state")));
+        overrides.put("EscalamientoNodo", new RuleOverride(Map.of(), Set.of("safe-state")));
         mz3.setPulsosSinRespuesta(2);
 
         service.registrarSinRespuesta("MZ-3");

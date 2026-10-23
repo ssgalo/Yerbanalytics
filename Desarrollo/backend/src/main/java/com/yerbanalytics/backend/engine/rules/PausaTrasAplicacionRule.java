@@ -45,7 +45,12 @@ public class PausaTrasAplicacionRule implements Rule {
 
     @Override
     public String label() {
-        return "⏸️ Pausa tras una aplicación (R-06)";
+        return "Pausa tras una aplicación";
+    }
+
+    @Override
+    public String code() {
+        return "R-06";
     }
 
     @Override

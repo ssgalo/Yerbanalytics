@@ -8,6 +8,7 @@
    ============================================================ */
 import type { DataRepository, FiltroHistorial } from '@/data/repository';
 import { apiFetch } from './apiFetch';
+import { EstadoReglaError } from '@/data/estadoReglaError';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
 import { ManualLockError } from '@/data/manualLockError';
 import { TankLoadError } from '@/data/tankError';
@@ -19,6 +20,7 @@ import { SecuenciaRechazadaError } from '@/data/secuenciaError';
 import type {
   ActionRecord,
   CambioParametro,
+  CambioEstadoRegla,
   CatalogoReglas,
   Configuracion,
   DagSchema,
@@ -28,6 +30,7 @@ import type {
   DisposicionTopologia,
   DiagnosisCard,
   HardwareData,
+  RevisionEfectividad,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
@@ -46,6 +49,7 @@ import type {
   TrazaEvaluacion,
   NuevoPlanRustificacion,
   PlanRustificacion,
+  ReglaCatalogo,
 } from '@/types/domain';
 
 export class HttpRepository implements DataRepository {
@@ -298,6 +302,20 @@ export class HttpRepository implements DataRepository {
     return (await res.json()) as HardwareData;
   }
 
+  async registerEffectivenessReview(eventId: string, detail: string): Promise<RevisionEfectividad> {
+    const res = await apiFetch(`${this.baseUrl}/efectividad/${encodeURIComponent(eventId)}/revision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ detail }),
+    });
+    if (!res.ok) {
+      // 400 (sin detalle), 404 (evento inexistente) y 409 (ya no bloquea) traen { error } con el motivo.
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al registrar la revisión`);
+    }
+    return (await res.json()) as RevisionEfectividad;
+  }
+
   /** POST/PUT compartidos: el backend devuelve la flota actualizada o { error } (HU-18 CA-03). */
   private async mutateDevice(
     method: 'POST' | 'PUT',
@@ -382,6 +400,27 @@ export class HttpRepository implements DataRepository {
       );
     }
     return (await res.json()) as CatalogoReglas;
+  }
+
+  async setEstadoRegla(nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo> {
+    const res = await apiFetch(`${this.baseUrl}/rules/${encodeURIComponent(nombre)}/estado`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cambio),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+        mensaje?: string;
+        consecuencia?: string;
+      } | null;
+      // Un 400 trae el código del rechazo (motivo, confirmación…) y la vista decide qué pedir; el resto es un fallo común.
+      if (res.status === 400 && body?.error) {
+        throw new EstadoReglaError(body.error, body.mensaje ?? body.error, body.consecuencia ?? null);
+      }
+      throw new Error(body?.error ?? `Error ${res.status} al cambiar el estado de la regla ${nombre}`);
+    }
+    return (await res.json()) as ReglaCatalogo;
   }
 
   async getRuleSchema(): Promise<DagSchema> {

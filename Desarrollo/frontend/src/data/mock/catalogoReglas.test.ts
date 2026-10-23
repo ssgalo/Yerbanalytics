@@ -81,9 +81,10 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
 const DIR_ENGINE = resolve(__dirname, '../../../../backend/src/main/java/com/yerbanalytics/backend/engine');
 const DIR_PARAMETROS = resolve(DIR_ENGINE, 'parametros');
 const DIR_REGLAS = resolve(DIR_ENGINE, 'rules');
-/** Las reglas de macro-zona (plan de nutrición, mediasombra) viven con su feature, no con las de sector. */
-const DIR_REGLAS_DE_ZONA = resolve(DIR_ENGINE, '..', 'nutrition');
-const DIR_REGLAS_DE_MEDIASOMBRA = resolve(DIR_ENGINE, '..', 'mediasombra');
+/** Las reglas de macro-zona (nutrición, bióticas, clorosis, estrés solar, mediasombra) viven con su feature, no con las de sector. */
+const DIRS_REGLAS_DE_FEATURE = ['nutrition', 'biotic', 'chlorosis', 'solarstress', 'mediasombra'].map((dir) =>
+  resolve(DIR_ENGINE, '..', dir),
+);
 
 interface EntradaEnum {
   /** `Clase.CONSTANTE` en el código Java (p. ej. `ParametrosRiego.UMBRAL_HUMEDAD`): lo que usan las reglas. */
@@ -167,7 +168,7 @@ export function parametrosPorRegla(
 
 function leerReglasDelBackend(): Record<string, string> {
   const fuentes: Record<string, string> = {};
-  for (const dir of [DIR_REGLAS, DIR_REGLAS_DE_ZONA, DIR_REGLAS_DE_MEDIASOMBRA]) {
+  for (const dir of [DIR_REGLAS, ...DIRS_REGLAS_DE_FEATURE]) {
     for (const f of readdirSync(dir).filter((n) => /^\w+Rule\.java$/.test(n))) {
       fuentes[f.replace('.java', '')] = readFileSync(resolve(dir, f), 'utf8');
     }
@@ -191,7 +192,22 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   ApplicationService: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationService.java'),
   TankService: resolve(DIR_ENGINE, '..', 'supply', 'TankService.java'),
   NutritionPlanService: resolve(DIR_ENGINE, '..', 'nutrition', 'NutritionPlanService.java'),
+  EffectivenessService: resolve(DIR_ENGINE, '..', 'effectiveness', 'EffectivenessService.java'),
+  HorarioMediasombraService: resolve(DIR_ENGINE, '..', 'mediasombra', 'HorarioMediasombraService.java'),
 };
+
+/**
+ * Servicios que deciden y el catálogo lista junto a las reglas (son `DemoControllable`, con interruptor), pero que no
+ * son una `Rule` ni una `ZoneRule`: no están en la cadena del DAG. Su prioridad sólo ordena el listado.
+ */
+const SERVICIOS_CON_INTERRUPTOR = [
+  'EscalamientoNodo',
+  'ReadingValidationGuard',
+  'HardwareFaultService',
+  'HorarioMediasombraService',
+  'ApplicationPreconditions',
+  'EffectivenessService',
+];
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
   const constantes = new Map([
@@ -221,12 +237,7 @@ describe('parametrosPorRegla (el lector del anti-drift)', () => {
   });
 });
 
-describe.skipIf(
-  !existsSync(DIR_PARAMETROS) ||
-    !existsSync(DIR_REGLAS) ||
-    !existsSync(DIR_REGLAS_DE_ZONA) ||
-    !existsSync(DIR_REGLAS_DE_MEDIASOMBRA),
-)(
+describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS) || !DIRS_REGLAS_DE_FEATURE.every(existsSync))(
   'catalogoReglas.fixture.json · reglas y usadoPor contra el código del backend',
   () => {
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));
@@ -239,25 +250,32 @@ describe.skipIf(
     );
     const noRegla = parametrosPorRegla(fuentesNoRegla, constantes);
 
-    it('el fixture tiene exactamente las reglas del backend, con su prioridad', () => {
+    it('el fixture tiene exactamente las reglas del backend, con su prioridad, más los servicios con interruptor', () => {
       const prioridades = Object.fromEntries(
-        Object.entries(fuentes).map(([id, src]) => [id, Number(/PRIORITY\s*=\s*(\d+)/.exec(src)?.[1])]),
+        Object.entries(fuentes).map(([id, src]) => [
+          id,
+          Number(/PRIORITY\s*=\s*(\d+)/.exec(src)?.[1] ?? /int priority\(\)\s*\{\s*return\s*(\d+)/.exec(src)?.[1]),
+        ]),
       );
-      expect(Object.fromEntries(catalogo.reglas.map((r) => [r.id, r.prioridad]))).toEqual(prioridades);
+      const delFixture = Object.fromEntries(
+        catalogo.reglas.filter((r) => !SERVICIOS_CON_INTERRUPTOR.includes(r.id)).map((r) => [r.id, r.prioridad]),
+      );
+      expect(delFixture).toEqual(prioridades);
+      expect(catalogo.reglas.map((r) => r.id)).toEqual(expect.arrayContaining(SERVICIOS_CON_INTERRUPTOR));
     });
 
-    it('cada regla declara los mismos parámetros que el fixture (reglas[].parametros)', () => {
+    it('cada pieza declara los mismos parámetros que el fixture (reglas[].parametros)', () => {
       for (const r of catalogo.reglas) {
         expect({ regla: r.id, parametros: [...r.parametros].sort() }).toEqual({
           regla: r.id,
-          parametros: [...delBackend[r.id]].sort(),
+          parametros: [...(delBackend[r.id] ?? noRegla[r.id] ?? [])].sort(),
         });
       }
     });
 
     it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y los demás consumidores) del backend', () => {
       for (const p of catalogo.parametros) {
-        const esperado = catalogo.reglas.filter((r) => delBackend[r.id].includes(p.clave)).map((r) => r.id);
+        const esperado = catalogo.reglas.filter((r) => delBackend[r.id]?.includes(p.clave)).map((r) => r.id);
         for (const [id, claves] of Object.entries(noRegla)) {
           if (claves.includes(p.clave)) esperado.push(id);
         }

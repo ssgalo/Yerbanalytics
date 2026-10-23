@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './catalogoReglas.fixture.json';
+import { soloReglasDeLaCadena } from './reglasMock';
 import { evaluarMotor, type EntradaMotor } from './trazaReglas';
 import type { CatalogoReglas, TrazaEvaluacion, TrazaRegla } from '@/types/domain';
 
-const catalogo = fixture as CatalogoReglas;
+/** La traza evalúa las reglas de la cadena; los servicios con interruptor no corren por sector. */
+const catalogo = soloReglasDeLaCadena(fixture as CatalogoReglas);
 
 /** 2026-06-13 12:00 UTC = 09:00 hora del vivero (UTC-3): dentro de la ventana de riego. */
 const TS_DIA = '2026-06-13T12:00:00.000Z';
@@ -35,8 +37,11 @@ const regla = (t: TrazaEvaluacion, id: string): TrazaRegla => {
   return r;
 };
 
+/** Las reglas que deciden sobre la macro-zona entera, en el orden en que corren. */
+const REGLAS_DE_ZONA = ['FungalConditionRule', 'OutbreakRule', 'LowEcRule', 'NutritionPlanRule'];
+
 describe('evaluarMotor · forma de la traza', () => {
-  it('trae las 18 reglas, en orden de prioridad, con el origen y el sector', () => {
+  it('trae las 26 reglas, en orden de prioridad, con el origen y el sector', () => {
     const t = evaluarMotor(catalogo, base);
 
     expect(t.reglas.map((r) => r.ruleId)).toEqual(catalogo.reglas.map((r) => r.id));
@@ -44,7 +49,7 @@ describe('evaluarMotor · forma de la traza', () => {
     expect(t.zonaId).toBe('MZ-1');
     expect(t.origen).toBe('TELEMETRIA');
     expect(t.ts).toBe(base.ts);
-    expect(t.reglas).toHaveLength(18);
+    expect(t.reglas).toHaveLength(26);
   });
 
   it('es determinística', () => {
@@ -400,7 +405,7 @@ describe('evaluarMotor · bloqueos por rama', () => {
     });
     expect(tipos(regla(t, 'ManualLockRule'))).toEqual(['ABORT_ALL']);
     // Las reglas de la macro-zona no son de la cadena del sector: el corte no las alcanza.
-    const deLaCadena = t.reglas.filter((x) => x.ruleId !== 'ManualLockRule' && !['LowEcRule', 'NutritionPlanRule'].includes(x.ruleId));
+    const deLaCadena = t.reglas.filter((x) => x.ruleId !== 'ManualLockRule' && !REGLAS_DE_ZONA.includes(x.ruleId));
     expect(deLaCadena.length).toBeGreaterThan(0);
     for (const r of deLaCadena) {
       expect(r).toMatchObject({ estado: 'NO_ALCANZADA', bloqueadaPor: 'ManualLockRule' });
@@ -443,8 +448,8 @@ describe('evaluarMotor · insumo y mediasombra', () => {
     expect(r.acciones[0].tipo).toBe('MOVER_MEDIASOMBRA');
   });
 
-  it('el seguimiento no tiene comparaciones', () => {
-    expect(regla(evaluarMotor(catalogo, base), 'FollowUpRule').comparaciones).toEqual([]);
+  it('S-06 no tiene comparaciones: la demo estática no evalúa efectividad', () => {
+    expect(regla(evaluarMotor(catalogo, base), 'IneffectiveActionRule').comparaciones).toEqual([]);
   });
 });
 
@@ -491,14 +496,14 @@ describe('evaluarMotor · reglas de falla de hardware (S-05)', () => {
   });
 });
 
-describe('evaluarMotor · reglas de macro-zona (plan de nutrición)', () => {
-  const ZONA = ['LowEcRule', 'NutritionPlanRule'];
+describe('evaluarMotor · reglas de macro-zona (bióticas y plan de nutrición)', () => {
+  const ZONA = REGLAS_DE_ZONA;
 
-  it('N-02 y N-01 van al final de la rama de insumos, en reposo y en ese orden', () => {
+  it('las bióticas (F-F2, F-04) y las del plan (N-02, N-01) van en la rama de insumos, en reposo y en ese orden: sanidad antes que rutina', () => {
     const t = evaluarMotor(catalogo, base);
     const orden = t.reglas.map((r) => r.ruleId);
 
-    expect(orden.indexOf('LowEcRule')).toBeLessThan(orden.indexOf('NutritionPlanRule'));
+    expect(ZONA.map((id) => orden.indexOf(id))).toEqual([...ZONA.map((id) => orden.indexOf(id))].sort((a, b) => a - b));
     for (const id of ZONA) {
       const r = regla(t, id);
       expect(r.rama).toBe('INSUMO');
@@ -512,7 +517,7 @@ describe('evaluarMotor · reglas de macro-zona (plan de nutrición)', () => {
     const t = evaluarMotor(catalogo, { ...base, dosis24h: 5 });
 
     expect(regla(t, 'DailyDoseLimitRule').acciones.map((a) => a.tipo)).toContain('ABORT_INSUMO');
-    expect(regla(t, 'SupplyRule').estado).toBe('OMITIDA_RAMA_BLOQUEADA');
+    // DailyDoseLimitRule (retirada) corre al final de la cadena: lo que va antes en la rama ya se evaluó.
     for (const id of ZONA) expect(regla(t, id).estado).toBe('EVALUADA');
   });
 

@@ -325,6 +325,20 @@ export interface Evolution {
   verdict: string;
   vSoft: string;
   vInk: string;
+  /** Por qué la evaluación dio efectiva o sin efectividad; ausente mientras está en seguimiento. */
+  motivo?: string | null;
+  /** `true` si la acción quedó sin efectividad y todavía bloquea su repetición (S-06): habilita «Registrar revisión». */
+  bloqueando?: boolean;
+}
+
+/** Revisión registrada de una acción sin efectividad (S-06). Espejo del DTO `EffectivenessReview`. */
+export interface RevisionEfectividad {
+  eventId: string;
+  /** `IRRIGATION` | `CORRECTIVE_FERTILIZER` | `FUNGICIDE`. */
+  kind: string;
+  /** Cuántos bloqueos se levantaron (el riego bloquea a toda la macro-zona). */
+  clearedEvents: number;
+  reviewedTs: number;
 }
 
 /** Registro del historial global de acciones (HU-11 / HU-12). Espejo del DTO backend. */
@@ -357,6 +371,12 @@ export interface ActionRecord {
   volumenL?: number | null;
   /** Duración de apertura ordenada (s); sólo en eventos de tipo `Riego`. */
   duracionSeg?: number | null;
+  /**
+   * Piezas del motor que estaban apagadas cuando se tomó la decisión (el grafo de razonamiento las excluye
+   * y dibuja todas las demás). Vacío = todo estaba prendido; `null`/ausente = evento anterior a este registro
+   * o que no vino del motor: el grafo cae a las que están apagadas de fábrica.
+   */
+  reglasInactivas?: string[] | null;
 }
 
 /** Nivel de una alerta del motor (eventos `Alerta` del historial). */
@@ -452,13 +472,11 @@ export interface MetricThreshold {
 }
 
 /**
- * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego no
- * vive acá: es un parámetro del catálogo del motor de reglas (`riego.volumen-max-evento`).
+ * Parámetros operativos de la configuración (HU-15): el pulso de sensado, la pasada diaria y el horario por defecto de
+ * la mediasombra. Lo que decide el motor (volúmenes, topes de dosis, seguimiento post-acción) vive en el catálogo de
+ * parámetros del motor de reglas.
  */
 export interface ConfigOperativa {
-  insumoDosisMax24hMl: number;
-  seguimientoLatenciaMin: number;
-  seguimientoDeltaMin: number;
   /**
    * Intervalo del pulso de sensado y evaluación (60–360 min). En cada franja, anclada a las 02:00,
    * el backend lee los sensores de todas las macro-zonas y evalúa el motor.
@@ -710,11 +728,15 @@ export interface RuleNode {
   branch: string;
   /** Claves del catálogo de parámetros que declara la regla; vacía en los nodos especiales. */
   parametros: string[];
+  /** Código de `reglas_v2` ("R-01"); vacío si la pieza no tiene (o es un nodo especial). */
+  codigo?: string;
   /**
-   * `false` si la regla está apagada (las retiradas, `yerbanalytics.reglas.retiradas`): no corre y el
-   * historial no la dibuja. Los nodos especiales siempre vienen activos; ausente = activa.
+   * Estado EFECTIVO hoy: `false` si la regla está apagada (por el vivero o, en modo demo, por el simulador) y no
+   * corre. Los nodos especiales siempre vienen activos; ausente = activa.
    */
   activa?: boolean;
+  /** `false` si arranca apagada de fábrica (las retiradas). Sirve para reconstruir el grafo de un evento viejo. */
+  activaPorDefecto?: boolean;
 }
 
 /** Arista dirigida entre dos nodos del DAG. Espejo de `RuleEdgeDto` del backend. */
@@ -772,13 +794,49 @@ export interface ParametroRegla {
   updatedTs: number | null;
 }
 
-/** Una regla del motor con las claves de los parámetros que declara. */
+/** Grupo de la pantalla Motor de reglas (el backend lo declara por pieza). */
+export type ObjetivoRegla = 'IRRIGATION' | 'NUTRITION' | 'SANITY' | 'SHADE' | 'FOLLOW_UP' | 'PROTECTION';
+
+/** Qué hace la pieza: actúa sobre el vivero, sólo avisa o protege (apagarla exige confirmación). */
+export type EfectoRegla = 'ACTS' | 'WARNS' | 'PROTECTS';
+
+/** Último cambio del interruptor de una pieza: quién, cuándo y por qué. */
+export interface UltimoCambioRegla {
+  motivo: string | null;
+  updatedBy: string;
+  /** Epoch ms. */
+  updatedTs: number;
+}
+
+/**
+ * Una pieza del motor que decide (regla por sector, de macro-zona o servicio) con las claves de los parámetros
+ * que declara. `label` viene sin emoji ni código; `codigo` es "" si la pieza no tiene (puede ser una lista).
+ */
 export interface ReglaCatalogo {
   id: string;
   label: string;
+  codigo: string;
   rama: RamaRegla;
+  objetivo: ObjetivoRegla;
+  efecto: EfectoRegla;
   prioridad: number;
   parametros: string[];
+  /** Estado operativo: lo que decidió el vivero; única fuente de verdad del encendido (la demo no lo cambia). */
+  activa: boolean;
+  /** `false` si arranca apagada de fábrica (una retirada). */
+  activaPorDefecto: boolean;
+  /** Si es una protección: qué pasa al apagarla. `null` si no lo es. */
+  proteccion: string | null;
+  /** `null` si nunca se cambió el interruptor. */
+  estado: UltimoCambioRegla | null;
+}
+
+/** Cuerpo de `PUT /api/rules/{name}/estado`. Prender nunca pide motivo ni confirmación. */
+export interface CambioEstadoRegla {
+  activa: boolean;
+  motivo?: string;
+  /** Obligatorio al apagar una protección. */
+  confirmaProteccion?: boolean;
 }
 
 /** Catálogo normalizado: los parámetros van una vez y las reglas los referencian por clave. */
@@ -849,6 +907,8 @@ export interface TrazaRegla {
   bloqueadaPor: string | null;
   /** "Clase: mensaje" cuando la regla lanzó una excepción (`ERROR`). */
   error: string | null;
+  /** Lo que la regla asumió porque no había pronóstico (O-01…O-03), p. ej. «Sin pronóstico: se asume que no llueve…». */
+  supuesto?: string | null;
 }
 
 /** Última evaluación del motor para un sector y origen. Vive en memoria en el backend. */

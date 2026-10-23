@@ -136,6 +136,49 @@
   font-variant-numeric: tabular-nums;
 }
 
+.evoReason {
+  flex-basis: 100%;
+  font-size: var(--t-13);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.review {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.reviewLabel {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.reviewField {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line-field);
+  border-radius: var(--r-m, 8px);
+  resize: vertical;
+}
+
+.reviewActions {
+  display: flex;
+  gap: 8px;
+}
+
+.reviewError {
+  font-size: var(--t-13);
+  color: var(--crit-ink);
+}
+
 .foot {
   flex: none;
   padding: 14px 22px 18px;

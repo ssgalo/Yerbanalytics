@@ -3,23 +3,27 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
+import com.yerbanalytics.backend.effectiveness.EffectivenessKind;
+import com.yerbanalytics.backend.effectiveness.FollowUp;
+import com.yerbanalytics.backend.effectiveness.FollowUpPolicy;
+import com.yerbanalytics.backend.effectiveness.TreatmentBaseline;
 import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.model.SectorEntity;
+import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +41,8 @@ import java.util.*;
 public class HistorialService {
 
     private static final String EMDASH = "—";
+    /** Veredicto de un seguimiento que todavía no se evaluó. */
+    public static final String VERDICT_EN_SEGUIMIENTO = "En seguimiento";
 
     private static final ColorPair VERDICT_EFECTIVA = new ColorPair("#E3F2E8", "#1E6B41");
     private static final ColorPair VERDICT_SEGUIMIENTO = new ColorPair("#E2ECF8", "#1F4F86");
@@ -46,29 +52,29 @@ public class HistorialService {
             DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZonaHorariaVivero.ZONA);
 
     private final HistorialRepository historialRepository;
-    private final SectorRepository sectorRepository;
-    private final ConfiguracionService configuracionService;
-    /** Fallbacks por properties, usados si la configuración persistida no está disponible. */
-    private final long latencyMs;
-    private final String latencyLabel;
-    private final double umbralRecuperacion;
+    /** Cuánto se espera para juzgar cada acción (E-01…E-03). Perezoso: el servicio de efectividad también escribe en el historial. */
+    private final FollowUpPolicy followUps;
     /** Reloj del vivero: el mismo que usa el despacho de riego para sellar y comparar los eventos. */
     private final Clock reloj;
+    /** Estado efectivo de las piezas: de ahí sale qué estaba apagado al registrar cada decisión del motor. */
+    private final RuleOverrides overrides;
 
+    /** Sin overrides: ninguna pieza figura apagada. */
     public HistorialService(HistorialRepository historialRepository,
-                            SectorRepository sectorRepository,
-                            @Lazy ConfiguracionService configuracionService,
-                            @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
-                            @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
-                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion,
+                            @Lazy FollowUpPolicy followUps,
                             Clock reloj) {
+        this(historialRepository, followUps, reloj, RuleOverrides.NONE);
+    }
+
+    @Autowired
+    public HistorialService(HistorialRepository historialRepository,
+                            @Lazy FollowUpPolicy followUps,
+                            Clock reloj,
+                            RuleOverrides overrides) {
         this.historialRepository = historialRepository;
-        this.sectorRepository = sectorRepository;
-        this.configuracionService = configuracionService;
-        this.latencyMs = latencyMs;
-        this.latencyLabel = latencyLabel;
-        this.umbralRecuperacion = umbralRecuperacion;
+        this.followUps = followUps;
         this.reloj = reloj;
+        this.overrides = overrides;
     }
 
     // ------------------------------------------------------------------
@@ -83,7 +89,7 @@ public class HistorialService {
         e.setLectura("Humedad de sustrato " + fmt0(hum) + "% bajo el umbral mínimo configurado.");
         e.setDecision("El motor de reglas ordena abrir la electroválvula del sector.");
         e.setAccion("Microaspersor abierto · riego autónomo en curso.");
-        withSeguimiento(e, hum);
+        withIrrigationFollowUp(e, hum, 0);
         historialRepository.save(e);
     }
 
@@ -103,8 +109,8 @@ public class HistorialService {
                 + detalle.duracionSeg() + " s"
                 + (detalle.recortado() ? " (duración recortada al máximo de la válvula)." : "."));
         e.setAccion("Electroválvula abierta · riego autónomo en curso.");
-        withSeguimiento(e, detalle.humedad());
-        historialRepository.save(e);
+        withIrrigationFollowUp(e, detalle.humedad(), detalle.duracionSeg());
+        guardarDelMotor(e);
     }
 
     /**
@@ -129,7 +135,7 @@ public class HistorialService {
         e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /** Regla con la que queda en el historial un riego que se cortó antes de tiempo (ver {@link #registrarCorteRiego}). */
@@ -157,7 +163,7 @@ public class HistorialService {
         e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /**
@@ -178,30 +184,38 @@ public class HistorialService {
      * supone que la dispara un diagnóstico: la aplicación puede venir de un plan de nutrición.
      */
     public void registrarInsumo(SectorEntity s, int ml, String insumo, String regla) {
+        registrarInsumo(s, ml, insumo, regla, null);
+    }
+
+    /**
+     * Como la anterior, y si {@code followUp} no es nulo abre el seguimiento de efectividad del tratamiento (E-02, E-03). Sin él la
+     * aplicación queda registrada pero no se evalúa (el plan de nutrición, o una racha que ya tiene su seguimiento abierto).
+     */
+    public void registrarInsumo(SectorEntity s, int ml, String insumo, String regla, FollowUp followUp) {
         HistorialEventoEntity e = armarInsumo(s);
         e.setRegla(regla);
         e.setDuracionSeg((int) Math.ceil(ml * ContratoNodo.BOMBA_INSUMO_MS_POR_ML / 1000.0));
         e.setLectura("Aplicación de " + insumo.toLowerCase() + " pedida por la regla " + regla + ".");
         e.setDecision("Las precondiciones de aplicación se cumplen: se ordenan " + ml + " ml de "
                 + insumo.toLowerCase() + ".");
-        historialRepository.save(e);
+        if (followUp != null) {
+            withTreatmentFollowUp(e, followUp);
+        }
+        guardarDelMotor(e);
     }
 
-    /** Registra una dosificación de insumo, con seguimiento de la métrica afectada. */
+    /** Registra una dosificación de insumo. Sin seguimiento: la evaluación de efectividad la abre quien aplica (E-02, E-03). */
     public void registrarInsumo(SectorEntity s) {
         historialRepository.save(armarInsumo(s));
     }
 
     private HistorialEventoEntity armarInsumo(SectorEntity s) {
-        Double humSus = currentMetric(s, "humSus");
-        double hum = humSus != null ? humSus : 0.0;
         Double conf = s.getDiagnosisConf();
-        HistorialEventoEntity e = base(s, "Insumo", "En seguimiento");
+        HistorialEventoEntity e = base(s, "Insumo", "Efectiva");
         e.setLectura("Diagnóstico IA: " + s.getDiagnosisEstado()
                 + (conf != null ? " (confianza " + fmt0(conf) + "%)" : "") + ".");
         e.setDecision("Confianza sobre el umbral: el motor habilita la dosificación localizada.");
         e.setAccion("Bomba peristáltica inyectando insumo en la línea del sector.");
-        withSeguimiento(e, hum);
         return e;
     }
 
@@ -219,32 +233,46 @@ public class HistorialService {
         return e;
     }
 
-    private void withSeguimiento(HistorialEventoEntity e, double valorAntes) {
-        // Latencia y delta vienen de la configuración agronómica vigente (HU-15 CA-07),
-        // con los valores de properties como fallback.
-        long effLatency = latencyMs;
-        String effLabel = latencyLabel;
-        double effUmbral = umbralRecuperacion;
-        try {
-            effLatency = configuracionService.getLatencyMs();
-            effLabel = configuracionService.getLatencyLabel();
-            effUmbral = configuracionService.getUmbralRecuperacion();
-        } catch (RuntimeException ignored) {
-            // Sin configuración disponible: se usan los fallbacks por properties.
-        }
-
+    /**
+     * E-01: el seguimiento de un riego compara la humedad de sustrato de la macro-zona antes del riego con la de la lectura de
+     * verificación. Se evalúa {@code latencia de verificación} después de que cierra la válvula, no después de la orden.
+     */
+    private void withIrrigationFollowUp(HistorialEventoEntity e, double valorAntes, int valveSeconds) {
+        long latency = valveSeconds * 1000L + followUps.latencyMs(EffectivenessKind.IRRIGATION);
+        e.setEfectividadTipo(EffectivenessKind.IRRIGATION.name());
         e.setMetricKey("humSus");
         e.setValorAntes(valorAntes);
-        e.setUmbralRecuperacion(effUmbral);
-        e.setLatencyMs(effLatency);
+        e.setLatencyMs(latency);
         e.setEvoShow(true);
         e.setEvoMetric("Humedad de sustrato");
         e.setEvoUnit("%");
         e.setEvoAntes(fmt0(valorAntes));
         e.setEvoAhora("—");
         e.setEvoDelta("—");
-        e.setEvoLatencia(effLabel);
-        e.setEvoVerdict("En seguimiento");
+        e.setEvoLatencia(followUps.latencyLabel(EffectivenessKind.IRRIGATION));
+        e.setEvoVerdict(VERDICT_EN_SEGUIMIENTO);
+        e.setEvoEvaluadoTs(null);
+    }
+
+    /**
+     * E-02 y E-03: el seguimiento de un tratamiento compara el diagnóstico del sector de después con el de cuando se aplicó, que
+     * queda en el evento (estado, severidad y los lindantes que ya tenían el daño).
+     */
+    private void withTreatmentFollowUp(HistorialEventoEntity e, FollowUp followUp) {
+        TreatmentBaseline baseline = followUp.baseline();
+        e.setRes("En seguimiento");
+        e.setEfectividadTipo(followUp.kind().name());
+        e.setDiagEstadoAntes(baseline.state());
+        e.setVecinosAntes(String.join(",", new java.util.TreeSet<>(baseline.neighbors())));
+        e.setLatencyMs(followUps.latencyMs(followUp.kind()));
+        e.setEvoShow(true);
+        e.setEvoMetric("Diagnóstico del sector");
+        e.setEvoUnit("");
+        e.setEvoAntes(baseline.severity() == null ? baseline.state() : baseline.state() + " " + baseline.severity().label());
+        e.setEvoAhora("—");
+        e.setEvoDelta("—");
+        e.setEvoLatencia(followUps.latencyLabel(followUp.kind()));
+        e.setEvoVerdict(VERDICT_EN_SEGUIMIENTO);
         e.setEvoEvaluadoTs(null);
     }
 
@@ -276,7 +304,8 @@ public class HistorialService {
         e.setSev(s.getDiagnosisSev());
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        e.setRegla(ruleName);
+        guardarDelMotor(e);
     }
 
     /**
@@ -298,6 +327,56 @@ public class HistorialService {
         e.setLectura(dispositivo + " con falla registrada: " + NodeErrorType.describe(falla) + ".");
         e.setDecision("Reparación registrada por " + usuario + ": " + detalle);
         e.setAccion("Falla levantada: el dispositivo vuelve a lo autónomo en el siguiente pulso.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra la revisión de un sector que había alcanzado el tope de fitosanitarios (F-06): quién la hizo, cuándo (el
+     * reloj del vivero) y qué constató. Levanta el bloqueo de la siguiente aplicación.
+     */
+    @Transactional
+    public void registrarRevisionFitosanitaria(String usuario, SectorEntity sector, String detalle) {
+        ZonaEntity zona = sector.getZona();
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(sector.getId());
+        e.setZonaId(zona.getId());
+        e.setZonaName(zona.getName() != null ? zona.getName() : zona.getId());
+        e.setTipo("Revisión");
+        e.setTs(reloj.millis());
+        e.setLectura("Sector con el tope de fitosanitarios alcanzado.");
+        e.setDecision("Revisión registrada por " + usuario + ": " + detalle);
+        e.setAccion("Bloqueo levantado: el sector puede recibir fitosanitarios otra vez.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra la revisión de una acción que quedó sin efectividad (S-06): quién la hizo, cuándo (el reloj del vivero) y qué
+     * constató. Levanta el bloqueo de la repetición autónoma de esa acción. Queda en el sector de la acción revisada.
+     */
+    @Transactional
+    public void registrarRevisionEfectividad(String usuario, HistorialEventoEntity revisado, String detalle) {
+        EffectivenessKind kind = EffectivenessKind.parse(revisado.getEfectividadTipo()).orElse(EffectivenessKind.IRRIGATION);
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(revisado.getSectorId());
+        e.setZonaId(revisado.getZonaId());
+        e.setZonaName(revisado.getZonaName() != null ? revisado.getZonaName() : revisado.getZonaId());
+        e.setTipo("Revisión");
+        e.setTs(reloj.millis());
+        e.setLectura(kind.label() + " sin efectividad"
+                + (revisado.getEvoMotivo() != null ? ": " + revisado.getEvoMotivo() : "."));
+        e.setDecision("Revisión registrada por " + usuario + ": " + detalle);
+        e.setAccion("Bloqueo levantado: " + kind.label().toLowerCase() + " vuelve a poder repetirse de forma autónoma "
+                + (kind.isZoneScoped() ? "en la macro-zona." : "en el sector."));
         e.setRes("Efectiva");
         e.setSev(EMDASH);
         e.setEvoShow(false);
@@ -342,6 +421,52 @@ public class HistorialService {
     }
 
     /**
+     * Guarda una decisión del motor junto con las piezas que estaban apagadas en este momento: el grafo del historial
+     * tiene que dibujar lo que corrió entonces, no lo que esté prendido cuando alguien lo mire. Un evento sin regla no es
+     * una decisión del motor y queda con {@code null}.
+     */
+    private void guardarDelMotor(HistorialEventoEntity e) {
+        if (e.getRegla() != null) {
+            e.setReglasInactivas(String.join(",", new TreeSet<>(overrides.inactiveNames())));
+        }
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra que alguien prendió o apagó una regla desde Motor de reglas: qué regla (con su código), el nuevo estado,
+     * quién, por qué y, si apagó una protección, qué implica. No va a la auditoría de seguridad: apagar una regla es
+     * operar el vivero y acá es donde se busca "¿por qué no se regó?".
+     *
+     * @param consecuencia el texto de la protección apagada; {@code null} si no aplica
+     */
+    @Transactional
+    public void registrarEstadoRegla(String usuario, String regla, String etiqueta, String codigo, boolean activa,
+                                     String motivo, String consecuencia) {
+        String nombre = "«" + etiqueta + "»" + (codigo == null || codigo.isBlank() ? "" : " (" + codigo + ")");
+        String estado = activa ? "prendida" : "apagada";
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(EMDASH);
+        e.setZonaName("Sistema");
+        e.setTipo("Configuración");
+        e.setTs(reloj.millis());
+        e.setRegla(regla);
+        e.setLectura("Interruptor del motor de reglas: " + nombre + ".");
+        e.setDecision("Regla " + nombre + " " + estado + " por " + usuario + "."
+                + (motivo == null || motivo.isBlank() ? "" : " Motivo: " + motivo + "."));
+        e.setAccion(consecuencia != null
+                ? "Consecuencia: " + consecuencia
+                : activa ? "El motor vuelve a evaluarla desde el próximo pulso."
+                        : "El motor deja de evaluarla desde el próximo pulso.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
      * Registra un movimiento (u orden no enviada) de la mediasombra de una macro-zona. La malla es de la zona: el evento
      * queda con {@code sectorId = "—"}. {@code regla} dice quién la movió (una regla del motor, el horario de la
      * mediasombra o una secuencia).
@@ -363,7 +488,7 @@ public class HistorialService {
         e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /** Registra que alguien inició o eliminó el plan de rustificación de una macro-zona. */
@@ -402,45 +527,6 @@ public class HistorialService {
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
         historialRepository.save(e);
-    }
-
-    // ------------------------------------------------------------------
-    // Seguimiento post-acción (HU-12) — corre periódicamente
-    // ------------------------------------------------------------------
-
-    @Scheduled(fixedDelayString = "${yerbanalytics.historial.eval-interval-ms:30000}")
-    @Transactional
-    public void evaluarSeguimiento() {
-        long now = reloj.millis();
-        List<HistorialEventoEntity> pendientes = historialRepository.findByEvoShowTrueAndEvoEvaluadoTsIsNull();
-        List<HistorialEventoEntity> evaluados = new ArrayList<>();
-
-        for (HistorialEventoEntity e : pendientes) {
-            if (e.getLatencyMs() == null || now - e.getTs() < e.getLatencyMs()) {
-                continue; // la latencia todavía no venció
-            }
-            SectorEntity s = sectorRepository.findById(e.getSectorId()).orElse(null);
-            Double ahora = s != null ? currentMetric(s, e.getMetricKey()) : null;
-            if (ahora == null) {
-                continue; // sin lectura disponible, se reintenta en el próximo ciclo
-            }
-
-            double antes = e.getValorAntes() != null ? e.getValorAntes() : 0.0;
-            double delta = ahora - antes;
-            double umbral = e.getUmbralRecuperacion() != null ? e.getUmbralRecuperacion() : umbralRecuperacion;
-            boolean efectiva = Math.abs(delta) >= umbral;
-
-            e.setEvoAhora(fmt0(ahora));
-            e.setEvoDelta((delta >= 0 ? "+" : "") + fmt0(delta));
-            e.setEvoVerdict(efectiva ? "Efectiva" : "Sin efectividad");
-            e.setBloqueoRepeticion(!efectiva);
-            e.setEvoEvaluadoTs(now);
-            evaluados.add(e);
-        }
-
-        if (!evaluados.isEmpty()) {
-            historialRepository.saveAll(evaluados);
-        }
     }
 
     /** Lectura vigente de la métrica: viene de la macro-zona del sector, no del sector. */
@@ -546,7 +632,9 @@ public class HistorialService {
                     e.getEvoLatencia(),
                     e.getEvoVerdict(),
                     vc.soft(),
-                    vc.ink()
+                    vc.ink(),
+                    e.getEvoMotivo(),
+                    e.isBloqueoRepeticion() && e.getEfectividadTipo() != null
             );
         }
 
@@ -572,8 +660,17 @@ public class HistorialService {
                 e.getRegla(),
                 e.getAlerta(),
                 e.getVolumenL(),
-                e.getDuracionSeg()
+                e.getDuracionSeg(),
+                reglasInactivas(e.getReglasInactivas())
         );
+    }
+
+    /** {@code null} (evento anterior al registro) sigue siendo {@code null}; vacío es "todas estaban prendidas". */
+    private static List<String> reglasInactivas(String guardadas) {
+        if (guardadas == null) {
+            return null;
+        }
+        return guardadas.isBlank() ? List.of() : List.of(guardadas.split(","));
     }
 
     private ColorPair verdictColor(String verdict) {

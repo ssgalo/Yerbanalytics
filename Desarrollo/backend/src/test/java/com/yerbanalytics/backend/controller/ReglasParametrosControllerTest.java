@@ -40,13 +40,18 @@ class ReglasParametrosControllerTest {
     @MockBean
     private CatalogoParametrosService service;
 
+    private static ReglaCatalogoDto regla(String id, String label, int prioridad) {
+        return new ReglaCatalogoDto(id, label, "R-01", "RIEGO", "IRRIGATION", "ACTS", prioridad,
+                List.of("riego.umbral-humedad"), true, true, null, null);
+    }
+
     private static CatalogoReglasDto catalogo(String valorUmbral) {
         ParametroDto umbral = new ParametroDto("riego.umbral-humedad", "Umbral de riego", "desc", "RIEGO",
                 "NUMERO", "%", valorUmbral, "42", 35.0, 60.0, 0, "reglas_v2 §5 R-01",
                 !valorUmbral.equals("42"), List.of("IrrigationRule", "WeatherOverrideRule"), null, null);
         return new CatalogoReglasDto(
-                List.of(new ReglaCatalogoDto("IrrigationRule", "Riego", "RIEGO", 10, List.of("riego.umbral-humedad")),
-                        new ReglaCatalogoDto("WeatherOverrideRule", "Lluvia", "RIEGO", 5, List.of("riego.umbral-humedad"))),
+                List.of(regla("IrrigationRule", "Riego", 10),
+                        regla("WeatherOverrideRule", "Lluvia", 5)),
                 List.of(umbral));
     }
 

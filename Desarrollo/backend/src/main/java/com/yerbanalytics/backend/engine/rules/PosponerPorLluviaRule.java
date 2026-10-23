@@ -37,7 +37,7 @@ import java.util.List;
 public class PosponerPorLluviaRule implements Rule {
 
     private static final int PRIORITY = 10;
-    private static final String NAME = "PosponerPorLluviaRule";
+    public static final String NAME = "PosponerPorLluviaRule";
     static final String TEXTO_ALERTA = "Riego pospuesto por pronóstico de lluvia";
 
     @Override
@@ -51,8 +51,18 @@ public class PosponerPorLluviaRule implements Rule {
     }
 
     @Override
+    public String supuestoSinPronostico() {
+        return "se asume que no llueve: no se pospone el riego";
+    }
+
+    @Override
     public String label() {
-        return "🌧️ Posponer por lluvia (R-03)";
+        return "Posponer por lluvia";
+    }
+
+    @Override
+    public String code() {
+        return "R-03";
     }
 
     @Override

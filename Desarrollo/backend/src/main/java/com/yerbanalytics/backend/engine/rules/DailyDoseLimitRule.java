@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
@@ -38,7 +40,7 @@ import java.util.List;
 @Component
 public class DailyDoseLimitRule implements Rule {
 
-    private static final int PRIORITY = 7;
+    private static final int PRIORITY = 28;
     public static final String NAME = "DailyDoseLimitRule";
     /** Bypass key: ignores the daily dose limit. */
     public static final String BYPASS_DAILY_LIMIT = "daily-limit";
@@ -62,7 +64,17 @@ public class DailyDoseLimitRule implements Rule {
 
     @Override
     public String label() {
-        return "🛑 Límite de dosis diaria";
+        return "Límite de dosis diaria";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Se dosifica sin el tope diario de dosis de la v1.");
     }
 
     @Override

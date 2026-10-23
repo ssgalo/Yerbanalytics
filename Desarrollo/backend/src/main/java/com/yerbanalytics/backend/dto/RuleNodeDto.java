@@ -7,7 +7,8 @@ import java.util.List;
  *
  * @param id       ID único del nodo. Para reglas: el nombre de la clase (ej: "ClimaOverrideRule").
  *                 Para los nodos especiales: "start", "abort", "success".
- * @param label    Etiqueta legible para el usuario.
+ * @param label    Etiqueta legible para el usuario, sin emojis y sin el código.
+ * @param codigo   Código de {@code reglas_v2} ({@code "R-01"}); vacío si la pieza no tiene o en los nodos especiales.
  * @param type     Tipo de nodo para el renderizador ("input", "default", "output").
  * @param priority Prioridad del nodo (-1 para start, 999 para terminales). Usado por el
  *                 frontend para determinar el coloreado reactivo al seleccionar un evento.
@@ -17,13 +18,18 @@ import java.util.List;
  * @param activa   {@code false} si la regla está apagada (p. ej. las retiradas de
  *                 {@code yerbanalytics.reglas.retiradas}): no corre, y el historial no la dibuja.
  *                 Los nodos especiales siempre van activos.
+ * @param activaPorDefecto {@code false} si la regla está retirada ({@code yerbanalytics.reglas.retiradas}): así arranca
+ *                 sin que nadie la haya prendido. El historial lo usa para los eventos viejos, que no guardaron qué
+ *                 reglas estaban apagadas. Los nodos especiales siempre van en {@code true}.
  */
 public record RuleNodeDto(
         String id,
         String label,
+        String codigo,
         String type,
         int priority,
         String branch,
         List<String> parametros,
-        boolean activa
+        boolean activa,
+        boolean activaPorDefecto
 ) {}

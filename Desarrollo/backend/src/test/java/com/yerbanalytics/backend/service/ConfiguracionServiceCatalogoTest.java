@@ -64,7 +64,7 @@ class ConfiguracionServiceCatalogoTest {
     }
 
     private static Configuracion cfg(String mediasombraDesde, String mediasombraHasta) {
-        return new Configuracion(umbralesDeFabrica(), new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null,
+        return new Configuracion(umbralesDeFabrica(), new ConfiguracionOperativa(240, "x", 1L, null, null,
                 null, mediasombraDesde, mediasombraHasta));
     }
 
@@ -75,8 +75,10 @@ class ConfiguracionServiceCatalogoTest {
         String json = new ObjectMapper().writeValueAsString(service.getConfiguracion().operativa());
 
         assertThat(json).doesNotContain("riegoTiempoMaxSeg").doesNotContain("mediasombraAperturaMaxPct");
-        assertThat(json).doesNotContain("riegoVolMaxDiarioMl").contains("insumoDosisMax24hMl")
-                .contains("seguimientoLatenciaMin").contains("pasadaDiariaHora")
+        assertThat(json).doesNotContain("riegoVolMaxDiarioMl").contains("pasadaDiariaHora")
+                // add-motor-reglas-operativo D-14: el seguimiento va al catálogo del motor y la dosis máxima se borró.
+                .doesNotContain("insumoDosisMax24hMl").doesNotContain("seguimientoLatenciaMin")
+                .doesNotContain("seguimientoDeltaMin")
                 .doesNotContain("intervaloEvaluacionMinutos").doesNotContain("sensingPullIntervalSeconds");
     }
 
@@ -84,7 +86,8 @@ class ConfiguracionServiceCatalogoTest {
     void laEntidadOperativaNoGuardaLosCamposMudados() {
         assertThat(ConfiguracionOperativaEntity.class.getDeclaredFields())
                 .extracting(java.lang.reflect.Field::getName)
-                .doesNotContain("riegoTiempoMaxSeg", "mediasombraAperturaMaxPct");
+                .doesNotContain("riegoTiempoMaxSeg", "mediasombraAperturaMaxPct", "insumoDosisMax24hMl",
+                        "seguimientoLatenciaMin", "seguimientoDeltaMin");
     }
 
     @Test

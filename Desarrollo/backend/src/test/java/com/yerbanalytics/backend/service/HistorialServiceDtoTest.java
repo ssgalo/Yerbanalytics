@@ -2,9 +2,9 @@ package com.yerbanalytics.backend.service;
 
 import java.time.Clock;
 import com.yerbanalytics.backend.dto.HistorialEvento;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,9 +24,7 @@ class HistorialServiceDtoTest {
 
     @Mock
     private HistorialRepository historialRepository;
-    @Mock
-    private SectorRepository sectorRepository;
-    @Mock
+@Mock
     private ConfiguracionService configuracionService;
 
     private HistorialEventoEntity entidad() {
@@ -46,7 +44,7 @@ class HistorialServiceDtoTest {
     }
 
     private HistorialService service() {
-        return new HistorialService(historialRepository, sectorRepository, configuracionService, 120000, "2 min", 5, Clock.systemUTC());
+        return new HistorialService(historialRepository, kind -> 1_800_000L, Clock.systemUTC());
     }
 
     @Test

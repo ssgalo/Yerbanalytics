@@ -8,7 +8,7 @@ import type { RuleScenario } from './types';
 export const PULSES_TO_DECLARE_OFFLINE = 3;
 
 /** The other scenarios feed telemetry to the engine; a node that does not answer cannot make them fire. */
-const OTHER_SCENARIOS = ['R01', 'R02', 'R03', 'R04', 'SHADING', 'SUPPLY', 'LOCK', 'APPLICATION_PRECONDITIONS'];
+const OTHER_SCENARIOS = ['R01', 'R02', 'R03', 'R04', 'SHADING', 'SUPPLY', 'LOCK', 'APPLICATION_PRECONDITIONS', 'IRRIGATION_NO_EFFECT', 'NO_FORECAST'];
 
 export const nodeOffline: RuleScenario = {
   key: 'NODE_OFFLINE',

@@ -212,6 +212,27 @@ public class WeatherService {
     }
 
     /**
+     * El estado del pronóstico, sin consultar la API ni lanzar ningún refresco: {@link ForecastStatus#AVAILABLE} si las reglas
+     * recibirían uno (el ficticio del modo demo, o el cacheado dentro de la vigencia utilizable, {@value #FACTOR_USABLE_VENCIDO} TTL),
+     * {@link ForecastStatus#EXPIRED} si hubo uno que ya no sirve y {@link ForecastStatus#ABSENT} si nunca lo hubo o el modo demo
+     * «sin pronóstico» está activo. La vigencia es la misma de {@link #getForecastSinEspera()}: no hay un parámetro aparte.
+     */
+    public ForecastStatus status() {
+        if (offlineSimulado.get()) {
+            return ForecastStatus.ABSENT;
+        }
+        if (mockForecast.get() != null) {
+            return ForecastStatus.AVAILABLE;
+        }
+        WeatherForecast cached = cache.get();
+        if (cached == null) {
+            return ForecastStatus.ABSENT;
+        }
+        return cached.isFresh(FACTOR_USABLE_VENCIDO * cacheTtlMs, reloj.instant())
+                ? ForecastStatus.AVAILABLE : ForecastStatus.EXPIRED;
+    }
+
+    /**
      * Pide el pronóstico en un hilo aparte apenas arranca la aplicación. Sin esto el primer mensaje del nodo no
      * encuentra pronóstico cacheado ({@link #getForecastSinEspera()} devuelve {@code null} en frío), R-03 queda sin dato
      * y R-01 puede encolar una ronda que la lluvia habría pospuesto. No bloquea el arranque ni lo rompe si falla.

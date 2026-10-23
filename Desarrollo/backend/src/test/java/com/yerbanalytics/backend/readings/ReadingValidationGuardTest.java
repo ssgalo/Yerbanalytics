@@ -6,7 +6,7 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -56,7 +56,7 @@ class ReadingValidationGuardTest {
     }
 
     private final RelojMutable reloj = new RelojMutable();
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private ComandoZonaPublisher publisher;
     private InvalidReadingEscalation escalation;
     private CatalogoParametrosService catalogo;
@@ -266,7 +266,7 @@ class ReadingValidationGuardTest {
     @Test
     @DisplayName("apagado: humedad 112 % se acepta como cualquier otra lectura")
     void apagado() {
-        overrides.put(ReadingValidationGuard.NAME, new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff(ReadingValidationGuard.NAME);
 
         ReadingCheck r = guard.check(zona, lectura("humSus", 112.0));
 
@@ -280,7 +280,7 @@ class ReadingValidationGuardTest {
     @Test
     @DisplayName("bypass 'retries': no pide relecturas y el valor inválido se descarta de inmediato")
     void bypassRetries() {
-        overrides.put(ReadingValidationGuard.NAME, new RuleOverride(true, Map.of(), Set.of("retries")));
+        overrides.put(ReadingValidationGuard.NAME, new RuleOverride(Map.of(), Set.of("retries")));
 
         ReadingCheck r = guard.check(zona, lectura("humSus", 112.0));
 

@@ -59,7 +59,12 @@ public class DeficitCriticoRule implements Rule {
 
     @Override
     public String label() {
-        return "🚨 Déficit hídrico crítico (R-02)";
+        return "Déficit hídrico crítico";
+    }
+
+    @Override
+    public String code() {
+        return "R-02";
     }
 
     @Override

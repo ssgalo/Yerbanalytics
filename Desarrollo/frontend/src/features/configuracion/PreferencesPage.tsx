@@ -1,4 +1,4 @@
-/* Vista Preferencias: pulso de sensado y evaluación, y pasada diaria del riel. */
+/* Vista Preferencias: pulso de sensado y pasada diaria del riel. */
 import { useMemo } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useAuth } from '@/hooks/AuthContext';
@@ -40,11 +40,11 @@ export function PreferencesPage() {
       editable={editable}
       onReset={onReset}
       blockedReason={pendingFixes(errors)}
-      intro="Cada cuánto el sistema lee los nodos y evalúa los sectores, y cuándo pasa el riel."
+      intro="Cada cuánto el sistema lee los nodos, y cuándo pasa el riel."
     >
       {draft && (
         <>
-          <ConfigSection title="Frecuencia operativa" hint="Pulso de sensado (IoT) y evaluación del motor">
+          <ConfigSection title="Frecuencia operativa" hint="Pulso de sensado de los nodos">
             <ConfigFieldset disabled={!editable}>
               <IntervalosForm value={draft.operativa} saved={config?.operativa} onChange={patchOperativa} />
             </ConfigFieldset>

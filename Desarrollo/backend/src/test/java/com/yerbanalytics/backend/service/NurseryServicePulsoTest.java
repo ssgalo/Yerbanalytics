@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.constant.NurseryConstants;
 import com.yerbanalytics.backend.dto.NurseryData;
+import com.yerbanalytics.backend.effectiveness.VerificationReads;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.Rule;
@@ -174,6 +175,40 @@ class NurseryServicePulsoTest {
 
         assertThat(evaluadas).isEmpty();
         assertThat(sector.getDiagnosisUsadoTs()).isNull();
+    }
+
+    @Test
+    @DisplayName("la lectura de verificación de E-01 se guarda pero no corre el motor ni responde al pulso")
+    void laLecturaDeVerificacionNoCorreElMotor() {
+        VerificationReads verification = new VerificationReads();
+        service.setVerificationReads(verification);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(new PulsoSensadoService.PulseResponse(true, true));
+        sector.setDiagnosisTs(AHORA.toEpochMilli() - 3_600_000L);
+        verification.expect("MZ-1", AHORA.toEpochMilli() - 1_000L);
+
+        telemetria();
+
+        assertThat(zona.getLastReadingTime()).isEqualTo(AHORA.toEpochMilli());
+        verify(zonaRepository).save(zona);
+        verify(pulsos, never()).recordResponse(anyString(), anyLong());
+        verify(actionExecutor, never()).execute(any(), any(), any());
+        assertThat(evaluadas).isEmpty();
+        assertThat(verification.answeredAfter("MZ-1")).isPresent();
+    }
+
+    @Test
+    @DisplayName("la lectura siguiente a la de verificación vuelve a ser la del pulso")
+    void despuesDeLaVerificacionLaIngestaVuelveAlPulso() {
+        VerificationReads verification = new VerificationReads();
+        service.setVerificationReads(verification);
+        when(pulsos.recordResponse(anyString(), anyLong())).thenReturn(new PulsoSensadoService.PulseResponse(true, true));
+        sector.setDiagnosisTs(AHORA.toEpochMilli() - 3_600_000L);
+        verification.expect("MZ-1", AHORA.toEpochMilli() - 1_000L);
+
+        telemetria();
+        telemetria();
+
+        assertThat(evaluadas).containsExactly("MZ-1-001");
     }
 
     @Test

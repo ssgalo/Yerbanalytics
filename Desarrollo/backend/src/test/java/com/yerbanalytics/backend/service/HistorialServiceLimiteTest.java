@@ -1,7 +1,6 @@
 package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,8 +27,7 @@ class HistorialServiceLimiteTest {
     private final HistorialRepository repo = mock(HistorialRepository.class);
 
     private HistorialService service() {
-        return new HistorialService(repo, mock(SectorRepository.class), mock(ConfiguracionService.class),
-                120000, "2 min", 5, Clock.systemUTC());
+        return new HistorialService(repo, kind -> 1_800_000L, Clock.systemUTC());
     }
 
     private int topeConsultado(Integer pedido) {

@@ -43,7 +43,12 @@ public class RiegoPorDeficitRule implements Rule {
 
     @Override
     public String label() {
-        return "💦 Riego por déficit hídrico (R-01)";
+        return "Riego por déficit hídrico";
+    }
+
+    @Override
+    public String code() {
+        return "R-01";
     }
 
     @Override

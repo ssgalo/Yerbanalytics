@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
@@ -36,7 +38,7 @@ import java.util.List;
 public class SustratoSaturadoRule implements Rule {
 
     private static final int PRIORITY = 4;
-    private static final String NAME = "SustratoSaturadoRule";
+    public static final String NAME = "SustratoSaturadoRule";
     static final String TEXTO_ALERTA = "Sustrato saturado, riesgo de asfixia radicular y hongos";
 
     @Override
@@ -51,7 +53,22 @@ public class SustratoSaturadoRule implements Rule {
 
     @Override
     public String label() {
-        return "💧 Sustrato saturado (R-04)";
+        return "Sustrato saturado";
+    }
+
+    @Override
+    public String code() {
+        return "R-04";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Se riega con el sustrato saturado.");
     }
 
     @Override

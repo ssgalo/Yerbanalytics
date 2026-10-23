@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
@@ -43,7 +43,7 @@ class FaultRulesOrquestacionTest {
 
     private static final HardwareFaults VALVULA = new HardwareFaults("SIN_CAUDAL");
 
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private RuleOrchestrator orquestador;
 
     /** Regla de una rama que siempre pide actuar: si corre, el test lo ve en sus acciones. */
@@ -138,7 +138,7 @@ class FaultRulesOrquestacionTest {
     @Test
     @DisplayName("apagada desde el simulador: no actúa y el sector averiado se evalúa como si estuviera sano")
     void apagada() {
-        overrides.put("HydraulicFaultRule", new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff("HydraulicFaultRule");
 
         ResultadoEvaluacion r = evaluar(40.0, VALVULA);
 
@@ -149,7 +149,7 @@ class FaultRulesOrquestacionTest {
     @Test
     @DisplayName("bypass 'fault': el sector averiado vuelve a evaluarse")
     void bypass() {
-        overrides.put("HydraulicFaultRule", new RuleOverride(true, Map.of(), Set.of("fault")));
+        overrides.put("HydraulicFaultRule", new RuleOverride(Map.of(), Set.of("fault")));
 
         ResultadoEvaluacion r = evaluar(40.0, new HardwareFaults("SIN_CAUDAL"));
 

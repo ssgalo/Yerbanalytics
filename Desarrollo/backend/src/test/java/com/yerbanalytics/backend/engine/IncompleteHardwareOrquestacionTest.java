@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
@@ -43,7 +43,7 @@ class IncompleteHardwareOrquestacionTest {
     private static final HardwareCoverage SIN_ELECTROVALVULA = new HardwareCoverage(false, true, true);
     private static final HardwareCoverage SIN_BOMBA = new HardwareCoverage(true, false, true);
 
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private RuleOrchestrator orquestador;
 
     /** Regla de una rama que siempre pide actuar: si corre, el test lo ve en sus acciones. */
@@ -148,7 +148,7 @@ class IncompleteHardwareOrquestacionTest {
     @Test
     @DisplayName("apagada desde el simulador: no actúa y el sector sin electroválvula se evalúa como si estuviera completo")
     void apagada() {
-        overrides.put("IncompleteHardwareRule", new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff("IncompleteHardwareRule");
 
         ResultadoEvaluacion r = evaluar(SIN_ELECTROVALVULA);
 
@@ -159,7 +159,7 @@ class IncompleteHardwareOrquestacionTest {
     @Test
     @DisplayName("bypass 'hardware': ignora los actuadores faltantes")
     void bypass() {
-        overrides.put("IncompleteHardwareRule", new RuleOverride(true, Map.of(), Set.of("hardware")));
+        overrides.put("IncompleteHardwareRule", new RuleOverride(Map.of(), Set.of("hardware")));
 
         ResultadoEvaluacion r = evaluar(HardwareCoverage.NONE);
 

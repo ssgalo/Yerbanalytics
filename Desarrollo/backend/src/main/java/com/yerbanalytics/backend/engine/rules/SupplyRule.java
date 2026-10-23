@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Regla de dosificación de insumo por diagnóstico IA (HU-07). <b>Retirada por defecto</b>: arranca apagada
- * ({@code yerbanalytics.reglas.retiradas}, ver {@code RuleOverridesStore}) hasta que las reglas v2 de aplicación
+ * ({@code yerbanalytics.reglas.retiradas}, ver {@code OperationalRuleStates}) hasta que las reglas v2 de aplicación
  * (N-*, F-*) la reemplacen; sin ellas, borrarla dejaría al vivero sin dosificación.
  *
  * <p><b>Prioridad:</b> 12 (ejecutora, corre justo después de {@link RiegoRule}).
@@ -50,7 +50,7 @@ public class SupplyRule implements Rule {
 
     @Override
     public String label() {
-        return "🧪 Dosificación de insumo";
+        return "Dosificación de insumo";
     }
 
     @Override

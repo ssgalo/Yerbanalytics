@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.engine.Rule;
@@ -57,7 +59,22 @@ public class IncompleteHardwareRule implements Rule {
 
     @Override
     public String label() {
-        return "🧰 Hardware incompleto (S-04)";
+        return "Hardware incompleto";
+    }
+
+    @Override
+    public String code() {
+        return "S-04";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Se ordena a actuadores que no están registrados.");
     }
 
     @Override

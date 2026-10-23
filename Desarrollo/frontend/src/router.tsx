@@ -8,6 +8,7 @@ import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
 import { HistorialPage } from '@/features/historial/HistorialPage';
 import { ConfiguracionPage } from '@/features/configuracion/ConfiguracionPage';
 import { PreferencesPage } from '@/features/configuracion/PreferencesPage';
+import { RustificacionPage } from '@/features/configuracion/RustificacionPage';
 import { DiagnosisCriteriaPage } from '@/features/configuracion/DiagnosisCriteriaPage';
 import { HardwarePage } from '@/features/hardware/HardwarePage';
 import { TopologiaPage } from '@/features/topologia/TopologiaPage';
@@ -73,6 +74,7 @@ export const routes: RouteObject[] = [
       { path: 'diagnosticos', element: con(VISTAS.diagnosticos, <DiagnosticsPage />) },
       { path: 'historial', element: con(VISTAS.historial, <HistorialPage />) },
       { path: 'configuracion', element: con(VISTAS.configuracion, <ConfiguracionPage />) },
+      { path: 'rustificacion', element: con(VISTAS.rustificacion, <RustificacionPage />) },
       { path: 'preferencias', element: con(VISTAS.preferencias, <PreferencesPage />) },
       { path: 'criterio-diagnostico', element: con(VISTAS.criterioDiagnostico, <DiagnosisCriteriaPage />) },
       { path: 'reglas', element: con(VISTAS.reglas, <ReglasPage />) },

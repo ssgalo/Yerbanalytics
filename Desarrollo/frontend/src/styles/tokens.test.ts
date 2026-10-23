@@ -38,7 +38,8 @@ describe('sistema de diseño', () => {
 
   it('theme.ts espeja los valores de tokens.css', () => {
     const css = readFileSync(join(__dirname, 'tokens.css'), 'utf-8');
-    const valor = (token: string) => css.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1]?.toUpperCase();
+    const valor = (token: string) =>
+      css.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1]?.toUpperCase();
     const pares: [string, string][] = [
       ['--bg', theme.bg],
       ['--ink', theme.ink],
@@ -68,7 +69,16 @@ describe('sistema de diseño', () => {
       'features/sector/components/detectionView.ts',
       'features/sistema-diseno/SistemaDisenoPage.tsx',
     ];
-    const fuera = usos(/--det-/).filter((u) => !permitidos.some((p) => u.split('\\').join('/').startsWith(p)));
+    const fuera = usos(/--det-/).filter(
+      (u) => !permitidos.some((p) => u.split('\\').join('/').startsWith(p)),
+    );
     expect(fuera).toEqual([]);
+  });
+
+  it('define el par de tokens de Compartidos (no reutiliza los de estado)', () => {
+    const css = readFileSync(join(__dirname, 'tokens.css'), 'utf-8');
+    for (const t of ['--shared-soft', '--shared-line', '--shared-ink']) {
+      expect(css, t).toMatch(new RegExp(`${t}:\\s*#[0-9a-f]{6}`, 'i'));
+    }
   });
 });
