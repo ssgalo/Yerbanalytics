@@ -2,6 +2,9 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
+import com.yerbanalytics.backend.effectiveness.EffectivenessBlockService;
+import com.yerbanalytics.backend.effectiveness.EffectivenessBlocks;
+import com.yerbanalytics.backend.effectiveness.VerificationReads;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ContextoRiego;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
@@ -89,6 +92,10 @@ public class NurseryService {
     private ZoneRuleEngine zoneRules;
     /** Opcional (por setter): el plan de nutrición que se muestra en el detalle de cada zona. Sin él, el snapshot no lo trae. */
     private NutritionPlanService nutritionPlan;
+    /** Opcional (por setter): las lecturas de verificación de E-01, que se guardan sin correr el motor. */
+    private VerificationReads verificationReads;
+    /** Opcional (por setter): los bloqueos por falta de efectividad (S-06). Sin él, el motor evalúa sin bloqueos. */
+    private EffectivenessBlockService effectivenessBlocks;
     private final PulsoSensadoService pulsos;
     private final EscalamientoNodoService escalamiento;
     private final ReadingRecorder readings;
@@ -109,6 +116,20 @@ public class NurseryService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setNutritionPlan(NutritionPlanService nutritionPlan) {
         this.nutritionPlan = nutritionPlan;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setVerificationReads(VerificationReads verificationReads) {
+        this.verificationReads = verificationReads;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEffectivenessBlocks(EffectivenessBlockService effectivenessBlocks) {
+        this.effectivenessBlocks = effectivenessBlocks;
+    }
+
+    private boolean isVerificationReading(String zoneId, long receivedMs) {
+        return verificationReads != null && verificationReads.consume(zoneId, receivedMs);
     }
 
     public NurseryService(NurseryProperties properties,
@@ -605,7 +626,9 @@ public class NurseryService {
         // telemetría (pulso sin motor, segunda respuesta, arranque del nodo, secuencia LECTURA) sólo actualiza
         // la lectura y el estado de los sectores. Una lectura que todavía espera su relectura no es la respuesta
         // definitiva: el pulso queda pendiente y el motor decide cuando llegue la que corrige (o la descartada).
-        PulsoSensadoService.PulseResponse pulseResponse = check.awaitsReread()
+        // La lectura de verificación de E-01 (que pidió el servicio de efectividad tras un riego) tampoco es del pulso: se guarda
+        // y nada más, así el pico de humedad del riego no dispara reglas ni cuenta como respuesta.
+        PulsoSensadoService.PulseResponse pulseResponse = check.awaitsReread() || isVerificationReading(zoneId, recepcionMs)
                 ? PulsoSensadoService.PulseResponse.NONE
                 : pulsos.recordResponse(zoneId, recepcionMs);
         boolean ejecutaMotor = pulseResponse.runsEngine();
@@ -658,6 +681,7 @@ public class NurseryService {
         Map<String, ContextoRiego> riegoPorSector = Map.of();
         Map<String, HardwareCoverage> hardwarePorSector = Map.of();
         Map<String, HardwareFaults> fallasPorSector = Map.of();
+        Map<String, EffectivenessBlocks> bloqueosPorSector = Map.of();
         WeatherForecast forecast = null;
         if (ejecutaMotor) {
             // S-04: qué actuadores tiene mapeado cada sector, también UNA vez por zona (dos consultas, no una por regla).
@@ -665,6 +689,10 @@ public class NurseryService {
             hardwarePorSector = hardwareService.coverageOf(zoneId, sectorIds);
             // S-05: cuáles de esos actuadores están averiados, también UNA vez por zona.
             fallasPorSector = hardwareService.faultsOf(sectorIds);
+            // S-06: qué acciones bloqueó la falta de efectividad, también UNA consulta por zona.
+            if (effectivenessBlocks != null) {
+                bloqueosPorSector = effectivenessBlocks.forZone(zoneId, sectorIds);
+            }
             Instant inicioCiclo = CicloLectura.inicio(ahora, intervaloSensadoMinutos());
             riegoPorSector = contextosDeRiego(zoneId, zona, sectors, inicioCiclo, ahora);
             // El pronóstico, UNA vez por evaluación de zona (no por sector) y sin esperar: este hilo es el del broker
@@ -702,7 +730,8 @@ public class NurseryService {
             // El ActionExecutor materializa las acciones (actualiza actuadores y persiste historial).
             RuleContext ctx = buildRuleContext(s, tempMetrics, finalStatus, ahora, forecast, riegoPorSector.get(s.getId()),
                     check.invalid(), hardwarePorSector.getOrDefault(s.getId(), HardwareCoverage.NONE),
-                    fallasPorSector.getOrDefault(s.getId(), HardwareFaults.NONE));
+                    fallasPorSector.getOrDefault(s.getId(), HardwareFaults.NONE),
+                    bloqueosPorSector.getOrDefault(s.getId(), EffectivenessBlocks.NONE));
             // La traza queda en memoria (última por sector y origen); no toca la base.
             ResultadoEvaluacion resultado = ruleOrchestrator.evaluate(ctx, OrigenEvaluacion.TELEMETRIA);
             trazaStore.guardar(resultado.traza());
@@ -741,7 +770,7 @@ public class NurseryService {
     private RuleContext buildRuleContext(SectorEntity s, List<Metric> metrics, String finalStatus,
                                          Instant ahora, WeatherForecast forecast, ContextoRiego riego,
                                          Set<String> invalidMetrics, HardwareCoverage hardware,
-                                         HardwareFaults faults) {
+                                         HardwareFaults faults, EffectivenessBlocks effectiveness) {
         ZonaEntity zona = s.getZona();
 
         boolean bloqueoActivo = !manualLockRepository.findBySectorIdAndActiveTrue(s.getId()).isEmpty()
@@ -761,7 +790,8 @@ public class NurseryService {
                 RuleOverrides.NONE,
                 invalidMetrics,
                 hardware,
-                faults
+                faults,
+                effectiveness
         );
     }
 

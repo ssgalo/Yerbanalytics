@@ -28,7 +28,14 @@ const record = (e: Partial<ActionRecord>): ActionRecord => ({
 });
 
 const RECORDS = [
-  record({ id: 'a', ts: 3, fecha: '03/10 14:00', regla: 'DeficitCriticoRule', volumenL: 6, duracionSeg: 720 }),
+  record({
+    id: 'a',
+    ts: 3,
+    fecha: '03/10 14:00',
+    regla: 'DeficitCriticoRule',
+    volumenL: 6,
+    duracionSeg: 720,
+  }),
   record({
     id: 'b',
     ts: 2,
@@ -46,8 +53,9 @@ const RECORDS = [
 ];
 
 vi.mock('@/hooks/useHistory', () => ({
-  useHistory: () => ({ records: RECORDS, loading: false, error: null }),
+  useHistory: () => ({ records: RECORDS, loading: false, error: null, reload: () => {} }),
 }));
+vi.mock('@/hooks/AuthContext', () => ({ useAuth: () => ({ puede: () => false }) }));
 vi.mock('@/hooks/useRuleEngineSchema', () => ({
   useRuleEngineSchema: () => ({ schema: buildRuleSchema(), loading: false, error: null }),
 }));
@@ -82,7 +90,9 @@ describe('HistorialPage', () => {
     fireEvent.click(within(detail()).getByRole('button', { name: /Ver razonamiento del motor/ }));
 
     const dialog = screen.getByRole('dialog', { name: 'Razonamiento del motor' });
-    expect(dialog.querySelector('[data-state="decided"]')?.textContent).toBe('Déficit hídrico crítico (R-02)');
+    expect(dialog.querySelector('[data-state="decided"]')?.textContent).toBe(
+      'Déficit hídrico crítico (R-02)',
+    );
     expect(dialog.querySelectorAll('[data-state="skipped"]').length).toBeGreaterThan(0);
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sólo ejecutadas' }));

@@ -31,10 +31,11 @@ class NutritionWiringTest {
     private List<DemoControllable> controllables;
 
     @Test
-    @DisplayName("el motor de zonas corre N-02 antes que N-01: la CE baja adelanta el plan en el mismo pulso")
+    @DisplayName("el motor de zonas corre la sanidad antes que la rutina y N-02 antes que N-01: la CE baja adelanta el plan en el mismo pulso")
     void engineRunsLowEcBeforeThePlan() {
         // Las de la mediasombra, también de zona, van antes y no cambian este orden.
-        assertThat(engine.getRules()).extracting(ZoneRule::name).containsSubsequence("LowEcRule", "NutritionPlanRule");
+        assertThat(engine.getRules()).extracting(ZoneRule::name)
+                .containsSubsequence("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule");
     }
 
     @Test

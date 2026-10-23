@@ -29,6 +29,12 @@ export const DEFAULT_THRESHOLDS: Record<string, number> = {
   'riego.lluvia-mm': 5,
   'mediasombra.uv-umbral': 7,
   'nutricion.ce-baja': 0.5,
+  'biotico.humedad-predisponente': 75,
+  'clorosis.ph-ferrica': 6.5,
+  'estres.luz-alta': 80,
+  'estres.humedad-reposicion': 55,
+  'estres.luz-baja': 60,
+  'estres.temp-baja': 30,
   'diagnostico.confianza-minima': 70,
   'seguridad.rango-hum-max': 100,
   'seguridad.relecturas-invalidas': 2,
@@ -49,6 +55,12 @@ export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
     lluviaMm: get('riego.lluvia-mm'),
     uvUmbral: get('mediasombra.uv-umbral'),
     ceBaja: get('nutricion.ce-baja'),
+    humedadPredisponente: get('biotico.humedad-predisponente'),
+    phFerrica: get('clorosis.ph-ferrica'),
+    luzAlta: get('estres.luz-alta'),
+    humedadReposicion: get('estres.humedad-reposicion'),
+    luzBaja: get('estres.luz-baja'),
+    tempBaja: get('estres.temp-baja'),
     confianzaMinima: get('diagnostico.confianza-minima'),
     humedadMaxima: get('seguridad.rango-hum-max'),
     relecturasInvalidas: get('seguridad.relecturas-invalidas'),
@@ -60,7 +72,11 @@ export interface RuleConditionResult {
   clima: SimulatedWeather | null;
   /** Diagnosis to register BEFORE the pulse; null if no selected rule needs one. */
   diagnostico: DiagnosisPlan | null;
+  /** The same diagnosis registered on several adjacent sectors BEFORE the pulse (an outbreak); null if no scenario asks for it. */
+  outbreak: { diagnosis: DiagnosisPlan; sectors: number } | null;
   needsCooldownReset: boolean;
+  /** The backend's «sin pronóstico» demo mode must be on before the pulse (O-01…O-03). */
+  offlineForecast: boolean;
   /** The target zone must stop answering LEER_AHORA, and no telemetry is published for it. */
   silenceZone: boolean;
   /** Sensing pulses to request, one after the other (at least one). */
@@ -141,7 +157,9 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       telemetria,
       clima: null,
       diagnostico: null,
+      outbreak: null,
       needsCooldownReset: false,
+      offlineForecast: false,
       silenceZone: false,
       pulses: 1,
       manualLock: null,
@@ -170,7 +188,9 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
   const notes: string[] = [];
   let weather: Partial<SimulatedWeather> | null = null;
   let diagnostico: DiagnosisPlan | null = null;
+  let outbreak: { diagnosis: DiagnosisPlan; sectors: number } | null = null;
   let silenceZone = false;
+  let offlineForecast = false;
   let pulses = 1;
   let manualLock: { reason: string } | null = null;
 
@@ -183,7 +203,9 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       weather = { ...(weather ?? {}), ...patch.weather };
     }
     diagnostico = patch.diagnosis ?? diagnostico;
+    outbreak = patch.outbreak ?? outbreak;
     silenceZone = silenceZone || (patch.silenceZone ?? false);
+    offlineForecast = offlineForecast || (patch.offlineForecast ?? false);
     pulses = Math.max(pulses, patch.pulses ?? 1);
     manualLock = patch.manualLock ?? manualLock;
     for (const [metric, claim] of Object.entries(patch.pinnedReadings ?? {})) {
@@ -216,7 +238,9 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     telemetria,
     clima: weather ? { ...MILD_WEATHER, ...weather } : null,
     diagnostico,
+    outbreak,
     needsCooldownReset,
+    offlineForecast,
     silenceZone,
     pulses,
     manualLock,

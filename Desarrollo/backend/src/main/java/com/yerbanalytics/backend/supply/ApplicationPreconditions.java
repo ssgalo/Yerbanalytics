@@ -44,6 +44,8 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
     public static final String BYPASS_TEMPERATURE = "temperature";
     public static final String BYPASS_RAIN = "rain";
     public static final String BYPASS_MOISTURE = "moisture";
+    /** F-06: el tope de fitosanitarios por sector. */
+    public static final String BYPASS_CAP = "cap";
     /** La evalúa el {@link ApplicationService} (el stock no es un dato del sector), pero se declara acá. */
     public static final String BYPASS_STOCK = "stock";
 
@@ -76,7 +78,7 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
 
     @Override
     public Set<String> bypassKeys() {
-        return Set.of(BYPASS_DIAGNOSIS, BYPASS_DAILY, BYPASS_WINDOW, BYPASS_TEMPERATURE, BYPASS_RAIN, BYPASS_MOISTURE,
+        return Set.of(BYPASS_DIAGNOSIS, BYPASS_CAP, BYPASS_DAILY, BYPASS_WINDOW, BYPASS_TEMPERATURE, BYPASS_RAIN, BYPASS_MOISTURE,
                 BYPASS_STOCK);
     }
 
@@ -88,6 +90,7 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
     @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosInsumo.FERTILIZER_INTERVAL, ParametrosInsumo.FUNGICIDE_INTERVAL,
+                ParametrosInsumo.FUNGICIDE_CAP,
                 ParametrosInsumo.MORNING_WINDOW, ParametrosInsumo.AFTERNOON_WINDOW,
                 ParametrosInsumo.MAX_APPLICATION_TEMP, ParametrosInsumo.MIN_APPLICATION_MOISTURE,
                 ParametrosInsumo.RAIN_BLOCKS_MM);
@@ -97,6 +100,8 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
         DeclaredParameters params = DeclaredParameters.of(this, vigentes);
         List<Supplier<PreconditionResult>> checks = List.of(
                 () -> diagnosis(facts, overrides),
+                () -> effectiveness(facts),
+                () -> fungicideCap(facts, params, overrides),
                 () -> interval(facts, params, overrides),
                 () -> oncePerDay(facts, overrides),
                 () -> window(facts, params, overrides),
@@ -119,6 +124,30 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
             return PreconditionResult.met();
         }
         return PreconditionResult.reject("P-D1: " + f.diagnosis().reason());
+    }
+
+    // --- S-06 ---
+
+    /**
+     * Un tratamiento del mismo tipo que quedó sin efectividad bloquea el siguiente en el sector hasta que alguien registre la
+     * revisión. El bloqueo ya viene decidido en los hechos (también su bypass y su apagado, del control de demo): acá sólo se
+     * rechaza. Se rechaza y no se difiere: esperar la próxima ventana no lo resuelve.
+     */
+    private PreconditionResult effectiveness(ApplicationFacts f) {
+        return f.effectivenessBlock() == null ? PreconditionResult.met() : PreconditionResult.reject(f.effectivenessBlock());
+    }
+
+    // --- F-06 ---
+
+    /** Un sector que ya recibió el tope de fitosanitarios en la ventana no recibe otro hasta que alguien registre la revisión. */
+    private PreconditionResult fungicideCap(ApplicationFacts f, DeclaredParameters params, RuleOverrides overrides) {
+        double cap = params.number(ParametrosInsumo.FUNGICIDE_CAP);
+        if (f.supply() != Supply.FUNGICIDE || f.fungicidesInCapWindow() < cap || overrides.isBypassed(NAME, BYPASS_CAP)) {
+            return PreconditionResult.met();
+        }
+        return PreconditionResult.rejectCap(String.format(
+                "F-06: el sector ya recibió %d fitosanitarios dentro de la ventana del tope (máximo %.0f); hace falta registrar la revisión",
+                f.fungicidesInCapWindow(), cap));
     }
 
     // --- P-D2 ---

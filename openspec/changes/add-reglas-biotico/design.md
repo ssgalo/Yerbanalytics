@@ -67,3 +67,35 @@ Parámetro `insumo.tope-fitosanitario` (3 en 30 días, rango 2–5).
 | `biotico.horas-dpv-acaros` | 72 h | 24–120 |
 | `biotico.sectores-foco` / `horas-foco` | 3 / 72 h | 2–10 / 24–120 |
 | `insumo.tope-fitosanitario` / `…-dias` | 3 / 30 d | 2–5 / 14–60 |
+
+## Decisiones tomadas al implementar
+
+Los nombres de clases y métodos del diseño estaban en español; se implementaron en inglés (CLAUDE.md §7): `DanoFungicoRule` → `FungalDamageRule`,
+`PlagaFoliarRule` → `FoliarPestRule`, `CondicionFungicaRule` → `FungalConditionRule`, `FocoRule` → `OutbreakRule`, `SeveridadV2` → `Severity`,
+`Vecinos.de` → `GridNeighbors.of`, `CapturasSeguidas.de` → `ConsecutiveCaptures.count`. Todo vive en el paquete `biotic/`.
+
+- **D-1 y D-6 (preguntas abiertas)**: se tomó el default del diseño. El `Daño biótico` genérico no dispara nada y los lindantes de otra MZ no se tratan.
+  Los dos siguen siendo un supuesto a validar con el vivero (como la vecindad por la grilla visual).
+- **Tipos, no textos (D-1)**: `BioticKind` (`FUNGAL`, `PEST`) mapea el estado del diagnóstico; *Plaga foliar* y *Ácaro* son el mismo tipo, también en el foco.
+- **Un esqueleto para F-F1 y F-P1**: `BioticDiagnosisBase` (template method) concentra lo común —diagnóstico del tipo y vigente (P-D1), las tres razones, las
+  acciones y la alerta— y cada regla concreta sólo dice qué ambiente favorece al problema, su texto y qué hace al esperar (F-P1 deja un `INFO`). Cada una declara su
+  `parametros()` con un `List.of(...)` literal porque el test anti-drift del frontend lee el código fuente.
+- **P-D1 sobre el sector (D-4)**: `ValidDiagnosis.of(...)` gana una sobrecarga con los campos que el sector ya guarda (estado, confianza, llegada), así la regla no
+  consulta la tabla de diagnósticos para saber si sirve. El foco la usa con **su propia ventana** (72 h) en lugar de la vigencia de 48 h.
+- **D-4, un diagnóstico, una aplicación**: la fila diferida guarda `diagnosis_ts` (no un `diagnostico_id`: lo que se compara con `diagnosisUsadoTs` es el instante).
+  `ApplicationService` da por usado ESE diagnóstico al ejecutar o al rechazar (un rechazo no se reintenta) y nunca retrocede el último usado.
+  `RuleOrchestrator` ya no lo gasta si alguna regla pidió una aplicación por el diagnóstico.
+- **Capturas seguidas (D-3)**: de cada día vale la última captura; la racha corre hacia atrás desde la más nueva sin saltear ningún día. Cuentan sólo las del tipo de
+  daño y con la confianza mínima.
+- **F-F2 sin estado (D-5)**: avisa cuando la condición se cumple con las últimas lecturas y no se cumplía con las mismas lecturas corridas una hacia atrás. No hace falta
+  una columna ni una tabla.
+- **F-04 sin repetir (D-6)**: no se le pide a un lindante que ya recibió fitosanitario dentro de la ventana ni al que ya lo tiene en cola (`FungicideLog`); si no queda
+  ninguno por tratar no se repiten ni las órdenes ni la alerta. Cada orden lleva su sector (`DetalleOutbreakTreatment`) y la ejecuta `ZoneActionExecutor`
+  llamando a `ApplicationService.request(..., false)`.
+- **D-7, tope**: es una precondición más (`ApplicationPreconditions`, bypass `cap`), no una regla. Cuenta las aplicaciones de la tabla `application` desde la última
+  revisión del sector (`sector.fungicide_review_ts`). La revisión es `POST /api/sectores/{id}/revision-fitosanitario` con `insumos.gestionar`: **no se creó un permiso
+  nuevo** (evita una migración manual de la matriz). `add-efectividad-y-s06` tiene su propia revisión por evento (`/api/efectividad/{eventoId}/revision`); no es la
+  misma acción, así que no se reusa. Sin botón en el dashboard todavía.
+- **D-8, temperatura predisponente**: dos parámetros (`-min` 10–22, `-max` 24–35, rangos propuestos por el equipo) que nunca se cruzan, así no hace falta una restricción cruzada.
+- **Dosis**: la del catálogo (`insumo.dosis-fitosanitario`, 10 ml de fábrica, máx. 50), no los 100 mL de la v2: el firmware no acepta más de 50 ml por comando.
+

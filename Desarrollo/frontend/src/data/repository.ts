@@ -18,6 +18,7 @@ import type {
   DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
+  RevisionEfectividad,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
@@ -89,6 +90,11 @@ export interface DataRepository {
    * autónomo. El detalle es obligatorio; devuelve la flota actualizada o rechaza con el motivo.
    */
   registerRepair(id: string, detalle: string): Promise<HardwareData>;
+  /**
+   * Registra la revisión de una acción que quedó sin efectividad (S-06): levanta el bloqueo de su repetición autónoma. El
+   * detalle es obligatorio; rechaza con el motivo si el evento no existe o ya no bloquea.
+   */
+  registerEffectivenessReview(eventId: string, detail: string): Promise<RevisionEfectividad>;
   /** Devuelve el resumen de la topología cargada en el vivero (HU-18 CA-01). */
   getTopologia(): Promise<TopologiaVivero>;
   /** Genera (o regenera) la grilla lógica del vivero y devuelve el resumen resultante (HU-18 CA-01). */

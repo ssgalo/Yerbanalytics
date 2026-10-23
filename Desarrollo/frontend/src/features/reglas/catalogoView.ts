@@ -76,6 +76,11 @@ export const CONSUMIDORES: Record<string, { titulo: string; descripcion: string;
     descripcion: 'Con qué nivel se avisa que hay que reponer el insumo de un tanque',
     rama: 'INSUMO',
   },
+  EffectivenessService: {
+    titulo: 'Evaluación de efectividad',
+    descripcion: 'Cuánto tiene que subir la humedad tras un riego y cuánto se espera para juzgar cada acción antes de bloquear su repetición',
+    rama: 'SEGUIMIENTO',
+  },
 };
 
 /** Rama a la que pertenece un consumidor que no es una regla (el despacho riega: RIEGO). */

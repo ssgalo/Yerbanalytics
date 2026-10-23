@@ -18,6 +18,9 @@ public interface DiagnosticoRepository extends JpaRepository<DiagnosticoEntity, 
     /** El diagnóstico más reciente del sector: es el que P-D1 evalúa. */
     Optional<DiagnosticoEntity> findFirstBySectorIdOrderByCreadoEnDesc(String sectorId);
 
+    /** Los diagnósticos del sector desde {@code since} (epoch ms), del más nuevo al más viejo: las capturas seguidas de F-F1 y F-P1. */
+    List<DiagnosticoEntity> findBySectorIdAndCreadoEnGreaterThanEqualOrderByCreadoEnDesc(String sectorId, long since);
+
     /** El diagnóstico más reciente de una captura: lo usa el seguimiento de la pasada del riel. */
     Optional<DiagnosticoEntity> findFirstByCapturaIdOrderByCreadoEnDesc(String capturaId);
 }

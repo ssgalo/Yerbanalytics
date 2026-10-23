@@ -324,4 +324,48 @@ class RuleOrchestratorTrazaTest {
         assertThat(de(r, "Dosificacion").estado()).isEqualTo(EstadoRegla.NO_ALCANZADA);
         assertThat(r.usoDiagnostico()).isFalse();
     }
+
+    // ------------------------------------------------------------------ un diagnóstico, una aplicación
+
+    private static ReglaFalsa queAplicaPorDiagnostico(String nombre, int prioridad) {
+        ReglaFalsa r = new ReglaFalsa(nombre, prioridad, RuleBranch.INSUMO, List.of(),
+                (c, ev) -> List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, nombre, "tratar",
+                        new DetalleInsumo(com.yerbanalytics.backend.supply.Supply.FUNGICIDE, true))));
+        r.usaDiagnostico = true;
+        return r;
+    }
+
+    @Test
+    void reglaQuePideUnaAplicacionPorDiagnostico_noGastaElDiagnosticoLoGastaLaAplicacion() {
+        ctx.sector().setDiagnosisTs(5000L);
+
+        ResultadoEvaluacion r = evaluar(queAplicaPorDiagnostico("Hongo", 15));
+
+        assertThat(de(r, "Hongo").estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(r.usoDiagnostico()).isFalse();
+    }
+
+    @Test
+    void siUnaReglaPideLaAplicacionLaOtraQueSoloEvaluaNoAlcanzaParaGastarElDiagnostico() {
+        ctx.sector().setDiagnosisTs(5000L);
+        ReglaFalsa plaga = deDiagnostico();
+
+        ResultadoEvaluacion r = evaluar(queAplicaPorDiagnostico("Hongo", 15), plaga);
+
+        assertThat(plaga.llamadas).hasSize(1);
+        assertThat(r.usoDiagnostico()).isFalse();
+    }
+
+    @Test
+    void unaAplicacionQueNoViveDeUnDiagnosticoNoImpideGastarlo() {
+        ctx.sector().setDiagnosisTs(5000L);
+        ReglaFalsa conAplicacionSinDiagnostico = new ReglaFalsa("Plan", 16, RuleBranch.INSUMO, List.of(),
+                (c, ev) -> List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "Plan", "fertilizar",
+                        new DetalleInsumo(com.yerbanalytics.backend.supply.Supply.FERTILIZER, false))));
+        conAplicacionSinDiagnostico.usaDiagnostico = true;
+
+        ResultadoEvaluacion r = evaluar(conAplicacionSinDiagnostico);
+
+        assertThat(r.usoDiagnostico()).isTrue();
+    }
 }

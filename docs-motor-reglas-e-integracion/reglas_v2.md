@@ -617,7 +617,7 @@ acción:
 | **O-02** Mediasombra | Pronóstico de temperatura y UV | M-02 usa sólo la última lectura (temperatura y luz). El horario (M-01) sigue igual. |
 | **O-03** Aplicaciones | Pronóstico de lluvia y temperatura | P-D4 se desactiva y P-D3 usa sólo la lectura. Demorar un tratamiento cuesta más que perder una aplicación por lluvia. |
 | **O-04** Plan de rustificación | Nada (depende del reloj) | Sigue normalmente. |
-| **O-05** Sincronización | — | Al volver la conexión se suben todos los eventos con su timestamp original y sin duplicados (HU-13 CA-03). |
+| **O-05** Sincronización | — | Al volver la conexión se suben todos los eventos con su timestamp original y sin duplicados (HU-13 CA-03). **No aplicable a la arquitectura actual** (decisión del 23/10/2026): el backend corre en el vivero y guarda el historial y las decisiones en su propia base; la LAN y el broker son locales y la única dependencia externa es el pronóstico. No hay destino remoto al que subir eventos. Se reabre cuando exista uno (nube, otro vivero), en un cambio aparte con su alcance y su seguridad. |
 
 ---
 

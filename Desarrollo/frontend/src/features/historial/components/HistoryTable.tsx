@@ -8,10 +8,17 @@ import { linkClass } from '@/components/ui/clases';
 import { cx } from '@/components/ui/estado';
 import type { ColumnQuery } from '@/hooks/useColumnQuery';
 import type { ActionRecord } from '@/types/domain';
-import { HISTORY_COLUMNS, isZoneWide, resultLabel, resultTone, typeIconPath } from '../actionPresentation';
+import {
+  HISTORY_COLUMNS,
+  isZoneWide,
+  resultLabel,
+  resultTone,
+  typeIconPath,
+} from '../actionPresentation';
 import styles from './HistoryTable.module.css';
 
-const isStatus = (tone: string) => tone === 'ok' || tone === 'warning' || tone === 'critical' || tone === 'offline';
+const isStatus = (tone: string) =>
+  tone === 'ok' || tone === 'warning' || tone === 'critical' || tone === 'offline';
 
 function ResultChip({ record }: { record: ActionRecord }) {
   const tone = resultTone(record);
@@ -69,7 +76,11 @@ export function HistoryTable({ query, selectedId, onSelect, footnote }: HistoryT
             <tr>
               {HISTORY_COLUMNS.map((c, i) => (
                 <th key={c.key}>
-                  <ColumnHeader column={c} query={query} alignEnd={i === HISTORY_COLUMNS.length - 1} />
+                  <ColumnHeader
+                    column={c}
+                    query={query}
+                    alignEnd={i === HISTORY_COLUMNS.length - 1}
+                  />
                 </th>
               ))}
             </tr>
@@ -106,10 +117,17 @@ export function HistoryTable({ query, selectedId, onSelect, footnote }: HistoryT
                     <span className={styles.type}>
                       <Glyph path={typeIconPath(r)} size={15} />
                       {r.tipo}
+                      {r.evo?.bloqueando && (
+                        <Chip tone="critical" glyph>
+                          Bloquea
+                        </Chip>
+                      )}
                     </span>
                   </td>
                   <td className={cx(styles.code, styles.colZone)}>{r.zonaName}</td>
-                  <td className={cx(zoneWide ? styles.muted : styles.code, styles.colSector)}>{r.sectorId}</td>
+                  <td className={cx(zoneWide ? styles.muted : styles.code, styles.colSector)}>
+                    {r.sectorId}
+                  </td>
                   <td className={styles.colResult}>
                     <ResultChip record={r} />
                   </td>

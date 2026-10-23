@@ -28,6 +28,7 @@ import type {
   DisposicionTopologia,
   DiagnosisCard,
   HardwareData,
+  RevisionEfectividad,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
@@ -296,6 +297,20 @@ export class HttpRepository implements DataRepository {
       throw new Error(body?.error ?? `Error ${res.status} al registrar la reparación`);
     }
     return (await res.json()) as HardwareData;
+  }
+
+  async registerEffectivenessReview(eventId: string, detail: string): Promise<RevisionEfectividad> {
+    const res = await apiFetch(`${this.baseUrl}/efectividad/${encodeURIComponent(eventId)}/revision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ detail }),
+    });
+    if (!res.ok) {
+      // 400 (sin detalle), 404 (evento inexistente) y 409 (ya no bloquea) traen { error } con el motivo.
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Error ${res.status} al registrar la revisión`);
+    }
+    return (await res.json()) as RevisionEfectividad;
   }
 
   /** POST/PUT compartidos: el backend devuelve la flota actualizada o { error } (HU-18 CA-03). */

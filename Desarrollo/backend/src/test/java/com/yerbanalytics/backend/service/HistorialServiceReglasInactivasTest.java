@@ -41,8 +41,7 @@ class HistorialServiceReglasInactivasTest {
     void setUp() {
         historialRepository = mock(HistorialRepository.class);
         overrides = mock(RuleOverrides.class);
-        service = new HistorialService(historialRepository, mock(SectorRepository.class),
-                HistorialTestSupport.parametrosDeFabrica(), Clock.systemUTC(), overrides);
+        service = new HistorialService(historialRepository, kind -> 1_800_000L, Clock.systemUTC(), overrides);
         sector = RuleContextTestFactory.sectorBasico("MZ-2-003");
         sector.setZona(RuleContextTestFactory.zonaBasica("MZ-2"));
         sector.getZona().setName("Macro-zona 2");

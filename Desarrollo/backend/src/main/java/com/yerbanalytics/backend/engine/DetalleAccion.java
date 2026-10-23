@@ -6,5 +6,5 @@ package com.yerbanalytics.backend.engine;
  * texto legible para el usuario; el detalle es lo que el sistema ejecuta.
  */
 public sealed interface DetalleAccion permits DetalleRiego, DetalleAlerta, DetalleInsumo, DetalleNutritionPlan, DetalleMediasombra,
-        CancelaRiego {
+        DetalleOutbreakTreatment, CancelPendingApplication, CancelaRiego {
 }

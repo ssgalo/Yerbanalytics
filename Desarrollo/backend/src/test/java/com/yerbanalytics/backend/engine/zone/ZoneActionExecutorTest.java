@@ -3,13 +3,18 @@ package com.yerbanalytics.backend.engine.zone;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleNutritionPlan;
+import com.yerbanalytics.backend.engine.DetalleOutbreakTreatment;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
+import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.nutrition.NutritionPlanService;
 import com.yerbanalytics.backend.mediasombra.MediasombraService;
 import com.yerbanalytics.backend.service.HistorialService;
+import com.yerbanalytics.backend.supply.ApplicationOutcome;
+import com.yerbanalytics.backend.supply.ApplicationService;
+import com.yerbanalytics.backend.supply.Supply;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,6 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @DisplayName("ZoneActionExecutor · efectos de las reglas de macro-zona")
 class ZoneActionExecutorTest {
@@ -35,6 +42,8 @@ class ZoneActionExecutorTest {
 
     private NutritionPlanService plan;
     private HistorialService history;
+    private ApplicationService applications;
+    private SectorEntity neighbor;
     private ZoneActionExecutor executor;
     private ZoneRuleContext ctx;
 
@@ -42,11 +51,16 @@ class ZoneActionExecutorTest {
     void setUp() {
         plan = mock(NutritionPlanService.class);
         history = mock(HistorialService.class);
-        executor = new ZoneActionExecutor(plan, history, mock(MediasombraService.class));
+        applications = mock(ApplicationService.class);
+        when(applications.request(any(), any(), anyString(), anyBoolean())).thenReturn(ApplicationOutcome.applied());
+        executor = new ZoneActionExecutor(plan, history, applications, mock(MediasombraService.class));
         ZonaEntity zone = new ZonaEntity();
         zone.setId("MZ-2");
         zone.setName("Macro-zona 2");
-        ctx = new ZoneRuleContext(zone, List.of(), NOW, Map.of(), Map.of(), false, Set.of(), RuleOverrides.NONE);
+        neighbor = new SectorEntity();
+        neighbor.setId("MZ-2-009");
+        neighbor.setZona(zone);
+        ctx = new ZoneRuleContext(zone, List.of(neighbor), NOW, Map.of(), Map.of(), false, Set.of(), RuleOverrides.NONE);
     }
 
     @Test
@@ -94,6 +108,33 @@ class ZoneActionExecutorTest {
         executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_VALVULA, "X", "riego")), ctx);
 
         verifyNoInteractions(plan, history);
+    }
+
+    @Test
+    void elTratamientoDeUnLindanteSePideAlServicioDeAplicacionSinExigirDiagnostico() {
+        RuleAction order = RuleAction.of(ActionType.ACTIVAR_BOMBA, "OutbreakRule", "lindante de un foco",
+                new DetalleOutbreakTreatment("MZ-2-009", Supply.FUNGICIDE));
+
+        executor.execute(List.of(order), ctx);
+
+        verify(applications).request(neighbor, Supply.FUNGICIDE, "OutbreakRule", false);
+    }
+
+    @Test
+    void unTratamientoDeUnSectorQueNoEsDeLaZonaSeIgnora() {
+        RuleAction order = RuleAction.of(ActionType.ACTIVAR_BOMBA, "OutbreakRule", "lindante",
+                new DetalleOutbreakTreatment("MZ-9-001", Supply.FUNGICIDE));
+
+        executor.execute(List.of(order), ctx);
+
+        verifyNoInteractions(applications);
+    }
+
+    @Test
+    void unTratamientoSinDetalleSeIgnora() {
+        executor.execute(List.of(RuleAction.of(ActionType.ACTIVAR_BOMBA, "OutbreakRule", "sin detalle")), ctx);
+
+        verifyNoInteractions(applications);
     }
 
     @Test

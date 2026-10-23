@@ -1,6 +1,9 @@
 package com.yerbanalytics.backend.supply;
 
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
+import com.yerbanalytics.backend.effectiveness.EffectivenessBlockService;
+import com.yerbanalytics.backend.effectiveness.EffectivenessService;
+import com.yerbanalytics.backend.effectiveness.FollowUp;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
@@ -77,6 +80,9 @@ public class ApplicationService implements ConsumidorParametros {
     private final WeatherService weather;
     private final ApplicationPreconditions preconditions;
     private final TankService tanks;
+    private final FungicideCap fungicideCap;
+    private final EffectivenessBlockService effectivenessBlocks;
+    private final EffectivenessService effectiveness;
     private final ComandoActuadorPublisher publisher;
     private final RuleOverrides overrides;
     private final DeclaredParameters params;
@@ -94,6 +100,9 @@ public class ApplicationService implements ConsumidorParametros {
                               WeatherService weather,
                               ApplicationPreconditions preconditions,
                               TankService tanks,
+                              FungicideCap fungicideCap,
+                              EffectivenessBlockService effectivenessBlocks,
+                              EffectivenessService effectiveness,
                               ComandoActuadorPublisher publisher,
                               RuleOverrides overrides,
                               // Perezoso: el catálogo necesita a este bean (es un consumidor de parámetros) para armarse.
@@ -110,6 +119,9 @@ public class ApplicationService implements ConsumidorParametros {
         this.weather = weather;
         this.preconditions = preconditions;
         this.tanks = tanks;
+        this.fungicideCap = fungicideCap;
+        this.effectivenessBlocks = effectivenessBlocks;
+        this.effectiveness = effectiveness;
         this.publisher = publisher;
         this.overrides = overrides;
         this.catalog = catalog;
@@ -127,6 +139,7 @@ public class ApplicationService implements ConsumidorParametros {
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosInsumo.FERTILIZER_DOSE, ParametrosInsumo.FUNGICIDE_DOSE,
                 ParametrosInsumo.RAIN_BLOCKS_HOURS, ParametrosInsumo.REENTRY_HOURS, ParametrosInsumo.PENDING_EXPIRY_DAYS,
+                ParametrosInsumo.FUNGICIDE_CAP_DAYS,
                 ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosDiagnostico.VALIDITY_HOURS);
     }
 
@@ -144,7 +157,9 @@ public class ApplicationService implements ConsumidorParametros {
     @Transactional
     public ApplicationOutcome request(SectorEntity sector, Supply supply, String originRule, boolean requiresDiagnosis) {
         ApplicationOutcome outcome = attempt(sector, supply, originRule, requiresDiagnosis);
-        settle(sector, supply, originRule, requiresDiagnosis, outcome, null);
+        // El diagnóstico que originó el pedido es el que el sector tiene ahora; si queda en cola viaja con ella.
+        Long diagnosisTs = requiresDiagnosis ? sector.getDiagnosisTs() : null;
+        settle(sector, supply, originRule, requiresDiagnosis, diagnosisTs, outcome, null);
         return outcome;
     }
 
@@ -155,6 +170,17 @@ public class ApplicationService implements ConsumidorParametros {
             pending.delete(p);
             log.info("Sector {}: la regla {} canceló la aplicación pendiente de {}.", sectorId, p.getRuleName(), supply);
         });
+    }
+
+    /**
+     * Retira el pedido pendiente de {@code supply} sólo si lo hizo {@code ruleName}: otra regla (el plan de nutrición) puede
+     * tener el suyo en la misma fila, y no es de quien corta.
+     */
+    @Transactional
+    public void cancelPending(String sectorId, Supply supply, String ruleName) {
+        pending.findBySectorIdAndSupply(sectorId, supply)
+                .filter(p -> ruleName.equals(p.getRuleName()))
+                .ifPresent(p -> cancelPending(sectorId, supply));
     }
 
     // -------------------------------------------------------------------------
@@ -207,7 +233,7 @@ public class ApplicationService implements ConsumidorParametros {
             return false;
         }
         ApplicationOutcome outcome = attempt(sector, p.getSupply(), p.getRuleName(), p.isRequiresDiagnosis());
-        settle(sector, p.getSupply(), p.getRuleName(), p.isRequiresDiagnosis(), outcome, p);
+        settle(sector, p.getSupply(), p.getRuleName(), p.isRequiresDiagnosis(), p.getDiagnosisTs(), outcome, p);
         return outcome.status() == ApplicationOutcome.Status.APPLIED;
     }
 
@@ -225,9 +251,12 @@ public class ApplicationService implements ConsumidorParametros {
         }
 
         Instant now = clock.instant();
-        ApplicationFacts facts = facts(sector, supply, now, requiresDiagnosis);
+        ApplicationFacts facts = facts(sector, supply, now, requiresDiagnosis, originRule);
         PreconditionResult result = preconditions.check(facts, catalog.vigentes(), overrides);
         if (!result.isMet()) {
+            if (result.capReached()) {
+                fungicideCap.reportReached(sector, result.reason());
+            }
             return result.verdict() == PreconditionResult.Verdict.REJECT
                     ? ApplicationOutcome.rejected(result.reason())
                     : ApplicationOutcome.deferred(result.reason());
@@ -266,7 +295,9 @@ public class ApplicationService implements ConsumidorParametros {
         }
         applications.save(new ApplicationEntity(UUID.randomUUID().toString(), sector.getId(), sector.getZona().getId(),
                 supply, ml, now.toEpochMilli(), originRule));
-        history.registrarInsumo(sector, ml, supply.label(), originRule);
+        // E-02, E-03: el tratamiento abre su seguimiento de efectividad con el estado en que estaba el sector.
+        FollowUp followUp = effectiveness.followUpFor(sector, supply, originRule, now).orElse(null);
+        history.registrarInsumo(sector, ml, supply.label(), originRule, followUp);
         tanks.consume(sector.getZona().getId(), supply, ml);
         log.info("Sector {}: {} ml de {} ordenados al nodo (regla {}).", sector.getId(), ml, supply, originRule);
     }
@@ -275,10 +306,14 @@ public class ApplicationService implements ConsumidorParametros {
      * Cierra el pedido contra la cola: aplicada o rechazada sale de ella, diferida entra o se actualiza. Deja constancia
      * en el historial de lo que no se aplicó, una sola vez mientras el motivo no cambie.
      *
-     * @param queued la fila pendiente de la que viene el intento, o {@code null} si es un pedido nuevo
+     * <p>El diagnóstico que originó el pedido se da por usado cuando el pedido termina (aplicado o rechazado), no mientras
+     * espera: si no, una aplicación diferida perdería el diagnóstico que la justifica (un diagnóstico, una aplicación).
+     *
+     * @param diagnosisTs {@code diagnosisTs} del diagnóstico de origen, o {@code null} si el pedido no lo disparó uno
+     * @param queued      la fila pendiente de la que viene el intento, o {@code null} si es un pedido nuevo
      */
     private void settle(SectorEntity sector, Supply supply, String originRule, boolean requiresDiagnosis,
-                        ApplicationOutcome outcome, PendingApplicationEntity queued) {
+                        Long diagnosisTs, ApplicationOutcome outcome, PendingApplicationEntity queued) {
         PendingApplicationEntity row = queued != null ? queued
                 : pending.findBySectorIdAndSupply(sector.getId(), supply).orElse(null);
         switch (outcome.status()) {
@@ -286,27 +321,39 @@ public class ApplicationService implements ConsumidorParametros {
                 if (row != null) {
                     pending.delete(row);
                 }
+                useDiagnosis(sector, diagnosisTs);
             }
             case REJECTED -> {
                 if (row != null) {
                     pending.delete(row);
                 }
+                useDiagnosis(sector, diagnosisTs);
                 recordNotApplied(sector, supply, originRule, "rechazada", outcome.reason());
             }
             case DEFERRED -> {
                 boolean newReason = row == null || !outcome.reason().equals(row.getLastReason());
                 if (row == null) {
                     row = new PendingApplicationEntity(UUID.randomUUID().toString(), sector.getId(),
-                            sector.getZona().getId(), supply, originRule, requiresDiagnosis, clock.millis(), null);
+                            sector.getZona().getId(), supply, originRule, requiresDiagnosis, clock.millis(), null,
+                            diagnosisTs);
                 }
                 row.setRuleName(originRule);
                 row.setRequiresDiagnosis(requiresDiagnosis);
+                row.setDiagnosisTs(diagnosisTs);
                 row.setLastReason(outcome.reason());
                 pending.save(row);
                 if (newReason) {
                     recordNotApplied(sector, supply, originRule, "diferida", outcome.reason());
                 }
             }
+        }
+    }
+
+    /** Da por usado el diagnóstico de origen; nunca retrocede el último usado (un más nuevo ya pudo haberse consumido). */
+    private void useDiagnosis(SectorEntity sector, Long diagnosisTs) {
+        Long used = sector.getDiagnosisUsadoTs();
+        if (diagnosisTs != null && (used == null || diagnosisTs > used)) {
+            sector.setDiagnosisUsadoTs(diagnosisTs);
         }
     }
 
@@ -319,7 +366,8 @@ public class ApplicationService implements ConsumidorParametros {
     // Los hechos
     // -------------------------------------------------------------------------
 
-    private ApplicationFacts facts(SectorEntity sector, Supply supply, Instant now, boolean requiresDiagnosis) {
+    private ApplicationFacts facts(SectorEntity sector, Supply supply, Instant now, boolean requiresDiagnosis,
+                                  String originRule) {
         ZonaEntity zone = sector.getZona();
         WeatherForecast forecast = weather.getForecastSinEspera();
 
@@ -342,7 +390,15 @@ public class ApplicationService implements ConsumidorParametros {
                         .map(a -> Instant.ofEpochMilli(a.getTs())).orElse(null),
                 temperature, zone.getHumSusRaw(),
                 zone.getHumSusTs() == null ? null : Instant.ofEpochMilli(zone.getHumSusTs()),
-                lastWatering(sector.getId()), rain);
+                lastWatering(sector.getId()), rain, fungicidesInCapWindow(sector, supply, now),
+                effectivenessBlocks.supplyBlock(sector, supply, originRule).orElse(null));
+    }
+
+    /** Cuántos fitosanitarios cuenta el tope del sector (F-06); sólo el fitosanitario tiene tope. */
+    private int fungicidesInCapWindow(SectorEntity sector, Supply supply, Instant now) {
+        return supply == Supply.FUNGICIDE
+                ? fungicideCap.appliedInWindow(sector, now, params.number(ParametrosInsumo.FUNGICIDE_CAP_DAYS))
+                : 0;
     }
 
     /** El riego más reciente: el del historial o el que el despacho recuerda en memoria si el registro falló. */
@@ -364,7 +420,8 @@ public class ApplicationService implements ConsumidorParametros {
         if (waiting.isEmpty()) {
             return false;
         }
-        ApplicationFacts fungicideFacts = facts(sector, Supply.FUNGICIDE, now, waiting.get().isRequiresDiagnosis());
+        ApplicationFacts fungicideFacts = facts(sector, Supply.FUNGICIDE, now, waiting.get().isRequiresDiagnosis(),
+                waiting.get().getRuleName());
         return preconditions.check(fungicideFacts, catalog.vigentes(), overrides).isMet();
     }
 }

@@ -3,6 +3,8 @@ package com.yerbanalytics.backend.supply;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
+import com.yerbanalytics.backend.engine.DetalleAlerta;
+import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
@@ -41,6 +43,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -104,6 +107,8 @@ class ApplicationServiceTest {
     private TestRuleOverrides overrides;
     private SectorEntity sector;
     private ApplicationService service;
+    private com.yerbanalytics.backend.effectiveness.EffectivenessBlockService effectivenessBlocks;
+    private com.yerbanalytics.backend.effectiveness.EffectivenessService effectiveness;
 
     @BeforeEach
     void setUp() {
@@ -120,6 +125,9 @@ class ApplicationServiceTest {
                         .max(Comparator.comparingLong(ApplicationEntity::getTs)));
         when(applications.findFirstBySectorIdOrderByTsDesc(any())).thenAnswer(i ->
                 savedApplications.stream().max(Comparator.comparingLong(ApplicationEntity::getTs)));
+        when(applications.countBySectorIdAndSupplyAndTsGreaterThanEqual(any(), any(), anyLong())).thenAnswer(i ->
+                savedApplications.stream().filter(a -> a.getSupply() == i.getArgument(1)
+                        && a.getTs() >= (long) i.getArgument(2)).count());
 
         pending = mock(PendingApplicationRepository.class);
         when(pending.save(any())).thenAnswer(i -> {
@@ -169,8 +177,13 @@ class ApplicationServiceTest {
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
         when(catalog.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
 
+        FungicideCap cap = new FungicideCap(new FungicideLog(applications, pending), history, clock);
+        effectivenessBlocks = mock(com.yerbanalytics.backend.effectiveness.EffectivenessBlockService.class);
+        when(effectivenessBlocks.supplyBlock(any(), any(), any())).thenReturn(Optional.empty());
+        effectiveness = mock(com.yerbanalytics.backend.effectiveness.EffectivenessService.class);
+        when(effectiveness.followUpFor(any(), any(), any(), any())).thenReturn(Optional.empty());
         service = new ApplicationService(applications, pending, diagnoses, sectors, historyRepository, history,
-                irrigation, weather, new ApplicationPreconditions(), tanks, publisher, overrides, catalog, clock,
+                irrigation, weather, new ApplicationPreconditions(), tanks, cap, effectivenessBlocks, effectiveness, publisher, overrides, catalog, clock,
                 new NoopTransactions());
     }
 
@@ -217,10 +230,56 @@ class ApplicationServiceTest {
             assertThat(a.getTs()).isEqualTo(at("08:00").toEpochMilli());
             assertThat(a.getRuleName()).isEqualTo("SupplyRule");
         });
-        verify(history).registrarInsumo(sector, 10, "Fertilizante", "SupplyRule");
+        verify(history).registrarInsumo(sector, 10, "Fertilizante", "SupplyRule", null);
         verify(tanks).consume("MZ-1", Supply.FERTILIZER, 10);
         assertThat(sector.getActuadorPump()).isEqualTo("Dosificando");
         assertThat(pendingRows).isEmpty();
+    }
+
+    // --- O-03: sin pronóstico ---
+
+    @Test
+    void withoutAForecastRainDoesNotBlockTheApplication() {
+        when(weather.getForecastSinEspera()).thenReturn(null);
+
+        assertThat(requestFertilizer().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    @Test
+    void withoutAForecastTheLastReadingDecidesTheTemperature() {
+        when(weather.getForecastSinEspera()).thenReturn(null);
+        sector.getZona().setTempRaw(35.0);
+
+        ApplicationOutcome outcome = requestFertilizer();
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.DEFERRED);
+        assertThat(outcome.reason()).contains("P-D3");
+    }
+
+    @Test
+    void aTreatmentOpensItsEffectivenessFollowUp() {
+        var followUp = new com.yerbanalytics.backend.effectiveness.FollowUp(
+                com.yerbanalytics.backend.effectiveness.EffectivenessKind.FUNGICIDE,
+                new com.yerbanalytics.backend.effectiveness.TreatmentBaseline("Daño fúngico", null, java.util.Set.of()));
+        when(effectiveness.followUpFor(sector, Supply.FUNGICIDE, "FungalDamageRule", at("08:00")))
+                .thenReturn(Optional.of(followUp));
+
+        service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", false);
+
+        verify(history).registrarInsumo(sector, 10, "Fitosanitario", "FungalDamageRule", followUp);
+    }
+
+    @Test
+    void aTreatmentBlockedByS06IsRejectedWithoutPublishing() {
+        when(effectivenessBlocks.supplyBlock(sector, Supply.FUNGICIDE, "FungalDamageRule"))
+                .thenReturn(Optional.of("S-06: el último fitosanitario de MZ-1-045 quedó sin efectividad"));
+
+        ApplicationOutcome outcome = service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", false);
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.REJECTED);
+        assertThat(outcome.reason()).contains("S-06");
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        verify(tanks, never()).consume(any(), any(), anyInt());
     }
 
     @Test
@@ -302,6 +361,18 @@ class ApplicationServiceTest {
 
         assertThat(service.processPending()).isZero();
         verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cancellingByRuleOnlyRemovesTheRequestThatRuleMade() {
+        clock.set(at("12:00"));
+        service.request(sector, Supply.FERTILIZER, "NutritionPlanRule", false);
+
+        service.cancelPending(SECTOR_ID, Supply.FERTILIZER, "ChlorosisNutritionalRule");
+        assertThat(pendingRows).as("el pedido es de otra regla: sigue").hasSize(1);
+
+        service.cancelPending(SECTOR_ID, Supply.FERTILIZER, "NutritionPlanRule");
+        assertThat(pendingRows).isEmpty();
     }
 
     @Test
@@ -513,5 +584,187 @@ class ApplicationServiceTest {
                 new RuleOverride(true, Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_WINDOW)));
 
         assertThat(requestFertilizer().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    // --- F-06: tope de fitosanitarios ---
+
+    /** Un fitosanitario ya aplicado al sector {@code daysAgo} días antes de las 08:00. */
+    private void fungicideAppliedDaysAgo(int daysAgo) {
+        savedApplications.add(new ApplicationEntity("a-" + daysAgo, SECTOR_ID, "MZ-1", Supply.FUNGICIDE, 10,
+                at("08:00").minus(Duration.ofDays(daysAgo)).toEpochMilli(), "F-F1"));
+    }
+
+    private void threeFungicidesInTheWindow() {
+        fungicideAppliedDaysAgo(25);
+        fungicideAppliedDaysAgo(18);
+        fungicideAppliedDaysAgo(9);
+    }
+
+    private ApplicationOutcome requestFungicide() {
+        return service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", false);
+    }
+
+    @Test
+    void theFourthFungicideInThirtyDaysIsRejectedWithTheCapAsTheReason() {
+        threeFungicidesInTheWindow();
+
+        ApplicationOutcome outcome = requestFungicide();
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.REJECTED);
+        assertThat(outcome.reason()).contains("F-06").contains("tope");
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(pendingRows).isEmpty();
+    }
+
+    @Test
+    void theCapRaisesAWarningForTheMacroZone() {
+        threeFungicidesInTheWindow();
+
+        requestFungicide();
+
+        org.mockito.ArgumentCaptor<DetalleAlerta> alert = org.mockito.ArgumentCaptor.forClass(DetalleAlerta.class);
+        verify(history).registrarAlerta(eq("MZ-1"), eq("Macro-zona 1"), eq("FungicideCap"), alert.capture(), anyLong());
+        assertThat(alert.getValue().nivel()).isEqualTo(NivelAlerta.WARNING);
+        assertThat(alert.getValue().texto()).contains(SECTOR_ID).contains("revisión");
+    }
+
+    @Test
+    void theCapWarningIsNotRepeatedWhileTheBlockStays() {
+        threeFungicidesInTheWindow();
+
+        requestFungicide();
+        requestFungicide();
+
+        verify(history, times(1)).registrarAlerta(any(), any(), eq("FungicideCap"), any(), anyLong());
+    }
+
+    @Test
+    void fungicidesOlderThanTheWindowDoNotCount() {
+        fungicideAppliedDaysAgo(45);
+        fungicideAppliedDaysAgo(40);
+        fungicideAppliedDaysAgo(35);
+
+        assertThat(requestFungicide().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    @Test
+    void aRegisteredReviewLiftsTheBlock() {
+        threeFungicidesInTheWindow();
+        sector.setFungicideReviewTs(at("08:00").minus(Duration.ofDays(1)).toEpochMilli());
+
+        // El último se aplicó hace 9 días: el intervalo de 7 ya pasó y la revisión dejó el conteo en cero.
+        assertThat(requestFungicide().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    @Test
+    void afterTheReviewOnlyTheNewApplicationsCount() {
+        threeFungicidesInTheWindow();
+        sector.setFungicideReviewTs(at("08:00").minus(Duration.ofDays(8)).toEpochMilli());
+
+        assertThat(requestFungicide().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    @Test
+    void theCapOnlyLimitsFungicidesNotFertilizers() {
+        threeFungicidesInTheWindow();
+
+        assertThat(requestFertilizer().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    @Test
+    void theCapBypassLetsTheFourthFungicideThrough() {
+        threeFungicidesInTheWindow();
+        overrides.put(ApplicationPreconditions.NAME,
+                new RuleOverride(true, Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_CAP)));
+
+        assertThat(requestFungicide().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    // --- Un diagnóstico, una aplicación (D-4) ---
+
+    private static final long DIAGNOSIS_TS = at("06:00").toEpochMilli();
+
+    private void sectorWithDiagnosis(long ts) {
+        sector.setDiagnosisTs(ts);
+        when(diagnoses.findFirstBySectorIdOrderByCreadoEnDesc(SECTOR_ID)).thenReturn(Optional.of(diagnosis(90, 2)));
+    }
+
+    @Test
+    void theDiagnosisIsUsedWhenTheApplicationRuns() {
+        sectorWithDiagnosis(DIAGNOSIS_TS);
+
+        service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", true);
+
+        assertThat(sector.getDiagnosisUsadoTs()).isEqualTo(DIAGNOSIS_TS);
+    }
+
+    @Test
+    void aDeferredApplicationDoesNotUseTheDiagnosisYet() {
+        sectorWithDiagnosis(DIAGNOSIS_TS);
+        clock.set(at("12:00"));
+
+        ApplicationOutcome outcome = service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", true);
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.DEFERRED);
+        assertThat(sector.getDiagnosisUsadoTs()).isNull();
+        assertThat(pendingRows.values()).singleElement()
+                .satisfies(p -> assertThat(p.getDiagnosisTs()).isEqualTo(DIAGNOSIS_TS));
+    }
+
+    @Test
+    void theDiagnosisIsUsedWhenTheDeferredApplicationFinallyRuns() {
+        sectorWithDiagnosis(DIAGNOSIS_TS);
+        clock.set(at("12:00"));
+        service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", true);
+
+        clock.set(at("17:00"));
+        assertThat(service.processPending()).isEqualTo(1);
+
+        assertThat(sector.getDiagnosisUsadoTs()).isEqualTo(DIAGNOSIS_TS);
+    }
+
+    @Test
+    void aNewerDiagnosisThatArrivedWhileWaitingStaysNew() {
+        sectorWithDiagnosis(DIAGNOSIS_TS);
+        clock.set(at("12:00"));
+        service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", true);
+
+        long newer = at("14:00").toEpochMilli();
+        sector.setDiagnosisTs(newer);
+        clock.set(at("17:00"));
+        service.processPending();
+
+        // Se consumió el que originó el pedido; el más nuevo todavía no lo vio ninguna regla.
+        assertThat(sector.getDiagnosisUsadoTs()).isEqualTo(DIAGNOSIS_TS).isLessThan(sector.getDiagnosisTs());
+    }
+
+    @Test
+    void aRejectedApplicationAlsoUsesTheDiagnosisBecauseItIsNeverRetried() {
+        when(diagnoses.findFirstBySectorIdOrderByCreadoEnDesc(SECTOR_ID)).thenReturn(Optional.of(diagnosis(10, 2)));
+        sector.setDiagnosisTs(DIAGNOSIS_TS);
+
+        ApplicationOutcome outcome = service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", true);
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.REJECTED);
+        assertThat(sector.getDiagnosisUsadoTs()).isEqualTo(DIAGNOSIS_TS);
+    }
+
+    @Test
+    void anApplicationNotDrivenByTheDiagnosisNeverTouchesIt() {
+        sector.setDiagnosisTs(DIAGNOSIS_TS);
+
+        requestFertilizer();
+
+        assertThat(sector.getDiagnosisUsadoTs()).isNull();
+    }
+
+    @Test
+    void usingADiagnosisNeverGoesBackwards() {
+        sectorWithDiagnosis(DIAGNOSIS_TS);
+        sector.setDiagnosisUsadoTs(at("07:00").toEpochMilli());
+
+        service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", true);
+
+        assertThat(sector.getDiagnosisUsadoTs()).isEqualTo(at("07:00").toEpochMilli());
     }
 }

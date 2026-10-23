@@ -140,7 +140,7 @@ describe('resumenTraza', () => {
     expect(r).toContainEqual(
       expect.objectContaining({
         tipo: 'omitida',
-        texto: expect.stringMatching(/Riego por déficit hídrico \(R-01\) quedó omitida por .*Posponer por lluvia/),
+        texto: expect.stringMatching(/Riego por déficit hídrico \(R-01\).* quedaron omitidas por .*Posponer por lluvia/),
       }),
     );
   });
@@ -173,6 +173,6 @@ describe('resumenTraza', () => {
   it('el bloqueo total aclara que no se evaluó el resto', () => {
     const r = resumen({ bloqueoManual: true });
     expect(r).toContainEqual(expect.objectContaining({ tipo: 'bloqueo', ruleId: 'ManualLockRule' }));
-    expect(r).toContainEqual(expect.objectContaining({ tipo: 'noAlcanzada', texto: expect.stringMatching(/15 reglas/) }));
+    expect(r).toContainEqual(expect.objectContaining({ tipo: 'noAlcanzada', texto: expect.stringMatching(/21 reglas/) }));
   });
 });

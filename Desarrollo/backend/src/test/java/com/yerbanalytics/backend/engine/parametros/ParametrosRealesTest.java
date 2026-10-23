@@ -48,7 +48,33 @@ class ParametrosRealesTest {
             Map.entry("insumo.humedad-min-aplicar", 45.0),           // reglas_v2 §8.2 P-D5
             Map.entry("insumo.lluvia-impide-mm", 5.0),               // reglas_v2 §8.2 P-D4
             Map.entry("insumo.lluvia-impide-horas", 6.0),
-            Map.entry("insumo.reingreso-horas", 24.0),               // reglas_v2 §8.3
+            Map.entry("insumo.tope-fitosanitario", 3.0),             // reglas_v2 F-06
+            Map.entry("insumo.tope-fitosanitario-dias", 30.0),
+            Map.entry("biotico.dpv-saturado", 0.3),                  // reglas_v2 §8.5 F-F1 / F-F2
+            Map.entry("biotico.dpv-calor-seco", 2.0),                // F-P1
+            Map.entry("biotico.humedad-hongo", 80.0),
+            Map.entry("biotico.temp-predisponente-min", 18.0),
+            Map.entry("biotico.temp-predisponente-max", 28.0),
+            Map.entry("biotico.humedad-predisponente", 75.0),
+            Map.entry("biotico.capturas-seguidas", 3.0),
+            Map.entry("biotico.horas-dpv-acaros", 72.0),
+            Map.entry("biotico.sectores-foco", 3.0),                 // F-04
+            Map.entry("biotico.horas-foco", 72.0),
+            Map.entry("clorosis.humedad-asfixia", 80.0),             // reglas_v2 §8.5 F-C1
+            Map.entry("clorosis.humedad-horas", 48.0),
+            Map.entry("clorosis.ce-salinidad", 2.0),
+            Map.entry("clorosis.ph-ferrica", 6.5),
+            Map.entry("estres.luz-alta", 80.0),                      // reglas_v2 §8.5 F-S1
+            Map.entry("estres.temp-alta", 32.0),
+            Map.entry("estres.humedad-reposicion", 55.0),
+            Map.entry("estres.luz-baja", 60.0),                      // F-S3
+            Map.entry("estres.temp-baja", 30.0),
+            Map.entry("efectividad.delta-riego", 8.0),              // reglas_v2 §9 E-01
+            Map.entry("efectividad.verificacion-min", 30.0),
+            Map.entry("efectividad.latencia-fertilizante-dias", 14.0),   // E-02
+            Map.entry("efectividad.latencia-fitosanitario-dias", 7.0),   // E-03
+            Map.entry("efectividad.espera-sin-diagnostico-horas", 48.0),
+            Map.entry("insumo.reingreso-horas", 24.0),              // reglas_v2 §8.3
             Map.entry("insumo.stock-aviso", 20.0),
             Map.entry("insumo.pendiente-vence-dias", 7.0),           // add-dosificacion-base D-5
             Map.entry("nutricion.intervalo-plan", 7.0),              // reglas_v2 §8.4 N-01
@@ -62,8 +88,6 @@ class ParametrosRealesTest {
             Map.entry("sensado.reintentos", 2.0),
             Map.entry("sensado.espera-reintento", 1.0),
             Map.entry("sensado.reintento-fuera-servicio", 15.0),
-            Map.entry("seguimiento.latencia-min", 2.0),              // add-motor-reglas-operativo D-14 (era seguimiento_latencia_min)
-            Map.entry("seguimiento.delta-min", 5.0),
             Map.entry("diagnostico.confianza-minima", 70.0));        // reglas_v2 §1.3 y §11 (era 85)
 
     /** Las claves nuevas de riego v2 (tabla D8): tipo, unidad, fábrica, mínimo, máximo y decimales. */
@@ -113,22 +137,9 @@ class ParametrosRealesTest {
     }
 
     @Test
-    void losParametrosDeSeguimientoVienenDeLaConfiguracionOperativaYSeEditanEnElMotor() {
-        DefinicionParametro latencia = catalogo.definicion("seguimiento.latencia-min").orElseThrow();
-        assertThat(latencia.familia()).isEqualTo(FamiliaParametro.SEGUIMIENTO);
-        assertThat(latencia.tipo()).isEqualTo(TipoParametro.ENTERO);
-        assertThat(latencia.unidad()).isEqualTo("min");
-        assertThat(latencia.fabrica()).isEqualTo("2");
-        assertThat(latencia.min()).isEqualTo(1.0);
-        assertThat(latencia.max()).isEqualTo(1440.0);
-
-        DefinicionParametro delta = catalogo.definicion("seguimiento.delta-min").orElseThrow();
-        assertThat(delta.familia()).isEqualTo(FamiliaParametro.SEGUIMIENTO);
-        assertThat(delta.tipo()).isEqualTo(TipoParametro.NUMERO);
-        assertThat(delta.fabrica()).isEqualTo("5");
-        assertThat(delta.min()).isEqualTo(0.5);
-        assertThat(delta.max()).isEqualTo(50.0);
-        assertThat(delta.decimales()).isEqualTo(1);
+    void losParametrosDeSeguimientoViejosYaNoExisten_laEfectividadSeJuzgaConEfectividadPunto() {
+        assertThat(catalogo.definicion("seguimiento.latencia-min")).isEmpty();
+        assertThat(catalogo.definicion("seguimiento.delta-min")).isEmpty();
     }
 
     @Test
@@ -232,6 +243,93 @@ class ParametrosRealesTest {
     }
 
     @Test
+    void losParametrosBioticosSonLosDeReglasV2Seccion8_5() {
+        record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica, Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("biotico.dpv-saturado", TipoParametro.NUMERO, "kPa", "0.3", 0.1, 0.5),
+                new Esperado("biotico.dpv-calor-seco", TipoParametro.NUMERO, "kPa", "2", 1.5, 3.0),
+                new Esperado("biotico.humedad-hongo", TipoParametro.NUMERO, "%", "80", 70.0, 90.0),
+                new Esperado("biotico.temp-predisponente-min", TipoParametro.NUMERO, "°C", "18", 10.0, 22.0),
+                new Esperado("biotico.temp-predisponente-max", TipoParametro.NUMERO, "°C", "28", 24.0, 35.0),
+                new Esperado("biotico.humedad-predisponente", TipoParametro.NUMERO, "%", "75", 65.0, 85.0),
+                new Esperado("biotico.capturas-seguidas", TipoParametro.ENTERO, "capturas", "3", 2.0, 5.0),
+                new Esperado("biotico.horas-dpv-acaros", TipoParametro.ENTERO, "h", "72", 24.0, 120.0),
+                new Esperado("biotico.sectores-foco", TipoParametro.ENTERO, "sectores", "3", 2.0, 10.0),
+                new Esperado("biotico.horas-foco", TipoParametro.ENTERO, "h", "72", 24.0, 120.0),
+                new Esperado("insumo.tope-fitosanitario", TipoParametro.ENTERO, "aplicaciones", "3", 2.0, 5.0),
+                new Esperado("insumo.tope-fitosanitario-dias", TipoParametro.ENTERO, "d", "30", 14.0, 60.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(e.clave().startsWith("biotico.")
+                    ? FamiliaParametro.BIOTICO : FamiliaParametro.INSUMO);
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.5");
+        }
+    }
+
+    @Test
+    void losParametrosDeClorosisYEstresSolarSonLosDeReglasV2Seccion8_5() {
+        record Esperado(String clave, FamiliaParametro familia, TipoParametro tipo, String unidad, String fabrica,
+                        Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("clorosis.humedad-asfixia", FamiliaParametro.CLOROSIS, TipoParametro.NUMERO, "%", "80", 70.0, 90.0),
+                new Esperado("clorosis.humedad-horas", FamiliaParametro.CLOROSIS, TipoParametro.ENTERO, "h", "48", 24.0, 72.0),
+                new Esperado("clorosis.ce-salinidad", FamiliaParametro.CLOROSIS, TipoParametro.NUMERO, "dS/m", "2", 1.5, 3.0),
+                new Esperado("clorosis.ph-ferrica", FamiliaParametro.CLOROSIS, TipoParametro.NUMERO, "", "6.5", 6.0, 7.0),
+                new Esperado("estres.luz-alta", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "%", "80", 60.0, 100.0),
+                new Esperado("estres.temp-alta", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "°C", "32", 28.0, 36.0),
+                new Esperado("estres.humedad-reposicion", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "%", "55", 45.0, 65.0),
+                new Esperado("estres.luz-baja", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "%", "60", 40.0, 80.0),
+                new Esperado("estres.temp-baja", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "°C", "30", 25.0, 32.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(e.familia());
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.5");
+        }
+    }
+
+    @Test
+    void losParametrosDeEfectividadSonLosDeReglasV2() {
+        record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica, Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("efectividad.delta-riego", TipoParametro.NUMERO, "%", "8", 3.0, 20.0),
+                new Esperado("efectividad.verificacion-min", TipoParametro.ENTERO, "min", "30", 15.0, 60.0),
+                new Esperado("efectividad.latencia-fertilizante-dias", TipoParametro.ENTERO, "d", "14", 7.0, 30.0),
+                new Esperado("efectividad.latencia-fitosanitario-dias", TipoParametro.ENTERO, "d", "7", 3.0, 21.0),
+                new Esperado("efectividad.espera-sin-diagnostico-horas", TipoParametro.ENTERO, "h", "48", 12.0, 96.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(FamiliaParametro.EFECTIVIDAD);
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+        }
+    }
+
+    @Test
+    void lasTemperaturasPredisponentesNuncaQuedanInvertidas() {
+        // Los rangos de cada una no se tocan (10–22 y 24–35): por eso no hace falta una restricción cruzada.
+        DefinicionParametro min = catalogo.definicion("biotico.temp-predisponente-min").orElseThrow();
+        DefinicionParametro max = catalogo.definicion("biotico.temp-predisponente-max").orElseThrow();
+
+        assertThat(min.max()).isLessThan(max.min());
+    }
+
+    @Test
     void lasClavesDeLasReglasViejasYaNoExisten() {
         assertThat(catalogo.definicion("riego.tiempo-max-apertura")).isEmpty();
         assertThat(catalogo.definicion("riego.max-riegos-24h")).isEmpty();
@@ -290,7 +388,7 @@ class ParametrosRealesTest {
 
     @Test
     void losValoresDeFabricaCumplenLasRestriccionesCruzadas() {
-        assertThat(catalogo.restricciones()).hasSize(9);
+        assertThat(catalogo.restricciones()).hasSize(11);
         assertThat(catalogo.violaciones(catalogo.fabricas())).isEmpty();
     }
 }

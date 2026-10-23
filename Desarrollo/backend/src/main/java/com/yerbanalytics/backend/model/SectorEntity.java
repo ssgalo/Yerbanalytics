@@ -89,6 +89,13 @@ public class SectorEntity {
     @Column(name = "reingreso_hasta")
     private Long reentryUntil;
 
+    /**
+     * Epoch ms en que alguien registró la revisión del sector tras alcanzar el tope de fitosanitarios (F-06). Desde ese
+     * momento el conteo del tope vuelve a cero. {@code null} si nunca se revisó.
+     */
+    @Column(name = "fungicide_review_ts")
+    private Long fungicideReviewTs;
+
     // Las lecturas sensadas viven en ZonaEntity: hay un solo nodo testigo por macro-zona
     // y los 100 sectores comparten esa lectura. El sector conserva sólo lo que es suyo
     // (diagnóstico del plantín, actuadores y estado derivado).

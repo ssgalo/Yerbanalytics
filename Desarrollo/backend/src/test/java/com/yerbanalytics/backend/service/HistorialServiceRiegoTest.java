@@ -6,7 +6,6 @@ import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,8 +27,7 @@ class HistorialServiceRiegoTest {
     @BeforeEach
     void setUp() {
         historialRepository = mock(HistorialRepository.class);
-        service = new HistorialService(historialRepository, mock(SectorRepository.class),
-                HistorialTestSupport.parametrosDeFabrica(), Clock.systemUTC());
+        service = new HistorialService(historialRepository, kind -> 1_800_000L, Clock.systemUTC());
         sector = RuleContextTestFactory.sectorBasico("MZ-2-003");
         sector.setZona(RuleContextTestFactory.zonaBasica("MZ-2"));
         sector.getZona().setName("Macro-zona 2");
@@ -82,8 +80,10 @@ class HistorialServiceRiegoTest {
         assertThat(e.getValorAntes()).isEqualTo(44.0);
         assertThat(e.getEvoAntes()).isEqualTo("44");
         assertThat(e.getEvoVerdict()).isEqualTo("En seguimiento");
-        assertThat(e.getLatencyMs()).isEqualTo(120_000L);
-        assertThat(e.getUmbralRecuperacion()).isEqualTo(5.0);
+        assertThat(e.getEfectividadTipo()).isEqualTo("IRRIGATION");
+        // La verificación se espera desde que cierra la válvula: 504 s de riego + 30 min.
+        assertThat(e.getLatencyMs()).isEqualTo(504_000L + 1_800_000L);
+        assertThat(e.getEvoLatencia()).isEqualTo("30 min");
         assertThat(e.getEvoEvaluadoTs()).isNull();
     }
 

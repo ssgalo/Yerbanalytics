@@ -9,6 +9,7 @@
      2. Injects simulated weather when needed (R-03 / ShadingRule).
      3. Publishes the calculated MQTT telemetry for the target sensor.
      4. Registers the prior AI diagnosis (SupplyRule only acts on a NEW one).
+     4b. Registers the same diagnosis on adjacent sectors of the zone (the outbreak scenario).
      5. Creates the manual lock the "Bloqueo manual" scenario asks for (before the pulse).
      5b. Publishes the node errors / registers the repairs of the S-05 scenarios (before the pulse).
      6. Triggers a sensing pulse with the rule engine (or the chain of pulses a scenario asks for).
@@ -33,6 +34,7 @@ import { shadeMarked, valveMarked, waitUntil } from '../faultFlow';
 import { faultyDevicesOf, sectorsWithValve, sectorsWithoutValve, type HardwareDevice } from '../hardwareCoverage';
 import { runPulses } from '../pulseChain';
 import { applyBypassRules } from '../bypassFlow';
+import { pickOutbreakSectors } from '../outbreakFlow';
 import { ensureTankStock } from '../tankStock';
 import { rulesWithoutScenario, SCENARIOS } from '../scenarios';
 
@@ -218,6 +220,17 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         setExecLog([...log]);
       }
 
+      // Step 1c: the «sin pronóstico» mode (O-01…O-03). It goes in before the weather: the offline mode wins over it.
+      if (conditions.offlineForecast) {
+        if (demoEnabled) {
+          await api.setOfflineForecast(true);
+          log.push('✓ Modo sin pronóstico activado: las reglas asumen que no llueve');
+        } else {
+          log.push('⚠ El backend no está en modo demo: no se puede activar el modo sin pronóstico');
+        }
+        setExecLog([...log]);
+      }
+
       // Step 2: inject simulated weather if needed.
       if (conditions.clima) {
         await api.setSimulatedWeather(conditions.clima);
@@ -329,6 +342,28 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           `✓ Diagnóstico IA ${created.id} registrado en ${diagnosisSector.id} (${conditions.diagnostico.estado}, conf. ${conditions.diagnostico.conf}%)`,
         );
         setExecLog([...log]);
+      }
+
+      // Step 4b: an outbreak (F-04) needs the same diagnosis on several sectors of the zone, adjacent ones from the middle of
+      // its grid. They all go in before the pulse, one capture each, through the same public endpoints as any diagnosis.
+      if (conditions.outbreak) {
+        const affected = pickOutbreakSectors(zoneSectors, conditions.outbreak.sectors);
+        if (affected.length === 0) {
+          throw new Error(
+            `${targetSensor.zonaId} tiene menos de ${conditions.outbreak.sectors} sectores: no alcanza para mostrar un foco.`,
+          );
+        }
+        for (const affectedSector of affected) {
+          const created = await registerDiagnosisWithCapture({
+            ...conditions.outbreak.diagnosis,
+            sectorId: affectedSector.id,
+            zonaId: affectedSector.zonaId,
+          });
+          log.push(
+            `✓ Diagnóstico IA ${created.id} registrado en ${affectedSector.id} (${conditions.outbreak.diagnosis.estado}, conf. ${conditions.outbreak.diagnosis.conf}%)`,
+          );
+          setExecLog([...log]);
+        }
       }
 
       // Step 5: the manual lock goes in before the pulse: that is the only moment the engine decides, and

@@ -6,7 +6,6 @@ import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,16 +35,13 @@ class HistorialServiceRelojTest {
     private static final Clock RELOJ = Clock.fixed(AHORA, ZonaHorariaVivero.ZONA);
 
     private HistorialRepository historialRepository;
-    private SectorRepository sectorRepository;
     private HistorialService service;
     private SectorEntity sector;
 
     @BeforeEach
     void setUp() {
         historialRepository = mock(HistorialRepository.class);
-        sectorRepository = mock(SectorRepository.class);
-        service = new HistorialService(historialRepository, sectorRepository,
-                HistorialTestSupport.parametrosDeFabrica(), RELOJ);
+        service = new HistorialService(historialRepository, kind -> 1_800_000L, RELOJ);
         sector = RuleContextTestFactory.sectorBasico("MZ-2-003");
         sector.setZona(RuleContextTestFactory.zonaBasica("MZ-2"));
         sector.getZona().setName("Macro-zona 2");
@@ -69,27 +65,6 @@ class HistorialServiceRelojTest {
         service.registrarInsumo(sector);
 
         assertThat(guardado().getTs()).isEqualTo(AHORA.toEpochMilli());
-    }
-
-    @Test
-    void elSeguimientoVenceContraElRelojDelVivero() {
-        HistorialEventoEntity e = new HistorialEventoEntity();
-        e.setId("h1");
-        e.setSectorId("MZ-2-003");
-        e.setTs(AHORA.toEpochMilli() - 119_000L);   // la latencia (120 s) todavía no venció
-        e.setLatencyMs(120_000L);
-        e.setMetricKey("humSus");
-        e.setValorAntes(40.0);
-        when(historialRepository.findByEvoShowTrueAndEvoEvaluadoTsIsNull()).thenReturn(List.of(e));
-        sector.getZona().setHumSusRaw(60.0);
-        when(sectorRepository.findById("MZ-2-003")).thenReturn(java.util.Optional.of(sector));
-
-        service.evaluarSeguimiento();
-        assertThat(e.getEvoEvaluadoTs()).isNull();
-
-        e.setTs(AHORA.toEpochMilli() - 121_000L);   // ahora sí venció
-        service.evaluarSeguimiento();
-        assertThat(e.getEvoEvaluadoTs()).isEqualTo(AHORA.toEpochMilli());
     }
 
     @Test

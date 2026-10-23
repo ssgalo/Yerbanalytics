@@ -46,6 +46,7 @@ const regla = (p: Partial<TrazaRegla> = {}): TrazaRegla => ({
   acciones: [{ tipo: 'ACTIVAR_VALVULA', motivo: 'Humedad de sustrato 38% bajo el umbral de riego (45%).' }],
   bloqueadaPor: null,
   error: null,
+  supuesto: null,
   ...p,
 });
 
@@ -172,6 +173,18 @@ describe('NodoPanel', () => {
   it('una con error muestra el mensaje', () => {
     montar(regla({ estado: 'ERROR', comparaciones: [], acciones: [], error: 'IllegalStateException: boom' }));
     expect(screen.getByText(/IllegalStateException: boom/)).toBeTruthy();
+  });
+
+  it('una regla que asumió algo por falta de pronóstico lo dice', () => {
+    montar(regla({ supuesto: 'Sin pronóstico: se asume que no llueve: no se pospone el riego' }));
+
+    expect(screen.getByText(/Sin pronóstico: se asume que no llueve/)).toBeTruthy();
+  });
+
+  it('con pronóstico no muestra ningún supuesto', () => {
+    montar(regla({ supuesto: null }));
+
+    expect(screen.queryByText(/Sin pronóstico/)).toBeNull();
   });
 
   it('SIN_DATO se lee "sin dato"', () => {

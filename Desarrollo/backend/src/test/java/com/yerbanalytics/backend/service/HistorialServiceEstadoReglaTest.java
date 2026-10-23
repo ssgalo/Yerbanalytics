@@ -27,14 +27,10 @@ class HistorialServiceEstadoReglaTest {
 
     @Mock
     private HistorialRepository historialRepository;
-    @Mock
-    private SectorRepository sectorRepository;
-    @Mock
-    private CatalogoParametrosService parametros;
 
     private HistorialEventoEntity registrar(boolean activa, String motivo, String consecuencia) {
-        HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                parametros, Clock.fixed(AHORA, ZoneOffset.UTC));
+        HistorialService service = new HistorialService(historialRepository, kind -> 1_800_000L,
+                Clock.fixed(AHORA, ZoneOffset.UTC));
 
         service.registrarEstadoRegla("Ana López", "SustratoSaturadoRule", "Sustrato saturado", "R-04",
                 activa, motivo, consecuencia);
@@ -83,8 +79,8 @@ class HistorialServiceEstadoReglaTest {
     @Test
     @DisplayName("una regla sin código no deja paréntesis vacíos")
     void sinCodigo() {
-        HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                parametros, Clock.fixed(AHORA, ZoneOffset.UTC));
+        HistorialService service = new HistorialService(historialRepository, kind -> 1_800_000L,
+                Clock.fixed(AHORA, ZoneOffset.UTC));
 
         service.registrarEstadoRegla("Ana", "SupplyRule", "Dosificación de insumo", "", false, null, null);
 

@@ -36,6 +36,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *       verifica las precondiciones, publica {@code pump ON {"ml"}} con la dosis del catálogo, la registra y descuenta
  *       el tanque (o la deja pendiente para la próxima ventana). El "Dosificando" lo cierra {@code SupplyDoseService}
  *       (ack final de la bomba o, si no llega, el plazo de la dosis); acá nada lo vuelve a "En espera".</li>
+ *   <li>{@code ABORT_INSUMO} con {@link CancelPendingApplication}: además del corte de la rama, retira la aplicación
+ *       pendiente que otra regla dejó para el sector (F-C1 ante una causa que el fertilizante no corrige).</li>
  *   <li>{@code ALERTA}: se persiste como evento "Alerta", una sola vez por macro-zona, regla y ciclo de
  *       lectura (el motor evalúa 100 sectores por mensaje: sin esto serían 100 alertas iguales).</li>
  *   <li>{@code NOOP_INFO} y las bloqueantes ({@code ABORT_*}, {@code POSTPONE_RIEGO}): se persiste el motivo
@@ -121,9 +123,13 @@ public class ActionExecutor {
                 // acá queda el log.
                 case NOOP_INFO -> log.debug("Sector {}: NOOP_INFO — {}", ctx.sector().getId(), action.motivo());
 
-                // El corte ya fue aplicado por el RuleOrchestrator.
-                case ABORT_RIEGO, ABORT_INSUMO, ABORT_MEDIASOMBRA, ABORT_ALL, POSTPONE_RIEGO ->
+                // El corte ya fue aplicado por el RuleOrchestrator; si trae el retiro de una aplicación pendiente, se hace acá.
+                case ABORT_RIEGO, ABORT_INSUMO, ABORT_MEDIASOMBRA, ABORT_ALL, POSTPONE_RIEGO -> {
                     log.debug("Sector {}: {} — {}", ctx.sector().getId(), action.type(), action.motivo());
+                    if (action.detalle() instanceof CancelPendingApplication cancel) {
+                        aplicaciones.cancelPending(ctx.sector().getId(), cancel.supply(), cancel.requestedBy());
+                    }
+                }
 
                 case ALERTA -> persistirAlerta(action, ctx);
 

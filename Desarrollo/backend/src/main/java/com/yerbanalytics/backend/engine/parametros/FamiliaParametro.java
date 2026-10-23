@@ -6,9 +6,12 @@ public enum FamiliaParametro {
     RIEGO,
     INSUMO,
     NUTRICION,
+    BIOTICO,
+    CLOROSIS,
+    ESTRES,
+    EFECTIVIDAD,
     MEDIASOMBRA,
     DIAGNOSTICO,
     READINGS,
-    SENSADO,
-    SEGUIMIENTO
+    SENSADO
 }

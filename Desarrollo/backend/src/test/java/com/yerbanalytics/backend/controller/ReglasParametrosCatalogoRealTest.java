@@ -76,29 +76,32 @@ class ReglasParametrosCatalogoRealTest {
         JsonNode json = catalogoJson();
 
         List<String> umbral = usadoPor(json, "riego.umbral-humedad");
-        // HardwareFaultService lo cita en la alerta de una falla hidráulica (riego manual si la humedad está baja).
+        // La alerta de la falla hidráulica (S-05) lee el mismo umbral para saber si pide el riego manual.
         assertThat(umbral).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule",
                 "PosponerPorLluviaRule", "RiegoPorDeficitRule", "HardwareFaultService");
         assertThat(usadoPor(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
         assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
         assertThat(usadoPor(json, "riego.lluvia-mm")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
         assertThat(usadoPor(json, "riego.lluvia-ventana")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.pausa-tras-aplicacion")).containsExactlyInAnyOrder("PausaTrasAplicacionRule", "DespachoRiego");
+        // F-S1 (la reposición por estrés solar) respeta la misma pausa tras una aplicación.
+        assertThat(usadoPor(json, "riego.pausa-tras-aplicacion"))
+                .containsExactlyInAnyOrder("PausaTrasAplicacionRule", "SolarStressRule", "DespachoRiego");
         assertThat(usadoPor(json, "riego.exceptuado-bloqueo")).containsExactlyInAnyOrder("DeficitCriticoRule", "DespachoRiego");
         // Lo que el despacho revalida antes de abrir cada válvula, junto a las reglas que ya lo decidieron.
         assertThat(usadoPor(json, "seguridad.antiguedad-max-lectura")).contains("StaleSensorRule", "DespachoRiego");
         assertThat(usadoPor(json, "riego.saturacion-bloqueo")).containsExactlyInAnyOrder("SustratoSaturadoRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.ventana-normal")).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "DespachoRiego");
+        assertThat(usadoPor(json, "riego.ventana-normal"))
+                .containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "SolarStressRule", "DespachoRiego");
         // La regla de ciclo lee el umbral crítico para dejar pasar a R-02.
         assertThat(usadoPor(json, "riego.umbral-critico")).contains("CicloLecturaRiegoRule");
     }
 
     @Test
-    void elSeguimientoPostAccionLoDeclaraQuienLoLee_HistorialService() throws Exception {
-        JsonNode json = catalogoJson();
+    void elSeguimientoViejoNoEstaEnElCatalogo_laEfectividadUsaEfectividadPunto() throws Exception {
+        List<String> claves = new ArrayList<>();
+        catalogoJson().get("parametros").forEach(p -> claves.add(p.get("clave").asText()));
 
-        assertThat(usadoPor(json, "seguimiento.latencia-min")).containsExactly("HistorialService");
-        assertThat(usadoPor(json, "seguimiento.delta-min")).containsExactly("HistorialService");
+        assertThat(claves).noneMatch(c -> c.startsWith("seguimiento."));
     }
 
     @Test
@@ -138,8 +141,9 @@ class ReglasParametrosCatalogoRealTest {
             actual = siguiente;
         }
 
-        assertThat(cadena).containsExactly("SustratoSaturadoRule", "CicloLecturaRiegoRule", "DeficitCriticoRule",
-                "FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule");
+        assertThat(cadena).containsExactly("SustratoSaturadoRule", "CicloLecturaRiegoRule", "DeficitCriticoRule", "IneffectiveActionRule",
+                "FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule",
+                "SolarStressRule");
         for (String id : cadena) {
             String etiqueta = nodos.get(id).get("label").asText();
             assertThat(etiqueta).as(id).isNotBlank().isNotEqualTo(id).doesNotContain("Rule");

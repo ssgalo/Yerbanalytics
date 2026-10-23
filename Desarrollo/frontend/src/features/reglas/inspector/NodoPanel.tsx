@@ -61,6 +61,7 @@ export function NodoPanel({ regla, label, tieneParametros, nombreDe, onEditar, o
         <p className={styles.panelNota}>No alcanzada: el motor se detuvo en {corto} antes de llegar acá.</p>
       )}
       {regla.estado === 'ERROR' && <p className={styles.panelError}>{regla.error}</p>}
+      {regla.supuesto && <p className={styles.panelNota}>{regla.supuesto}</p>}
 
       {regla.comparaciones.length > 0 && (
         <section>
