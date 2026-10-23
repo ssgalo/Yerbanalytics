@@ -25,6 +25,9 @@ export interface OverrideParametro {
 
 const FABRICA = fixture as CatalogoReglas;
 
+/** Reglas retiradas: arrancan apagadas, como `yerbanalytics.reglas.retiradas` del backend. */
+const RETIRADAS = new Set(['SupplyRule', 'DailyDoseLimitRule']);
+
 /** Catálogo vigente: el de fábrica con los overrides aplicados. Siempre una copia nueva. */
 export function catalogoVigente(overrides: ReadonlyMap<string, OverrideParametro>): CatalogoReglas {
   const catalogo = structuredClone(FABRICA);
@@ -78,6 +81,7 @@ export function buildRuleSchema(): DagSchema {
     priority: r.prioridad,
     branch: r.rama,
     parametros: [...r.parametros],
+    activa: !RETIRADAS.has(r.id),
   });
 
   // Cadena global

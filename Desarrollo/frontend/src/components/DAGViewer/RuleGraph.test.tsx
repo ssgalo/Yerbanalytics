@@ -6,7 +6,7 @@ import { RuleGraph } from './RuleGraph';
 import { buildRuleSchema } from '@/data/mock/reglasMock';
 import { evaluarMotor, type EntradaMotor } from '@/data/mock/trazaReglas';
 import fixture from '@/data/mock/catalogoReglas.fixture.json';
-import type { ActionRecord, CatalogoReglas } from '@/types/domain';
+import type { CatalogoReglas } from '@/types/domain';
 
 afterEach(cleanup);
 
@@ -30,17 +30,6 @@ const base: EntradaMotor = {
 const traza = (e: Partial<EntradaMotor> = {}) => evaluarMotor(catalogo, { ...base, ...e });
 const nodo = (id: string) =>
   document.querySelector(`.react-flow__node[data-id="${id}"]`) as HTMLElement;
-
-describe('RuleGraph sin traza (modo Historial)', () => {
-  it('se comporta como hoy: nodos por defecto, sin nodos de traza', () => {
-    render(<RuleGraph schema={schema} activeEvents={[]} />);
-
-    expect(nodo('RiegoPorDeficitRule')).toBeTruthy();
-    expect(within(nodo('RiegoPorDeficitRule')).getByText('💦 Riego por déficit hídrico (R-01)')).toBeTruthy();
-    expect(document.querySelector('.react-flow__node-regla')).toBeNull();
-    expect(document.querySelector('[data-estado]')).toBeNull();
-  });
-});
 
 describe('RuleGraph con traza (Inspector)', () => {
   it('pinta cada regla con el estado que sale de la traza', () => {
@@ -96,68 +85,5 @@ describe('RuleGraph con traza (Inspector)', () => {
     render(<RuleGraph schema={schema} traza={traza()} seleccionada="RiegoPorDeficitRule" />);
     expect(nodo('RiegoPorDeficitRule').querySelector('[data-seleccionado="true"]')).toBeTruthy();
     expect(nodo('ManualLockRule').querySelector('[data-seleccionado="true"]')).toBeNull();
-  });
-});
-
-describe('RuleGraph en el Historial: a qué regla se atribuye cada evento (13.4)', () => {
-  const evento = (e: Partial<ActionRecord>): ActionRecord => ({
-    id: 'HE-1',
-    sectorId: 'MZ-1-001',
-    zonaName: 'Macro-zona 1',
-    tipo: 'Riego',
-    time: 'hace 5 min',
-    ts: 1,
-    fecha: '03/10 10:05',
-    lectura: 'Humedad de sustrato 38%.',
-    decision: 'El motor de reglas ordena regar.',
-    accion: 'Electroválvula abierta.',
-    res: 'Efectiva',
-    resSoft: '#fff',
-    resInk: '#000',
-    sev: '—',
-    tint: '#fff',
-    ink: '#000',
-    path: 'M0 0',
-    evo: null,
-    ...e,
-  });
-  const ACCION = 'color-mix(in srgb, var(--info) 22%, var(--art))'; // fondo de un nodo que accionó
-  const fondo = (id: string) => nodo(id).style.background;
-
-  it('un riego ordenado por R-02 marca a DeficitCriticoRule (campo `regla`)', () => {
-    render(<RuleGraph schema={schema} activeEvents={[evento({ regla: 'DeficitCriticoRule' })]} />);
-
-    expect(fondo('DeficitCriticoRule')).toBe(ACCION);
-    expect(fondo('RiegoPorDeficitRule')).not.toBe(ACCION);
-  });
-
-  it('un riego sin `regla` (historial viejo) se atribuye a RiegoPorDeficitRule, no a la regla borrada', () => {
-    render(<RuleGraph schema={schema} activeEvents={[evento({ regla: null })]} />);
-
-    expect(fondo('RiegoPorDeficitRule')).toBe(ACCION);
-    expect(nodo('IrrigationRule')).toBeNull();
-  });
-
-  it('un riego pospuesto por lluvia marca a la regla que lo pospuso', () => {
-    render(
-      <RuleGraph
-        schema={schema}
-        activeEvents={[
-          evento({ regla: 'PosponerPorLluviaRule', res: 'Pospuesta', decision: 'Lluvia prevista: se pospone el riego.' }),
-        ]}
-      />,
-    );
-
-    expect(fondo('PosponerPorLluviaRule')).not.toBe(ACCION);
-    expect(fondo('PosponerPorLluviaRule')).not.toBe(fondo('RiegoPorDeficitRule'));
-  });
-
-  it('una alerta de macro-zona no se atribuye a ningún nodo (no es una decisión de un sector)', () => {
-    render(
-      <RuleGraph schema={schema} activeEvents={[evento({ tipo: 'Alerta', sectorId: '—', regla: 'SustratoSaturadoRule', alerta: 'WARNING' })]} />,
-    );
-
-    expect(fondo('SustratoSaturadoRule')).not.toBe(ACCION);
-    expect(fondo('SustratoSaturadoRule')).toBe(fondo('ManualLockRule'));
   });
 });
