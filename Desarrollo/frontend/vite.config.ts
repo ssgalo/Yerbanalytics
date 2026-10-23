@@ -19,5 +19,7 @@ export default defineConfig({
   },
   test: {
     setupFiles: ['./src/testSetup.ts'],
+    // Holgado frente a la espera de 5 s de Testing Library (src/testSetup.ts): si no, el test se corta antes que la búsqueda.
+    testTimeout: 15000,
   },
 });
