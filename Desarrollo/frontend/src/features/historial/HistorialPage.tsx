@@ -1,67 +1,60 @@
-/* Vista principal: Historial y trazabilidad + Inspector de Decisiones (HU-11 / HU-12) */
-import { useMemo, useState } from 'react';
+/* Vista principal: Historial y trazabilidad (HU-11 / HU-12).
+   Tabla de acciones a la izquierda, detalle de la elegida a la derecha y, desde el detalle, el
+   razonamiento del motor. En celular, la tabla es una lista y el detalle se abre encima. */
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePageTitle } from '@/hooks/PageMeta';
+import { useColumnQuery } from '@/hooks/useColumnQuery';
 import { useHistory } from '@/hooks/useHistory';
 import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
-import { Callout } from '@/components/ui/Callout';
-import { HistorialFilters, type HistorialFilterState } from './components/HistorialFilters';
-import { HistorialTimeline } from './components/HistorialTimeline';
+import { decidingRule, plainLabel } from '@/components/DAGViewer/historyGraphModel';
+import type { Range } from '@/lib/columnQuery';
+import { ActionDetail } from './components/ActionDetail';
+import { HISTORY_COLUMNS } from './actionPresentation';
+import { HistoryTable } from './components/HistoryTable';
+import { ReasoningModal } from './components/ReasoningModal';
 import styles from './HistorialPage.module.css';
 
-const INITIAL: HistorialFilterState = {
-  tipo: 'Todas',
-  zona: 'Todas',
-  sector: '',
-  resultado: 'Todas',
-  desde: '',
-  hasta: '',
-};
-
 /**
- * Eventos que se piden por consulta (los más recientes). El historial real acumula cientos de miles de
+ * Acciones que se piden por consulta (las más recientes). El historial real acumula cientos de miles de
  * eventos `Info`: bajarlo entero colgaba la pestaña y el backend.
  */
 export const LIMITE_HISTORIAL = 1000;
 
+const NEWEST_FIRST = { column: 'fecha', dir: 'desc' } as const;
+
 export function HistorialPage() {
-  const [filters, setFilters] = useState<HistorialFilterState>(INITIAL);
+  // El rango de fechas también se pide al backend: así se puede ir más atrás que el tope.
+  const [range, setRange] = useState<Range | null>(null);
+  const { records, loading, error } = useHistory({ desde: range?.min, hasta: range?.max, limit: LIMITE_HISTORIAL });
+  const { schema } = useRuleEngineSchema();
 
-  // Tipo y fechas se resuelven en el backend; macro-zona, sector y resultado, sobre lo recibido.
-  const desdeMs = filters.desde ? new Date(`${filters.desde}T00:00:00`).getTime() : undefined;
-  const hastaMs = filters.hasta ? new Date(`${filters.hasta}T23:59:59.999`).getTime() : undefined;
-  const { records, loading, error } = useHistory({
-    tipo: filters.tipo === 'Todas' ? undefined : filters.tipo,
-    desde: desdeMs,
-    hasta: hastaMs,
-    limit: LIMITE_HISTORIAL,
-  });
-  const { schema, loading: schemaLoading } = useRuleEngineSchema();
+  const query = useColumnQuery(records, HISTORY_COLUMNS, NEWEST_FIRST);
+  const dateFilter = (query.filters.fecha as Range | null | undefined) ?? null;
+  useEffect(() => setRange(dateFilter), [dateFilter]);
 
-  const patch = (p: Partial<HistorialFilterState>) => setFilters((f) => ({ ...f, ...p }));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
 
-  /** Macro-zonas presentes en el historial (data-driven, sirve para mock y http). */
-  const zonaOpts = useMemo(
-    () => [...new Set(records.map((r) => r.zonaName))].sort(),
-    [records],
+  // Sin elección (o si los filtros la dejaron afuera), se ve la primera de la tabla.
+  const selected = query.visible.find((r) => r.id === selectedId) ?? query.visible[0] ?? null;
+
+  const ruleLabel = useCallback(
+    (id: string) => {
+      const node = schema?.nodes.find((n) => n.id === id);
+      return node ? plainLabel(node.label) : id;
+    },
+    [schema],
+  );
+  const hasReasoning = useMemo(
+    () => !!schema && !!selected && decidingRule(schema, selected) != null,
+    [schema, selected],
   );
 
-  /** Filtrado en memoria de lo que el backend no recorta. */
-  const filtered = useMemo(() => {
-    const sectorQ = filters.sector.trim().toLowerCase();
-
-    return records.filter(
-      (r) =>
-        (filters.zona === 'Todas' || r.zonaName === filters.zona) &&
-        (filters.resultado === 'Todas' || r.res === filters.resultado) &&
-        (sectorQ === '' || r.sectorId.toLowerCase().includes(sectorQ)),
-    );
-  }, [records, filters.zona, filters.resultado, filters.sector]);
-
-  const truncado = records.length >= LIMITE_HISTORIAL;
-
+  const truncated = records.length >= LIMITE_HISTORIAL;
   usePageTitle(
     'Historial y trazabilidad',
-    truncado ? `Últimas ${records.length} acciones registradas` : `${records.length} acciones registradas`,
+    truncated ? `Últimas ${records.length} acciones registradas` : `${records.length} acciones registradas`,
   );
 
   if (error) {
@@ -72,32 +65,37 @@ export function HistorialPage() {
     );
   }
 
-  // Sólo la primera carga reemplaza la vista: al cambiar un filtro se conserva lo anterior hasta que llega lo nuevo.
+  // Sólo la primera carga reemplaza la vista: al cambiar las fechas se conserva lo anterior hasta que llega lo nuevo.
   if (loading && records.length === 0) {
     return <div className={styles.state}>Cargando historial…</div>;
   }
 
   return (
-    <div className={styles.root}>
-      <HistorialFilters value={filters} zonaOpts={zonaOpts} count={filtered.length} onChange={patch} />
-
-      {truncado && (
-        <div className={styles.aviso}>
-          <Callout>
-            Se muestran los {LIMITE_HISTORIAL} eventos más recientes
-            {filters.tipo !== 'Todas' || filters.desde || filters.hasta ? ' que cumplen el tipo y las fechas elegidos' : ''}.
-            Para ver más atrás, acotá por tipo de acción o por rango de fechas.
-          </Callout>
-        </div>
+    <div className={styles.page}>
+      <HistoryTable
+        query={query}
+        selectedId={selected?.id ?? null}
+        onSelect={(id) => {
+          setSelectedId(id);
+          setDetailOpen(true);
+        }}
+        footnote={
+          truncated
+            ? `Se muestran las ${LIMITE_HISTORIAL} acciones más recientes. Para ver más atrás, filtrá por fecha.`
+            : undefined
+        }
+      />
+      <ActionDetail
+        record={selected}
+        ruleLabel={ruleLabel}
+        hasReasoning={hasReasoning}
+        onOpenReasoning={() => setReasoningOpen(true)}
+        open={detailOpen}
+        onBack={() => setDetailOpen(false)}
+      />
+      {reasoningOpen && selected && schema && (
+        <ReasoningModal record={selected} schema={schema} onClose={() => setReasoningOpen(false)} />
       )}
-
-      <div className={styles.singleColumn}>
-        <HistorialTimeline
-          records={filtered}
-          schema={schema}
-          schemaLoading={schemaLoading}
-        />
-      </div>
     </div>
   );
 }

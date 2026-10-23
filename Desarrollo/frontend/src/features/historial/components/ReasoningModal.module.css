@@ -1,0 +1,102 @@
+/* Popup del razonamiento del motor: casi toda la pantalla, sobre un velo. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  padding: 24px;
+  background: rgba(21, 35, 27, 0.42);
+  animation: ybFade 0.14s both;
+}
+
+.dialog {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-15);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.sub {
+  font-size: var(--t-12);
+  font-stretch: var(--w-cond);
+  color: var(--muted);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--line2);
+  color: var(--ink);
+}
+
+.close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.graph {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .backdrop {
+    padding: 0;
+  }
+
+  .dialog {
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .head {
+    padding: 10px 12px;
+  }
+
+  /* El selector baja a su propia línea, a lo ancho */
+  .head > [role='group'] {
+    order: 3;
+  }
+}

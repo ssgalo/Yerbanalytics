@@ -14,6 +14,9 @@ import java.util.List;
  * @param branch   Rama a la que pertenece el nodo.
  * @param parametros Claves de los parámetros del catálogo que declara la regla; vacía en los
  *                 nodos especiales (start, abort, success).
+ * @param activa   {@code false} si la regla está apagada (p. ej. las retiradas de
+ *                 {@code yerbanalytics.reglas.retiradas}): no corre, y el historial no la dibuja.
+ *                 Los nodos especiales siempre van activos.
  */
 public record RuleNodeDto(
         String id,
@@ -21,5 +24,6 @@ public record RuleNodeDto(
         String type,
         int priority,
         String branch,
-        List<String> parametros
+        List<String> parametros,
+        boolean activa
 ) {}
