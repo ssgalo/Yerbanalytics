@@ -1,7 +1,6 @@
 /* Un parámetro editable dentro de la tarjeta de su regla (o del bloque de compartidos): Field + InputUnit del sistema de diseño. */
 import { Field, Input, InputUnit } from '@/components/ui/Field';
 import { Chip } from '@/components/ui/Chip';
-import { formatearValor } from '@/lib/parametrosValidation';
 import { unidadSegunValor } from '@/lib/plural';
 import type { ParametroRegla } from '@/types/domain';
 import { idParametro } from './anclas';
@@ -38,16 +37,9 @@ export function ParametroInline({
   onRestablecer,
 }: ParametroInlineProps) {
   const id = idParametro(p.clave);
+  // Sin texto de rango y fábrica debajo del campo, para no cargar la pantalla: el rango aparece en el error
+  // cuando el valor se sale de él, y "Restablecer fábrica" vuelve al valor de fábrica.
   const error = errorCliente ?? errorServidor;
-  const rango =
-    p.min !== null && p.max !== null
-      ? `${p.min}–${p.max} ${unidadSegunValor(p.unidad, p.max)} · `
-      : '';
-  const hint = (
-    <>
-      {rango}fábrica {formatearValor(p, p.fabrica)}
-    </>
-  );
   const comun = { disabled, readOnly: soloLectura, invalid: error !== null, modified: editado };
 
   let control: React.ReactNode;
@@ -113,7 +105,6 @@ export function ParametroInline({
           </>
         }
         htmlFor={id}
-        hint={hint}
         error={error}
       >
         {control}

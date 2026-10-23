@@ -121,7 +121,7 @@ describe('ReglaCard', () => {
     expect((screen.getByRole('switch') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('sus parámetros propios se editan en línea con su unidad, rango y fábrica', () => {
+  it('sus parámetros propios se editan en línea con su unidad, sin el texto de rango y fábrica debajo', () => {
     const { onEditar } = montar('RiegoPorDeficitRule');
 
     const campo = screen.getByLabelText(/Humedad objetivo/) as HTMLInputElement;
@@ -131,7 +131,7 @@ describe('ReglaCard', () => {
       expect.objectContaining({ clave: 'riego.humedad-objetivo' }),
       '60',
     );
-    expect(screen.getAllByText(/fábrica/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/fábrica \d/)).toBeNull();
   });
 
   it('un parámetro compartido va en sólo lectura con "Compartido con N" y el enlace al bloque', () => {
