@@ -3,6 +3,10 @@ package com.yerbanalytics.backend.service;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.dto.ActionEvent;
 import com.yerbanalytics.backend.dto.ColorPair;
+import com.yerbanalytics.backend.effectiveness.EffectivenessKind;
+import com.yerbanalytics.backend.effectiveness.FollowUp;
+import com.yerbanalytics.backend.effectiveness.FollowUpPolicy;
+import com.yerbanalytics.backend.effectiveness.TreatmentBaseline;
 import com.yerbanalytics.backend.dto.Evolution;
 import com.yerbanalytics.backend.dto.HistorialEvento;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
@@ -14,13 +18,10 @@ import com.yerbanalytics.backend.mqtt.NodeErrorType;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,8 @@ import java.util.*;
 public class HistorialService {
 
     private static final String EMDASH = "—";
+    /** Veredicto de un seguimiento que todavía no se evaluó. */
+    public static final String VERDICT_EN_SEGUIMIENTO = "En seguimiento";
 
     private static final ColorPair VERDICT_EFECTIVA = new ColorPair("#E3F2E8", "#1E6B41");
     private static final ColorPair VERDICT_SEGUIMIENTO = new ColorPair("#E2ECF8", "#1F4F86");
@@ -47,28 +50,16 @@ public class HistorialService {
             DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZonaHorariaVivero.ZONA);
 
     private final HistorialRepository historialRepository;
-    private final SectorRepository sectorRepository;
-    private final ConfiguracionService configuracionService;
-    /** Fallbacks por properties, usados si la configuración persistida no está disponible. */
-    private final long latencyMs;
-    private final String latencyLabel;
-    private final double umbralRecuperacion;
+    /** Cuánto se espera para juzgar cada acción (E-01…E-03). Perezoso: el servicio de efectividad también escribe en el historial. */
+    private final FollowUpPolicy followUps;
     /** Reloj del vivero: el mismo que usa el despacho de riego para sellar y comparar los eventos. */
     private final Clock reloj;
 
     public HistorialService(HistorialRepository historialRepository,
-                            SectorRepository sectorRepository,
-                            @Lazy ConfiguracionService configuracionService,
-                            @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
-                            @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
-                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion,
+                            @Lazy FollowUpPolicy followUps,
                             Clock reloj) {
         this.historialRepository = historialRepository;
-        this.sectorRepository = sectorRepository;
-        this.configuracionService = configuracionService;
-        this.latencyMs = latencyMs;
-        this.latencyLabel = latencyLabel;
-        this.umbralRecuperacion = umbralRecuperacion;
+        this.followUps = followUps;
         this.reloj = reloj;
     }
 
@@ -84,7 +75,7 @@ public class HistorialService {
         e.setLectura("Humedad de sustrato " + fmt0(hum) + "% bajo el umbral mínimo configurado.");
         e.setDecision("El motor de reglas ordena abrir la electroválvula del sector.");
         e.setAccion("Microaspersor abierto · riego autónomo en curso.");
-        withSeguimiento(e, hum);
+        withIrrigationFollowUp(e, hum, 0);
         historialRepository.save(e);
     }
 
@@ -104,7 +95,7 @@ public class HistorialService {
                 + detalle.duracionSeg() + " s"
                 + (detalle.recortado() ? " (duración recortada al máximo de la válvula)." : "."));
         e.setAccion("Electroválvula abierta · riego autónomo en curso.");
-        withSeguimiento(e, detalle.humedad());
+        withIrrigationFollowUp(e, detalle.humedad(), detalle.duracionSeg());
         historialRepository.save(e);
     }
 
@@ -179,30 +170,38 @@ public class HistorialService {
      * supone que la dispara un diagnóstico: la aplicación puede venir de un plan de nutrición.
      */
     public void registrarInsumo(SectorEntity s, int ml, String insumo, String regla) {
+        registrarInsumo(s, ml, insumo, regla, null);
+    }
+
+    /**
+     * Como la anterior, y si {@code followUp} no es nulo abre el seguimiento de efectividad del tratamiento (E-02, E-03). Sin él la
+     * aplicación queda registrada pero no se evalúa (el plan de nutrición, o una racha que ya tiene su seguimiento abierto).
+     */
+    public void registrarInsumo(SectorEntity s, int ml, String insumo, String regla, FollowUp followUp) {
         HistorialEventoEntity e = armarInsumo(s);
         e.setRegla(regla);
         e.setDuracionSeg((int) Math.ceil(ml * ContratoNodo.BOMBA_INSUMO_MS_POR_ML / 1000.0));
         e.setLectura("Aplicación de " + insumo.toLowerCase() + " pedida por la regla " + regla + ".");
         e.setDecision("Las precondiciones de aplicación se cumplen: se ordenan " + ml + " ml de "
                 + insumo.toLowerCase() + ".");
+        if (followUp != null) {
+            withTreatmentFollowUp(e, followUp);
+        }
         historialRepository.save(e);
     }
 
-    /** Registra una dosificación de insumo, con seguimiento de la métrica afectada. */
+    /** Registra una dosificación de insumo. Sin seguimiento: la evaluación de efectividad la abre quien aplica (E-02, E-03). */
     public void registrarInsumo(SectorEntity s) {
         historialRepository.save(armarInsumo(s));
     }
 
     private HistorialEventoEntity armarInsumo(SectorEntity s) {
-        Double humSus = currentMetric(s, "humSus");
-        double hum = humSus != null ? humSus : 0.0;
         Double conf = s.getDiagnosisConf();
-        HistorialEventoEntity e = base(s, "Insumo", "En seguimiento");
+        HistorialEventoEntity e = base(s, "Insumo", "Efectiva");
         e.setLectura("Diagnóstico IA: " + s.getDiagnosisEstado()
                 + (conf != null ? " (confianza " + fmt0(conf) + "%)" : "") + ".");
         e.setDecision("Confianza sobre el umbral: el motor habilita la dosificación localizada.");
         e.setAccion("Bomba peristáltica inyectando insumo en la línea del sector.");
-        withSeguimiento(e, hum);
         return e;
     }
 
@@ -220,32 +219,46 @@ public class HistorialService {
         return e;
     }
 
-    private void withSeguimiento(HistorialEventoEntity e, double valorAntes) {
-        // Latencia y delta vienen de la configuración agronómica vigente (HU-15 CA-07),
-        // con los valores de properties como fallback.
-        long effLatency = latencyMs;
-        String effLabel = latencyLabel;
-        double effUmbral = umbralRecuperacion;
-        try {
-            effLatency = configuracionService.getLatencyMs();
-            effLabel = configuracionService.getLatencyLabel();
-            effUmbral = configuracionService.getUmbralRecuperacion();
-        } catch (RuntimeException ignored) {
-            // Sin configuración disponible: se usan los fallbacks por properties.
-        }
-
+    /**
+     * E-01: el seguimiento de un riego compara la humedad de sustrato de la macro-zona antes del riego con la de la lectura de
+     * verificación. Se evalúa {@code latencia de verificación} después de que cierra la válvula, no después de la orden.
+     */
+    private void withIrrigationFollowUp(HistorialEventoEntity e, double valorAntes, int valveSeconds) {
+        long latency = valveSeconds * 1000L + followUps.latencyMs(EffectivenessKind.IRRIGATION);
+        e.setEfectividadTipo(EffectivenessKind.IRRIGATION.name());
         e.setMetricKey("humSus");
         e.setValorAntes(valorAntes);
-        e.setUmbralRecuperacion(effUmbral);
-        e.setLatencyMs(effLatency);
+        e.setLatencyMs(latency);
         e.setEvoShow(true);
         e.setEvoMetric("Humedad de sustrato");
         e.setEvoUnit("%");
         e.setEvoAntes(fmt0(valorAntes));
         e.setEvoAhora("—");
         e.setEvoDelta("—");
-        e.setEvoLatencia(effLabel);
-        e.setEvoVerdict("En seguimiento");
+        e.setEvoLatencia(followUps.latencyLabel(EffectivenessKind.IRRIGATION));
+        e.setEvoVerdict(VERDICT_EN_SEGUIMIENTO);
+        e.setEvoEvaluadoTs(null);
+    }
+
+    /**
+     * E-02 y E-03: el seguimiento de un tratamiento compara el diagnóstico del sector de después con el de cuando se aplicó, que
+     * queda en el evento (estado, severidad y los lindantes que ya tenían el daño).
+     */
+    private void withTreatmentFollowUp(HistorialEventoEntity e, FollowUp followUp) {
+        TreatmentBaseline baseline = followUp.baseline();
+        e.setRes("En seguimiento");
+        e.setEfectividadTipo(followUp.kind().name());
+        e.setDiagEstadoAntes(baseline.state());
+        e.setVecinosAntes(String.join(",", new java.util.TreeSet<>(baseline.neighbors())));
+        e.setLatencyMs(followUps.latencyMs(followUp.kind()));
+        e.setEvoShow(true);
+        e.setEvoMetric("Diagnóstico del sector");
+        e.setEvoUnit("");
+        e.setEvoAntes(baseline.severity() == null ? baseline.state() : baseline.state() + " " + baseline.severity());
+        e.setEvoAhora("—");
+        e.setEvoDelta("—");
+        e.setEvoLatencia(followUps.latencyLabel(followUp.kind()));
+        e.setEvoVerdict(VERDICT_EN_SEGUIMIENTO);
         e.setEvoEvaluadoTs(null);
     }
 
@@ -384,45 +397,6 @@ public class HistorialService {
         historialRepository.save(e);
     }
 
-    // ------------------------------------------------------------------
-    // Seguimiento post-acción (HU-12) — corre periódicamente
-    // ------------------------------------------------------------------
-
-    @Scheduled(fixedDelayString = "${yerbanalytics.historial.eval-interval-ms:30000}")
-    @Transactional
-    public void evaluarSeguimiento() {
-        long now = reloj.millis();
-        List<HistorialEventoEntity> pendientes = historialRepository.findByEvoShowTrueAndEvoEvaluadoTsIsNull();
-        List<HistorialEventoEntity> evaluados = new ArrayList<>();
-
-        for (HistorialEventoEntity e : pendientes) {
-            if (e.getLatencyMs() == null || now - e.getTs() < e.getLatencyMs()) {
-                continue; // la latencia todavía no venció
-            }
-            SectorEntity s = sectorRepository.findById(e.getSectorId()).orElse(null);
-            Double ahora = s != null ? currentMetric(s, e.getMetricKey()) : null;
-            if (ahora == null) {
-                continue; // sin lectura disponible, se reintenta en el próximo ciclo
-            }
-
-            double antes = e.getValorAntes() != null ? e.getValorAntes() : 0.0;
-            double delta = ahora - antes;
-            double umbral = e.getUmbralRecuperacion() != null ? e.getUmbralRecuperacion() : umbralRecuperacion;
-            boolean efectiva = Math.abs(delta) >= umbral;
-
-            e.setEvoAhora(fmt0(ahora));
-            e.setEvoDelta((delta >= 0 ? "+" : "") + fmt0(delta));
-            e.setEvoVerdict(efectiva ? "Efectiva" : "Sin efectividad");
-            e.setBloqueoRepeticion(!efectiva);
-            e.setEvoEvaluadoTs(now);
-            evaluados.add(e);
-        }
-
-        if (!evaluados.isEmpty()) {
-            historialRepository.saveAll(evaluados);
-        }
-    }
-
     /** Lectura vigente de la métrica: viene de la macro-zona del sector, no del sector. */
     private Double currentMetric(SectorEntity s, String key) {
         return s.getZona() != null ? s.getZona().raw(key) : null;
@@ -526,7 +500,9 @@ public class HistorialService {
                     e.getEvoLatencia(),
                     e.getEvoVerdict(),
                     vc.soft(),
-                    vc.ink()
+                    vc.ink(),
+                    e.getEvoMotivo(),
+                    e.isBloqueoRepeticion() && e.getEfectividadTipo() != null
             );
         }
 

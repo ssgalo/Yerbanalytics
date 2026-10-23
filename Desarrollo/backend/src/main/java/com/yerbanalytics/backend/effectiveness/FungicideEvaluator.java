@@ -23,7 +23,7 @@ public final class FungicideEvaluator {
                 && now.severity().ordinal() > before.severity().ordinal();
         if (grew) {
             return Evaluation.ineffective(describe(now), "empeoró",
-                    "La severidad aumentó de " + before.severity() + " a " + now.severity() + ".");
+                    "La severidad aumentó de " + before.severity().label() + " a " + now.severity().label() + ".");
         }
         return Evaluation.effective(describe(now), now.isHealthy() ? "Sano" : "estable",
                 now.isHealthy()
@@ -32,6 +32,6 @@ public final class FungicideEvaluator {
     }
 
     private static String describe(DiagnosisView now) {
-        return now.severity() == null ? now.state() : now.state() + " " + now.severity();
+        return now.severity() == null ? now.state() : now.state() + " " + now.severity().label();
     }
 }

@@ -5,13 +5,11 @@ import com.yerbanalytics.backend.engine.rules.ShadingRule;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
-import com.yerbanalytics.backend.engine.rules.FollowUpRule;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.RustificacionEtapaEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
-import com.yerbanalytics.backend.service.HistorialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,17 +28,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests unitarios de {@link ShadingRule} y {@link FollowUpRule} (tarea 4.7 / 5.2).
+ * Tests unitarios de {@link ShadingRule} (tarea 4.7).
  */
-@DisplayName("ShadingRule y FollowUpRule")
+@DisplayName("ShadingRule")
 @ExtendWith(MockitoExtension.class)
-class ShadingAndFollowUpRuleTest {
+class ShadingRuleTest {
 
     @Mock
     private RustificacionEtapaRepository rustificacionRepository;
-
-    @Mock
-    private HistorialService historialService;
 
     private SectorEntity sector;
     private ZonaEntity zona;
@@ -191,38 +186,5 @@ class ShadingAndFollowUpRuleTest {
         // UV 8 < umbral 9: no es pico.
         assertThat(rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosMediasombra.UV_UMBRAL, "9"))).get(0).type())
                 .isEqualTo(ActionType.NOOP_INFO);
-    }
-
-    // ===== FollowUpRule =====
-
-    @Test
-    @DisplayName("FollowUpRule: siempre emite NOOP_INFO (tarea interna)")
-    void seguimientoRule_emiteNoopInfo() {
-        FollowUpRule rule = new FollowUpRule(historialService);
-        RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
-
-        List<RuleAction> acciones = evaluar(rule, ctx);
-
-        assertThat(acciones).hasSize(1);
-        assertThat(acciones.get(0).type()).isEqualTo(ActionType.NOOP_INFO);
-    }
-
-    @Test
-    @DisplayName("FollowUpRule: sin parámetros ni comparaciones")
-    void seguimientoRule_sinParametrosNiComparaciones() {
-        FollowUpRule rule = new FollowUpRule(historialService);
-        Evaluacion ev = ev(rule);
-
-        rule.evaluate(RuleContextTestFactory.basico(sector, zona), ev);
-
-        assertThat(rule.parametros()).isEmpty();
-        assertThat(ev.comparaciones()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("FollowUpRule: prioridad es 21 (la última)")
-    void seguimientoRule_prioridad21() {
-        FollowUpRule rule = new FollowUpRule(historialService);
-        assertThat(rule.priority()).isEqualTo(21);
     }
 }

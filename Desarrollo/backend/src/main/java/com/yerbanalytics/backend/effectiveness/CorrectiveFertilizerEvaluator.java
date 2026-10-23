@@ -18,16 +18,20 @@ public final class CorrectiveFertilizerEvaluator {
         if (sameState && before.severity() != null && now.severity() != null
                 && now.severity().ordinal() < before.severity().ordinal()) {
             return Evaluation.effective(describe(now), "mejoró",
-                    "La severidad de " + now.state() + " bajó de " + before.severity() + " a " + now.severity() + ".");
+                    "La severidad de " + now.state() + " bajó de " + before.severity().label() + " a " + now.severity().label() + ".");
         }
         return Evaluation.ineffective(describe(now), sameState ? "igual" : "otro daño",
                 sameState
-                        ? "La severidad de " + before.state() + " no bajó (antes " + before.severity()
-                                + ", ahora " + now.severity() + ")."
+                        ? "La severidad de " + before.state() + " no bajó (antes " + labelOf(before.severity())
+                                + ", ahora " + labelOf(now.severity()) + ")."
                         : "El diagnóstico pasó de " + before.state() + " a " + now.state() + ": la clorosis no se resolvió.");
     }
 
+    private static String labelOf(com.yerbanalytics.backend.engine.Severity severity) {
+        return severity == null ? "sin severidad" : severity.label();
+    }
+
     private static String describe(DiagnosisView now) {
-        return now.severity() == null ? now.state() : now.state() + " " + now.severity();
+        return now.severity() == null ? now.state() : now.state() + " " + now.severity().label();
     }
 }

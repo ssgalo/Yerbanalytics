@@ -29,6 +29,11 @@ public enum Severity {
         return Optional.empty();
     }
 
+    /** La severidad como se guarda y se muestra: Baja, Media o Alta. */
+    public String label() {
+        return stored;
+    }
+
     /** «Severidad moderada o alta»: la que por sí sola justifica un fitosanitario. */
     public boolean isModerateOrHigher() {
         return this != MILD;

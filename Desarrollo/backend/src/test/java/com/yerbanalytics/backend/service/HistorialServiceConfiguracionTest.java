@@ -2,7 +2,6 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
-import com.yerbanalytics.backend.repository.SectorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,15 +19,12 @@ class HistorialServiceConfiguracionTest {
 
     @Mock
     private HistorialRepository historialRepository;
-    @Mock
-    private SectorRepository sectorRepository;
-    @Mock
+@Mock
     private ConfiguracionService configuracionService;
 
     @Test
     void asientaUnEventoConfiguracionConElUsuarioYElDetalle() {
-        HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                configuracionService, 120000, "2 min", 5, java.time.Clock.systemUTC());
+        HistorialService service = new HistorialService(historialRepository, kind -> 1_800_000L, java.time.Clock.systemUTC());
 
         service.registrarConfiguracion("Ana", "Parámetros de reglas modificados: riego.umbral-humedad.");
 
@@ -44,8 +40,7 @@ class HistorialServiceConfiguracionTest {
 
     @Test
     void laRecalibracionDelCriterioDeDiagnosticoQuedaConSuUsuario() {
-        HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                configuracionService, 120000, "2 min", 5, java.time.Clock.systemUTC());
+        HistorialService service = new HistorialService(historialRepository, kind -> 1_800_000L, java.time.Clock.systemUTC());
 
         service.registrarCriterioDiagnostico("Ana", "Criterio de diagnóstico actualizado.");
 
