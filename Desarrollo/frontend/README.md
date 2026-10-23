@@ -187,7 +187,7 @@ src/
 
 - **Motor de reglas** (`/reglas`): las reglas agrupadas por objetivo, cada una con su interruptor operativo
   (`PUT /api/rules/{name}/estado`, `reglas.editar`) y sus parámetros. Apagar una protección pide motivo y confirmación;
-  una regla apagada se ve como tal y, en modo demo, avisa que el simulador puede estar forzándola. Sin `reglas.editar` todo
+  una regla apagada se ve como tal (la demo no puede prender ni apagar reglas: Motor de reglas es la única fuente de verdad). Sin `reglas.editar` todo
   queda en sólo lectura. El interruptor no es un control de demo: ésos viven en el simulador.
 - **Rustificación** (`/rustificacion`, dentro de Configuración): el horario por defecto de la mediasombra y el resumen del
   plan de cada macro-zona, con enlace a su detalle. **Umbrales** (`/configuracion`) queda sólo con las bandas de alerta de

@@ -18,11 +18,11 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 
 ## 2. Backend: estado operativo y efectivo (D-1, D-2, D-9)
 - [x] 2.1 RED: `OperationalRuleStatesTest`: sin fila rige la siembra de retiradas; con fila rige la fila; fila huérfana se ignora y se loguea; la cache se actualiza después del commit y no si hay rollback.
-- [x] 2.2 RED: `EffectiveRuleOverridesTest`: tabla operativo × override de demo (ninguno, prendido, apagado) → efectivo (el override explícito gana; sin override, el operativo); cooldowns y bypass siguen saliendo de la capa de demo.
+- [x] 2.2 (reemplazada por 15.1) RED: `EffectiveRuleOverridesTest`: tabla operativo × override de demo (ninguno, prendido, apagado) → efectivo (el override explícito gana; sin override, el operativo); cooldowns y bypass siguen saliendo de la capa de demo.
 - [x] 2.3 RED: reescribir `RuleOverridesStoreRetiredTest`: el store ya no siembra; las retiradas salen apagadas por el estado operativo.
 - [x] 2.4 RED: test de integración (Spring, modo `REAL`): apagar una regla ⇒ `OMITIDA_DESHABILITADA` en la traza del pulso siguiente; reiniciar el contexto ⇒ sigue apagada.
 - [x] 2.5 GREEN: `RuleStateEntity` (`regla_estado`), `RuleStateRepository`, `OperationalRuleStates`, `EffectiveRuleOverrides` (único bean de `RuleOverrides`); `RuleOverridesStore` sin `implements RuleOverrides` ni siembra.
-- [x] 2.6 RED/GREEN: `DemoRuleDto.operationalActive`; `DemoRulesControllerTest` (modo demo): `PUT enabled: true` sobre una regla apagada en el vivero la hace correr y `operationalActive` sigue en `false`; `clear()` devuelve el estado operativo.
+- [x] 2.6 (reemplazada por 15.2) RED/GREEN: `DemoRuleDto.operationalActive`; `DemoRulesControllerTest` (modo demo): `PUT enabled: true` sobre una regla apagada en el vivero la hace correr y `operationalActive` sigue en `false`; `clear()` devuelve el estado operativo.
 
 ## 3. Backend: API, permisos y registro (D-5, D-6, D-7, D-8)
 - [x] 3.1 RED: `ReglasEstadoControllerTest` (MockMvc): `200` al apagar una regla de acción sin motivo; `400 MOTIVO_REQUERIDO`, `400 CONFIRMACION_REQUERIDA` (con `consecuencia`) y `400 MOTIVO_DEMASIADO_LARGO` para una protección; `404` nombre desconocido; mismo estado ⇒ `200` sin fila ni evento.
@@ -77,7 +77,7 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 
 ## 12. Simulador (D-9)
 - [x] 12.1 RED: `RuleToggles` (o su modelo) muestra la leyenda "Apagada en el vivero" en una regla con `operationalActive: false`, con el interruptor habilitado.
-- [x] 12.2 RED: `happyPath` sigue prendiendo `SupplyRule` por demo y completa el tramo de insumo (test de regresión).
+- [x] 12.2 (reemplazada por 15.5) RED: `happyPath` sigue prendiendo `SupplyRule` por demo y completa el tramo de insumo (test de regresión).
 - [x] 12.3 GREEN: tipos (`DemoRule.operationalActive`), `RuleToggles`, `happyPath`; escenarios que asumían etiquetas con emoji.
 
 ## 13. Documentación
@@ -89,7 +89,16 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [ ] 14.1 Las tres suites verdes, `npm run lint` con 0 warnings, `tsc -b` y `npm run build` del frontend.
 - [ ] 14.2 `rg -n '\p{Extended_Pictographic}' Desarrollo/frontend/src Desarrollo/backend/src/main` sin resultados.
 - [ ] 14.3 Manual, modo `REAL`: apagar R-04 pide motivo y confirmación; reiniciar el backend y seguir viéndola apagada; el historial muestra el evento; un Operario la ve en sólo lectura.
-- [ ] 14.4 Manual, modo demo con el simulador: el simulador apaga una regla prendida y prende una apagada en el vivero (gana el override); happy path completo, incluido el tramo de insumo.
+- [ ] 14.4 Manual, modo demo con el simulador: Control de reglas muestra el estado en sólo lectura y `PUT enabled` da 400; con `SupplyRule` apagada el happy path avisa y saltea sólo el insumo; prendida en Motor de reglas, el happy path completa el tramo de insumo.
 - [ ] 14.5 Historial: el grafo de un riego anterior al apagado de R-03 sigue mostrando R-03.
 - [ ] 14.6 Migración manual corrida dos veces en la base de desarrollo; crear una fila operativa nueva funciona.
 - [ ] 14.7 Revisión con contexto fresco del diff antes del PR (CLAUDE.md, regla de PR).
+
+## 15. Cambio de diseño: Motor de reglas, única fuente de verdad del encendido (D-2, D-9, D-15)
+La demo pierde el interruptor de encendido; conserva sólo cooldowns y bypass. Estado efectivo = operativo.
+- [x] 15.1 RED/GREEN: `EffectiveRuleOverridesTest`, `RuleOverridesStoreRetiredTest`: `isEnabled` y `inactiveNames` salen sólo del operativo; la capa de demo (cooldowns/bypass, `clear()`) no lo cambia. `RuleOverride` sin campo `enabled`; `TestRuleOverrides.turnOff` como doble de prueba del operativo.
+- [x] 15.2 RED/GREEN: `DemoRulesControllerTest` y `DemoRuleControlServiceTest`: `GET /api/demo/rules` trae `enabled` de sólo lectura (operativo), sin `operationalActive` ni `effectiveEnabled`; `PUT` con `enabled` responde `400` "El encendido se cambia en Motor de reglas."; cooldowns y bypass siguen igual.
+- [x] 15.3 `ReglaCatalogoDto` sin `apagadaPorDemo` (`ReglasCatalogo` ya no depende del store de demo); frontend sin el aviso «Apagada por la demo».
+- [x] 15.4 RED/GREEN: `ruleToggleModel` (`stateLegend`): «Prendida en el vivero» / «Apagada en el vivero — se cambia en Motor de reglas»; `RuleToggles` sin interruptor.
+- [x] 15.5 RED/GREEN: `happyPath`: ya no llama `updateRule(..., { enabled: true })`; con `SupplyRule` apagada avisa «Prendé «Dosificación de insumo» en Motor de reglas para probar el tramo de insumo» y saltea sólo el bypass de precondiciones y el stock de tanques.
+- [x] 15.6 Docs: design (D-2, D-9, D-15, riesgos, pregunta 7), spec, proposal, CLAUDE.md (§4, §6, §6.2) y READMEs del backend, del frontend y del simulador.

@@ -409,10 +409,10 @@ cd Desarrollo/backend
   reparto del riego. Son `DemoControllable` y declaran sus umbrales en el catálogo como cualquier regla, y su traza se suma a la del sector en el
   Inspector. Antes de escribir una regla nueva, decidir si es de sector (`Rule`) o de zona (`ZoneRule`). Detalle en el README del backend ("Plan de nutrición").
 - **Patrón para agregar una nueva regla agronómica**:
-  - Toda pieza que decide una acción (regla por sector, por macro-zona o servicio) es un **`DemoControllable`** (`engine/overrides/`; `Rule` ya lo extiende): así aparece en `GET /api/demo/rules`, se apaga y declara sus `cooldownKeys()`/`bypassKeys()`. Las reglas nuevas también necesitan su escenario en el simulador (`Desarrollo/simulador/src/scenarios/`; ver su README).
+  - Toda pieza que decide una acción (regla por sector, por macro-zona o servicio) es un **`DemoControllable`** (`engine/overrides/`; `Rule` ya lo extiende): así aparece en `GET /api/demo/rules` (con su estado de encendido en sólo lectura) y declara sus `cooldownKeys()`/`bypassKeys()`. Las reglas nuevas también necesitan su escenario en el simulador (`Desarrollo/simulador/src/scenarios/`; ver su README).
   - Toda regla nueva debe seguir estrictamente el patrón de las existentes: implementar `Rule`, anotarse como `@Component`, definir `priority()` ascendente, `name()`, `label()` legible para el usuario, `branch()` (GLOBAL, RIEGO, INSUMO, MEDIASOMBRA, SEGUIMIENTO) y declarar sus umbrales en `parametros()`.
   - Toda regla se presenta con `code()` (el de `reglas_v2`, o ninguno), `objective()` y `effect()`, y declara `protection()` (texto de la consecuencia de apagarla) si su efecto es `PROTECTS`; `ReglasArquitecturaTest` lo verifica. El `label()` va sin emojis y sin el código.
-  - **Interruptor de activación por regla**: lo gestiona `OperationalRuleStates` (estado operativo, `regla_estado`) y lo consulta el motor por `RuleOverrides` (`EffectiveRuleOverrides`: el override explícito de demo, si existe, y si no el operativo). Una regla no implementa su propio flag. Las retiradas (`yerbanalytics.reglas.retiradas`) son sólo el estado por defecto, mientras nadie decida otra cosa; apagada figura `OMITIDA_DESHABILITADA`.
+  - **Interruptor de activación por regla**: lo gestiona `OperationalRuleStates` (estado operativo, `regla_estado`) y lo consulta el motor por `RuleOverrides` (`EffectiveRuleOverrides`: el efectivo es siempre el operativo; la demo no tiene interruptor de encendido). Una regla no implementa su propio flag. Las retiradas (`yerbanalytics.reglas.retiradas`) son sólo el estado por defecto, mientras nadie decida otra cosa; apagada figura `OMITIDA_DESHABILITADA`.
   - **Flags de Cooldowns y variables de bypass en modo demo**: Si la regla impone restricciones temporales (esperas entre riegos, límites por hora, ventanas horarias, pausas tras insumos) o variables que condicionan la acción, debe implementar las flags de cooldown o variables de bypass correspondientes:
     - **Cada regla puede tener más de una flag de cooldown o variable a bypasear**: Por ejemplo, una regla puede tener un cooldown de ciclo de lectura Y una guarda de riego en curso, o una pausa tras aplicación Y un límite de dosis.
     - En producción (`yerbanalytics.mode=REAL`), cada regla aplica estrictamente los valores y cooldowns establecidos por el usuario en la configuración agronómica.
@@ -426,11 +426,11 @@ cd Desarrollo/backend
   - En modo `REAL` (producción), el backend no expone ningún rastro de simulación: los endpoints `/api/demo/**` no se registran (retornan 404), no existen tablas demo en base de datos y todas las reglas respetan sus cooldowns productivos. El estado operativo de las reglas sí rige en `REAL`.
   - **Interruptor operativo vs. controles de demo.** Prender o apagar una regla es una **operación del vivero**: vive en
     Motor de reglas (`PUT /api/rules/{name}/estado`, permiso `reglas.editar`), se persiste en `regla_estado`, vale en modo
-    `REAL` y sobrevive reinicios. Apagar una protección exige motivo y confirmación. Los **controles de demo** —apagar una
-    regla para un escenario, cooldowns en cero, bypass de guardas, clima simulado, "Leer ahora"— siguen viviendo sólo en el
-    simulador, en memoria, existen sólo en modo demo y, mientras están puestos, ganan sobre el estado operativo. El
-    simulador no escribe el estado operativo.
-  - **Aislamiento estricto: ninguna implementación de demo en la app productiva.** Todo control de demo (botón "Leer ahora", override de reglas para un escenario, bypass de cooldowns, clima simulado) DEBE vivir exclusivamente en el simulador (`Desarrollo/simulador/`). El frontend productivo (`Desarrollo/frontend/`) no debe tener ningún rastro, botón ni vista de demo; su único interruptor de reglas es el operativo.
+    `REAL` y sobrevive reinicios. Apagar una protección exige motivo y confirmación. Es **la única fuente de verdad del
+    encendido**: la demo no puede prender ni apagar reglas (`PUT /api/demo/rules/{name}` con `enabled` da 400). Los
+    **controles de demo** —cooldowns en cero, bypass de guardas, clima simulado, "Leer ahora"— siguen viviendo sólo en el
+    simulador, en memoria, y existen sólo en modo demo. El simulador no escribe ni pisa el estado operativo.
+  - **Aislamiento estricto: ninguna implementación de demo en la app productiva.** Todo control de demo (botón "Leer ahora", bypass de cooldowns, clima simulado) DEBE vivir exclusivamente en el simulador (`Desarrollo/simulador/`). El frontend productivo (`Desarrollo/frontend/`) no debe tener ningún rastro, botón ni vista de demo; su único interruptor de reglas es el operativo.
 
 
 ## 6.1 Captura de imágenes (`Desarrollo/camara*/` + `Desarrollo/contratos/`)
@@ -521,9 +521,10 @@ Invariantes a respetar al tocar esta área:
   pasadas y el servicio de inferencia. **No toca `/api/camara/v1/**`**, que es el contrato del
   dispositivo.
 - **Toda funcionalidad y control de demo vive exclusivamente acá, NUNCA en la app productiva.**
-  El botón "Leer ahora", los controles de clima ficticio, el bypass de cooldowns y el override de activación de
-  reglas para un escenario son herramientas del simulador (`:5180`); su interruptor, en modo demo, **gana** sobre el
-  estado operativo (la leyenda «Apagada en el vivero» lo avisa) y nunca lo escribe: la cuenta Servicio no tiene `reglas.editar`. El frontend productivo (`Desarrollo/frontend/`)
+  El botón "Leer ahora", los controles de clima ficticio, el bypass de cooldowns y los controles de reglas
+  (sólo cooldowns y bypass) son herramientas del simulador (`:5180`); **no tiene interruptor de encendido**: cada regla muestra su
+  estado operativo en sólo lectura («Apagada en el vivero — se cambia en Motor de reglas») y el happy path avisa en vez de prender
+  `SupplyRule`. La cuenta Servicio no tiene `reglas.editar`. El frontend productivo (`Desarrollo/frontend/`)
   no contiene ninguna implementación, vista ni control de demo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.

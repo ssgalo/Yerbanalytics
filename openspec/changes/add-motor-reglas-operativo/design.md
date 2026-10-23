@@ -40,26 +40,27 @@ Entidad `RuleStateEntity` (tabla `regla_estado`): `nombre` (PK, el `name()` del 
   loguea un `WARN` al arrancar. No se borran solas: si la regla vuelve, vuelve con lo que se decidió.
 - `ddl-auto=update` crea la tabla; no hace falta migración para ella.
 
-### D-2 — Un solo estado efectivo: el override explícito de demo gana; si no, el operativo
+### D-2 — Un solo estado efectivo: el operativo (Motor de reglas es la única fuente de verdad del encendido)
 
 `EffectiveRuleOverrides implements RuleOverrides` (en `engine/overrides/`) pasa a ser **el único bean de
 `RuleOverrides`**:
 
 ```
-isEnabled(n)          = demo.explicitEnabled(n).orElse(operational.isActive(n))
+isEnabled(n)          = operational.isActive(n)
 cooldownMinutes(n, k) = demo (sin cambios)
 isBypassed(n, k)      = demo (sin cambios)
 ```
 
 - `RuleOverridesStore` **deja de implementar `RuleOverrides`** y de sembrar las retiradas; queda como la capa de demo
-  (en memoria, la escribe sólo `DemoRuleControlService`). `clear()` borra los overrides explícitos: vuelve a regir el estado operativo. La capa distingue "nunca tocado" de "prendido a mano" (`explicitEnabled` es un `Optional`).
+  (en memoria, la escribe sólo `DemoRuleControlService`) y guarda **sólo cooldowns y bypass**: `RuleOverride` no tiene campo de
+  encendido. `clear()` borra esos overrides y no cambia el estado de ninguna pieza.
 - Todos los consumidores siguen inyectando `RuleOverrides`: no cambia ninguno (`RuleOrchestrator`, `ZoneRuleEngine`,
   `DespachoRiego`, los servicios). `RuleNodeDto.activa` de `GET /api/rules/schema` sale de ese mismo bean, así que
   ya es el efectivo sin tocar `RuleEngineSchemaController`.
-- **En modo demo, el override explícito del simulador gana, para prender o apagar.** Sólo existe con
-  `yerbanalytics.demo.enabled=true`: en producción la capa está vacía y el efectivo es el operativo. Se eligió así para no
-  romper el happy path de Demo Expo, que prende `SupplyRule` (retirada) para el tramo de insumo; el simulador es un
-  entorno de prueba, no el vivero.
+- **La demo no tiene interruptor de encendido.** Se había previsto que el override del simulador ganara sobre el operativo
+  (para que el happy path de Demo Expo prendiera `SupplyRule`, retirada); se descartó porque dos fuentes de verdad para el
+  mismo estado confunden: lo que muestra Motor de reglas tiene que ser lo que corre. El efectivo es siempre el operativo y
+  la capa de demo sólo acelera (cooldowns) o saltea guardas (bypass). `inactiveNames()` también sale del operativo.
 
 ### D-3 — Lo que cada pieza declara (en `DemoControllable`)
 
@@ -125,7 +126,6 @@ ReglaCatalogoDto(
   id, label, codigo, rama, objetivo, efecto, prioridad, parametros,
   activa,            // estado operativo
   activaPorDefecto,  // false si está en yerbanalytics.reglas.retiradas
-  apagadaPorDemo,    // la capa de demo la apaga (siempre false sin modo demo)
   proteccion,        // texto de la consecuencia, o null
   estado             // { motivo, updatedBy, updatedTs } o null si nunca se cambió
 )
@@ -184,12 +184,15 @@ por regla y tiene efecto inmediato en el próximo pulso: es una acción, no un b
 
 ### D-9 — El simulador no escribe el estado operativo
 
-- La cuenta Servicio sigue **sin** `reglas.editar`: el simulador no puede llamar a `PUT /api/rules/{name}/estado`. Su
-  interruptor sigue siendo el de demo (capa en memoria), y en modo demo gana sobre el operativo (D-2).
-- `DemoRuleDto` suma `operationalActive` (sólo lectura). `enabled` sigue significando la capa de demo. El simulador
-  muestra la leyenda "Apagada en el vivero" junto al interruptor cuando `operationalActive` es `false`, para que se sepa
-  que el override de demo la está forzando.
-- **`happyPath.ts` sigue prendiendo `SupplyRule`** por `/api/demo/rules`, sin cambios de comportamiento.
+- La cuenta Servicio sigue **sin** `reglas.editar`: el simulador no puede llamar a `PUT /api/rules/{name}/estado`, y la
+  demo tampoco tiene otro camino para prender o apagar (D-2).
+- `DemoRuleDto.enabled` es **sólo lectura** y significa el estado operativo (lo que corre); no hay `operationalActive` ni
+  `effectiveEnabled`. `PUT /api/demo/rules/{name}` con `enabled` responde `400` ("El encendido se cambia en Motor de
+  reglas."); acepta sólo `cooldownMinutes` y `bypassed`. El catálogo (`GET /api/rules/parametros`) ya no trae `apagadaPorDemo`.
+- El simulador muestra por regla «Prendida en el vivero» o «Apagada en el vivero — se cambia en Motor de reglas», sin
+  interruptor; cooldowns y bypass quedan igual.
+- **`happyPath.ts` ya no prende `SupplyRule`**: si está apagada avisa «Prendé «Dosificación de insumo» en Motor de reglas
+  para probar el tramo de insumo» y saltea sólo ese tramo (bypass de precondiciones y stock de tanques), sin cortar el resto.
 
 ### D-10 — El despacho de riego respeta el interruptor de cada guarda que revalida
 
@@ -282,7 +285,7 @@ Pestañas: **Reglas** (reemplaza a *Parámetros*) e **Inspector**. `?tab=` se co
 - **Tarjeta** (`ReglaCard`, se reescribe): nombre + código (`--font-display`), chip de efecto (`Chip`: Actúa → `info`,
   Avisa → `line`, Protege → `dark`; el efecto no usa colores de estado), `Switch` con `aria-label` "Prender/Apagar <nombre>", chip *Retirada* si
   `activaPorDefecto` es false, `Callout` si está apagada (crit para protecciones, neutral para el resto) con quién, cuándo
-  y motivo, y otro si `apagadaPorDemo` ("El simulador la apagó en modo demo").
+  y motivo, .
 - **Umbrales en línea**: cada parámetro propio con `Field` + `InputUnit` (unidad), rango y valor de fábrica como `hint`,
   marca de modificado. Reutiliza `ParametroField`.
 - **Compartidos**: un parámetro con `usadoPor.length > 1` se edita **una sola vez**, en el bloque "Compartidos del grupo"
@@ -335,15 +338,15 @@ Texto propuesto, que reemplaza lo que hoy dice que los interruptores de reglas s
 
 > **Interruptor operativo vs. controles de demo.** Prender o apagar una regla es una **operación del vivero**: vive en
 > Motor de reglas (`PUT /api/rules/{name}/estado`, permiso `reglas.editar`), se persiste en `regla_estado`, vale en modo
-> `REAL` y sobrevive reinicios. Apagar una protección exige motivo y confirmación. Los **controles de demo** —apagar una
-> regla para un escenario, cooldowns en cero, bypass de guardas, clima simulado, "Leer ahora"— siguen viviendo sólo en el
-> simulador, en memoria, existen sólo en modo demo y, mientras están puestos, ganan sobre el estado operativo. El
-> simulador no escribe el estado operativo.
+> `REAL` y sobrevive reinicios. Apagar una protección exige motivo y confirmación. Es **la única fuente de verdad
+> del encendido**: la demo no tiene interruptor. Los **controles de demo** —cooldowns en cero, bypass de guardas, clima
+> simulado, "Leer ahora"— siguen viviendo sólo en el simulador, en memoria, y existen sólo en modo demo. El simulador no
+> escribe ni pisa el estado operativo.
 
 Se edita en §4 ("Sin controles de demo": el interruptor operativo no es un control de demo), §6 ("Modos de operación y
 Feature Flags" y "Patrón para agregar una nueva regla": el flag `enabled` lo gestiona `OperationalRuleStates`, y toda regla
-declara `code()`, `objective()`, `effect()` y, si corresponde, `protection()`) y §6.2 (el interruptor del simulador es la
-capa de demo).
+declara `code()`, `objective()`, `effect()` y, si corresponde, `protection()`) y §6.2 (la demo conserva sólo cooldowns y bypass; el
+encendido es de Motor de reglas).
 
 ## Adaptación de los PRs de reglas v2
 
@@ -361,9 +364,9 @@ solas en su grupo de la pantalla (no hay mapa que tocar en el frontend).
 
 ## Riesgos
 
-- **Precedencia demo vs. operativo.** En modo demo, el simulador puede prender una regla que el vivero apagó (D-2). Es
-  aceptable porque la capa de demo no existe en producción; el dashboard muestra siempre el estado efectivo y el simulador
-  avisa cuando su override contradice al vivero.
+- **Probar un tramo apagado en el vivero.** Como la demo ya no puede prender reglas, quien quiera probar un tramo cuya regla
+  está apagada (p. ej. insumo con `SupplyRule` retirada) la prende antes en Motor de reglas; el happy path del simulador
+  avisa y saltea ese tramo en vez de forzarlo (D-9). A cambio no hay forma de que el dashboard y el motor discrepen.
 - **Huecos al apagar reglas de acción.** Apagar R-01 con R-02 encendida deja regar sólo el déficit crítico; apagar R-05
   deja a R-01 regar de noche; apagar `ApplicationPreconditions` corta todas las aplicaciones (no las libera). La tarjeta lo
   dice (D-4) y el historial lo registra, pero el sistema no impide combinaciones. No se modelan dependencias entre reglas
@@ -373,8 +376,7 @@ solas en su grupo de la pantalla (no hay mapa que tocar en el frontend).
   tiene que decirlo literal.
 - **Parámetros compartidos.** Editar `riego.umbral-humedad` cambia cinco piezas a la vez; editarlo una sola vez y mostrar
   "Compartido con N" lo hace visible, no lo evita.
-- **Reinicios.** El estado operativo sobrevive; la capa de demo no (como hoy). Tras un reinicio con modo demo, lo que el
-  simulador había apagado vuelve a correr si el vivero lo tiene prendido.
+- **Reinicios.** El estado operativo sobrevive; la capa de demo (cooldowns y bypass) no, como hoy.
 - **Cambiar `yerbanalytics.reglas.retiradas`** sólo afecta a las piezas sin fila. Una retirada que alguien prendió a mano
   sigue prendida aunque la lista cambie: es lo esperado (decidió una persona), pero hay que saberlo.
 - **Migración manual** obligatoria para borrar las columnas (D-14).
@@ -396,5 +398,6 @@ Se resolvieron al cerrar el design (23/10/2026), sin bloquear la implementación
 5. **Códigos**: no se inventan. Las piezas sin código en `reglas_v2` se muestran sin código.
 6. **Conteo de migraciones** de CLAUDE.md §6: la tarea de docs reconcilia la lista con los `migracion-*.sql` reales y suma
    la nueva.
-7. **Precedencia con la demo** (agregada al cerrar): el override explícito del simulador gana en modo demo (D-2), para no
-   romper el happy path de Demo Expo.
+7. **Precedencia con la demo** (resuelta al cerrar, decisión final): no hay precedencia porque no hay dos fuentes. Motor de
+   reglas es la única fuente de verdad del encendido; la demo conserva sólo cooldowns y bypass, y el happy path avisa en vez
+   de prender `SupplyRule`.
