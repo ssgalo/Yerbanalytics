@@ -59,4 +59,32 @@ class ValidDiagnosisTest {
     void missingConfidenceIsNotValid() {
         assertThat(ValidDiagnosis.of(diagnosis("Clorosis", null, 1), NOW, 70, 48).valid()).isFalse();
     }
+
+    // --- Con los datos que el sector guarda de su último diagnóstico (lo usan las reglas, que no leen la entidad) ---
+
+    private static ValidDiagnosis.Verdict fromSector(String state, Double conf, Long hoursAgo, double maxAgeHours) {
+        Long createdAt = hoursAgo == null ? null : NOW.minusSeconds(hoursAgo * 3600).toEpochMilli();
+        return ValidDiagnosis.of(state, conf, createdAt, NOW, 70, maxAgeHours);
+    }
+
+    @Test
+    void theSectorFieldsGiveTheSameVerdictAsTheEntity() {
+        assertThat(fromSector("Daño fúngico", 82.0, 3L, 48).valid()).isTrue();
+        assertThat(fromSector("Daño fúngico", 82.0, 60L, 48).reason()).contains("60 h");
+        assertThat(fromSector("Daño fúngico", 65.0, 2L, 48).reason()).contains("65 %").contains("70 %");
+        assertThat(fromSector("No concluyente", null, 1L, 48).valid()).isFalse();
+    }
+
+    @Test
+    void aSectorThatNeverHadADiagnosisHasNothingToApplyOn() {
+        assertThat(fromSector("Sano", null, null, 48).valid()).isFalse();
+        assertThat(fromSector("Sano", null, null, 48).reason()).contains("no tiene diagnóstico");
+    }
+
+    @Test
+    void theAgeLimitIsTheOneTheCallerPasses() {
+        // F-04 mira una ventana de 72 h aunque la vigencia de P-D1 sea de 48.
+        assertThat(fromSector("Daño fúngico", 90.0, 60L, 72).valid()).isTrue();
+        assertThat(fromSector("Daño fúngico", 90.0, 80L, 72).valid()).isFalse();
+    }
 }
