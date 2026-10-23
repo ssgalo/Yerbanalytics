@@ -112,6 +112,21 @@ La mediasombra es binaria (el firmware enrolla con un objetivo >= 50 y desenroll
 corré `src/main/resources/migracion-mediasombra-binaria.sql` (idempotente) para borrar sus overrides; el
 catálogo los ignora con un warn si no lo hacés. El tope de las etapas de rustificación pasa a 100 % fijo.
 
+### Migración manual pendiente · mediasombra por macro-zona
+
+La mediasombra pasó a ser **de la macro-zona** (una por zona, como el nodo testigo) y la rustificación global por
+porcentaje se reemplazó por un plan por zona (ver "Mediasombra por macro-zona y plan de rustificación"). `ddl-auto=update`
+crea `zona.mediasombra_abierta`, las columnas del horario por defecto en `configuracion_operativa` y las tablas
+`plan_rustificacion` / `etapa_plan_rustificacion`, pero no mueve datos ni borra lo viejo. Corré
+`src/main/resources/migracion-mediasombra-por-zona.sql` (idempotente) **después de arrancar el backend nuevo una vez**:
+
+- pasa una mediasombra de cada zona de su sector a la zona (conserva serial y falla) y borra las demás;
+- copia la posición a `zona.mediasombra_abierta` y borra `sector.actuador_shade`;
+- borra `rustificacion_etapa`.
+
+> **Hasta correrla, no se pueden crear sectores** (regenerar la topología, los tests con base real como
+> `SectorPumpStateTest`): `sector.actuador_shade` sigue `NOT NULL` y la entidad ya no la escribe.
+
 ### Migración manual pendiente · pulso de sensado y pasada diaria
 
 El pedido de lectura cada X segundos y el barrido periódico del motor se reemplazaron por el **pulso
@@ -406,7 +421,7 @@ código; en la base (`parametro_regla`) sólo hay los overrides. Cada regla decl
 usa (`Rule.parametros()`) y sólo puede leer esos. Sumar un umbral nuevo es agregarlo al catálogo, no
 una constante en la regla.
 
-Fuera del catálogo quedan, a propósito, la fecha de siembra (`yerbanalytics.nursery.sowing-date-iso`),
+Fuera del catálogo quedan, a propósito, el horario por defecto de la mediasombra (configuración operativa),
 el intervalo de despacho de riego, los parámetros del cliente de pronóstico (`yerbanalytics.weather.*`)
 y el intervalo del pulso de sensado y evaluación (configuración operativa).
 
@@ -438,8 +453,8 @@ backend caído no se recupera.
 
 - **No hay barrido.** `NurseryWatchdog` y `intervaloEvaluacionMinutos` se eliminaron. Toda otra
   telemetría (arranque del nodo, secuencia `LECTURA`, segunda respuesta, pulso sin motor) sólo actualiza
-  la lectura y el estado de los sectores. La mediasombra la mueven las reglas en el pulso; el plan de
-  rustificación por horario queda fuera del motor (`add-rustificacion-por-macrozona`).
+  la lectura y el estado de los sectores. Lo reactivo de la mediasombra (pico de UV) lo deciden las reglas de zona en
+  el pulso; el plan de rustificación y el horario por defecto quedan fuera del motor (`HorarioMediasombraService`).
 - **Pulso manual**: `POST /api/pulsos {"ejecutarMotor": bool}` (`true` si se omite) → `202
   {id, origen, ejecutaMotor, pedidoEn}` · `409 {"error"}` si hay uno en curso. Permiso `pasadas.operar`.
   Pide a todas las zonas y sólo se usa por API: Demo Expo usa la secuencia `LECTURA` con `ejecutarMotor`,
@@ -459,7 +474,8 @@ backend caído no se recupera.
   Cualquier telemetría vuelve la cuenta a 0 (alerta `INFO` si estaba fuera de servicio). La cuenta está
   en la base: sobrevive a un reinicio.
 - **Estado seguro** (S-02): al cruzar el tercero se ordena **una sola vez** `valve OFF`, `pump OFF` y
-  `shade SET {targetPct: 0}` a los equipos **registrados** en los sectores de la zona (`ZoneSafeState`, por el
+  `shade SET {targetPct: 0}` a los equipos **registrados** de la zona (válvula y bomba de cada sector, la mediasombra de
+  la zona por el comando de zona; `ZoneSafeState`, por el
   mismo `ComandoActuadorPublisher`, así que `SeguimientoComandosService` vigila cada ack). La alerta
   `CRITICAL` dice cuántas órdenes salieron. No se revierte cuando el nodo vuelve: decide el motor con la
   lectura nueva (que llega en el siguiente pulso). Una zona sin equipos registrados no recibe órdenes.
@@ -866,9 +882,9 @@ Suspende la actuación autónoma sobre un **sector** o una **macro-zona**. Se cr
 - **Al reanudar** no se repone nada: decide la próxima lectura.
 - Cada activación y reanudación deja una **alerta `INFO`** en el historial (usuario, alcance y motivo), atribuida a
   `ManualLockRule`.
-- `ManualLockRule` (prioridad 0, `ABORT_ALL`) corta la cadena del sector, y con ella a `ShadingRule`: el bloqueo de una
-  zona llega a cada uno de sus sectores. Cuando exista la evaluación por zona (`add-mediasombra-v2`), M-01/M-02 deben
-  consultar el bloqueo de la zona (`ManualLockShadingTest` fija el comportamiento).
+- `ManualLockRule` (prioridad 0, `ABORT_ALL`) corta la cadena del sector. La mediasombra es de la zona: un bloqueo **de la
+  zona** corta su rama en las reglas de zona (`ShadeFaultRule`) y frena también al horario de la mediasombra; un bloqueo de
+  un solo sector no la toca.
 - Desde el simulador: apagar la regla, el bypass `lock` y el escenario «Bloqueo manual» (README del simulador).
 
 ## Lectura inválida (S-03) y hardware incompleto (S-04)
@@ -903,7 +919,7 @@ rango del catálogo (`seguridad.rango-hum|temp|ph|ce|luz-min|max`; bordes inclui
 ### S-04 · sin el actuador mapeado no se actúa
 
 `HardwareService.coverageOf(zona, sectores)` arma, con dos consultas por zona, qué tiene registrado cada sector
-(`HardwareCoverage`: electroválvula, bomba, nodo testigo de la zona y si la zona tiene alguna mediasombra) y
+(`HardwareCoverage`: electroválvula, bomba y nodo testigo de la zona) y
 `NurseryService` la pone en `RuleContext.hardware`. `IncompleteHardwareRule` (prioridad **1**, entre el bloqueo manual y la
 frescura) corta sólo lo que falta, sin alertas:
 
@@ -911,9 +927,9 @@ frescura) corta sólo lo que falta, sin alertas:
 |---|---|
 | electroválvula del sector, o nodo testigo de la zona | `ABORT_RIEGO` |
 | bomba peristáltica del sector | `ABORT_INSUMO` |
-| ninguna mediasombra en la zona | `ABORT_MEDIASOMBRA` (acción nueva: omite las reglas de esa rama) |
 
-Nunca `ABORT_ALL`: un sector sin bomba sí se riega. «Mapeado» no es «sano»: un dispositivo con falla cuenta (eso es de S-05).
+La mediasombra es de la zona: si falta, la rama de la malla la corta la regla de zona `ShadeFaultRule` (S-04 por zona,
+`HardwareService.mallaDe`). Nunca `ABORT_ALL`: un sector sin bomba sí se riega. «Mapeado» no es «sano»: un dispositivo con falla cuenta (eso es de S-05).
 Una regla de la cadena no puede tener prioridad fraccionaria, así que las demás subieron una (`ReglasArquitecturaTest` exige
 prioridades únicas). S-05 volvió a correrlas para sumar `HydraulicFaultRule` (ver «Fallas del nodo»).
 
@@ -931,9 +947,9 @@ y `simulador/server/contract.ts`).
 | Pieza | Qué hace |
 |---|---|
 | `NodeErrorReceiver` (`mqtt/`) | Parsea el payload, saca la zona del tópico y entrega a `HardwareFaultService`. Un `tipo` que el contrato no define, un JSON roto o un tópico inesperado se loguean y se descartan |
-| `HardwareFaultService` (`service/`) | **Único lugar que escribe `dispositivo.falla`** (+ `falla_desde`). `SIN_CAUDAL`/`CAUDAL_EXCESIVO` marcan la electroválvula del sector; `MEDIASOMBRA_FIN_DE_CARRERA` marca la mediasombra de **todos** los sectores de la zona (la v2 la trata por zona, el hardware la registra por sector). Deja UNA alerta `CRITICAL` con los textos de la v2 |
+| `HardwareFaultService` (`service/`) | **Único lugar que escribe `dispositivo.falla`** (+ `falla_desde`). `SIN_CAUDAL`/`CAUDAL_EXCESIVO` marcan la electroválvula del sector; `MEDIASOMBRA_FIN_DE_CARRERA` marca la mediasombra **de la zona** (se registra con la zona, una por zona). Deja UNA alerta `CRITICAL` con los textos de la v2 |
 | `HydraulicFaultRule` (prioridad **2**, `GLOBAL`) | Sector con la válvula averiada: `ABORT_RIEGO` (con `CancelaRiego.TODAS`: retira también el riego ya encolado) y `ABORT_INSUMO`. **R-02 no se exceptúa**: la v2 no lo dice, por eso la alerta pide riego manual. Nunca `ABORT_ALL` |
-| `ShadeFaultRule` (prioridad **13**, `MEDIASOMBRA`) | Malla averiada: `ABORT_MEDIASOMBRA`; `ShadingRule` no mueve la malla |
+| `ShadeFaultRule` (regla **de zona**, prioridad **13**, `MEDIASOMBRA`) | Malla averiada, sin registrar o zona bloqueada: `ABORT_MEDIASOMBRA`; `ShadingRule` no mueve la malla |
 
 - **Una sola fuente:** no hay tabla de fallas. `HardwareService.faultsOf(sectores)` (una consulta por zona) arma `HardwareFaults` y
   `NurseryService` lo pone en `RuleContext.faults`, como `coverageOf` hace con S-04. `HardwareService` ya derivaba el estado
@@ -945,7 +961,7 @@ y `simulador/server/contract.ts`).
   (`SeguimientoComandosService` la entrega al mismo servicio). Mientras la marca siga con el mismo tipo, el segundo aviso es
   `DUPLICATE` y no alerta. Con el receptor apagado desde el simulador, el ack alerta como antes.
 - **Reparación (D-5):** `POST /api/hardware/{id}/reparacion {detalle}` (permiso `hardware.reparar`; el detalle es obligatorio; `400`
-  sin detalle o dispositivo inexistente, `409` si no tiene falla) limpia la marca (la de la malla, en toda la zona), deja el evento
+  sin detalle o dispositivo inexistente, `409` si no tiene falla) limpia la marca, deja el evento
   **«Reparación»** en el historial con usuario y detalle y una alerta `INFO`. En el siguiente pulso el sector vuelve a evaluarse.
   S-06 reutilizará este camino.
 - **Prioridades:** `HydraulicFaultRule` entra en la 2 y las reglas de riego subieron una (`ShadeFaultRule` en la 13 y
@@ -956,6 +972,37 @@ y `simulador/server/contract.ts`).
 > **Efecto operativo.** Un sector con falla hidráulica **no se riega solo ni se dosifica** hasta que se registre la reparación, y con
 > la mediasombra averiada la malla no recibe comandos de la regla de mediasombra. El estado seguro del nodo caído (S-02) no pasa por
 > las reglas: sigue ordenando cerrar la malla.
+
+## Mediasombra por macro-zona y plan de rustificación (`add-rustificacion-por-macrozona`)
+
+**La mediasombra es de la macro-zona**: hay una por zona y se registra como el nodo testigo (con `zonaId`, sin sector). Su
+última posición ordenada vive en `zona.mediasombra_abierta` (`GET /api/nursery` → `zonas[].mediasombra`: `abierta` |
+`cerrada` | `null`); los actuadores del sector ya no la traen. Todo `shade SET` sale por el **comando de zona**
+(`nursery/zone/{zona}/command`, con `actuador: "shade"`) y su ACK vuelve por `nursery/zone/{zona}/ack`
+(`ContratoNodo.TOPIC_ACK_ZONA`; espejo en `contrato.h` y el simulador).
+
+Dos cosas mueven la malla, y no se pisan:
+
+| Quién | Cuándo | Qué |
+|---|---|---|
+| `HorarioMediasombraService` (`mediasombra/`, **fuera del motor**) | Cada minuto revisa; **actúa sólo en los bordes** | Abre al entrar en la ventana de hoy y cierra al salir. La ventana es la de la etapa del **plan de rustificación** de la zona o, sin plan en curso, el **horario por defecto** (`mediasombraAbiertaDesde/Hasta` en la configuración operativa, 08:00–17:00 de fábrica). Iniciar o eliminar un plan, cambiar el horario o pasar de etapa también es un borde |
+| Reglas de zona (`ShadeFaultRule` 13, `ShadingRule` 14), en el pulso con motor | En cualquier momento | Hoy, cerrar ante un pico de UV. **El horario no lo corrige**: queda cerrada hasta el próximo borde de apertura (que puede ser al día siguiente) |
+
+- Ni el horario ni el motor mandan nada si la zona tiene **bloqueo manual**, **no tiene mediasombra registrada** o la tiene
+  **averiada**; el horario tampoco con la zona en **estado seguro**. Lo deja en el historial; pasado el impedimento, espera al
+  próximo borde. Al arrancar el backend, la primera revisión pone cada zona en su posición si la última orden no coincide.
+- Todo movimiento queda en el historial (tipo «Mediasombra»), con quién lo pidió (`HorarioMediasombraService`, la regla o el
+  estado seguro). El único que publica es `MediasombraService`; el estado seguro y las secuencias de Demo Expo publican por su
+  cuenta (prioridad propia, commandId propio) y registran la posición.
+- **Plan de rustificación** (`PlanRustificacionService`): fecha de inicio y etapas de N días (1–60) con una ventana
+  `HH:MM`–`HH:MM` (cierre después de la apertura). A lo sumo uno vigente por zona. El estado se calcula: `programado` antes del
+  inicio (rige el horario por defecto), `en_curso` desde ese día y **también pasada la última etapa** (la última se sostiene),
+  `cancelado` cuando alguien lo elimina; entonces vuelve el horario por defecto.
+  - `GET /api/zonas/{zona}/rustificacion` → plan vigente o `204` (permiso `vivero.ver`).
+  - `POST /api/zonas/{zona}/rustificacion {fechaInicio, etapas: [{dias, abiertaDesde, abiertaHasta}]}` → `400`/`409 {error}`.
+  - `POST /api/zonas/{zona}/rustificacion/cancelar` (eliminar) → `409` si no hay plan. Los dos con `configuracion.editar`.
+- **Simulador:** `HorarioMediasombraService` es `DemoControllable` (se apaga); `ShadeFaultRule` admite los bypass `fault` y
+  `hardware`. Las secuencias de Demo Expo (abrir / cerrar / desplegar-esperar-enrollar) siguen igual, ahora por el comando de zona.
 
 ## Aplicación de insumos (`add-dosificacion-base` · reglas_v2 §8.1–8.3)
 
@@ -1167,9 +1214,9 @@ Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "M
 `openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.
 
 - **Destino.** La zona de menor número (orden numérico) y su primer sector. Sin topología, `409`.
-- **MQTT que ahora sí se usa.** Publica `ON`/`OFF` de la válvula y `SET` de la mediasombra en
-  `nursery/zone/{zona}/sector/{sector}/command`, y `LEER_AHORA` en `nursery/zone/{zona}/command` (QoS 1,
-  sin ACK). **Escucha el ACK de los actuadores** (`nursery/zone/+/sector/+/ack`) con un adaptador propio
+- **MQTT que ahora sí se usa.** Publica `ON`/`OFF` de la válvula en `nursery/zone/{zona}/sector/{sector}/command`, y el
+  `SET` de la mediasombra (que es de la zona) y `LEER_AHORA` en `nursery/zone/{zona}/command` (QoS 1). **Escucha el ACK de
+  los actuadores** (`nursery/zone/+/sector/+/ack` y, el de la malla, `nursery/zone/+/ack`) con un adaptador propio
   (`-ack`), que `AckActuadorReceiver` entrega a `SeguimientoComandosService` *y* a `SecuenciaService`
   (los comandos de las secuencias también los vigila el seguimiento, a propósito: una falla mecánica es una
   alerta real sin importar quién mandó el comando), y la telemetría con otro (`-lectura`); el de telemetría que alimenta al motor queda idéntico, a

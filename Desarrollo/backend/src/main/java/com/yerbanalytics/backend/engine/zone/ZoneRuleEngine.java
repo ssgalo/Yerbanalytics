@@ -1,8 +1,11 @@
 package com.yerbanalytics.backend.engine.zone;
 
+import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.engine.HardwareFaults;
+import com.yerbanalytics.backend.engine.MallaZona;
 import com.yerbanalytics.backend.engine.RuleAction;
+import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
@@ -10,6 +13,7 @@ import com.yerbanalytics.backend.engine.traza.AccionTrazada;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.TrazaRegla;
+import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.model.ManualLockEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -30,11 +34,12 @@ import java.util.Set;
 /**
  * Corre las {@link ZoneRule} <b>una vez por macro-zona</b>, cuando el motor termina de evaluar sus sectores en un
  * pulso con motor (reglas_v2: el motor decide sólo en el pulso). Es el camino compartido de las reglas que no son de un
- * sector: hoy el plan de nutrición (N-01) y la CE baja (N-02).
+ * sector: el plan de nutrición (N-01), la CE baja (N-02) y la mediasombra, que es de la macro-zona.
  *
  * <p>Las reglas corren por prioridad y cada una ejecuta sus acciones antes de que corra la siguiente: N-02 puede
  * adelantar el plan y N-01, que viene después, ya lo ve vencido en el mismo pulso. Una regla apagada con un override no
- * corre; queda en la traza.
+ * corre; queda en la traza. Como en la cadena por sector, un {@code ABORT_MEDIASOMBRA} corta las reglas que siguen de la
+ * rama MEDIASOMBRA (quedan {@code OMITIDA_RAMA_BLOQUEADA}).
  *
  * <p>Si una regla lanza, la excepción se propaga (como en las reglas por sector: la transacción de la ingesta revierte
  * y el pulso siguiente lo reintenta) y antes se guarda la traza parcial con esa regla en {@code ERROR}.
@@ -69,9 +74,12 @@ public class ZoneRuleEngine {
      *
      * @param hardware lo que ya armó el motor por sector (S-04)
      * @param faults   lo que ya armó el motor por sector (S-05)
+     * @param forecast el pronóstico del pulso; {@code null} si no hay uno cacheado
+     * @param malla    la mediasombra de la zona
      */
     public List<TrazaRegla> evaluate(ZonaEntity zone, List<SectorEntity> sectors, Instant now,
-                                     Map<String, HardwareCoverage> hardware, Map<String, HardwareFaults> faults) {
+                                     Map<String, HardwareCoverage> hardware, Map<String, HardwareFaults> faults,
+                                     WeatherForecast forecast, MallaZona malla) {
         boolean zoneLocked = false;
         Set<String> lockedSectors = new HashSet<>();
         for (ManualLockEntity lock : locks.findByActiveTrue()) {
@@ -81,7 +89,8 @@ public class ZoneRuleEngine {
                 zoneLocked = true;
             }
         }
-        return evaluate(new ZoneRuleContext(zone, sectors, now, hardware, faults, zoneLocked, lockedSectors, overrides));
+        return evaluate(new ZoneRuleContext(zone, sectors, now, hardware, faults, zoneLocked, lockedSectors, overrides,
+                forecast, malla));
     }
 
     /** Evalúa todas las reglas de zona, en orden de prioridad, y guarda la traza. */
@@ -90,10 +99,16 @@ public class ZoneRuleEngine {
         ZoneRuleContext ctx = original.withOverrides(overrides);
         ParametrosVigentes current = parameters.vigentes();
         List<TrazaRegla> trace = new ArrayList<>(rules.size());
+        String abortMediasombra = null;
 
         for (ZoneRule rule : rules) {
             if (!overrides.isEnabled(rule.name())) {
                 trace.add(skipped(rule, EstadoRegla.OMITIDA_DESHABILITADA));
+                continue;
+            }
+            if (rule.branch() == RuleBranch.MEDIASOMBRA && abortMediasombra != null) {
+                trace.add(new TrazaRegla(rule.name(), rule.branch(), rule.priority(), EstadoRegla.OMITIDA_RAMA_BLOQUEADA,
+                        List.of(), List.of(), abortMediasombra));
                 continue;
             }
             Evaluacion ev = new Evaluacion(rule, current);
@@ -108,6 +123,9 @@ public class ZoneRuleEngine {
             trace.add(new TrazaRegla(rule.name(), rule.branch(), rule.priority(), EstadoRegla.EVALUADA,
                     List.copyOf(ev.comparaciones()),
                     actions.stream().map(a -> new AccionTrazada(a.type(), a.motivo())).toList(), null));
+            if (abortMediasombra == null && actions.stream().anyMatch(a -> a.type() == ActionType.ABORT_MEDIASOMBRA)) {
+                abortMediasombra = rule.name();
+            }
         }
 
         traces.save(ctx.zone().getId(), trace);

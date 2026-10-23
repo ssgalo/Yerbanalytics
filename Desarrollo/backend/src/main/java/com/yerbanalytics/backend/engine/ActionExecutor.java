@@ -18,8 +18,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Único punto donde las acciones del motor se convierten en efectos reales.
@@ -38,8 +36,6 @@ import java.util.regex.Pattern;
  *       verifica las precondiciones, publica {@code pump ON {"ml"}} con la dosis del catálogo, la registra y descuenta
  *       el tanque (o la deja pendiente para la próxima ventana). El "Dosificando" lo cierra {@code SupplyDoseService}
  *       (ack final de la bomba o, si no llega, el plazo de la dosis); acá nada lo vuelve a "En espera".</li>
- *   <li>{@code MOVER_MEDIASOMBRA}: actualiza {@code actuadorShade} con el porcentaje del motivo
- *       ({@code [apertura=N]}) y publica {@code shade SET}.</li>
  *   <li>{@code ALERTA}: se persiste como evento "Alerta", una sola vez por macro-zona, regla y ciclo de
  *       lectura (el motor evalúa 100 sectores por mensaje: sin esto serían 100 alertas iguales).</li>
  *   <li>{@code NOOP_INFO} y las bloqueantes ({@code ABORT_*}, {@code POSTPONE_RIEGO}): se persiste el motivo
@@ -70,13 +66,9 @@ public class ActionExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(ActionExecutor.class);
 
-    /** Extrae el porcentaje de apertura del motivo de MOVER_MEDIASOMBRA: {@code [apertura=N]}. */
-    private static final Pattern APERTURA_PATTERN = Pattern.compile("\\[apertura=(\\d+)\\]");
-
     private static final int INTERVALO_SENSADO_DEFAULT_MIN = 240;
 
     private final HistorialService historialService;
-    private final ComandoActuadorPublisher publisher;
     private final ColaRiego cola;
     private final ApplicationService aplicaciones;
 
@@ -86,10 +78,9 @@ public class ActionExecutor {
      */
     private final Map<String, Instant> alertasPorCiclo = new ConcurrentHashMap<>();
 
-    public ActionExecutor(HistorialService historialService, ComandoActuadorPublisher publisher, ColaRiego cola,
+    public ActionExecutor(HistorialService historialService, ColaRiego cola,
                           ApplicationService aplicaciones) {
         this.historialService = historialService;
-        this.publisher = publisher;
         this.cola = cola;
         this.aplicaciones = aplicaciones;
     }
@@ -124,15 +115,6 @@ public class ActionExecutor {
                         log.warn("Sector {}: ACTIVAR_BOMBA de {} sin insumo: no se aplica nada.",
                                 ctx.sector().getId(), action.ruleName());
                     }
-                }
-
-                case MOVER_MEDIASOMBRA -> {
-                    int apertura = parseApertura(action.motivo(), ctx.sector().getActuadorShade());
-                    log.info("Sector {}: MOVER_MEDIASOMBRA → {}% — {}",
-                            ctx.sector().getId(), apertura, action.motivo());
-                    ctx.sector().setActuadorShade(apertura);
-                    // Downlink: enviar posición de mediasombra
-                    publishCommand(ctx, "shade", "SET", Map.of("targetPct", apertura));
                 }
 
                 // Registro de Inacción: el usuario puede ver por qué el motor no actuó. Ya se persistió arriba;
@@ -308,39 +290,5 @@ public class ActionExecutor {
     private static int intervaloSensado(RuleContext ctx) {
         return ctx.config() != null && ctx.config().getIntervaloSensadoMinutos() != null
                 ? ctx.config().getIntervaloSensadoMinutos() : INTERVALO_SENSADO_DEFAULT_MIN;
-    }
-
-    // -------------------------------------------------------------------------
-    // Publicación MQTT
-    // -------------------------------------------------------------------------
-
-    /**
-     * Publica el comando al tópico del sector a través del {@link ComandoActuadorPublisher}.
-     *
-     * <p>Si la publicación falla (broker caído, canal lleno, etc.) se registra y NO se frena la
-     * ejecución: el estado en base de datos ya fue actualizado y el historial ya fue escrito.
-     */
-    private void publishCommand(RuleContext ctx, String actuador, String accion, Map<String, Object> parametros) {
-        String zonaId   = ctx.zona() != null ? ctx.zona().getId() : "unknown";
-        String sectorId = ctx.sector().getId();
-        ComandoActuadorPublisher.Resultado r = publisher.publicar(zonaId, sectorId, actuador, accion, parametros);
-        if (!r.publicado()) {
-            // No propagamos: el comando físico se reintentará cuando el motor vuelva a evaluar.
-            log.warn("Sector {}: el comando {} {} no se publicó — {}", sectorId, actuador, accion, r.error());
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Parseo de parámetros del motivo
-    // -------------------------------------------------------------------------
-
-    /**
-     * Extrae el porcentaje de apertura del motivo de la acción {@code MOVER_MEDIASOMBRA}.
-     * Si el motivo no contiene el patrón {@code [apertura=N]}, retorna {@code fallback}.
-     */
-    private static int parseApertura(String motivo, int fallback) {
-        if (motivo == null) return fallback;
-        Matcher m = APERTURA_PATTERN.matcher(motivo);
-        return m.find() ? Integer.parseInt(m.group(1)) : fallback;
     }
 }

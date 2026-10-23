@@ -129,4 +129,17 @@ class AckActuadorReceiverTest {
         assertThat(ack.tipoDetalle()).isEqualTo("en_cola");
         assertThat(ack.esperaMaxSec()).isEqualTo(45L);
     }
+    @Test
+    void elAckDeLaMallaLlegaPorElTopicoDeZonaYSinSector() {
+        receiver.processMessage(mensaje(
+                "{\"commandId\":\"m-1\",\"status\":\"SUCCESS\",\"detalle\":{\"tipo\":\"ok\",\"targetPct\":100}}",
+                "nursery/zone/MZ-3/ack"));
+
+        ArgumentCaptor<AckActuador> c = ArgumentCaptor.forClass(AckActuador.class);
+        verify(seguimiento).registrarAck(c.capture());
+        verify(secuencias).registrarAck(any());
+        assertThat(c.getValue().zonaId()).isEqualTo("MZ-3");
+        assertThat(c.getValue().sectorId()).isNull();
+        assertThat(c.getValue().commandId()).isEqualTo("m-1");
+    }
 }

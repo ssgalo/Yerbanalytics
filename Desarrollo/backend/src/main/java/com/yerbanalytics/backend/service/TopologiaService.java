@@ -261,7 +261,6 @@ public class TopologiaService {
         s.setDiagnosisSev(SEV_OFFLINE);
         s.setActuadorValve(VALVE_OFFLINE);
         s.setActuadorPump(PUMP_OFFLINE);
-        s.setActuadorShade(0);
         // Sin lecturas que inicializar: viven en la macro-zona, no en el sector.
         return s;
     }

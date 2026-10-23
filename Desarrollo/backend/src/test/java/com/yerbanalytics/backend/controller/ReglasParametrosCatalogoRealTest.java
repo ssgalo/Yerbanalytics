@@ -71,8 +71,9 @@ class ReglasParametrosCatalogoRealTest {
         JsonNode json = catalogoJson();
 
         List<String> umbral = usadoPor(json, "riego.umbral-humedad");
+        // HardwareFaultService lo cita en la alerta de una falla hidráulica (riego manual si la humedad está baja).
         assertThat(umbral).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule",
-                "PosponerPorLluviaRule", "RiegoPorDeficitRule");
+                "PosponerPorLluviaRule", "RiegoPorDeficitRule", "HardwareFaultService");
         assertThat(usadoPor(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
         assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
         assertThat(usadoPor(json, "riego.lluvia-mm")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");

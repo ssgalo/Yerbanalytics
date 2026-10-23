@@ -152,6 +152,18 @@ public class ZonaEntity {
     @Column(name = "nutrition_batch_start_ts")
     private Long nutritionBatchStartTs;
 
+    // ------------------------------------------------------------------
+    // Mediasombra (una por macro-zona, add-rustificacion-por-macrozona)
+    // ------------------------------------------------------------------
+
+    /**
+     * Última posición que el backend le ordenó a la mediasombra de la zona: {@code true} abierta (enrollada),
+     * {@code false} cerrada (desplegada), {@code null} si nunca le ordenó nada. Es lo último que se mandó, no una
+     * lectura: el nodo pudo reiniciarse o moverla una secuencia de Demo Expo.
+     */
+    @Column(name = "mediasombra_abierta")
+    private Boolean mediasombraAbierta;
+
     /**
      * Valor crudo de una métrica por su clave del contrato, o {@code null} si el nodo nunca
      * la reportó. Evita que cada consumidor repita la cadena de {@code if}s por clave.

@@ -26,8 +26,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * La publicación MQTT del {@code ActionExecutor}: la bomba y la mediasombra publican exactamente lo mismo
- * que siempre. La válvula ya NO se publica acá: {@code ACTIVAR_VALVULA} se encola y la abre el despacho
+ * La publicación MQTT del {@code ActionExecutor}: no publica nada. La bomba la publica el servicio de aplicación y
+ * la mediasombra, que es de la macro-zona, el {@code ZoneActionExecutor}. La válvula tampoco se publica acá: {@code ACTIVAR_VALVULA} se encola y la abre el despacho
  * (ver {@code ActionExecutorColaTest}).
  */
 @DisplayName("ActionExecutor - publicación de comandos")
@@ -48,7 +48,7 @@ class ActionExecutorPublicacionTest {
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c-1", null));
         aplicaciones = mock(ApplicationService.class);
         when(aplicaciones.request(any(), any(), any(), anyBoolean())).thenReturn(ApplicationOutcome.applied());
-        executor = new ActionExecutor(historial, publisher, new ColaRiego(), aplicaciones);
+        executor = new ActionExecutor(historial, new ColaRiego(), aplicaciones);
         ZonaEntity zona = RuleContextTestFactory.zonaBasica("MZ-1");
         sector = RuleContextTestFactory.sectorBasico("MZ-1-001");
         sector.setZona(zona);
@@ -85,22 +85,12 @@ class ActionExecutorPublicacionTest {
     }
 
     @Test
-    void moverMediasombraPublicaElPorcentajeDelMotivo() {
-        executor.execute(List.of(RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "ShadingRule", "cerrar [apertura=40]")), ctx, OrigenEvaluacion.TELEMETRIA);
+    void moverMediasombraYaNoEsDelSector() {
+        // La mediasombra es de la macro-zona: la mueve el ZoneActionExecutor. Una acción de sector se ignora.
+        executor.execute(List.of(RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "X", "cerrar")), ctx,
+                OrigenEvaluacion.TELEMETRIA);
 
-        verify(publisher).publicar("MZ-1", "MZ-1-001", "shade", "SET", Map.of("targetPct", 40));
-        assertThat(sector.getActuadorShade()).isEqualTo(40);
-    }
-
-    @Test
-    void unaFallaDePublicacionNoDetieneLaEjecucion() {
-        when(publisher.publicar(any(), any(), any(), any(), any()))
-                .thenReturn(new ComandoActuadorPublisher.Resultado(false, "c-2", "broker caído"));
-
-        executor.execute(List.of(
-                RuleAction.of(ActionType.MOVER_MEDIASOMBRA, "ShadingRule", "cerrar [apertura=40]"),
-                RuleAction.noopInfo("X", "m")), ctx, OrigenEvaluacion.TELEMETRIA);
-
-        verify(historial).registrarInaccion(eq(sector), eq(ActionType.NOOP_INFO), eq("X"), eq("m"));
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        verify(publisher, never()).publicarZona(any(), any(), any(), any());
     }
 }

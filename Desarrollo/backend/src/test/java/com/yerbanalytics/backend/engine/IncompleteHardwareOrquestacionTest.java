@@ -40,9 +40,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("S-04 en el orquestador")
 class IncompleteHardwareOrquestacionTest {
 
-    private static final HardwareCoverage SIN_ELECTROVALVULA = new HardwareCoverage(false, true, true, true);
-    private static final HardwareCoverage SIN_BOMBA = new HardwareCoverage(true, false, true, true);
-    private static final HardwareCoverage SIN_MEDIASOMBRA = new HardwareCoverage(true, true, true, false);
+    private static final HardwareCoverage SIN_ELECTROVALVULA = new HardwareCoverage(false, true, true);
+    private static final HardwareCoverage SIN_BOMBA = new HardwareCoverage(true, false, true);
 
     private final RuleOverridesStore overrides = new RuleOverridesStore();
     private RuleOrchestrator orquestador;
@@ -113,17 +112,6 @@ class IncompleteHardwareOrquestacionTest {
         assertThat(regla(r, "Dosis").estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
         assertThat(regla(r, "Dosis").bloqueadaPor()).isEqualTo("IncompleteHardwareRule");
         assertThat(de(r, ActionType.MOVER_MEDIASOMBRA)).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("zona sin mediasombra: se omite la rama de la malla y riego e insumos siguen")
-    void sinMediasombra() {
-        ResultadoEvaluacion r = evaluar(SIN_MEDIASOMBRA);
-
-        assertThat(regla(r, "Sombra").estado()).isEqualTo(EstadoRegla.OMITIDA_RAMA_BLOQUEADA);
-        assertThat(de(r, ActionType.MOVER_MEDIASOMBRA)).isEmpty();
-        assertThat(de(r, ActionType.ACTIVAR_VALVULA)).hasSize(1);
-        assertThat(de(r, ActionType.ACTIVAR_BOMBA)).hasSize(1);
     }
 
     @Test

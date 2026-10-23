@@ -44,7 +44,7 @@ class ActionExecutorInaccionTest {
         ComandoActuadorPublisher publisher = mock(ComandoActuadorPublisher.class);
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c", null));
-        executor = new ActionExecutor(historial, publisher, new ColaRiego(), mock(ApplicationService.class));
+        executor = new ActionExecutor(historial, new ColaRiego(), mock(ApplicationService.class));
     }
 
     private static RuleContext ctx(String sectorId, Instant ahora) {
