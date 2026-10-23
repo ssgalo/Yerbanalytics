@@ -173,6 +173,20 @@ class OperationalRuleStatesTest {
         assertThat(states.isActive("RiegoPorDeficitRule")).isTrue();
     }
 
+    @Test
+    @DisplayName("un reload entre el set y el commit no pierde el cambio: se aplica sobre el cache vigente")
+    void reloadEntreSetYCommitNoPierdeElCambio() {
+        OperationalRuleStates states = states();
+        TransactionSynchronizationManager.initSynchronization();
+
+        states.set("RiegoPorDeficitRule", false, null, "Ana");
+        // Lo que el reload lee de la base ya trae la fila (el commit es inminente) o no; el cache nuevo es otro mapa.
+        states.reload();
+        commit();
+
+        assertThat(states.isActive("RiegoPorDeficitRule")).isFalse();
+    }
+
     private static void commit() {
         for (TransactionSynchronization s : TransactionSynchronizationManager.getSynchronizations()) {
             s.afterCommit();
