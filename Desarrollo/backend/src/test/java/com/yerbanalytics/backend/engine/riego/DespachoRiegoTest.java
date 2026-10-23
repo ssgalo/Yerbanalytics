@@ -7,6 +7,9 @@ import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
+import com.yerbanalytics.backend.engine.overrides.RuleOverride;
+import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.solarstress.SolarStressRule;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException;
@@ -867,6 +870,59 @@ class DespachoRiegoTest {
         assertThat(cola.zonas()).isEmpty();
         verify(historial).registrarAlerta(eq("MZ-2"), any(), eq("DespachoRiego"),
                 argThat(a -> a.texto().contains("ventana")), anyLong());
+    }
+
+    /** Un pedido de riego de reposición de F-S1: el despacho lo trata como riego común (ventana, R-06, lluvia y ciclo). */
+    private void pedirReposicion(String zona, int n, int duracionSeg) {
+        cola.solicitar(new SolicitudRiego(zona, id(zona, n), n,
+                new DetalleRiego(5.0, duracionSeg, 50.0, false), SolarStressRule.NAME, reloj.instant()));
+    }
+
+    @Test
+    void unaReposicionDeF_S1FueraDeLaVentanaSeDescartaComoUnRiegoComun() {
+        reloj.avanzar(Duration.ofHours(8));                           // 18:05: la ventana cerró
+        pedirReposicion("MZ-2", 1, 600);
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
+    }
+
+    @Test
+    void elBypassDeVentanaDeF_S1HaceQueSuReposicionSalgaFueraDeLaVentana() {
+        reloj.avanzar(Duration.ofHours(8));                           // 18:05
+        RuleOverridesStore overrides = new RuleOverridesStore();
+        overrides.put(SolarStressRule.NAME, new RuleOverride(true, Map.of(), Set.of(SolarStressRule.BYPASS_WINDOW)));
+        despacho.setOverrides(overrides);
+        pedirReposicion("MZ-2", 1, 600);
+
+        despacho.tick();
+
+        verify(publisher, times(1)).publicar(eq("MZ-2"), eq("MZ-2-001"), eq("valve"), eq("ON"), any());
+    }
+
+    @Test
+    void elBypassDeVentanaDeF_S1NoAbreElRiegoPorDeficitDeR01() {
+        reloj.avanzar(Duration.ofHours(8));                           // 18:05
+        RuleOverridesStore overrides = new RuleOverridesStore();
+        overrides.put(SolarStressRule.NAME, new RuleOverride(true, Map.of(), Set.of(SolarStressRule.BYPASS_WINDOW)));
+        despacho.setOverrides(overrides);
+        pedir("MZ-2", 1, 600);                                        // R-01
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void laReposicionDeF_S1RespetaLaPausaPorAplicacionDeR06() {
+        historia(fila("MZ-2-001", "Insumo", "ApplicationService", reloj.instant().minus(Duration.ofHours(1))));
+        pedirReposicion("MZ-2", 1, 600);
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
     }
 
     @Test

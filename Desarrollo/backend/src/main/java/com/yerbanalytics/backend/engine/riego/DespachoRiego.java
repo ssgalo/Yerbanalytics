@@ -17,6 +17,7 @@ import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.rules.FueraDeVentanaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.PausaTrasAplicacionRule;
+import com.yerbanalytics.backend.solarstress.SolarStressRule;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
@@ -489,7 +490,7 @@ public class DespachoRiego implements ConsumidorParametros {
             // Precondiciones que no son la humedad. Se miran aunque no haya cupo: lo vencido no espera lugar.
             String motivoDescarte = s.esDeficitCritico()
                     ? motivoDeDescarteDeR02(s, ahoraInstante, historia)
-                    : motivoDeDescarteDeR01(s, ahoraInstante, inicioCiclo, enVentana, pronostico, historia);
+                    : motivoDeDescarteDeR01(s, ahoraInstante, inicioCiclo, enVentana || skipsSolarStressWindow(s), pronostico, historia);
             if (MOTIVO_ESPERA.equals(motivoDescarte)) {
                 continue;     // no se sabe todavía: la solicitud sigue en la cola
             }
@@ -543,6 +544,15 @@ public class DespachoRiego implements ConsumidorParametros {
             registrar(s, ahora);
         }
         descartadas(zonaId, zona, ahora, descartes);
+    }
+
+    /**
+     * La reposición de F-S1 se revalida como un riego común (ventana, R-06, lluvia y ciclo), pero la ventana la saltea también
+     * el bypass propio de F-S1 en el simulador, igual que el de R-05 saltea la de R-01.
+     */
+    private boolean skipsSolarStressWindow(SolicitudRiego s) {
+        return SolarStressRule.NAME.equals(s.regla())
+                && overrides.skipsGuard(SolarStressRule.NAME, SolarStressRule.BYPASS_WINDOW);
     }
 
     private void retirarTodas(List<SolicitudRiego> pendientes, Map<String, Integer> descartes, String motivo) {
