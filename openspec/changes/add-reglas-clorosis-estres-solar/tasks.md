@@ -1,10 +1,10 @@
 # Tasks: add-reglas-clorosis-estres-solar
 
-**TDD estricto**, un commit por bloque. Rama: `feat/reglas-v2-clorosis-estres-solar`. **F-S2 (bloque 4.3) no se implementó**: depende de `add-mediasombra-v2` (cancelado), ver el design. Requiere `add-dosificacion-base`;
+**TDD estricto**, un commit por bloque. Rama: `feat/reglas-v2-clorosis-estres-solar`. **F-S2 (bloque 4.3) no se implementó**: dependía de `add-mediasombra-v2` (cancelado); desde #66 el dueño de la malla por horario existe (`HorarioMediasombraService`), ver el design. Requiere `add-dosificacion-base`;
 F-S2 requiere `add-mediasombra-v2`.
 
 ## 0. Previo
-- [x] 0.1 D-5 queda sin objeto (F-S2 no se implementó). D-3: la rustificación se resuelve con el plan **global** detrás de `HardeningPhase`, no apagada (ver el design).
+- [x] 0.1 D-5 queda sin objeto (F-S2 no se implementó). D-3: la rustificación se resuelve detrás de `HardeningPhase`, no apagada: primero con el plan global y, al integrar #66, con el plan de la macro-zona (ver el design).
 - [x] 0.2 Verificado: `SolicitudRiego` admite una regla de origen nueva; falta registrar las claves de F-S1 en los chequeos de guarda de `DespachoRiego` (tarea 4.1b).
 - [x] 0.3 `add-historial-lecturas` y `add-dosificacion-base` están integrados. El `ZoneRuleEngine` no hace falta: las cuatro reglas implementadas son de sector.
 

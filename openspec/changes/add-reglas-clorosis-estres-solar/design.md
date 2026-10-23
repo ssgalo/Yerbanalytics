@@ -56,6 +56,7 @@ Restricción cruzada: luz-baja < luz-alta; temp-baja < temp-alta.
 Los nombres de clases y métodos de la spec ya estaban en inglés y se mantienen. Todo vive en `chlorosis/` (F-C1, F-C2) y `solarstress/` (F-S1, F-S3), más
 `hardening/` para la rustificación.
 
+- **Actualizado al integrar #66:** `HorarioMediasombraService` es el dueño de la malla por horario que se describe abajo; F-S2 queda **desbloqueada** (falta una ventana de protección que ese servicio respete). El resto del punto es el razonamiento original.
 - **F-S2 no se implementa.** Depende de `add-mediasombra-v2` (cancelado): «la mediasombra de la MZ queda cerrada de 11:00 a 16:00 durante 3 días» necesita quien
   retenga la malla por horario. Hoy sólo `ShadingRule` la mueve, sector por sector, en cada pulso (cada 4 h) por el pico de UV o por el plan global, así que una
   versión parcial cerraría la malla a destiempo (el pulso de las 10 h es antes de las 11 y el de las 14 h la cerraría hasta las 18 h) o la dejaría cerrada. Se necesita un
