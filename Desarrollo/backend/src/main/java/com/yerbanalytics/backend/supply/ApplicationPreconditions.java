@@ -56,7 +56,12 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
 
     @Override
     public String label() {
-        return "💉 Precondiciones de aplicación";
+        return "Precondiciones de aplicación";
+    }
+
+    @Override
+    public String code() {
+        return "P-D1, P-D2, P-D3, P-D4, P-D5";
     }
 
     @Override

@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.HardwareFaults;
@@ -50,7 +52,22 @@ public class HydraulicFaultRule implements Rule {
 
     @Override
     public String label() {
-        return "🚰 Falla hidráulica (S-05)";
+        return "Falla hidráulica";
+    }
+
+    @Override
+    public String code() {
+        return "S-05";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Un sector con falla hidráulica marcada se riega y dosifica solo.");
     }
 
     @Override

@@ -75,7 +75,12 @@ public class LowEcRule implements ZoneRule {
 
     @Override
     public String label() {
-        return "🧂 CE baja (N-02)";
+        return "CE baja";
+    }
+
+    @Override
+    public String code() {
+        return "N-02";
     }
 
     @Override

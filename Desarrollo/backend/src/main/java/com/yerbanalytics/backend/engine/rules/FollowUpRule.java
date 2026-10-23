@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -58,7 +59,12 @@ public class FollowUpRule implements Rule {
 
     @Override
     public String label() {
-        return "⏱️ Seguimiento post-acción";
+        return "Seguimiento post-acción";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.WARNS;
     }
 
     @Override

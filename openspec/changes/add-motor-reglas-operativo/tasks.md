@@ -7,14 +7,14 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 `cd Desarrollo/simulador && npm test && npm run typecheck`.
 
 ## 0. Previo
-- [ ] 0.1 Resolver las preguntas abiertas 1 (vista Rustificación) y 2 (clasificación de protecciones) del design antes de 4.x y 7.x.
+- [x] 0.1 Resolver las preguntas abiertas 1 (vista Rustificación) y 2 (clasificación de protecciones) del design antes de 4.x y 7.x.
 
 ## 1. Backend: declaración de cada pieza (D-3, D-4, D-12)
-- [ ] 1.1 RED: `ReglasArquitecturaTest` suma: toda `label()` sin `\p{Extended_Pictographic}` y sin `(X-NN)`; `code()` con formato válido o vacío; `effect() == PROTECTS` ⇔ `protection().isPresent()`; la lista de protecciones esperada (D-4) es exactamente la que declara `protection()`.
-- [ ] 1.2 RED: `RuleEngineSchemaControllerTest` afirma etiquetas sin emoji y `codigo` en `RuleNodeDto`.
-- [ ] 1.3 GREEN: `RuleObjective`, `RuleEffect`; `code()`, `objective()`, `effect()`, `protection()` en `DemoControllable` con sus defaults; javadoc nuevo (no se renombra la interfaz).
-- [ ] 1.4 GREEN: las 23 piezas: `label()` limpia, `code()`, `objective()`, `effect()` y, en las protecciones, el texto de la consecuencia (tabla D-4).
-- [ ] 1.5 Texto de `ApplicationService:221` sin "control de demo".
+- [x] 1.1 RED: `ReglasArquitecturaTest` suma: toda `label()` sin `\p{Extended_Pictographic}` y sin `(X-NN)`; `code()` con formato válido o vacío; `effect() == PROTECTS` ⇔ `protection().isPresent()`; la lista de protecciones esperada (D-4) es exactamente la que declara `protection()`.
+- [x] 1.2 RED: `RuleEngineSchemaControllerTest` afirma etiquetas sin emoji y `codigo` en `RuleNodeDto`.
+- [x] 1.3 GREEN: `RuleObjective`, `RuleEffect`; `code()`, `objective()`, `effect()`, `protection()` en `DemoControllable` con sus defaults; javadoc nuevo (no se renombra la interfaz).
+- [x] 1.4 GREEN: las 23 piezas: `label()` limpia, `code()`, `objective()`, `effect()` y, en las protecciones, el texto de la consecuencia (tabla D-4).
+- [x] 1.5 Texto de `ApplicationService:221` sin "control de demo".
 
 ## 2. Backend: estado operativo y efectivo (D-1, D-2, D-9)
 - [ ] 2.1 RED: `OperationalRuleStatesTest`: sin fila rige la siembra de retiradas; con fila rige la fila; fila huérfana se ignora y se loguea; la cache se actualiza después del commit y no si hay rollback.

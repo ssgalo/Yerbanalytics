@@ -218,7 +218,7 @@ public class ApplicationService implements ConsumidorParametros {
     /** Evalúa y, si corresponde, ejecuta. No toca la cola de pendientes: eso lo resuelve {@link #settle}. */
     private ApplicationOutcome attempt(SectorEntity sector, Supply supply, String originRule, boolean requiresDiagnosis) {
         if (!overrides.isEnabled(ApplicationPreconditions.NAME)) {
-            return ApplicationOutcome.rejected("las aplicaciones están apagadas desde el control de demo");
+            return ApplicationOutcome.rejected("las aplicaciones están apagadas en el motor de reglas");
         }
         if (SupplyDoseService.DOSIFICANDO.equals(sector.getActuadorPump())) {
             return ApplicationOutcome.deferred("el sector ya está dosificando");

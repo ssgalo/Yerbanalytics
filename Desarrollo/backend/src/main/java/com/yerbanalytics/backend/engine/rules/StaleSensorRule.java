@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
@@ -61,7 +63,22 @@ public class StaleSensorRule implements Rule {
 
     @Override
     public String label() {
-        return "📵 Sensor sin datos recientes";
+        return "Sensor sin datos recientes";
+    }
+
+    @Override
+    public String code() {
+        return "S-02";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("El motor decide con lecturas viejas o con la humedad congelada.");
     }
 
     @Override

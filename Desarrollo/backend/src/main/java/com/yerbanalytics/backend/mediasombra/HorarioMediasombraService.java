@@ -96,7 +96,7 @@ public class HorarioMediasombraService implements DemoControllable {
 
     @Override
     public String label() {
-        return "🕗 Horario de la mediasombra (plan de rustificación u horario por defecto)";
+        return "Horario de la mediasombra (plan de rustificación u horario por defecto)";
     }
 
     @Override

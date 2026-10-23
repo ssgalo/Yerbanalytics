@@ -72,7 +72,10 @@ class RuleEngineSchemaControllerTest {
         mockMvc.perform(get("/api/rules/schema"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].branch", contains("GLOBAL")))
-                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].label", contains("🧰 Hardware incompleto (S-04)")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].label", contains("Hardware incompleto")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].codigo", contains("S-04")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='ManualLockRule')].codigo", contains("")))
+                .andExpect(jsonPath("$.nodes[?(@.id=='start')].codigo", contains("")))
                 .andExpect(jsonPath("$.nodes[?(@.id=='IncompleteHardwareRule')].parametros[*]", empty()))
                 .andExpect(jsonPath("$.edges[?(@.source=='ManualLockRule' && @.target=='IncompleteHardwareRule')]", hasSize(1)))
                 .andExpect(jsonPath("$.edges[?(@.source=='IncompleteHardwareRule' && @.target=='StaleSensorRule')]", hasSize(1)));

@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.CancelaRiego;
 import com.yerbanalytics.backend.engine.Rule;
@@ -55,7 +57,22 @@ public class ManualLockRule implements Rule {
 
     @Override
     public String label() {
-        return "🔒 Bloqueo manual";
+        return "Bloqueo manual";
+    }
+
+    @Override
+    public String code() {
+        return "S-01";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Un sector o una macro-zona bloqueados a mano vuelven a regarse y dosificarse solos.");
     }
 
     @Override

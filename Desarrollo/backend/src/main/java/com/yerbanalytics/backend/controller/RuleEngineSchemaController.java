@@ -43,7 +43,7 @@ import java.util.List;
 public class RuleEngineSchemaController {
 
     /** Lo que el grafo necesita de una regla, sea por sector o de macro-zona. */
-    private record RuleView(String name, String label, RuleBranch branch, int priority, List<String> parameters) {}
+    private record RuleView(String name, String label, String code, RuleBranch branch, int priority, List<String> parameters) {}
 
     private final RuleOrchestrator ruleOrchestrator;
     private final ZoneRuleEngine zoneRuleEngine;
@@ -70,26 +70,26 @@ public class RuleEngineSchemaController {
         // Las de sector y las de macro-zona (plan de nutrición) comparten el grafo, ordenadas por prioridad.
         List<RuleView> rules = new ArrayList<>();
         for (Rule rule : ruleOrchestrator.getRules()) {
-            rules.add(new RuleView(rule.name(), rule.label(), rule.branch(), rule.priority(), claves(rule.parametros())));
+            rules.add(new RuleView(rule.name(), rule.label(), rule.code(), rule.branch(), rule.priority(), claves(rule.parametros())));
         }
         zoneRuleEngine.getRules().forEach(rule ->
-                rules.add(new RuleView(rule.name(), rule.label(), rule.branch(), rule.priority(), claves(rule.parametros()))));
+                rules.add(new RuleView(rule.name(), rule.label(), rule.code(), rule.branch(), rule.priority(), claves(rule.parametros()))));
         rules.sort(java.util.Comparator.comparingInt(RuleView::priority));
 
         List<RuleNodeDto> nodes = new ArrayList<>();
         List<RuleEdgeDto> edges = new ArrayList<>();
 
         // Nodo de inicio (no es una regla, es el punto de entrada global)
-        nodes.add(new RuleNodeDto("start", "Inicio Evaluación", "input", -1, "GLOBAL", List.of(), true));
+        nodes.add(new RuleNodeDto("start", "Inicio Evaluación", "", "input", -1, "GLOBAL", List.of(), true));
         
         // Nodo de aborto global
-        nodes.add(new RuleNodeDto("abort-GLOBAL", "Pipeline Detenido", "output", 999, "GLOBAL", List.of(), true));
+        nodes.add(new RuleNodeDto("abort-GLOBAL", "Pipeline Detenido", "", "output", 999, "GLOBAL", List.of(), true));
 
         // Nodos de aborto y éxito por rama
         for (com.yerbanalytics.backend.engine.RuleBranch branch : com.yerbanalytics.backend.engine.RuleBranch.values()) {
             if (branch == com.yerbanalytics.backend.engine.RuleBranch.GLOBAL) continue;
-            nodes.add(new RuleNodeDto("abort-" + branch.name(), "Bloqueo " + branch.name(), "output", 999, branch.name(), List.of(), true));
-            nodes.add(new RuleNodeDto("success-" + branch.name(), "Evaluado OK", "output", 1000, branch.name(), List.of(), true));
+            nodes.add(new RuleNodeDto("abort-" + branch.name(), "Bloqueo " + branch.name(), "", "output", 999, branch.name(), List.of(), true));
+            nodes.add(new RuleNodeDto("success-" + branch.name(), "Evaluado OK", "", "output", 1000, branch.name(), List.of(), true));
         }
 
         // Agrupar reglas por rama, preservando el orden de prioridad interno
@@ -103,7 +103,7 @@ public class RuleEngineSchemaController {
         List<RuleView> globalRules = rulesByBranch.getOrDefault(com.yerbanalytics.backend.engine.RuleBranch.GLOBAL, List.of());
         for (RuleView rule : globalRules) {
             String ruleId = rule.name();
-            nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), "GLOBAL", rule.parameters(),
+            nodes.add(new RuleNodeDto(ruleId, rule.label(), rule.code(), "default", rule.priority(), "GLOBAL", rule.parameters(),
                     overrides.isEnabled(ruleId)));
             edges.add(new RuleEdgeDto("e_" + lastGlobalId + "_" + ruleId, lastGlobalId, ruleId, "Continúa"));
             edges.add(new RuleEdgeDto("e_" + ruleId + "_abort", ruleId, "abort-GLOBAL", "Bloquea"));
@@ -121,7 +121,7 @@ public class RuleEngineSchemaController {
 
             for (RuleView rule : branchRules) {
                 String ruleId = rule.name();
-                nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), branch.name(), rule.parameters(),
+                nodes.add(new RuleNodeDto(ruleId, rule.label(), rule.code(), "default", rule.priority(), branch.name(), rule.parameters(),
                         overrides.isEnabled(ruleId)));
                 
                 // Arista: prevNodeId -> esta regla

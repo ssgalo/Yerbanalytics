@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
@@ -62,7 +64,17 @@ public class DailyDoseLimitRule implements Rule {
 
     @Override
     public String label() {
-        return "🛑 Límite de dosis diaria";
+        return "Límite de dosis diaria";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Se dosifica sin el tope diario de dosis de la v1.");
     }
 
     @Override

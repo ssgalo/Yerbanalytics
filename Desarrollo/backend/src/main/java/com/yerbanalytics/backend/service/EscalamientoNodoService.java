@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -88,7 +90,22 @@ public class EscalamientoNodoService implements ConsumidorParametros, DemoContro
 
     @Override
     public String label() {
-        return "📡 Nodo sin respuesta (S-02)";
+        return "Nodo sin respuesta";
+    }
+
+    @Override
+    public String code() {
+        return "S-02";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Un nodo que no responde nunca pasa a fuera de servicio y su macro-zona no va a estado seguro.");
     }
 
     @Override

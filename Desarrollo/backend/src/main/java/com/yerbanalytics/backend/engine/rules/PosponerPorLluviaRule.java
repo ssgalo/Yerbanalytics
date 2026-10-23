@@ -52,7 +52,12 @@ public class PosponerPorLluviaRule implements Rule {
 
     @Override
     public String label() {
-        return "🌧️ Posponer por lluvia (R-03)";
+        return "Posponer por lluvia";
+    }
+
+    @Override
+    public String code() {
+        return "R-03";
     }
 
     @Override

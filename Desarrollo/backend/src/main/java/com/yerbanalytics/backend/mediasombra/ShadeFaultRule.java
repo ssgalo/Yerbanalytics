@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.mediasombra;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import java.util.Optional;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.MallaZona;
 import com.yerbanalytics.backend.engine.RuleAction;
@@ -50,7 +52,22 @@ public class ShadeFaultRule implements ZoneRule {
 
     @Override
     public String label() {
-        return "⚙️ Mediasombra disponible (S-01, S-04, S-05)";
+        return "Mediasombra disponible";
+    }
+
+    @Override
+    public String code() {
+        return "S-01, S-04, S-05";
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("Se mueve la malla de una zona bloqueada, sin malla registrada o con la malla averiada.");
     }
 
     @Override

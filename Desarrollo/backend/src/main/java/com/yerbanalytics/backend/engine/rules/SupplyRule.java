@@ -50,7 +50,7 @@ public class SupplyRule implements Rule {
 
     @Override
     public String label() {
-        return "🧪 Dosificación de insumo";
+        return "Dosificación de insumo";
     }
 
     @Override
