@@ -39,6 +39,7 @@ public class CatalogoParametros {
                 ParametrosRiego.values(),
                 ParametrosInsumo.values(),
                 ParametrosNutricion.values(),
+                ParametrosBiotico.values(),
                 ParametrosMediasombra.values(),
                 ParametrosDiagnostico.values(),
                 ReadingParameters.values(),

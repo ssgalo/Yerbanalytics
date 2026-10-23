@@ -48,6 +48,18 @@ class ParametrosRealesTest {
             Map.entry("insumo.humedad-min-aplicar", 45.0),           // reglas_v2 §8.2 P-D5
             Map.entry("insumo.lluvia-impide-mm", 5.0),               // reglas_v2 §8.2 P-D4
             Map.entry("insumo.lluvia-impide-horas", 6.0),
+            Map.entry("insumo.tope-fitosanitario", 3.0),             // reglas_v2 F-06
+            Map.entry("insumo.tope-fitosanitario-dias", 30.0),
+            Map.entry("biotico.dpv-saturado", 0.3),                  // reglas_v2 §8.5 F-F1 / F-F2
+            Map.entry("biotico.dpv-calor-seco", 2.0),                // F-P1
+            Map.entry("biotico.humedad-hongo", 80.0),
+            Map.entry("biotico.temp-predisponente-min", 18.0),
+            Map.entry("biotico.temp-predisponente-max", 28.0),
+            Map.entry("biotico.humedad-predisponente", 75.0),
+            Map.entry("biotico.capturas-seguidas", 3.0),
+            Map.entry("biotico.horas-dpv-acaros", 72.0),
+            Map.entry("biotico.sectores-foco", 3.0),                 // F-04
+            Map.entry("biotico.horas-foco", 72.0),
             Map.entry("insumo.reingreso-horas", 24.0),               // reglas_v2 §8.3
             Map.entry("insumo.stock-aviso", 20.0),
             Map.entry("insumo.pendiente-vence-dias", 7.0),           // add-dosificacion-base D-5
@@ -208,6 +220,45 @@ class ParametrosRealesTest {
             assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
             assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.4");
         }
+    }
+
+    @Test
+    void losParametrosBioticosSonLosDeReglasV2Seccion8_5() {
+        record Esperado(String clave, TipoParametro tipo, String unidad, String fabrica, Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("biotico.dpv-saturado", TipoParametro.NUMERO, "kPa", "0.3", 0.1, 0.5),
+                new Esperado("biotico.dpv-calor-seco", TipoParametro.NUMERO, "kPa", "2", 1.5, 3.0),
+                new Esperado("biotico.humedad-hongo", TipoParametro.NUMERO, "%", "80", 70.0, 90.0),
+                new Esperado("biotico.temp-predisponente-min", TipoParametro.NUMERO, "°C", "18", 10.0, 22.0),
+                new Esperado("biotico.temp-predisponente-max", TipoParametro.NUMERO, "°C", "28", 24.0, 35.0),
+                new Esperado("biotico.humedad-predisponente", TipoParametro.NUMERO, "%", "75", 65.0, 85.0),
+                new Esperado("biotico.capturas-seguidas", TipoParametro.ENTERO, "capturas", "3", 2.0, 5.0),
+                new Esperado("biotico.horas-dpv-acaros", TipoParametro.ENTERO, "h", "72", 24.0, 120.0),
+                new Esperado("biotico.sectores-foco", TipoParametro.ENTERO, "sectores", "3", 2.0, 10.0),
+                new Esperado("biotico.horas-foco", TipoParametro.ENTERO, "h", "72", 24.0, 120.0),
+                new Esperado("insumo.tope-fitosanitario", TipoParametro.ENTERO, "aplicaciones", "3", 2.0, 5.0),
+                new Esperado("insumo.tope-fitosanitario-dias", TipoParametro.ENTERO, "d", "30", 14.0, 60.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(e.clave().startsWith("biotico.")
+                    ? FamiliaParametro.BIOTICO : FamiliaParametro.INSUMO);
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.5");
+        }
+    }
+
+    @Test
+    void lasTemperaturasPredisponentesNuncaQuedanInvertidas() {
+        // Los rangos de cada una no se tocan (10–22 y 24–35): por eso no hace falta una restricción cruzada.
+        DefinicionParametro min = catalogo.definicion("biotico.temp-predisponente-min").orElseThrow();
+        DefinicionParametro max = catalogo.definicion("biotico.temp-predisponente-max").orElseThrow();
+
+        assertThat(min.max()).isLessThan(max.min());
     }
 
     @Test
