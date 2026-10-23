@@ -226,7 +226,8 @@ export class MockRepository implements DataRepository {
   private conEstado(p: PlanRustificacion): PlanRustificacion {
     if (p.estado === 'cancelado') return p;
     const pr = progreso(p);
-    return { ...p, estado: pr.terminado ? 'finalizado' : pr.dia === 0 ? 'programado' : 'en_curso' };
+    // Pasada la última etapa sigue en curso: la última se sostiene hasta que alguien elimina el plan.
+    return { ...p, estado: pr.dia === 0 ? 'programado' : 'en_curso' };
   }
 
   async getPlanRustificacion(zonaId: string): Promise<PlanRustificacion | null> {

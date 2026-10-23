@@ -28,7 +28,7 @@ describe('HardeningCard', () => {
     montar('MZ-1');
 
     expect(await screen.findByText('Sin plan de rustificación')).toBeTruthy();
-    await waitFor(() => expect(screen.getByText(/abierta de 08:00 a 18:00/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/abierta de 08:00 a 17:00/)).toBeTruthy());
     expect((screen.getByRole('button', { name: 'Iniciar plan' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -90,7 +90,7 @@ describe('HardeningCard', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('ya tiene un plan de rustificación vigente');
   });
 
-  it('con un plan en curso muestra la etapa de hoy y se puede cancelar, con confirmación', async () => {
+  it('con un plan en curso muestra la etapa de hoy y se puede eliminar, con confirmación', async () => {
     // Sin pasar por el mock: el plan demo de MZ-3 lo usan otros tests.
     const cancelar = vi
       .spyOn(getRepository(), 'cancelarPlanRustificacion')
@@ -100,23 +100,23 @@ describe('HardeningCard', () => {
     expect(await screen.findByText('En curso')).toBeTruthy();
     expect(screen.getByText(/Hoy, abierta de/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar plan' }));
     expect(screen.getByText(/vuelve desde ahora al horario por defecto/)).toBeTruthy();
     expect(cancelar).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, cancelar plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar plan' }));
 
     await waitFor(() => expect(cancelar).toHaveBeenCalledWith('MZ-3'));
     expect(await screen.findByText('Sin plan de rustificación')).toBeTruthy();
   });
 
-  it('sin configuracion.editar no puede iniciar ni cancelar', async () => {
+  it('sin configuracion.editar no puede iniciar ni eliminar', async () => {
     montar('MZ-1', 'OPERARIO');
     expect(((await screen.findByRole('button', { name: 'Iniciar plan' })) as HTMLButtonElement).disabled).toBe(true);
     cleanup();
 
     montar('MZ-3', 'OPERARIO');
     expect(await screen.findByText('En curso')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Cancelar plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Eliminar plan' })).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ import type {
   DiagnosisDetail,
   HistoryEntry,
   LecturaZona,
+  PosicionMediasombra,
   Sector,
   SectorDetail,
 } from '@/types/domain';
@@ -27,6 +28,8 @@ export function buildSectorDetail(
   imagenUrl?: string,
   /** Diagnóstico `DX-` más reciente del sector: el modal pide sus cajas. */
   latestCapture?: Pick<DiagnosisCard, 'id' | 'detectionCount'> | null,
+  /** Mediasombra de su macro-zona (la malla es de la zona, no del sector). */
+  mediasombra?: PosicionMediasombra | null,
 ): SectorDetail {
   // presentación del diagnóstico
   const diag: DiagnosisDetail = {
@@ -61,9 +64,9 @@ export function buildSectorDetail(
       path: 'M9 2h6M10 2v4l-4.5 9A2 2 0 0 0 7.3 18h9.4a2 2 0 0 0 1.8-3L14 6V2',
     },
     {
-      name: 'Mediasombra',
-      state: 'Apertura ' + A.shade + '%',
-      active: false,
+      name: 'Mediasombra (de la macro-zona)',
+      state: mediasombra === 'abierta' ? 'Abierta' : mediasombra === 'cerrada' ? 'Cerrada' : 'Sin órdenes',
+      active: mediasombra === 'abierta',
       path: 'M4 12h16M12 4v3M3 16h18a9 9 0 0 0-18 0Z',
     },
   ].map((a) => {
