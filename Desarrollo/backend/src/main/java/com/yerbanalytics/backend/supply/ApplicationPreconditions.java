@@ -95,6 +95,7 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
         DeclaredParameters params = DeclaredParameters.of(this, vigentes);
         List<Supplier<PreconditionResult>> checks = List.of(
                 () -> diagnosis(facts, overrides),
+                () -> effectiveness(facts),
                 () -> fungicideCap(facts, params, overrides),
                 () -> interval(facts, params, overrides),
                 () -> oncePerDay(facts, overrides),
@@ -118,6 +119,17 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
             return PreconditionResult.met();
         }
         return PreconditionResult.reject("P-D1: " + f.diagnosis().reason());
+    }
+
+    // --- S-06 ---
+
+    /**
+     * Un tratamiento del mismo tipo que quedó sin efectividad bloquea el siguiente en el sector hasta que alguien registre la
+     * revisión. El bloqueo ya viene decidido en los hechos (también su bypass y su apagado, del control de demo): acá sólo se
+     * rechaza. Se rechaza y no se difiere: esperar la próxima ventana no lo resuelve.
+     */
+    private PreconditionResult effectiveness(ApplicationFacts f) {
+        return f.effectivenessBlock() == null ? PreconditionResult.met() : PreconditionResult.reject(f.effectivenessBlock());
     }
 
     // --- F-06 ---

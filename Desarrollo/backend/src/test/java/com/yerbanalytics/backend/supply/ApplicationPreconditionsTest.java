@@ -253,6 +253,35 @@ class ApplicationPreconditionsTest {
         assertThat(check(capped, bypassing("cap")).isMet()).isTrue();
     }
 
+    // --- S-06: tratamiento anterior sin efectividad ---
+
+    private static ApplicationFacts blockedByEffectiveness(ApplicationFacts f, String reason) {
+        return new ApplicationFacts(f.supply(), f.now(), f.diagnosis(), f.lastSameSupply(), f.lastAnySupply(),
+                f.airTemp(), f.soilMoisture(), f.moistureAt(), f.lastWatering(), f.rain(), 0, reason);
+    }
+
+    @Test
+    void aTreatmentWithoutEffectivenessRejectsTheNextOneAndSaysWhy() {
+        PreconditionResult r = check(blockedByEffectiveness(ok(Supply.FUNGICIDE, "08:00"),
+                "S-06: el último fitosanitario de MZ-1-045 quedó sin efectividad"));
+
+        assertThat(r.verdict()).isEqualTo(PreconditionResult.Verdict.REJECT);
+        assertThat(r.capReached()).isFalse();
+        assertThat(r.reason()).contains("S-06").contains("MZ-1-045");
+    }
+
+    @Test
+    void withoutABlockTheApplicationGoesOn() {
+        assertThat(check(blockedByEffectiveness(ok(Supply.FUNGICIDE, "08:00"), null)).isMet()).isTrue();
+    }
+
+    @Test
+    void theEffectivenessBlockIsRejectedNotDeferredSoItIsNotRetriedEveryWindow() {
+        PreconditionResult r = check(blockedByEffectiveness(ok(Supply.FERTILIZER, "12:00"), "S-06: sin efectividad"));
+
+        assertThat(r.verdict()).isEqualTo(PreconditionResult.Verdict.REJECT);
+    }
+
     @Test
     void anotherRejectionIsNotTheCap() {
         ApplicationFacts f = ok(Supply.FUNGICIDE, "08:00");

@@ -107,6 +107,8 @@ class ApplicationServiceTest {
     private RuleOverridesStore overrides;
     private SectorEntity sector;
     private ApplicationService service;
+    private com.yerbanalytics.backend.effectiveness.EffectivenessBlockService effectivenessBlocks;
+    private com.yerbanalytics.backend.effectiveness.EffectivenessService effectiveness;
 
     @BeforeEach
     void setUp() {
@@ -176,8 +178,12 @@ class ApplicationServiceTest {
         when(catalog.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
 
         FungicideCap cap = new FungicideCap(new FungicideLog(applications, pending), history, clock);
+        effectivenessBlocks = mock(com.yerbanalytics.backend.effectiveness.EffectivenessBlockService.class);
+        when(effectivenessBlocks.supplyBlock(any(), any(), any())).thenReturn(Optional.empty());
+        effectiveness = mock(com.yerbanalytics.backend.effectiveness.EffectivenessService.class);
+        when(effectiveness.followUpFor(any(), any(), any(), any())).thenReturn(Optional.empty());
         service = new ApplicationService(applications, pending, diagnoses, sectors, historyRepository, history,
-                irrigation, weather, new ApplicationPreconditions(), tanks, cap, publisher, overrides, catalog, clock,
+                irrigation, weather, new ApplicationPreconditions(), tanks, cap, effectivenessBlocks, effectiveness, publisher, overrides, catalog, clock,
                 new NoopTransactions());
     }
 
@@ -224,10 +230,36 @@ class ApplicationServiceTest {
             assertThat(a.getTs()).isEqualTo(at("08:00").toEpochMilli());
             assertThat(a.getRuleName()).isEqualTo("SupplyRule");
         });
-        verify(history).registrarInsumo(sector, 10, "Fertilizante", "SupplyRule");
+        verify(history).registrarInsumo(sector, 10, "Fertilizante", "SupplyRule", null);
         verify(tanks).consume("MZ-1", Supply.FERTILIZER, 10);
         assertThat(sector.getActuadorPump()).isEqualTo("Dosificando");
         assertThat(pendingRows).isEmpty();
+    }
+
+    @Test
+    void aTreatmentOpensItsEffectivenessFollowUp() {
+        var followUp = new com.yerbanalytics.backend.effectiveness.FollowUp(
+                com.yerbanalytics.backend.effectiveness.EffectivenessKind.FUNGICIDE,
+                new com.yerbanalytics.backend.effectiveness.TreatmentBaseline("Daño fúngico", null, java.util.Set.of()));
+        when(effectiveness.followUpFor(sector, Supply.FUNGICIDE, "FungalDamageRule", at("08:00")))
+                .thenReturn(Optional.of(followUp));
+
+        service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", false);
+
+        verify(history).registrarInsumo(sector, 10, "Fitosanitario", "FungalDamageRule", followUp);
+    }
+
+    @Test
+    void aTreatmentBlockedByS06IsRejectedWithoutPublishing() {
+        when(effectivenessBlocks.supplyBlock(sector, Supply.FUNGICIDE, "FungalDamageRule"))
+                .thenReturn(Optional.of("S-06: el último fitosanitario de MZ-1-045 quedó sin efectividad"));
+
+        ApplicationOutcome outcome = service.request(sector, Supply.FUNGICIDE, "FungalDamageRule", false);
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.REJECTED);
+        assertThat(outcome.reason()).contains("S-06");
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        verify(tanks, never()).consume(any(), any(), anyInt());
     }
 
     @Test

@@ -1,6 +1,9 @@
 package com.yerbanalytics.backend.supply;
 
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
+import com.yerbanalytics.backend.effectiveness.EffectivenessBlockService;
+import com.yerbanalytics.backend.effectiveness.EffectivenessService;
+import com.yerbanalytics.backend.effectiveness.FollowUp;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
@@ -78,6 +81,8 @@ public class ApplicationService implements ConsumidorParametros {
     private final ApplicationPreconditions preconditions;
     private final TankService tanks;
     private final FungicideCap fungicideCap;
+    private final EffectivenessBlockService effectivenessBlocks;
+    private final EffectivenessService effectiveness;
     private final ComandoActuadorPublisher publisher;
     private final RuleOverrides overrides;
     private final DeclaredParameters params;
@@ -96,6 +101,8 @@ public class ApplicationService implements ConsumidorParametros {
                               ApplicationPreconditions preconditions,
                               TankService tanks,
                               FungicideCap fungicideCap,
+                              EffectivenessBlockService effectivenessBlocks,
+                              EffectivenessService effectiveness,
                               ComandoActuadorPublisher publisher,
                               RuleOverrides overrides,
                               // Perezoso: el catálogo necesita a este bean (es un consumidor de parámetros) para armarse.
@@ -113,6 +120,8 @@ public class ApplicationService implements ConsumidorParametros {
         this.preconditions = preconditions;
         this.tanks = tanks;
         this.fungicideCap = fungicideCap;
+        this.effectivenessBlocks = effectivenessBlocks;
+        this.effectiveness = effectiveness;
         this.publisher = publisher;
         this.overrides = overrides;
         this.catalog = catalog;
@@ -242,7 +251,7 @@ public class ApplicationService implements ConsumidorParametros {
         }
 
         Instant now = clock.instant();
-        ApplicationFacts facts = facts(sector, supply, now, requiresDiagnosis);
+        ApplicationFacts facts = facts(sector, supply, now, requiresDiagnosis, originRule);
         PreconditionResult result = preconditions.check(facts, catalog.vigentes(), overrides);
         if (!result.isMet()) {
             if (result.capReached()) {
@@ -286,7 +295,9 @@ public class ApplicationService implements ConsumidorParametros {
         }
         applications.save(new ApplicationEntity(UUID.randomUUID().toString(), sector.getId(), sector.getZona().getId(),
                 supply, ml, now.toEpochMilli(), originRule));
-        history.registrarInsumo(sector, ml, supply.label(), originRule);
+        // E-02, E-03: el tratamiento abre su seguimiento de efectividad con el estado en que estaba el sector.
+        FollowUp followUp = effectiveness.followUpFor(sector, supply, originRule, now).orElse(null);
+        history.registrarInsumo(sector, ml, supply.label(), originRule, followUp);
         tanks.consume(sector.getZona().getId(), supply, ml);
         log.info("Sector {}: {} ml de {} ordenados al nodo (regla {}).", sector.getId(), ml, supply, originRule);
     }
@@ -355,7 +366,8 @@ public class ApplicationService implements ConsumidorParametros {
     // Los hechos
     // -------------------------------------------------------------------------
 
-    private ApplicationFacts facts(SectorEntity sector, Supply supply, Instant now, boolean requiresDiagnosis) {
+    private ApplicationFacts facts(SectorEntity sector, Supply supply, Instant now, boolean requiresDiagnosis,
+                                  String originRule) {
         ZonaEntity zone = sector.getZona();
         WeatherForecast forecast = weather.getForecastSinEspera();
 
@@ -378,7 +390,8 @@ public class ApplicationService implements ConsumidorParametros {
                         .map(a -> Instant.ofEpochMilli(a.getTs())).orElse(null),
                 temperature, zone.getHumSusRaw(),
                 zone.getHumSusTs() == null ? null : Instant.ofEpochMilli(zone.getHumSusTs()),
-                lastWatering(sector.getId()), rain, fungicidesInCapWindow(sector, supply, now));
+                lastWatering(sector.getId()), rain, fungicidesInCapWindow(sector, supply, now),
+                effectivenessBlocks.supplyBlock(sector, supply, originRule).orElse(null));
     }
 
     /** Cuántos fitosanitarios cuenta el tope del sector (F-06); sólo el fitosanitario tiene tope. */
@@ -407,7 +420,8 @@ public class ApplicationService implements ConsumidorParametros {
         if (waiting.isEmpty()) {
             return false;
         }
-        ApplicationFacts fungicideFacts = facts(sector, Supply.FUNGICIDE, now, waiting.get().isRequiresDiagnosis());
+        ApplicationFacts fungicideFacts = facts(sector, Supply.FUNGICIDE, now, waiting.get().isRequiresDiagnosis(),
+                waiting.get().getRuleName());
         return preconditions.check(fungicideFacts, catalog.vigentes(), overrides).isMet();
     }
 }

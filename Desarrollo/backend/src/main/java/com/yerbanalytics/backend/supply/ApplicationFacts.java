@@ -31,13 +31,22 @@ public record ApplicationFacts(
         Instant moistureAt,
         Instant lastWatering,
         WeatherForecast.LluviaPrevista rain,
-        int fungicidesInCapWindow) {
+        int fungicidesInCapWindow,
+        String effectivenessBlock) {
+
+    /** Sin bloqueo por efectividad: lo que se ve antes de que existiera S-06. */
+    public ApplicationFacts(Supply supply, Instant now, ValidDiagnosis.Verdict diagnosis, Instant lastSameSupply,
+                            Instant lastAnySupply, Double airTemp, Double soilMoisture, Instant moistureAt,
+                            Instant lastWatering, WeatherForecast.LluviaPrevista rain, int fungicidesInCapWindow) {
+        this(supply, now, diagnosis, lastSameSupply, lastAnySupply, airTemp, soilMoisture, moistureAt, lastWatering,
+                rain, fungicidesInCapWindow, null);
+    }
 
     /** Sin tope: lo que se ve antes de que existiera F-06 (ningún fitosanitario en la ventana). */
     public ApplicationFacts(Supply supply, Instant now, ValidDiagnosis.Verdict diagnosis, Instant lastSameSupply,
                             Instant lastAnySupply, Double airTemp, Double soilMoisture, Instant moistureAt,
                             Instant lastWatering, WeatherForecast.LluviaPrevista rain) {
         this(supply, now, diagnosis, lastSameSupply, lastAnySupply, airTemp, soilMoisture, moistureAt, lastWatering,
-                rain, 0);
+                rain, 0, null);
     }
 }
