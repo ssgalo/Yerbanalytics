@@ -56,7 +56,7 @@ Cada cambio tiene su bloque *Control desde el simulador* en `tasks.md` y su `spe
 | 4 | `add-metrica-dpv` | §1.4 DPV (cálculo, persistencia, UI) | C, H |
 | 5 | `add-mediasombra-v2` | M-01, M-02, §7 plan de rustificación por MZ, principio 4, `ZoneRuleEngine` | C |
 | 6 | `add-dosificacion-base` | §8.1–8.3: insumos, tanques/stock, P-D1…P-D5, reingreso, **bomba por insumo en contrato y firmware** | C, 2 |
-| 7 | `add-plan-nutricion` | N-01, N-02 | C, H, 6, `ZoneRuleEngine` (5) |
+| 7 | `add-plan-nutricion` | N-01, N-02 | C, H, 6; crea `ZoneRuleEngine` (5 se canceló) |
 | 8 | `add-reglas-biotico` | F-F1, F-F2, F-P1, F-04, F-06 | C, H, 4, 6 |
 | 9 | `add-reglas-clorosis-estres-solar` | F-C1, F-C2, F-S1, F-S2, F-S3 | C, H, 5, 6 |
 | 10 | `add-efectividad-y-s06` | E-01 (realineado), E-02, E-03, S-06, F-05 + revisión humana + sector del nodo testigo | C, 6, 8, 9 |
@@ -98,7 +98,7 @@ F-05,E-01…E-03→10 · O-01…O-05→11.
 | S-01 no se puede activar: no hay endpoints de bloqueo ni UI | 1 | Tareas 1–3 |
 | Nadie lee `bloqueoRepeticion` (S-06 inexistente) | 10 | Bloque 4 |
 | No existe historial de lecturas; N-02, F-C1, F-F*, F-P1, F-S* lo necesitan | H | Cambio propio, prerrequisito de 4, 7, 8, 9 |
-| El motor sólo evalúa por sector; mediasombra, N-01/N-02 y F-S2 son por MZ | 5 (`ZoneRuleEngine`) | Tarea 3.0 |
+| El motor sólo evalúa por sector; mediasombra, N-01/N-02 y F-S2 son por MZ | 7 (`ZoneRuleEngine`, creado ahí al cancelarse 5) | `engine/zone/` |
 | La mediasombra y las bombas se registran por sector; la v2 habla de la MZ | 5 y 6 | Un comando por sector de la MZ con mediasombra registrada |
 | El pronóstico no trae temperatura por hora ni UV máximo | C §2 (lo consume 5) | Tarea 2.3 de C |
 | El simulador no puede accionar R-03 (el clima simulado ignora `precipMm` y no genera marcas horarias) | C §2 | Tareas 2.1–2.2 de C |

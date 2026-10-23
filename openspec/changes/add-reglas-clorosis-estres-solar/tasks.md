@@ -6,7 +6,7 @@ F-S2 requiere `add-mediasombra-v2`.
 ## 0. Previo
 - [ ] 0.1 Confirmar D-5 (10 % de qué) y D-3 (si el plan de rustificación aún no está, dejar la condición apagada).
 - [x] 0.2 Verificado: `SolicitudRiego` admite una regla de origen nueva; falta registrar las claves de F-S1 en los chequeos de guarda de `DespachoRiego` (tarea 4.1b).
-- [ ] 0.3 Confirmar que `add-historial-lecturas` y `ZoneRuleEngine` (de `add-mediasombra-v2`) están integrados.
+- [ ] 0.3 Confirmar que `add-historial-lecturas` y `ZoneRuleEngine` (`engine/zone/`, creado por `add-plan-nutricion`: `add-mediasombra-v2` se canceló) están integrados.
 
 ## 1. Historial de lecturas
 - [ ] 1.1 Test de integración: `ReadingHistory.max/average` por ventana y franja horaria (10–16 h) con los valores que usa F-S1/F-S3.
