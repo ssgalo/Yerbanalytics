@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
@@ -43,7 +43,7 @@ class EscalamientoNodoReintentoTest {
     private ZonaRepository zones;
     private ComandoZonaPublisher publisher;
     private CatalogoParametrosService parameters;
-    private RuleOverridesStore overrides;
+    private TestRuleOverrides overrides;
     private RelojDePrueba clock;
     private EscalamientoNodoService service;
     private ZonaEntity mz2;
@@ -53,7 +53,7 @@ class EscalamientoNodoReintentoTest {
         zones = mock(ZonaRepository.class);
         publisher = mock(ComandoZonaPublisher.class);
         parameters = mock(CatalogoParametrosService.class);
-        overrides = new RuleOverridesStore();
+        overrides = new TestRuleOverrides();
         clock = new RelojDePrueba(T);
         when(parameters.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
         when(publisher.leerAhora(anyString())).thenReturn(new Resultado(true, "c", null));

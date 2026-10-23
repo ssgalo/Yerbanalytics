@@ -3,7 +3,7 @@ package com.yerbanalytics.backend.engine;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.rules.IncompleteHardwareRule;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
@@ -120,7 +120,7 @@ class IncompleteHardwareRuleTest {
     @Test
     @DisplayName("bypass 'hardware': el sector sin electroválvula se evalúa como si estuviera completo")
     void bypassHardware() {
-        RuleOverridesStore store = new RuleOverridesStore();
+        TestRuleOverrides store = new TestRuleOverrides();
         store.put(IncompleteHardwareRule.NAME, new RuleOverride(true, Map.of(), Set.of("hardware")));
         RuleContext conBypass = ctx(HardwareCoverage.NONE).withOverrides(store);
 

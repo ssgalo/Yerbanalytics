@@ -10,18 +10,22 @@ import java.util.TreeSet;
 
 /**
  * Casos de uso del control de demo: listar las piezas con su override, cambiarlo validando que las claves existan
- * y poner todos los cooldowns en cero. Escribe sólo en el {@link RuleOverridesStore}; el controlador HTTP que lo usa
- * existe únicamente con el modo demo.
+ * y poner todos los cooldowns en cero. Escribe sólo en el {@link RuleOverridesStore} (la capa de demo, que gana sobre el
+ * estado operativo mientras el override explícito exista); el controlador HTTP que lo usa existe únicamente con el modo
+ * demo. Nunca escribe el estado operativo: eso es del vivero.
  */
 @Component
 public class DemoRuleControlService {
 
     private final DemoControllableRegistry registry;
     private final RuleOverridesStore store;
+    private final EffectiveRuleOverrides effective;
 
-    public DemoRuleControlService(DemoControllableRegistry registry, RuleOverridesStore store) {
+    public DemoRuleControlService(DemoControllableRegistry registry, RuleOverridesStore store,
+                                  EffectiveRuleOverrides effective) {
         this.registry = registry;
         this.store = store;
+        this.effective = effective;
     }
 
     public List<ControllableState> list() {
@@ -68,7 +72,9 @@ public class DemoRuleControlService {
     }
 
     private ControllableState stateOf(DemoControllable controllable) {
-        return new ControllableState(controllable, store.get(controllable.name()));
+        String name = controllable.name();
+        return new ControllableState(controllable, store.get(name), effective.isOperationallyActive(name),
+                effective.isEnabled(name));
     }
 
     private static void requireDeclared(String name, String kind, Set<String> given, Set<String> declared) {

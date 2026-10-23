@@ -3,6 +3,10 @@ package com.yerbanalytics.backend.controller;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
 import com.yerbanalytics.backend.engine.overrides.DemoRuleControlService;
+import com.yerbanalytics.backend.engine.overrides.EffectiveRuleOverrides;
+import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
+import com.yerbanalytics.backend.engine.overrides.RuleStateEntity;
+import com.yerbanalytics.backend.engine.overrides.RuleStateRepository;
 import com.yerbanalytics.backend.engine.overrides.FakeControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,12 +43,22 @@ class DemoRulesControllerTest {
         DemoControllable regla() {
             return FakeControllable.of("StaleSensorRule", 10);
         }
+
+        /** En el vivero, "StaleSensorRule" está apagada; "ZoneShading" no tiene fila (rige la siembra: prendida). */
+        @Bean
+        RuleStateRepository reglaEstadoRepository() {
+            RuleStateRepository repository = org.mockito.Mockito.mock(RuleStateRepository.class);
+            org.mockito.Mockito.when(repository.findAll())
+                    .thenReturn(java.util.List.of(new RuleStateEntity("StaleSensorRule", false, "recalibrando", "Ana", 1L)));
+            return repository;
+        }
     }
 
     @Nested
     @WebMvcTest(DemoRulesController.class)
     @AutoConfigureMockMvc(addFilters = false)
-    @Import({Piezas.class, DemoControllableRegistry.class, DemoRuleControlService.class, RuleOverridesStore.class})
+    @Import({Piezas.class, DemoControllableRegistry.class, DemoRuleControlService.class, RuleOverridesStore.class,
+            OperationalRuleStates.class, EffectiveRuleOverrides.class})
     @TestPropertySource(properties = "yerbanalytics.demo.enabled=true")
     class ModoDemo {
 
@@ -79,6 +93,38 @@ class DemoRulesControllerTest {
 
             mvc.perform(get("/api/demo/rules"))
                     .andExpect(jsonPath("$[1].enabled").value(false));
+        }
+
+        @Test
+        void informaElEstadoOperativoYElEfectivoDeCadaPieza() throws Exception {
+            mvc.perform(get("/api/demo/rules"))
+                    .andExpect(jsonPath("$[0].name").value("StaleSensorRule"))
+                    .andExpect(jsonPath("$[0].operationalActive").value(false))
+                    .andExpect(jsonPath("$[0].effectiveEnabled").value(false))
+                    .andExpect(jsonPath("$[1].operationalActive").value(true))
+                    .andExpect(jsonPath("$[1].effectiveEnabled").value(true));
+        }
+
+        @Test
+        void prenderUnaApagadaEnElViveroLaHaceCorrerYElOperativoSigueApagado() throws Exception {
+            mvc.perform(put("/api/demo/rules/StaleSensorRule")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.enabled").value(true))
+                    .andExpect(jsonPath("$.operationalActive").value(false))
+                    .andExpect(jsonPath("$.effectiveEnabled").value(true));
+        }
+
+        @Test
+        void limpiarLaCapaDeDemoDevuelveElEstadoOperativo() throws Exception {
+            mvc.perform(put("/api/demo/rules/StaleSensorRule")
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"));
+
+            store.clear();
+
+            mvc.perform(get("/api/demo/rules"))
+                    .andExpect(jsonPath("$[0].effectiveEnabled").value(false))
+                    .andExpect(jsonPath("$[0].enabled").value(true));
         }
 
         @Test

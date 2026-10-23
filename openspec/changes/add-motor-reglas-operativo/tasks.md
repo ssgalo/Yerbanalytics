@@ -17,12 +17,12 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 1.5 Texto de `ApplicationService:221` sin "control de demo".
 
 ## 2. Backend: estado operativo y efectivo (D-1, D-2, D-9)
-- [ ] 2.1 RED: `OperationalRuleStatesTest`: sin fila rige la siembra de retiradas; con fila rige la fila; fila huérfana se ignora y se loguea; la cache se actualiza después del commit y no si hay rollback.
-- [ ] 2.2 RED: `EffectiveRuleOverridesTest`: tabla operativo × override de demo (ninguno, prendido, apagado) → efectivo (el override explícito gana; sin override, el operativo); cooldowns y bypass siguen saliendo de la capa de demo.
-- [ ] 2.3 RED: reescribir `RuleOverridesStoreRetiredTest`: el store ya no siembra; las retiradas salen apagadas por el estado operativo.
-- [ ] 2.4 RED: test de integración (Spring, modo `REAL`): apagar una regla ⇒ `OMITIDA_DESHABILITADA` en la traza del pulso siguiente; reiniciar el contexto ⇒ sigue apagada.
-- [ ] 2.5 GREEN: `RuleStateEntity` (`regla_estado`), `RuleStateRepository`, `OperationalRuleStates`, `EffectiveRuleOverrides` (único bean de `RuleOverrides`); `RuleOverridesStore` sin `implements RuleOverrides` ni siembra.
-- [ ] 2.6 RED/GREEN: `DemoRuleDto.operationalActive`; `DemoRulesControllerTest` (modo demo): `PUT enabled: true` sobre una regla apagada en el vivero la hace correr y `operationalActive` sigue en `false`; `clear()` devuelve el estado operativo.
+- [x] 2.1 RED: `OperationalRuleStatesTest`: sin fila rige la siembra de retiradas; con fila rige la fila; fila huérfana se ignora y se loguea; la cache se actualiza después del commit y no si hay rollback.
+- [x] 2.2 RED: `EffectiveRuleOverridesTest`: tabla operativo × override de demo (ninguno, prendido, apagado) → efectivo (el override explícito gana; sin override, el operativo); cooldowns y bypass siguen saliendo de la capa de demo.
+- [x] 2.3 RED: reescribir `RuleOverridesStoreRetiredTest`: el store ya no siembra; las retiradas salen apagadas por el estado operativo.
+- [x] 2.4 RED: test de integración (Spring, modo `REAL`): apagar una regla ⇒ `OMITIDA_DESHABILITADA` en la traza del pulso siguiente; reiniciar el contexto ⇒ sigue apagada.
+- [x] 2.5 GREEN: `RuleStateEntity` (`regla_estado`), `RuleStateRepository`, `OperationalRuleStates`, `EffectiveRuleOverrides` (único bean de `RuleOverrides`); `RuleOverridesStore` sin `implements RuleOverrides` ni siembra.
+- [x] 2.6 RED/GREEN: `DemoRuleDto.operationalActive`; `DemoRulesControllerTest` (modo demo): `PUT enabled: true` sobre una regla apagada en el vivero la hace correr y `operationalActive` sigue en `false`; `clear()` devuelve el estado operativo.
 
 ## 3. Backend: API, permisos y registro (D-5, D-6, D-7, D-8)
 - [ ] 3.1 RED: `ReglasEstadoControllerTest` (MockMvc): `200` al apagar una regla de acción sin motivo; `400 MOTIVO_REQUERIDO`, `400 CONFIRMACION_REQUERIDA` (con `consecuencia`) y `400 MOTIVO_DEMASIADO_LARGO` para una protección; `404` nombre desconocido; mismo estado ⇒ `200` sin fila ni evento.

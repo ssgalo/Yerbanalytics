@@ -5,7 +5,7 @@ import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.exception.HardwareConflictException;
@@ -59,7 +59,7 @@ class HardwareFaultServiceTest {
     private SectorRepository sectores;
     private ZonaRepository zonas;
     private HistorialService historial;
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private HardwareFaultService service;
     private ZonaEntity zona;
     private DispositivoEntity valvula;

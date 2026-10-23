@@ -4,7 +4,7 @@ import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.riego.DespachoRiego;
@@ -101,7 +101,7 @@ class ApplicationServiceTest {
     private TankService tanks;
     private ComandoActuadorPublisher publisher;
     private WeatherService weather;
-    private RuleOverridesStore overrides;
+    private TestRuleOverrides overrides;
     private SectorEntity sector;
     private ApplicationService service;
 
@@ -165,7 +165,7 @@ class ApplicationServiceTest {
         when(publisher.publicar(any(), any(), any(), any(), any()))
                 .thenReturn(new ComandoActuadorPublisher.Resultado(true, "c-1", null));
 
-        overrides = new RuleOverridesStore();
+        overrides = new TestRuleOverrides();
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
         when(catalog.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
 

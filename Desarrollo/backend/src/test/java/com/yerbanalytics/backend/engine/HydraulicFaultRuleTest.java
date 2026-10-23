@@ -2,7 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.rules.HydraulicFaultRule;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.ResultadoComparacion;
@@ -84,7 +84,7 @@ class HydraulicFaultRuleTest {
     @Test
     @DisplayName("bypass 'fault': el sector con la falla marcada se evalúa como si estuviera sano")
     void bypassFault() {
-        RuleOverridesStore store = new RuleOverridesStore();
+        TestRuleOverrides store = new TestRuleOverrides();
         store.put(HydraulicFaultRule.NAME, new RuleOverride(true, Map.of(), Set.of("fault")));
 
         assertThat(rule.evaluate(ctx(SIN_CAUDAL).withOverrides(store), ev(rule)))

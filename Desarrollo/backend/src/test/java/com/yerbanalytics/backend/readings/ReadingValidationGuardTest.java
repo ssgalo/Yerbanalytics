@@ -6,7 +6,7 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -56,7 +56,7 @@ class ReadingValidationGuardTest {
     }
 
     private final RelojMutable reloj = new RelojMutable();
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private ComandoZonaPublisher publisher;
     private InvalidReadingEscalation escalation;
     private CatalogoParametrosService catalogo;

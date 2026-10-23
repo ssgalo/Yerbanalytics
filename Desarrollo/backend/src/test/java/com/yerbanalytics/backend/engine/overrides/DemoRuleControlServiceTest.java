@@ -11,6 +11,8 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("DemoRuleControlService")
 class DemoRuleControlServiceTest {
@@ -21,9 +23,53 @@ class DemoRuleControlServiceTest {
     @BeforeEach
     void setUp() {
         store = new RuleOverridesStore();
+        RuleStateRepository repository = mock(RuleStateRepository.class);
+        // "Plain" está apagada en el vivero; "ZoneShading", prendida.
+        when(repository.findAll()).thenReturn(List.of(new RuleStateEntity("Plain", false, "recalibrando", "Ana", 1L)));
+        var effective = new EffectiveRuleOverrides(store, new OperationalRuleStates(repository, List.of()));
         var sinClaves = new FakeControllable("Plain", "Plain", RuleBranch.RIEGO, 5, Set.of(), Set.of());
         service = new DemoRuleControlService(
-                new DemoControllableRegistry(List.of(FakeControllable.of("ZoneShading", 50), sinClaves)), store);
+                new DemoControllableRegistry(List.of(FakeControllable.of("ZoneShading", 50), sinClaves)), store,
+                effective);
+    }
+
+    @Test
+    @DisplayName("una pieza sin override informa el estado operativo y el efectivo que rige")
+    void sinOverrideInformaElOperativo() {
+        var plain = service.list().stream().filter(e -> e.controllable().name().equals("Plain")).findFirst().orElseThrow();
+
+        assertThat(plain.operationalActive()).isFalse();
+        assertThat(plain.effectiveEnabled()).isFalse();
+        assertThat(plain.override().enabled()).isNull();
+    }
+
+    @Test
+    @DisplayName("prender por demo una apagada en el vivero la hace correr y el operativo sigue apagado")
+    void prenderPorDemoGana() {
+        var estado = service.update("Plain", true, null, null);
+
+        assertThat(estado.effectiveEnabled()).isTrue();
+        assertThat(estado.operationalActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("cambiar sólo cooldowns no fuerza el estado de una apagada en el vivero")
+    void cooldownsNoForzanElEstado() {
+        var estado = service.update("Plain", null, Map.of(), Set.of());
+
+        assertThat(estado.effectiveEnabled()).isFalse();
+        assertThat(estado.override().enabled()).isNull();
+    }
+
+    @Test
+    @DisplayName("limpiar la capa de demo devuelve el estado operativo")
+    void clearDevuelveElOperativo() {
+        service.update("Plain", true, null, null);
+
+        store.clear();
+
+        assertThat(service.list().stream().filter(e -> e.controllable().name().equals("Plain")).findFirst().orElseThrow()
+                .effectiveEnabled()).isFalse();
     }
 
     @Test
@@ -32,7 +78,7 @@ class DemoRuleControlServiceTest {
         var estado = service.update("ZoneShading", false, null, null);
 
         assertThat(estado.override().enabled()).isFalse();
-        assertThat(store.isEnabled("ZoneShading")).isFalse();
+        assertThat(store.explicitEnabled("ZoneShading")).contains(false);
     }
 
     @Test

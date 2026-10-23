@@ -7,7 +7,7 @@ import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -44,7 +44,7 @@ class ZoneRuleEngineTest {
     private ZoneActionExecutor executor;
     private ZoneTraceStore traces;
     private ManualLockRepository locks;
-    private RuleOverridesStore overrides;
+    private TestRuleOverrides overrides;
     private ZonaEntity zone;
 
     private static ZoneRule rule(String name, int priority, Function<ZoneRuleContext, List<RuleAction>> body) {
@@ -70,7 +70,7 @@ class ZoneRuleEngineTest {
         }).when(executor).execute(any(), any());
         traces = new ZoneTraceStore();
         locks = mock(ManualLockRepository.class);
-        overrides = new RuleOverridesStore();
+        overrides = new TestRuleOverrides();
         zone = new ZonaEntity();
         zone.setId("MZ-2");
     }

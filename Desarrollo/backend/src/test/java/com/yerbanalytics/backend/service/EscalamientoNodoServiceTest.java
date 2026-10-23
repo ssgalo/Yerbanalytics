@@ -4,7 +4,7 @@ import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.SensingParameters;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
@@ -41,7 +41,7 @@ class EscalamientoNodoServiceTest {
     private ZonaRepository zonas;
     private HistorialService historial;
     private ZoneSafeState safeState;
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private EscalamientoNodoService service;
     private ZonaEntity mz3;
 

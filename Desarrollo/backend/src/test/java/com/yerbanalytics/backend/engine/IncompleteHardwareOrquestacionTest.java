@@ -1,7 +1,7 @@
 package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
@@ -43,7 +43,7 @@ class IncompleteHardwareOrquestacionTest {
     private static final HardwareCoverage SIN_ELECTROVALVULA = new HardwareCoverage(false, true, true);
     private static final HardwareCoverage SIN_BOMBA = new HardwareCoverage(true, false, true);
 
-    private final RuleOverridesStore overrides = new RuleOverridesStore();
+    private final TestRuleOverrides overrides = new TestRuleOverrides();
     private RuleOrchestrator orquestador;
 
     /** Regla de una rama que siempre pide actuar: si corre, el test lo ve en sus acciones. */

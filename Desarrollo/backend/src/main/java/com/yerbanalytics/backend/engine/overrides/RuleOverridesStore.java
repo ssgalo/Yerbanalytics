@@ -1,60 +1,34 @@
 package com.yerbanalytics.backend.engine.overrides;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory overrides of the rules. Nothing in production writes to it: the only writer is the demo control, which
- * exists only with {@code yerbanalytics.demo.enabled=true}. Nothing is persisted, so a restart goes back to the
- * configured behaviour.
+ * Capa de demo de los overrides de las piezas, en memoria. Nada en producción escribe acá: el único que escribe es el
+ * control de demo ({@link DemoRuleControlService}), que existe sólo con {@code yerbanalytics.demo.enabled=true}. No se
+ * persiste, así que un reinicio vuelve al comportamiento configurado.
  *
- * <p>It starts with the <b>retired rules</b> ({@code yerbanalytics.reglas.retiradas}) turned off: rules that stay in
- * the code but must not act, because what replaces them is not there yet. Today those are the v1 supply rules
- * ({@code SupplyRule}, {@code DailyDoseLimitRule}): the v2 application rules (N-*, F-*) decide through the
- * {@code ApplicationService} and will take over, and the v1 pair goes away with them. In production they stay off;
- * with the demo enabled the simulator can turn them back on, and {@link #clear()} leaves them off again.
+ * <p>No decide por sí sola si una pieza corre: eso lo resuelve {@link EffectiveRuleOverrides}, donde el override explícito
+ * de esta capa gana sobre el estado operativo ({@link OperationalRuleStates}), que es donde viven las reglas retiradas.
+ * Un override sin interruptor explícito ({@link RuleOverride#explicitEnabled()} vacío) deja decidir al operativo.
  */
 @Component
-public class RuleOverridesStore implements RuleOverrides {
+public class RuleOverridesStore {
 
-    private static final RuleOverride OFF = new RuleOverride(false, Map.of(), Set.of());
-
-    private final Set<String> retired;
     private final Map<String, RuleOverride> overrides = new ConcurrentHashMap<>();
 
-    public RuleOverridesStore() {
-        this(List.of());
+    /** El interruptor explícito de demo de una pieza; vacío si nunca se tocó (o sólo se tocaron cooldowns o bypass). */
+    public Optional<Boolean> explicitEnabled(String ruleName) {
+        return get(ruleName).explicitEnabled();
     }
 
-    @Autowired
-    public RuleOverridesStore(
-            @Value("${yerbanalytics.reglas.retiradas:SupplyRule,DailyDoseLimitRule}") List<String> retired) {
-        this.retired = retired.stream().map(String::trim).filter(n -> !n.isEmpty()).collect(java.util.stream.Collectors.toUnmodifiableSet());
-        seedRetired();
-    }
-
-    private void seedRetired() {
-        retired.forEach(name -> overrides.put(name, OFF));
-    }
-
-    @Override
-    public boolean isEnabled(String ruleName) {
-        return get(ruleName).enabled();
-    }
-
-    @Override
     public Optional<Double> cooldownMinutes(String ruleName, String key) {
         return Optional.ofNullable(get(ruleName).cooldownMinutes().get(key));
     }
 
-    @Override
     public boolean isBypassed(String ruleName, String key) {
         return get(ruleName).bypassed().contains(key);
     }
@@ -69,10 +43,9 @@ public class RuleOverridesStore implements RuleOverrides {
         overrides.put(ruleName, override);
     }
 
-    /** Back to the configured behaviour for every rule (the retired ones stay off). */
+    /** Borra todos los overrides: vuelve a regir el estado operativo y la configuración de cada pieza. */
     public void clear() {
         overrides.clear();
-        seedRetired();
     }
 
     /** Snapshot of the rules that have an override. */
