@@ -101,6 +101,36 @@ describe('alta de dispositivos (HU-18 CA-02/03)', () => {
   });
 });
 
+describe('sector del nodo testigo (E-01)', () => {
+  const nodo = (sectorId: string | null): NuevoDispositivo => ({
+    serial: 'NODO-TESTIGO-1',
+    tipo: 'nodo_testigo',
+    zonaId: 'MZ-3',
+    sectorId,
+  });
+
+  it('el sector es opcional y se guarda si se informa', () => {
+    const fleet: ReturnType<typeof buildFleet> = [];
+    expect(altaError(fleet, nodo(null))).toBeNull();
+    expect(altaError(fleet, nodo('MZ-3-045'))).toBeNull();
+    const raw = altaDispositivo(fleet, nodo('MZ-3-045'));
+    expect(raw.zonaId).toBe('MZ-3');
+    expect(raw.sectorId).toBe('MZ-3-045');
+  });
+
+  it('rechaza un sector de otra macro-zona', () => {
+    expect(altaError([], nodo('MZ-1-045'))).toMatch(/no pertenece a la macro-zona/);
+  });
+
+  it('el sector del nodo no lo hace figurar como sector con hardware incompleto', () => {
+    const fleet: ReturnType<typeof buildFleet> = [];
+    altaDispositivo(fleet, nodo('MZ-3-045'));
+    const hw = buildHardware(fleet, FIXED_NOW);
+    expect(hw.incompletos).toEqual([]);
+    expect(hw.dispositivos[0].ubicacion).toBe('MZ-3 · MZ-3-045');
+  });
+});
+
 describe('recambio (HU-21 CA-05)', () => {
   it('limpia la avería y conserva la posición', () => {
     const fleet = buildFleet(FIXED_NOW);

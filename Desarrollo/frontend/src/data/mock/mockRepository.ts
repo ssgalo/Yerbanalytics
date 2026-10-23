@@ -20,6 +20,7 @@ import type {
   DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
+  RevisionEfectividad,
   NurseryData,
   NuevaTopologia,
   NuevoDispositivo,
@@ -368,6 +369,11 @@ export class MockRepository implements DataRepository {
   async registerRepair(id: string, detalle: string): Promise<HardwareData> {
     repararDispositivo(this.fleet(), id, detalle);
     return buildHardware(this.fleet());
+  }
+
+  async registerEffectivenessReview(): Promise<RevisionEfectividad> {
+    // La demo estática no evalúa efectividad: ninguna acción queda bloqueada, así que no hay nada que revisar.
+    throw new Error('La demo estática no tiene acciones bloqueadas por falta de efectividad.');
   }
 
   /** Topología actual: la generada por el Administrador o, por defecto, el seed 6 × 100. */

@@ -446,8 +446,8 @@ describe('evaluarMotor · insumo y mediasombra', () => {
     expect(r.acciones[0].tipo).toBe('MOVER_MEDIASOMBRA');
   });
 
-  it('el seguimiento no tiene comparaciones', () => {
-    expect(regla(evaluarMotor(catalogo, base), 'FollowUpRule').comparaciones).toEqual([]);
+  it('S-06 no tiene comparaciones: la demo estática no evalúa efectividad', () => {
+    expect(regla(evaluarMotor(catalogo, base), 'IneffectiveActionRule').comparaciones).toEqual([]);
   });
 });
 
@@ -515,7 +515,7 @@ describe('evaluarMotor · reglas de macro-zona (bióticas y plan de nutrición)'
     const t = evaluarMotor(catalogo, { ...base, dosis24h: 5 });
 
     expect(regla(t, 'DailyDoseLimitRule').acciones.map((a) => a.tipo)).toContain('ABORT_INSUMO');
-    expect(regla(t, 'SupplyRule').estado).toBe('OMITIDA_RAMA_BLOQUEADA');
+    // DailyDoseLimitRule (retirada) corre al final de la cadena: lo que va antes en la rama ya se evaluó.
     for (const id of ZONA) expect(regla(t, id).estado).toBe('EVALUADA');
   });
 

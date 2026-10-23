@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@/test/reactFlowJsdom';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { HistorialTimeline } from './HistorialTimeline';
 import { HistorialFilters } from './HistorialFilters';
 import { buildRuleSchema } from '@/data/mock/reglasMock';
@@ -114,6 +114,86 @@ describe('HistorialTimeline · conteo de sectores evaluados', () => {
     render(<HistorialTimeline records={records} schema={schema} schemaLoading={false} />);
 
     expect(screen.getByRole('button', { name: /Ciclo/ }).textContent).toContain('0 sectores evaluados · 1 decisión');
+  });
+});
+
+describe('HistorialTimeline · revisión de una acción sin efectividad (S-06)', () => {
+  const sinEfectividad = (extra: Partial<NonNullable<ActionRecord['evo']>> = {}): ActionRecord['evo'] => ({
+    show: true,
+    metric: 'Humedad de sustrato',
+    antes: '44',
+    ahora: '48',
+    unit: '%',
+    delta: '+4',
+    latencia: '30 min',
+    verdict: 'Sin efectividad',
+    vSoft: '#FBE3DD',
+    vInk: '#9A2B17',
+    motivo: 'Humedad de sustrato 44 % → 48 % (+4 puntos; hacen falta al menos +8).',
+    bloqueando: true,
+    ...extra,
+  });
+
+  it('muestra por qué quedó sin efectividad y ofrece registrar la revisión', () => {
+    render(
+      <HistorialTimeline records={[evento({ evo: sinEfectividad() })]} schema={schema} schemaLoading={false}
+        onReview={async () => undefined} />,
+    );
+    abrirTodo('Macro-zona 2', 'MZ-2-014');
+
+    expect(screen.getByText(/hacen falta al menos \+8/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Registrar revisión' })).toBeTruthy();
+  });
+
+  it('sin permiso (sin onReview) o si ya no bloquea no hay botón', () => {
+    const { rerender } = render(
+      <HistorialTimeline records={[evento({ evo: sinEfectividad() })]} schema={schema} schemaLoading={false} />,
+    );
+    abrirTodo('Macro-zona 2', 'MZ-2-014');
+    expect(screen.queryByRole('button', { name: 'Registrar revisión' })).toBeNull();
+
+    rerender(
+      <HistorialTimeline records={[evento({ evo: sinEfectividad({ bloqueando: false }) })]} schema={schema}
+        schemaLoading={false} onReview={async () => undefined} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Registrar revisión' })).toBeNull();
+  });
+
+  it('confirma con el detalle (obligatorio) y llama a onReview con el id del evento', async () => {
+    const onReview = vi.fn(async () => undefined);
+    render(
+      <HistorialTimeline records={[evento({ id: 'HE-9', evo: sinEfectividad() })]} schema={schema}
+        schemaLoading={false} onReview={onReview} />,
+    );
+    abrirTodo('Macro-zona 2', 'MZ-2-014');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar revisión' }));
+    const confirmar = screen.getByRole('button', { name: 'Confirmar revisión' }) as HTMLButtonElement;
+    expect(confirmar.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('Qué se constató'), { target: { value: '  Destapé el emisor  ' } });
+    expect(confirmar.disabled).toBe(false);
+    fireEvent.click(confirmar);
+
+    await waitFor(() => expect(onReview).toHaveBeenCalledWith('HE-9', 'Destapé el emisor'));
+  });
+
+  it('si el backend rechaza la revisión muestra el motivo y conserva lo escrito', async () => {
+    const onReview = vi.fn(async () => {
+      throw new Error('El evento HE-9 no es una acción sin efectividad que siga bloqueando.');
+    });
+    render(
+      <HistorialTimeline records={[evento({ id: 'HE-9', evo: sinEfectividad() })]} schema={schema}
+        schemaLoading={false} onReview={onReview} />,
+    );
+    abrirTodo('Macro-zona 2', 'MZ-2-014');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar revisión' }));
+    fireEvent.change(screen.getByLabelText('Qué se constató'), { target: { value: 'Revisé' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar revisión' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('siga bloqueando');
+    expect((screen.getByLabelText('Qué se constató') as HTMLTextAreaElement).value).toBe('Revisé');
   });
 });
 

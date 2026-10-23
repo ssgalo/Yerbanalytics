@@ -101,13 +101,14 @@ describe('MockRepository · esquema del DAG', () => {
     expect(par('StaleSensorRule', 'SustratoSaturadoRule')).toBe(true);
     expect(par('SustratoSaturadoRule', 'CicloLecturaRiegoRule')).toBe(true);
     expect(par('CicloLecturaRiegoRule', 'DeficitCriticoRule')).toBe(true);
-    expect(par('DeficitCriticoRule', 'FueraDeVentanaRiegoRule')).toBe(true);
+    expect(par('DeficitCriticoRule', 'IneffectiveActionRule')).toBe(true);
+    expect(par('IneffectiveActionRule', 'FueraDeVentanaRiegoRule')).toBe(true);
     expect(par('FueraDeVentanaRiegoRule', 'PausaTrasAplicacionRule')).toBe(true);
     expect(par('PausaTrasAplicacionRule', 'PosponerPorLluviaRule')).toBe(true);
     expect(par('PosponerPorLluviaRule', 'RiegoPorDeficitRule')).toBe(true);
     expect(par('RiegoPorDeficitRule', 'SolarStressRule')).toBe(true);
     expect(par('SolarStressRule', 'success-RIEGO')).toBe(true);
-    expect(par('FollowUpRule', 'SolarStressUnexplainedRule')).toBe(true);
+    expect(par('StaleSensorRule', 'SolarStressUnexplainedRule')).toBe(true);
     expect(par('SolarStressUnexplainedRule', 'success-SEGUIMIENTO')).toBe(true);
   });
 });

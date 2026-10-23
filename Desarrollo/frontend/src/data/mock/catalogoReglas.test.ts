@@ -190,6 +190,7 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   ApplicationService: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationService.java'),
   TankService: resolve(DIR_ENGINE, '..', 'supply', 'TankService.java'),
   NutritionPlanService: resolve(DIR_ENGINE, '..', 'nutrition', 'NutritionPlanService.java'),
+  EffectivenessService: resolve(DIR_ENGINE, '..', 'effectiveness', 'EffectivenessService.java'),
 };
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {

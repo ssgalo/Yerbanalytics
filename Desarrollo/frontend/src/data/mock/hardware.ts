@@ -166,7 +166,7 @@ export function toDispositivo(r: RawDispositivo, now: number = Date.now()): Disp
     tipoLabel: TIPO_LABEL[r.tipo] ?? r.tipo,
     zonaId: r.zonaId,
     sectorId: r.sectorId,
-    ubicacion: r.sectorId ?? r.zonaId ?? '—',
+    ubicacion: r.tipo === NODO_TESTIGO && r.sectorId ? `${r.zonaId} · ${r.sectorId}` : (r.sectorId ?? r.zonaId ?? '—'),
     bateria: r.bateria,
     senal: r.senal,
     ultimoUpdate: r.ultimoUpdate,
@@ -186,7 +186,7 @@ export function toDispositivo(r: RawDispositivo, now: number = Date.now()): Disp
 function sectoresIncompletos(fleet: RawDispositivo[]): SectorIncompleto[] {
   const tiposPorSector = new Map<string, Set<string>>();
   for (const r of fleet) {
-    if (!r.sectorId) continue;
+    if (!r.sectorId || r.tipo === NODO_TESTIGO) continue;
     if (!tiposPorSector.has(r.sectorId)) tiposPorSector.set(r.sectorId, new Set());
     tiposPorSector.get(r.sectorId)!.add(r.tipo);
   }
@@ -231,6 +231,11 @@ export function altaError(fleet: RawDispositivo[], nuevo: NuevoDispositivo): str
     if (fleet.some((d) => d.tipo === NODO_TESTIGO && d.zonaId === zonaId)) {
       return `La macro-zona «${zonaId}» ya tiene un nodo testigo.`;
     }
+    // El sector del nodo testigo es opcional; si se informa tiene que ser de la macro-zona.
+    const nodoSector = nuevo.sectorId?.trim();
+    if (nodoSector && zonaIdDe(nodoSector) !== zonaId) {
+      return `El sector «${nodoSector}» no pertenece a la macro-zona «${zonaId}».`;
+    }
   } else {
     const sectorId = nuevo.sectorId?.trim();
     if (!sectorId) return 'El actuador debe asociarse a un sector.';
@@ -261,7 +266,7 @@ export function altaDispositivo(fleet: RawDispositivo[], nuevo: NuevoDispositivo
     serial: nuevo.serial.trim(),
     tipo: nuevo.tipo,
     zonaId: esNodo ? (nuevo.zonaId?.trim() ?? null) : null,
-    sectorId: esNodo ? null : (nuevo.sectorId?.trim() ?? null),
+    sectorId: nuevo.sectorId?.trim() || null,
     bateria: null,
     senal: null,
     ultimoUpdate: null,

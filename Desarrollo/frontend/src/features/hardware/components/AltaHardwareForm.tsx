@@ -56,7 +56,8 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
           serial: serial.trim(),
           tipo,
           zonaId: esNodo ? zonaId.trim() : null,
-          sectorId: esNodo ? null : sectorId.trim(),
+          // El sector del nodo testigo es opcional: E-01 verifica el riego del sector donde está instalado.
+          sectorId: esNodo ? sectorId.trim() || null : sectorId.trim(),
         };
     try {
       await onSubmit(payload);
@@ -111,20 +112,32 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
             </div>
 
             {esNodo ? (
-              <div className={styles.group}>
-                <label className={styles.label}>Macro-zona</label>
-                <select
-                  className={styles.select}
-                  value={zonaId}
-                  onChange={(e) => setZonaId(e.target.value)}
-                >
-                  {ZONA_IDS.map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <>
+                <div className={styles.group}>
+                  <label className={styles.label}>Macro-zona</label>
+                  <select
+                    className={styles.select}
+                    value={zonaId}
+                    onChange={(e) => setZonaId(e.target.value)}
+                  >
+                    {ZONA_IDS.map((z) => (
+                      <option key={z} value={z}>
+                        {z}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.group}>
+                  <label className={styles.label}>Sector del nodo (opcional)</label>
+                  <input
+                    className={styles.input}
+                    type="text"
+                    placeholder="ej. MZ-1-045"
+                    value={sectorId}
+                    onChange={(e) => setSectorId(e.target.value)}
+                  />
+                </div>
+              </>
             ) : (
               <div className={styles.group}>
                 <label className={styles.label}>Sector</label>

@@ -447,7 +447,8 @@ const EVALUADORES: Record<string, Evaluador> = {
       ? [accion('MOVER_MEDIASOMBRA', `[apertura=0] Mediasombra cerrada por pico de radiación UV (índice  ≥ umbral ${ev.numero('mediasombra.uv-umbral').toFixed(1)}).`)]
       : noop('Sin pico de UV: la mediasombra no se mueve.'),
 
-  FollowUpRule: () => noop('Seguimiento post-acción: sin acciones pendientes de evaluar.'),
+  // S-06: la demo estática no evalúa efectividad, así que nunca hay un riego bloqueado.
+  IneffectiveActionRule: () => noop('El último riego de la macro-zona no quedó sin efectividad: no se bloquea.'),
 
   // Reglas bióticas por sector (F-F1, F-P1): actúan una vez por diagnóstico nuevo, y la demo no tiene historial de
   // diagnósticos ni de lecturas, así que muestran siempre el estado de reposo.

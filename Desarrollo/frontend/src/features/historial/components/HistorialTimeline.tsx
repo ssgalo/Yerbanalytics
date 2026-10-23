@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Glyph, Icon } from '@/components/ui/Icon';
 import { RuleGraph } from '@/components/DAGViewer/RuleGraph';
 import type { ActionRecord, Evolution, DagSchema } from '@/types/domain';
@@ -12,6 +13,11 @@ interface HistorialTimelineProps {
   records: ActionRecord[];
   schema: DagSchema | null;
   schemaLoading: boolean;
+  /**
+   * Registra la revisión de una acción sin efectividad (S-06). Sin esto (rol sin `efectividad.revisar`) el historial se ve igual
+   * pero no se ofrece levantar el bloqueo.
+   */
+  onReview?: (eventId: string, detail: string) => Promise<void>;
 }
 
 interface SectorGroup {
@@ -31,7 +37,7 @@ interface CycleGroup {
   zonas: Record<string, ZonaGroup>;
 }
 
-export function HistorialTimeline({ records, schema, schemaLoading }: HistorialTimelineProps) {
+export function HistorialTimeline({ records, schema, schemaLoading, onReview }: HistorialTimelineProps) {
   const [openCycles, setOpenCycles] = useState<Record<string, boolean>>({});
   const toggleCycle = (fecha: string) => setOpenCycles((o) => ({ ...o, [fecha]: !o[fecha] }));
 
@@ -248,7 +254,7 @@ export function HistorialTimeline({ records, schema, schemaLoading }: HistorialT
                                             />
                                             <Chain label="Decisión del motor" text={r.decision} />
                                             <Chain label="Acción ejecutada" text={r.accion} />
-                                            {r.evo && <EvoBlock evo={r.evo} />}
+                                            {r.evo && <EvoBlock evo={r.evo} eventId={r.id} onReview={onReview} />}
                                           </div>
                                           );
                                         })}
@@ -282,7 +288,15 @@ function Chain({ label, text }: { label: string; text: string }) {
   );
 }
 
-function EvoBlock({ evo }: { evo: Evolution }) {
+function EvoBlock({
+  evo,
+  eventId,
+  onReview,
+}: {
+  evo: Evolution;
+  eventId: string;
+  onReview?: (eventId: string, detail: string) => Promise<void>;
+}) {
   return (
     <div className={styles.evo}>
       <div className={styles.evoLatencia}>
@@ -312,6 +326,74 @@ function EvoBlock({ evo }: { evo: Evolution }) {
           {evo.verdict}
         </Badge>
       </div>
+      {evo.motivo && <div className={styles.evoMotivo}>{evo.motivo}</div>}
+      {evo.bloqueando && onReview && <RevisionForm eventId={eventId} onReview={onReview} />}
+    </div>
+  );
+}
+
+/** «Registrar revisión» (S-06): el detalle de lo que se constató en persona es obligatorio y levanta el bloqueo. */
+function RevisionForm({
+  eventId,
+  onReview,
+}: {
+  eventId: string;
+  onReview: (eventId: string, detail: string) => Promise<void>;
+}) {
+  const campoId = useId();
+  const [abierto, setAbierto] = useState(false);
+  const [detalle, setDetalle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!abierto) {
+    return (
+      <div className={styles.revision}>
+        <Button variant="secondary" size="sm" onClick={() => setAbierto(true)}>
+          Registrar revisión
+        </Button>
+      </div>
+    );
+  }
+
+  const confirmar = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onReview(eventId, detalle.trim());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={styles.revision}>
+      <label className={styles.revisionLabel} htmlFor={campoId}>
+        Qué se constató
+      </label>
+      <textarea
+        id={campoId}
+        className={styles.revisionCampo}
+        rows={2}
+        placeholder="ej. Se destapó el emisor y se probó el caudal"
+        value={detalle}
+        onChange={(e) => setDetalle(e.target.value)}
+      />
+      <div className={styles.revisionAcciones}>
+        <Button variant="primary" size="sm" disabled={busy || detalle.trim() === ''} onClick={confirmar}>
+          {busy ? 'Guardando…' : 'Confirmar revisión'}
+        </Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => setAbierto(false)}>
+          Cancelar
+        </Button>
+      </div>
+      {error && (
+        <div className={styles.revisionError} role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

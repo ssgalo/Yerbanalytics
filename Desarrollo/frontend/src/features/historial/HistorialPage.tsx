@@ -1,5 +1,7 @@
 /* Vista principal: Historial y trazabilidad + Inspector de Decisiones (HU-11 / HU-12) */
 import { useMemo, useState } from 'react';
+import { getRepository } from '@/data';
+import { useAuth } from '@/hooks/AuthContext';
 import { usePageTitle } from '@/hooks/PageMeta';
 import { useHistory } from '@/hooks/useHistory';
 import { useRuleEngineSchema } from '@/hooks/useRuleEngineSchema';
@@ -29,13 +31,22 @@ export function HistorialPage() {
   // Tipo y fechas se resuelven en el backend; macro-zona, sector y resultado, sobre lo recibido.
   const desdeMs = filters.desde ? new Date(`${filters.desde}T00:00:00`).getTime() : undefined;
   const hastaMs = filters.hasta ? new Date(`${filters.hasta}T23:59:59.999`).getTime() : undefined;
-  const { records, loading, error } = useHistory({
+  const { puede } = useAuth();
+  const { records, loading, error, reload } = useHistory({
     tipo: filters.tipo === 'Todas' ? undefined : filters.tipo,
     desde: desdeMs,
     hasta: hastaMs,
     limit: LIMITE_HISTORIAL,
   });
   const { schema, loading: schemaLoading } = useRuleEngineSchema();
+
+  // Levantar el bloqueo de una acción sin efectividad (S-06) es de quien tiene `efectividad.revisar`.
+  const registrarRevision = puede('efectividad.revisar')
+    ? async (eventId: string, detail: string) => {
+        await getRepository().registerEffectivenessReview(eventId, detail);
+        reload();
+      }
+    : undefined;
 
   const patch = (p: Partial<HistorialFilterState>) => setFilters((f) => ({ ...f, ...p }));
 
@@ -96,6 +107,7 @@ export function HistorialPage() {
           records={filtered}
           schema={schema}
           schemaLoading={schemaLoading}
+          onReview={registrarRevision}
         />
       </div>
     </div>

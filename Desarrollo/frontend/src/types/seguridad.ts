@@ -31,6 +31,7 @@ export type Permiso =
   | 'bloqueos.gestionar'
   | 'insumos.ver'
   | 'insumos.gestionar'
+  | 'efectividad.revisar'
   | 'simulacion.gestionar'
   | 'usuarios.gestionar'
   | 'auditoria.ver';

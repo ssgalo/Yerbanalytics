@@ -70,7 +70,7 @@ describe('ParametrosTab · agrupación (7.2)', () => {
       expect.stringMatching(/Historial de lecturas/),
       expect.stringMatching(/Lectura de los nodos/),
       expect.stringMatching(/Nodo sin respuesta/),
-      expect.stringMatching(/Riego · 8 reglas/),
+      expect.stringMatching(/Riego · 9 reglas/),
       expect.stringMatching(/Ejecución del riego/),
       expect.stringMatching(/Insumos/),
       expect.stringMatching(/Aplicación de insumos/),
@@ -78,6 +78,7 @@ describe('ParametrosTab · agrupación (7.2)', () => {
       expect.stringMatching(/Tanques de insumo/),
       expect.stringMatching(/Mediasombra/),
       expect.stringMatching(/Seguimiento/),
+      expect.stringMatching(/Evaluación de efectividad/),
     ]);
     // Colapsadas: ningún campo de regla a la vista. Los grupos de lo que lee parámetros sin ser una regla (ejecución
     // del riego, lectura inválida…) no se colapsan: sus campos son los únicos que se ven.

@@ -321,6 +321,20 @@ export interface Evolution {
   verdict: string;
   vSoft: string;
   vInk: string;
+  /** Por qué la evaluación dio efectiva o sin efectividad; ausente mientras está en seguimiento. */
+  motivo?: string | null;
+  /** `true` si la acción quedó sin efectividad y todavía bloquea su repetición (S-06): habilita «Registrar revisión». */
+  bloqueando?: boolean;
+}
+
+/** Revisión registrada de una acción sin efectividad (S-06). Espejo del DTO `EffectivenessReview`. */
+export interface RevisionEfectividad {
+  eventId: string;
+  /** `IRRIGATION` | `CORRECTIVE_FERTILIZER` | `FUNGICIDE`. */
+  kind: string;
+  /** Cuántos bloqueos se levantaron (el riego bloquea a toda la macro-zona). */
+  clearedEvents: number;
+  reviewedTs: number;
 }
 
 /** Registro del historial global de acciones (HU-11 / HU-12). Espejo del DTO backend. */
