@@ -6,6 +6,10 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
+import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
+import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
+import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
+import com.yerbanalytics.backend.engine.overrides.RuleStateRepository;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
@@ -82,13 +86,17 @@ class CatalogoParametrosServiceTest {
 
     @BeforeEach
     void setUp() {
+        List<Rule> reglas = List.of(regla("IrrigationRule", 10, RuleBranch.RIEGO,
+                        ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.LITROS_POR_PUNTO),
+                regla("WeatherOverrideRule", 5, RuleBranch.RIEGO, ParametrosRiego.UMBRAL_HUMEDAD),
+                regla("ManualLockRule", 1, RuleBranch.GLOBAL));
         catalogo = new CatalogoParametros(
                 CatalogoParametros.definicionesReales(),
                 CatalogoParametros.restriccionesReales(),
-                List.of(regla("IrrigationRule", 10, RuleBranch.RIEGO,
-                                ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.LITROS_POR_PUNTO),
-                        regla("WeatherOverrideRule", 5, RuleBranch.RIEGO, ParametrosRiego.UMBRAL_HUMEDAD),
-                        regla("ManualLockRule", 1, RuleBranch.GLOBAL)));
+                reglas);
+        RuleStateRepository estados = org.mockito.Mockito.mock(RuleStateRepository.class);
+        ReglasCatalogo piezas = new ReglasCatalogo(new DemoControllableRegistry(new ArrayList<>(reglas)),
+                new OperationalRuleStates(estados, List.of()), new RuleOverridesStore());
 
         lenient().when(repository.findAll()).thenAnswer(i -> new ArrayList<>(tabla.values()));
         lenient().when(repository.save(any(ParametroReglaEntity.class))).thenAnswer(i -> {
@@ -99,7 +107,7 @@ class CatalogoParametrosServiceTest {
         lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
 
         service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
-                operativaRepository);
+                operativaRepository, piezas);
     }
 
     private void override(String clave, String valor) {

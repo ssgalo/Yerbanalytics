@@ -25,11 +25,11 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 2.6 RED/GREEN: `DemoRuleDto.operationalActive`; `DemoRulesControllerTest` (modo demo): `PUT enabled: true` sobre una regla apagada en el vivero la hace correr y `operationalActive` sigue en `false`; `clear()` devuelve el estado operativo.
 
 ## 3. Backend: API, permisos y registro (D-5, D-6, D-7, D-8)
-- [ ] 3.1 RED: `ReglasEstadoControllerTest` (MockMvc): `200` al apagar una regla de acción sin motivo; `400 MOTIVO_REQUERIDO`, `400 CONFIRMACION_REQUERIDA` (con `consecuencia`) y `400 MOTIVO_DEMASIADO_LARGO` para una protección; `404` nombre desconocido; mismo estado ⇒ `200` sin fila ni evento.
-- [ ] 3.2 RED: `MapaPermisosCoberturaTest` cubre `PUT /api/rules/*/estado`; test de seguridad: Operario y Servicio ⇒ `403`, Ingeniero Agrónomo ⇒ `200`.
-- [ ] 3.3 RED: `GET /api/rules/parametros` lista todas las piezas del registro con `codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`.
-- [ ] 3.4 RED: `HistorialServiceTest`: `registrarEstadoRegla` deja un evento `Configuración` con regla, usuario, motivo y, si es protección, la consecuencia.
-- [ ] 3.5 GREEN: `PUT /api/rules/{name}/estado` (controller + servicio), `ReglaCatalogoDto` ampliada, `CatalogoParametrosService.catalogo()` desde el registro, `MapaPermisos`, descripción de `Permiso.REGLAS_EDITAR`.
+- [x] 3.1 RED: `ReglasEstadoControllerTest` (MockMvc): `200` al apagar una regla de acción sin motivo; `400 MOTIVO_REQUERIDO`, `400 CONFIRMACION_REQUERIDA` (con `consecuencia`) y `400 MOTIVO_DEMASIADO_LARGO` para una protección; `404` nombre desconocido; mismo estado ⇒ `200` sin fila ni evento.
+- [x] 3.2 RED: `MapaPermisosCoberturaTest` cubre `PUT /api/rules/*/estado`; test de seguridad: Operario y Servicio ⇒ `403`, Ingeniero Agrónomo ⇒ `200`.
+- [x] 3.3 RED: `GET /api/rules/parametros` lista todas las piezas del registro con `codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`.
+- [x] 3.4 RED: `HistorialServiceTest`: `registrarEstadoRegla` deja un evento `Configuración` con regla, usuario, motivo y, si es protección, la consecuencia.
+- [x] 3.5 GREEN: `PUT /api/rules/{name}/estado` (controller + servicio), `ReglaCatalogoDto` ampliada, `CatalogoParametrosService.catalogo()` desde el registro, `MapaPermisos`, descripción de `Permiso.REGLAS_EDITAR`.
 
 ## 4. Backend: despacho de riego (D-10)
 - [ ] 4.1 RED: `DespachoRiegoTest`: con `ManualLockRule`, `PosponerPorLluviaRule` o `SustratoSaturadoRule` apagadas, el despacho no descarta por bloqueo, lluvia o saturación; prendidas, descarta como hoy.

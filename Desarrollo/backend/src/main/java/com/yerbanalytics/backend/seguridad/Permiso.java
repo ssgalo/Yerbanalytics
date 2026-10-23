@@ -29,7 +29,7 @@ public enum Permiso {
     CONFIGURACION_VER("configuracion.ver", "Configuración", "Ver la configuración agronómica", null),
     CONFIGURACION_EDITAR("configuracion.editar", "Configuración", "Editar la configuración agronómica", CONFIGURACION_VER),
     REGLAS_VER("reglas.ver", "Motor de reglas", "Ver el grafo de reglas, las trazas y los parámetros", null),
-    REGLAS_EDITAR("reglas.editar", "Motor de reglas", "Editar el catálogo de parámetros", REGLAS_VER),
+    REGLAS_EDITAR("reglas.editar", "Motor de reglas", "Editar los parámetros del motor y prender o apagar reglas", REGLAS_VER),
     HARDWARE_VER("hardware.ver", "Hardware", "Ver el estado del hardware", null),
     HARDWARE_GESTIONAR("hardware.gestionar", "Hardware", "Alta y recambio de dispositivos", HARDWARE_VER),
     HARDWARE_REPARAR("hardware.reparar", "Hardware", "Registrar la reparación de un dispositivo averiado", HARDWARE_VER),

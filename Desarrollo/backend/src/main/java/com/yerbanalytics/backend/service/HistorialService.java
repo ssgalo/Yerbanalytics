@@ -342,6 +342,40 @@ public class HistorialService {
     }
 
     /**
+     * Registra que alguien prendió o apagó una regla desde Motor de reglas: qué regla (con su código), el nuevo estado,
+     * quién, por qué y, si apagó una protección, qué implica. No va a la auditoría de seguridad: apagar una regla es
+     * operar el vivero y acá es donde se busca "¿por qué no se regó?".
+     *
+     * @param consecuencia el texto de la protección apagada; {@code null} si no aplica
+     */
+    @Transactional
+    public void registrarEstadoRegla(String usuario, String regla, String etiqueta, String codigo, boolean activa,
+                                     String motivo, String consecuencia) {
+        String nombre = "«" + etiqueta + "»" + (codigo == null || codigo.isBlank() ? "" : " (" + codigo + ")");
+        String estado = activa ? "prendida" : "apagada";
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(EMDASH);
+        e.setZonaName("Sistema");
+        e.setTipo("Configuración");
+        e.setTs(reloj.millis());
+        e.setRegla(regla);
+        e.setLectura("Interruptor del motor de reglas: " + nombre + ".");
+        e.setDecision("Regla " + nombre + " " + estado + " por " + usuario + "."
+                + (motivo == null || motivo.isBlank() ? "" : " Motivo: " + motivo + "."));
+        e.setAccion(consecuencia != null
+                ? "Consecuencia: " + consecuencia
+                : activa ? "El motor vuelve a evaluarla desde el próximo pulso."
+                        : "El motor deja de evaluarla desde el próximo pulso.");
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        historialRepository.save(e);
+    }
+
+    /**
      * Registra un movimiento (u orden no enviada) de la mediasombra de una macro-zona. La malla es de la zona: el evento
      * queda con {@code sectorId = "—"}. {@code regla} dice quién la movió (una regla del motor, el horario de la
      * mediasombra o una secuencia).

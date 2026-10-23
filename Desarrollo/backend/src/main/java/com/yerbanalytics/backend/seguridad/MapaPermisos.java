@@ -104,6 +104,8 @@ public final class MapaPermisos {
 
         permiso(r, get, "/api/rules/**", Permiso.REGLAS_VER);
         permiso(r, put, "/api/rules/parametros", Permiso.REGLAS_EDITAR);
+        // El interruptor operativo de cada regla: el mismo permiso que editar los parámetros del motor.
+        permiso(r, put, "/api/rules/*/estado", Permiso.REGLAS_EDITAR);
 
         permiso(r, get, "/api/hardware/**", Permiso.HARDWARE_VER);
         // La reparación va antes que el POST general: la registra quien arregla, no quien administra la flota.

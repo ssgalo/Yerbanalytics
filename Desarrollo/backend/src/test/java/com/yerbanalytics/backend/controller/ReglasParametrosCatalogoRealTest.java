@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.engine.Rule;
+import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
 import com.yerbanalytics.backend.engine.zone.ZoneRule;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
@@ -52,10 +53,14 @@ class ReglasParametrosCatalogoRealTest {
     @Autowired
     private CatalogoParametros catalogo;
 
+    /** Todo lo que se puede prender o apagar: reglas por sector, de macro-zona y servicios que deciden. */
+    @Autowired
+    private DemoControllableRegistry piezas;
+
     private JsonNode catalogoJson() throws Exception {
         String cuerpo = mockMvc.perform(get("/api/rules/parametros"))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         return new ObjectMapper().readTree(cuerpo);
     }
 
@@ -156,12 +161,12 @@ class ReglasParametrosCatalogoRealTest {
         assertThat(claves).isNotEmpty().doesNotHaveDuplicates()
                 .containsExactlyInAnyOrderElementsOf(catalogo.definiciones().stream().map(DefinicionParametro::clave).toList());
 
-        // Toda regla registrada figura, una vez, con exactamente los parámetros que declara.
+        // Toda pieza conmutable figura, una vez, con exactamente los parámetros que declara (ninguno si no lee).
         Map<String, List<String>> declarado = new LinkedHashMap<>();
-        reglasRegistradas.forEach(r -> declarado.put(r.name(),
-                r.parametros().stream().map(DefinicionParametro::clave).toList()));
-        reglasDeZona.forEach(r -> declarado.put(r.name(),
-                r.parametros().stream().map(DefinicionParametro::clave).toList()));
+        piezas.all().forEach(p -> declarado.put(p.name(), p instanceof ConsumidorParametros c
+                ? c.parametros().stream().map(DefinicionParametro::clave).toList() : List.of()));
+        assertThat(declarado.keySet()).containsAll(reglasRegistradas.stream().map(Rule::name).toList())
+                .containsAll(reglasDeZona.stream().map(ZoneRule::name).toList());
         Map<String, List<String>> enJson = new LinkedHashMap<>();
         json.get("reglas").forEach(r -> {
             List<String> ps = new ArrayList<>();
@@ -183,5 +188,48 @@ class ReglasParametrosCatalogoRealTest {
                     .containsExactlyInAnyOrderElementsOf(declaradoPorConsumidores.entrySet().stream()
                             .filter(e -> e.getValue().contains(clave)).map(Map.Entry::getKey).toList());
         });
+    }
+
+    private JsonNode regla(JsonNode json, String id) {
+        for (JsonNode r : json.get("reglas")) {
+            if (r.get("id").asText().equals(id)) {
+                return r;
+            }
+        }
+        throw new AssertionError("no está la regla " + id);
+    }
+
+    @Test
+    @DisplayName("lista todas las piezas conmutables, también los servicios, con lo que la pantalla necesita")
+    void listaTodasLasPiezasConSuDeclaracion() throws Exception {
+        JsonNode json = catalogoJson();
+
+        assertThat(json.get("reglas")).hasSize(piezas.all().size());
+        assertThat(piezas.all().stream().map(com.yerbanalytics.backend.engine.overrides.DemoControllable::name))
+                .contains("HardwareFaultService", "ApplicationPreconditions", "HorarioMediasombraService");
+
+        JsonNode r01 = regla(json, "RiegoPorDeficitRule");
+        assertThat(r01.get("label").asText()).isEqualTo("Riego por déficit hídrico");
+        assertThat(r01.get("codigo").asText()).isEqualTo("R-01");
+        assertThat(r01.get("rama").asText()).isEqualTo("RIEGO");
+        assertThat(r01.get("objetivo").asText()).isEqualTo("IRRIGATION");
+        assertThat(r01.get("efecto").asText()).isEqualTo("ACTS");
+        assertThat(r01.get("activa").asBoolean()).isTrue();
+        assertThat(r01.get("activaPorDefecto").asBoolean()).isTrue();
+        assertThat(r01.get("apagadaPorDemo").asBoolean()).isFalse();
+        assertThat(r01.get("proteccion").isNull()).isTrue();
+        assertThat(r01.get("estado").isNull()).isTrue();
+
+        JsonNode r04 = regla(json, "SustratoSaturadoRule");
+        assertThat(r04.get("efecto").asText()).isEqualTo("PROTECTS");
+        assertThat(r04.get("proteccion").asText()).isEqualTo("Se riega con el sustrato saturado.");
+
+        JsonNode retirada = regla(json, "SupplyRule");
+        assertThat(retirada.get("activa").asBoolean()).isFalse();
+        assertThat(retirada.get("activaPorDefecto").asBoolean()).isFalse();
+
+        assertThat(regla(json, "ManualLockRule").get("objetivo").asText()).isEqualTo("PROTECTION");
+        assertThat(regla(json, "HardwareFaultService").get("efecto").asText()).isEqualTo("PROTECTS");
+        assertThat(regla(json, "FollowUpRule").get("efecto").asText()).isEqualTo("WARNS");
     }
 }
