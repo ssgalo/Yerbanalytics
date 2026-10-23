@@ -200,6 +200,81 @@ describe('ReglasTab · interruptores', () => {
     expect(document.activeElement).toBe(sw);
   });
 
+  it('un clic afuera no cierra la confirmación, haya o no motivo escrito', async () => {
+    montar();
+    fireEvent.click(interruptor('Apagar Sustrato saturado'));
+    const dialogo = await screen.findByRole('alertdialog');
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+
+    fireEvent.change(within(dialogo).getByLabelText(/Motivo/), { target: { value: 'sonda' } });
+    fireEvent.mouseDown(document.body);
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+    expect((within(dialogo).getByLabelText(/Motivo/) as HTMLTextAreaElement).value).toBe('sonda');
+  });
+
+  it('en vuelo no se cancela: ni con clic afuera ni con Escape', async () => {
+    let resolver: (r: ReglaCatalogo) => void = () => undefined;
+    const onCambiarEstado = vi.fn(
+      () => new Promise<ReglaCatalogo>((res) => (resolver = res)),
+    );
+    montar({ onCambiarEstado });
+    fireEvent.click(interruptor('Apagar Riego por déficit hídrico'));
+    const dialogo = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Apagar regla' }));
+    await waitFor(() => expect(onCambiarEstado).toHaveBeenCalled());
+
+    fireEvent.mouseDown(document.body);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+
+    resolver({ ...catalogoDeFabrica().reglas[0], activa: false });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  });
+
+  it('Escape cancela la confirmación cuando no hay un pedido en vuelo, y devuelve el foco', async () => {
+    const { onCambiarEstado } = montar();
+    const sw = interruptor('Apagar Sustrato saturado');
+    fireEvent.click(sw);
+    await screen.findByRole('alertdialog');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(onCambiarEstado).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(sw);
+  });
+
+  it('tras apagar con éxito el foco vuelve al interruptor de la regla', async () => {
+    const { onCambiarEstado } = montar();
+    const sw = interruptor('Apagar Riego por déficit hídrico');
+    fireEvent.click(sw);
+    const dialogo = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Apagar regla' }));
+
+    await waitFor(() => expect(onCambiarEstado).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(
+      screen.getByRole('switch', { name: /Riego por déficit hídrico/ }),
+    );
+  });
+
+  it('es modal: aria-modal y el Tab no se escapa del diálogo', async () => {
+    montar();
+    fireEvent.click(interruptor('Apagar Riego por déficit hídrico'));
+    const dialogo = await screen.findByRole('alertdialog');
+    expect(dialogo.getAttribute('aria-modal')).toBe('true');
+
+    const ultimo = within(dialogo).getByRole('button', { name: 'Apagar regla' });
+    ultimo.focus();
+    fireEvent.keyDown(ultimo, { key: 'Tab' });
+    expect(document.activeElement).toBe(within(dialogo).getByLabelText(/Motivo/));
+
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(ultimo);
+  });
+
   it('prender es inmediato: sin diálogo, sin motivo', async () => {
     const { onCambiarEstado } = montar();
 
