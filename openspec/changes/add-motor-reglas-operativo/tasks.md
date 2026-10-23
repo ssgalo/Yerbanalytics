@@ -92,7 +92,7 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [ ] 14.4 Manual, modo demo con el simulador: Control de reglas muestra el estado en sólo lectura y `PUT enabled` da 400; con `SupplyRule` apagada el happy path avisa y saltea sólo el insumo; prendida en Motor de reglas, el happy path completa el tramo de insumo.
 - [ ] 14.5 Historial: el grafo de un riego anterior al apagado de R-03 sigue mostrando R-03.
 - [ ] 14.6 Migración manual corrida dos veces en la base de desarrollo; crear una fila operativa nueva funciona.
-- [x] 14.7 Revisión con contexto fresco del diff antes del PR (CLAUDE.md, regla de PR): hecha; sus hallazgos se corrigieron (sección 16).
+- [x] 14.7 Revisión con contexto fresco del diff antes del PR (CLAUDE.md, regla de PR): hecha; sus nueve hallazgos se corrigieron en commits propios (73508f6 … 6c04f6c), y los tests de los ítems 1 y 7 se verificaron por mutación.
 
 ## 15. Cambio de diseño: Motor de reglas, única fuente de verdad del encendido (D-2, D-9, D-15)
 La demo pierde el interruptor de encendido; conserva sólo cooldowns y bypass. Estado efectivo = operativo.
