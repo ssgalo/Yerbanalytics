@@ -75,6 +75,8 @@ export interface RuleConditionResult {
   /** The same diagnosis registered on several adjacent sectors BEFORE the pulse (an outbreak); null if no scenario asks for it. */
   outbreak: { diagnosis: DiagnosisPlan; sectors: number } | null;
   needsCooldownReset: boolean;
+  /** The backend's «sin pronóstico» demo mode must be on before the pulse (O-01…O-03). */
+  offlineForecast: boolean;
   /** The target zone must stop answering LEER_AHORA, and no telemetry is published for it. */
   silenceZone: boolean;
   /** Sensing pulses to request, one after the other (at least one). */
@@ -157,6 +159,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
       diagnostico: null,
       outbreak: null,
       needsCooldownReset: false,
+      offlineForecast: false,
       silenceZone: false,
       pulses: 1,
       manualLock: null,
@@ -187,6 +190,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
   let diagnostico: DiagnosisPlan | null = null;
   let outbreak: { diagnosis: DiagnosisPlan; sectors: number } | null = null;
   let silenceZone = false;
+  let offlineForecast = false;
   let pulses = 1;
   let manualLock: { reason: string } | null = null;
 
@@ -201,6 +205,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     diagnostico = patch.diagnosis ?? diagnostico;
     outbreak = patch.outbreak ?? outbreak;
     silenceZone = silenceZone || (patch.silenceZone ?? false);
+    offlineForecast = offlineForecast || (patch.offlineForecast ?? false);
     pulses = Math.max(pulses, patch.pulses ?? 1);
     manualLock = patch.manualLock ?? manualLock;
     for (const [metric, claim] of Object.entries(patch.pinnedReadings ?? {})) {
@@ -235,6 +240,7 @@ export function calculateConditions(selectedKeys: string[], thresholds: Threshol
     diagnostico,
     outbreak,
     needsCooldownReset,
+    offlineForecast,
     silenceZone,
     pulses,
     manualLock,

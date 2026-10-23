@@ -18,6 +18,7 @@ import { incompleteHardware } from './incompleteHardware';
 import { invalidReading } from './invalidReading';
 import { lock } from './lock';
 import { lowEc } from './lowEc';
+import { noForecast } from './noForecast';
 import { nodeOffline } from './nodeOffline';
 import { nutritionPlan } from './nutritionPlan';
 import { outbreak } from './outbreak';
@@ -36,7 +37,7 @@ export const SCENARIOS: RuleScenario[] = [
   faultNoFlow, faultOverflow, faultShadeLimit, repair, applicationPreconditions, nutritionPlan, lowEc,
   fungalDamage, foliarPest, fungalCondition, outbreak, fungicideCap,
   chlorosisNutritional, chlorosisNonNutritional, solarStress, solarStressUnexplained,
-  irrigationNoEffect, treatmentNoEffect,
+  irrigationNoEffect, treatmentNoEffect, noForecast,
 ];
 
 /** Backend pieces (`GET /api/demo/rules`) that no scenario exercises. */

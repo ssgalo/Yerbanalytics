@@ -58,6 +58,8 @@ export interface TelemetryClaim {
 export interface ScenarioPatch {
   /** Metrics to publish, by key (`humSus`, `temp`…). */
   telemetry?: Record<string, TelemetryClaim>;
+  /** Turn the backend's «sin pronóstico» demo mode on BEFORE the pulse (`PUT /api/demo/weather/offline`). */
+  offlineForecast?: boolean;
   /** Weather fields to inject. Whatever no scenario sets falls back to a mild day. */
   weather?: Partial<SimulatedWeather>;
   /** Diagnosis to register BEFORE the pulse. */

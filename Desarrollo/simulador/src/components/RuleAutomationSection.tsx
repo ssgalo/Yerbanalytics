@@ -220,6 +220,17 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
         setExecLog([...log]);
       }
 
+      // Step 1c: the «sin pronóstico» mode (O-01…O-03). It goes in before the weather: the offline mode wins over it.
+      if (conditions.offlineForecast) {
+        if (demoEnabled) {
+          await api.setOfflineForecast(true);
+          log.push('✓ Modo sin pronóstico activado: las reglas asumen que no llueve');
+        } else {
+          log.push('⚠ El backend no está en modo demo: no se puede activar el modo sin pronóstico');
+        }
+        setExecLog([...log]);
+      }
+
       // Step 2: inject simulated weather if needed.
       if (conditions.clima) {
         await api.setSimulatedWeather(conditions.clima);

@@ -851,6 +851,8 @@ export interface TrazaRegla {
   bloqueadaPor: string | null;
   /** "Clase: mensaje" cuando la regla lanzó una excepción (`ERROR`). */
   error: string | null;
+  /** Lo que la regla asumió porque no había pronóstico (O-01…O-03), p. ej. «Sin pronóstico: se asume que no llueve…». */
+  supuesto?: string | null;
 }
 
 /** Última evaluación del motor para un sector y origen. Vive en memoria en el backend. */

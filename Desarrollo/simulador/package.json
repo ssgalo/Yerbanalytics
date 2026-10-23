@@ -12,7 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts --prod",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test server/contract.test.ts server/demo-mode.test.ts server/emission.test.ts src/ruleConditions.test.ts src/scenarios/scenarios.test.ts src/scenarios/chlorosisSolar.test.ts src/scenarios/effectiveness.test.ts src/pulseChain.test.ts src/hardwareCoverage.test.ts server/node-errors.test.ts src/faultFlow.test.ts src/happyPath.test.ts src/tankStock.test.ts src/bypassFlow.test.ts src/outbreakFlow.test.ts server/nodeQueue.test.ts"
+    "test": "tsx --test server/contract.test.ts server/demo-mode.test.ts server/emission.test.ts src/ruleConditions.test.ts src/scenarios/scenarios.test.ts src/scenarios/chlorosisSolar.test.ts src/scenarios/effectiveness.test.ts src/scenarios/noForecast.test.ts src/pulseChain.test.ts src/hardwareCoverage.test.ts server/node-errors.test.ts src/faultFlow.test.ts src/happyPath.test.ts src/tankStock.test.ts src/bypassFlow.test.ts src/outbreakFlow.test.ts server/nodeQueue.test.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
