@@ -1192,10 +1192,10 @@ extendido de la macro-zona) no está implementada**: ver abajo.
 - **Control desde el simulador** (`/api/demo/rules`): las cuatro se apagan; `SolarStressRule` tiene los bypass `window` (ignora la ventana de riego, también en el
   despacho) y `samples` (la última lectura cuenta como las 48 h); `SolarStressUnexplainedRule`, `samples`. Escenarios `CHLOROSIS_NUTRITIONAL`,
   `CHLOROSIS_NON_NUTRITIONAL`, `SOLAR_STRESS` y `SOLAR_STRESS_UNEXPLAINED` en el simulador.
-- **F-S2 queda sin implementar.** Cerrar la mediasombra de la macro-zona de 11 a 16 h durante 3 días necesita un dueño de la malla por horario (el cambio
-  `add-mediasombra-v2`, cancelado): hoy sólo `ShadingRule` la mueve, sector por sector, en cada pulso (cada 4 h), por el pico de UV o por el plan global, sin
-  una hora de apertura ni de cierre que se pueda retener 5 horas. Sin ese dueño, una versión «parcial» cerraría la malla a destiempo o la dejaría cerrada. Los
-  parámetros `estres.pct-sectores-mz` y `estres.dias-proteccion` de la spec tampoco se crearon.
+- **F-S2 queda sin implementar.** Cerrar la mediasombra de la macro-zona de 11 a 16 h durante 3 días necesitaba un dueño de la malla por horario,
+  que no existía cuando se escribió este cambio. Con `add-rustificacion-por-macrozona` (#66) ese dueño existe: `HorarioMediasombraService` abre y cierra la
+  malla de cada zona en los bordes de su ventana. F-S2 queda **desbloqueada**: falta sumarle una ventana de protección (cerrada de 11 a 16 h por N días) que
+  ese servicio respete. Los parámetros `estres.pct-sectores-mz` y `estres.dias-proteccion` de la spec tampoco se crearon.
 
 ## Efectividad de las acciones y S-06 (`add-efectividad-y-s06` · reglas_v2 §4 y §9)
 

@@ -125,7 +125,7 @@ hardware real.
   corrige (sustrato > 80 % medio en 48 h, CE ≥ 2,0, pH ≥ 6,5) cortando la rama de insumos del sector con un `WARNING` que dice la causa, y **F-C2**
   fertiliza si no hay ninguna. El estrés solar no usa químicos: **F-S1** (luz ≥ 80 % entre las 10 y las 16 h, o ≥ 32 °C, en 48 h) repone agua con un
   riego del sector si el sustrato está < 55 %; **F-S3** (luz < 60 % y < 30 °C) sólo avisa «síntoma no explicado por radiación». La luz es el % de un
-  LDR. **F-S2 (cerrar la malla de la zona) no está implementada**: depende de un dueño de la malla por horario que la cancelación de `add-mediasombra-v2` dejó sin hacer.
+  LDR. **F-S2 (cerrar la malla de la zona) no está implementada**; ya no está bloqueada: el dueño de la malla por horario que le faltaba es `HorarioMediasombraService` (#66).
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
