@@ -267,7 +267,7 @@ describe('ReglasTab · sólo lectura y filtros', () => {
   it('el grupo Riego cuenta sus reglas y las apagadas, y las ejecuciones no tienen interruptor', () => {
     montar();
 
-    expect(screen.getByRole('heading', { name: 'Riego · 7 reglas' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Riego · 8 reglas' })).toBeTruthy();
     const ejec = screen.getByRole('article', { name: 'Ejecución del riego' });
     expect(within(ejec).queryByRole('switch')).toBeNull();
     expect(campo('riego.sectores-simultaneos')).toBeTruthy();

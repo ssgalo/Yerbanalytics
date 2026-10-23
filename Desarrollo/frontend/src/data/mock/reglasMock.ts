@@ -50,6 +50,7 @@ const SERVICIOS = new Set([
   'HardwareFaultService',
   'HorarioMediasombraService',
   'ApplicationPreconditions',
+  'EffectivenessService',
 ]);
 
 /** Sólo las reglas de la cadena (sin los servicios): lo que dibuja el grafo y evalúa la traza. */

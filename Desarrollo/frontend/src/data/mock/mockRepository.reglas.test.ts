@@ -73,7 +73,7 @@ describe('MockRepository · catálogo de reglas', () => {
 });
 
 /** Servicios que deciden y están en el catálogo, pero no son reglas de la cadena: no tienen nodo en el DAG. */
-const SERVICIOS = ['EscalamientoNodo', 'ReadingValidationGuard', 'HardwareFaultService', 'HorarioMediasombraService', 'ApplicationPreconditions'];
+const SERVICIOS = ['EscalamientoNodo', 'ReadingValidationGuard', 'HardwareFaultService', 'HorarioMediasombraService', 'ApplicationPreconditions', 'EffectivenessService'];
 
 describe('MockRepository · estado de las reglas', () => {
   const regla = (c: CatalogoReglas, id: string) => c.reglas.find((r) => r.id === id)!;

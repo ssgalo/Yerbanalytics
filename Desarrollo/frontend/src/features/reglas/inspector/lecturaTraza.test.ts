@@ -139,7 +139,7 @@ describe('resumenTraza', () => {
     expect(r).toContainEqual(
       expect.objectContaining({
         tipo: 'omitida',
-        texto: expect.stringMatching(/Riego por déficit hídrico quedó omitida por .*Posponer por lluvia/),
+        texto: expect.stringMatching(/Riego por déficit hídrico.* quedaron omitidas por .*Posponer por lluvia/),
       }),
     );
   });

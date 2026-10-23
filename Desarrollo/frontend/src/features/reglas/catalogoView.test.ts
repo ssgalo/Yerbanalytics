@@ -47,12 +47,13 @@ describe('agruparPorObjetivo · orden de las piezas', () => {
 });
 
 describe('agruparPorObjetivo', () => {
-  it('agrupa en el orden fijado y no dibuja un grupo sin piezas (Sanidad)', () => {
+  it('agrupa en el orden fijado, con Sanidad entre Nutrición y Mediasombra', () => {
     const grupos = agruparPorObjetivo(catalogoDeFabrica());
 
     expect(grupos.map((g) => g.objetivo)).toEqual([
       'IRRIGATION',
       'NUTRITION',
+      'SANITY',
       'SHADE',
       'FOLLOW_UP',
       'PROTECTION',
@@ -60,6 +61,7 @@ describe('agruparPorObjetivo', () => {
     expect(grupos.map((g) => g.titulo)).toEqual([
       'Riego',
       'Nutrición',
+      'Sanidad',
       'Mediasombra',
       'Seguimiento',
       'Protecciones',
@@ -75,19 +77,27 @@ describe('agruparPorObjetivo', () => {
     expect(NOMBRE_OBJETIVO.SANITY).toBe('Sanidad');
   });
 
-  it('un grupo de Sanidad aparece cuando hay una pieza con ese objetivo', () => {
+  it('un grupo sin piezas no se dibuja (Sanidad sin sus reglas)', () => {
     const c = catalogoDeFabrica();
-    const f: ReglaCatalogo = {
-      ...c.reglas[0],
-      id: 'FungalDamageRule',
-      objetivo: 'SANITY',
-      efecto: 'ACTS',
-      proteccion: null,
-    };
-    const grupos = agruparPorObjetivo({ ...c, reglas: [...c.reglas, f] });
+    const grupos = agruparPorObjetivo({
+      ...c,
+      reglas: c.reglas.filter((r) => r.objetivo !== 'SANITY'),
+    });
 
-    expect(grupos.map((g) => g.objetivo)).toContain('SANITY');
-    expect(grupos.map((g) => g.objetivo).indexOf('SANITY')).toBe(2);
+    expect(grupos.map((g) => g.objetivo)).not.toContain('SANITY');
+  });
+
+  it('Sanidad trae las reglas bióticas y el estrés solar sin radiación; Seguimiento, la evaluación de efectividad', () => {
+    expect(grupo('SANITY')!.reglas.map((r) => r.id).sort()).toEqual([
+      'FoliarPestRule',
+      'FungalConditionRule',
+      'FungalDamageRule',
+      'OutbreakRule',
+      'SolarStressUnexplainedRule',
+    ]);
+    expect(grupo('FOLLOW_UP')!.reglas.map((r) => r.id)).toEqual(['EffectivenessService']);
+    // S-06 es una protección: vive en Protecciones aunque sea de la rama de riego.
+    expect(grupo('PROTECTION')!.reglas.map((r) => r.id)).toContain('IneffectiveActionRule');
   });
 
   it('dentro de cada grupo, por prioridad; R-04 (protege) está en Riego y no en Protecciones', () => {
@@ -103,6 +113,7 @@ describe('agruparPorObjetivo', () => {
       'PausaTrasAplicacionRule',
       'PosponerPorLluviaRule',
       'RiegoPorDeficitRule',
+      'SolarStressRule',
     ]);
     expect(riego.reglas[0].efecto).toBe('PROTECTS');
     expect(grupo('PROTECTION')!.reglas.map((r) => r.id)).not.toContain('SustratoSaturadoRule');
@@ -139,10 +150,11 @@ describe('agruparPorObjetivo', () => {
     expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).toContain(
       'seguridad.antiguedad-max-lectura',
     );
-    // Nutrición: la regla de insumo y el servicio de aplicación.
-    expect(grupo('NUTRITION', c)!.compartidos.map((p) => p.clave)).toContain(
-      'diagnostico.confianza-minima',
-    );
+    // El diagnóstico de IA lo leen la dosificación y las reglas F-*: gana Riego (F-S1), que va antes.
+    for (const clave of ['diagnostico.confianza-minima', 'diagnostico.vigencia-horas']) {
+      expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).toContain(clave);
+      expect(grupo('NUTRITION', c)!.compartidos.map((p) => p.clave)).not.toContain(clave);
+    }
 
     const todos = agruparPorObjetivo(c).flatMap((g) => g.compartidos.map((p) => p.clave));
     expect(new Set(todos).size).toBe(todos.length);
@@ -159,12 +171,9 @@ describe('agruparPorObjetivo', () => {
 
     const despacho = grupo('IRRIGATION', c)!.consumidores.find((x) => x.id === 'DespachoRiego')!;
     expect(despacho.parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
-    const hist = grupo('FOLLOW_UP', c)!.consumidores.find((x) => x.id === 'HistorialService')!;
-    expect(hist.parametros.map((p) => p.clave).sort()).toEqual([
-      'seguimiento.delta-min',
-      'seguimiento.latencia-min',
-    ]);
-    expect(nombreConsumidor('HistorialService')).toMatch(/^Ejecución/);
+    const purga = grupo('PROTECTION', c)!.consumidores.find((x) => x.id === 'ReadingPurge')!;
+    expect(purga.parametros.map((p) => p.clave)).toEqual(['readings.retention-days']);
+    expect(nombreConsumidor('ReadingPurge')).toMatch(/^Ejecución/);
     expect(nombreConsumidor('DespachoRiego')).toMatch(/^Ejecución/);
   });
 
@@ -174,6 +183,8 @@ describe('agruparPorObjetivo', () => {
       'ReadingValidationGuard',
       'HardwareFaultService',
       'ApplicationPreconditions',
+      'EffectivenessService',
+      'HistorialService',
     ]) {
       expect(CONSUMIDORES[id]).toBeUndefined();
     }
@@ -203,7 +214,11 @@ describe('agruparPorObjetivo', () => {
       { ...SIN_FILTROS, soloConCambios: true },
       new Set(['riego.humedad-objetivo']),
     );
-    expect(cambios.flatMap((g) => g.reglas.map((r) => r.id))).toEqual(['RiegoPorDeficitRule']);
+    // La humedad objetivo la usan R-01 y F-S1 (estrés solar): las dos aparecen, ambas en Riego.
+    expect(cambios.flatMap((g) => g.reglas.map((r) => r.id)).sort()).toEqual([
+      'RiegoPorDeficitRule',
+      'SolarStressRule',
+    ]);
     expect(cambios).toHaveLength(1);
   });
 

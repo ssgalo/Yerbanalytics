@@ -54,7 +54,7 @@ describe('ReglaCard', () => {
     montar('SustratoSaturadoRule');
     expect(screen.getByText('Protege')).toBeTruthy();
     cleanup();
-    montar('FollowUpRule');
+    montar('FungalConditionRule');
     expect(screen.getByText('Avisa')).toBeTruthy();
   });
 
@@ -117,14 +117,14 @@ describe('ReglaCard', () => {
   });
 
   it('sus parámetros propios se editan en línea con su unidad, sin el texto de rango y fábrica debajo', () => {
-    const { onEditar } = montar('RiegoPorDeficitRule');
+    const { onEditar } = montar('ShadingRule');
 
-    const campo = screen.getByLabelText(/Humedad objetivo/) as HTMLInputElement;
-    fireEvent.change(campo, { target: { value: '60' } });
+    const campo = screen.getByLabelText(/Índice UV de protección/) as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: '8' } });
 
     expect(onEditar).toHaveBeenCalledWith(
-      expect.objectContaining({ clave: 'riego.humedad-objetivo' }),
-      '60',
+      expect.objectContaining({ clave: 'mediasombra.uv-umbral' }),
+      '8',
     );
     expect(screen.queryByText(/fábrica \d/)).toBeNull();
   });
