@@ -260,7 +260,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay quince scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay dieciséis scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -280,6 +280,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   base ya sembrada (la matriz sólo se siembra si está vacía).
 > - `resources/migracion-permisos-servicio-simulador.sql` — agrega `reglas.ver`, `pasadas.ver` y `pasadas.operar` al rol
 >   Servicio (catálogo y traza del motor, pulsos, secuencias y pasadas); sin ellas dan 403.
+> - `resources/migracion-permisos-simulacion-servicio.sql` — agrega `simulacion.gestionar` al rol Servicio (el simulador usa `/api/demo/**`); sin él da 403.
 > - `resources/migracion-permisos-hardware-servicio.sql` — agrega `hardware.ver` al rol Servicio (el simulador lo lee
 >   para su escenario de hardware incompleto); sólo lectura.
 > - `resources/migracion-permisos-hardware-reparar.sql` — agrega `hardware.reparar` (Ingeniero, Operario y Servicio) y
