@@ -71,9 +71,9 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 10.2 GREEN: `historyGraphModel` sin `plainLabel` ni filtro por `activa`.
 
 ## 11. Frontend: Configuración (D-14)
-- [ ] 11.1 RED: `ConfiguracionPage.test`: sólo bandas de métricas, sin seguimiento, límites de insumos ni mediasombra, sin enlace a Motor de reglas.
-- [ ] 11.2 RED: test de la vista Rustificación: edita el horario por defecto (validación de cierre > apertura) y lista las macro-zonas con su plan y enlace.
-- [ ] 11.3 GREEN: se borran `SeguimientoForm`, `LimitesActuadoresForm`, sus tests y los campos de `ConfigOperativa`/`configValidation`; `RustificacionPage` + ruta + entrada del Sidebar; textos de `ConfiguracionPage` y `PreferencesPage` sin el motor.
+- [x] 11.1 RED: `ConfiguracionPage.test`: sólo bandas de métricas, sin seguimiento, límites de insumos ni mediasombra, sin enlace a Motor de reglas.
+- [x] 11.2 RED: test de la vista Rustificación: edita el horario por defecto (validación de cierre > apertura) y lista las macro-zonas con su plan y enlace.
+- [x] 11.3 GREEN: se borran `SeguimientoForm`, `LimitesActuadoresForm`, sus tests y los campos de `ConfigOperativa`/`configValidation`; `RustificacionPage` + ruta + entrada del Sidebar; textos de `ConfiguracionPage` y `PreferencesPage` sin el motor.
 
 ## 12. Simulador (D-9)
 - [ ] 12.1 RED: `RuleToggles` (o su modelo) muestra la leyenda "Apagada en el vivero" en una regla con `operationalActive: false`, con el interruptor habilitado.

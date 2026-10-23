@@ -458,13 +458,11 @@ export interface MetricThreshold {
 }
 
 /**
- * Límites operativos y parámetros de seguimiento (HU-15). El volumen de riego no
- * vive acá: es un parámetro del catálogo del motor de reglas (`riego.volumen-max-evento`).
+ * Parámetros operativos de la configuración (HU-15): el pulso de sensado, la pasada diaria y el horario por defecto de
+ * la mediasombra. Lo que decide el motor (volúmenes, topes de dosis, seguimiento post-acción) vive en el catálogo de
+ * parámetros del motor de reglas.
  */
 export interface ConfigOperativa {
-  insumoDosisMax24hMl: number;
-  seguimientoLatenciaMin: number;
-  seguimientoDeltaMin: number;
   /**
    * Intervalo del pulso de sensado y evaluación (60–360 min). En cada franja, anclada a las 02:00,
    * el backend lee los sensores de todas las macro-zonas y evalúa el motor.
