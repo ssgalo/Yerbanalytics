@@ -302,7 +302,8 @@ public class HistorialService implements ConsumidorParametros {
         e.setSev(s.getDiagnosisSev());
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        e.setRegla(ruleName);
+        guardarDelMotor(e);
     }
 
     /**
