@@ -368,7 +368,7 @@ Lo resuelto:
 | `FoliarPestRule` | F-P1 | SANITY | ACTS | no |
 | `FungalConditionRule` | F-F2 | SANITY | WARNS | no |
 | `OutbreakRule` | F-04 | SANITY | ACTS | no |
-| `ChlorosisNonNutritionalRule` | F-C1 | NUTRITION | WARNS (corta la rama de insumos y avisa; no manda a ningún actuador) | no |
+| `ChlorosisNonNutritionalRule` | F-C1 | NUTRITION | ACTS (corta la rama de insumos y cancela el fertilizante pendiente de F-C2: decide, aunque no mande a un actuador) | no |
 | `ChlorosisNutritionalRule` | F-C2 | NUTRITION | ACTS | no |
 | `SolarStressRule` | F-S1 | IRRIGATION | ACTS | no |
 | `SolarStressUnexplainedRule` | F-S3 | SANITY | WARNS | no |

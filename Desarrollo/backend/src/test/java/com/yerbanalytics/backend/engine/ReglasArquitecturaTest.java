@@ -212,7 +212,7 @@ class ReglasArquitecturaTest {
             "FoliarPestRule", new Esperada("F-P1", RuleObjective.SANITY, RuleEffect.ACTS),
             "FungalConditionRule", new Esperada("F-F2", RuleObjective.SANITY, RuleEffect.WARNS),
             "OutbreakRule", new Esperada("F-04", RuleObjective.SANITY, RuleEffect.ACTS),
-            "ChlorosisNonNutritionalRule", new Esperada("F-C1", RuleObjective.NUTRITION, RuleEffect.WARNS),
+            "ChlorosisNonNutritionalRule", new Esperada("F-C1", RuleObjective.NUTRITION, RuleEffect.ACTS),
             "ChlorosisNutritionalRule", new Esperada("F-C2", RuleObjective.NUTRITION, RuleEffect.ACTS),
             "SolarStressRule", new Esperada("F-S1", RuleObjective.IRRIGATION, RuleEffect.ACTS),
             "SolarStressUnexplainedRule", new Esperada("F-S3", RuleObjective.SANITY, RuleEffect.WARNS),

@@ -86,7 +86,7 @@ public class ChlorosisNonNutritionalRule implements Rule {
 
     @Override
     public RuleEffect effect() {
-        return RuleEffect.WARNS;
+        return RuleEffect.ACTS;
     }
 
     @Override
