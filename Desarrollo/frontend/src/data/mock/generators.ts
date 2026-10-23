@@ -26,6 +26,7 @@ import { capturaDemo } from './capturasDemo';
 import { mockConfidenceLevel, mockDetections } from './detections';
 import catalogo from './catalogoReglas.fixture.json';
 import { ACT, C, LAB, actTpl, pathos, resMap, sevMap, specs, tints, zonaDefs } from './specs';
+import { vaporDeficitDeMetricas } from './vaporDeficit';
 import {
   clampDisposicion,
   DEFAULT_MACRO_ZONAS_POR_FILA,
@@ -358,6 +359,7 @@ export function buildNursery(
     lecturaPorZona[z.id] = ts;
     const lectura = {
       metrics,
+      dpv: offlineOnly ? null : vaporDeficitDeMetricas(metrics),
       ts,
       ago,
       stale: offlineOnly,

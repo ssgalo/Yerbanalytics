@@ -82,6 +82,21 @@ public class ZonaEntity {
     private Double kRaw;
 
     // ------------------------------------------------------------------
+    // Métrica derivada (no viaja por el contrato MQTT)
+    // ------------------------------------------------------------------
+
+    /**
+     * Déficit de presión de vapor en kPa, calculado por la ingesta con la temperatura y la humedad ambiental de la
+     * misma lectura. No es una de las diez métricas sensadas: {@link #raw} y {@link #setRaw} no la conocen.
+     */
+    @Column(name = "dpv")
+    private Double dpvRaw;
+
+    /** Epoch ms de la lectura de la que salió {@link #dpvRaw}; queda vieja si una lectura no trae T o HR. */
+    @Column(name = "dpv_ts")
+    private Long dpvTs;
+
+    // ------------------------------------------------------------------
     // Estado del nodo testigo
     // ------------------------------------------------------------------
 

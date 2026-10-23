@@ -97,10 +97,27 @@ export interface Sector {
   actuadores: Actuadores;
 }
 
+/** Tramo agronómico del DPV (reglas_v2 §1.4). */
+export type VaporBand = 'SATURATED' | 'TRANSITION' | 'COMFORTABLE' | 'HIGH_DEMAND' | 'DRY_HEAT';
+
+/**
+ * Déficit de presión de vapor de una macro-zona: derivado de su temperatura del aire y humedad ambiental, no
+ * sensado (no viaja por el contrato del nodo). Informativo: no mueve el estado de los sectores.
+ */
+export interface VaporDeficit {
+  /** En kPa. */
+  value: number;
+  band: VaporBand;
+  /** El tramo en palabras: 'calor seco'. */
+  label: string;
+}
+
 /** Lectura sensada de una macro-zona: lo que reportó su nodo testigo. */
 export interface LecturaZona {
   /** Las 10 métricas, ya evaluadas contra sus umbrales. */
   metrics: Metric[];
+  /** DPV derivado de T y HR; `null` si la zona no tiene dato o el nodo está fuera de servicio. */
+  dpv: VaporDeficit | null;
   /** Instante de la lectura (epoch ms); `null` si el nodo nunca reportó. */
   ts: number | null;
   /** Antigüedad legible: 'hace 4 min'. */

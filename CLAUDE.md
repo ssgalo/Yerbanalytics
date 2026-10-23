@@ -70,6 +70,11 @@ hardware real.
   > dS/m; `uv` es **% de luz de un LDR**, no radiación UV (la clave se conserva
   > por compatibilidad con el firmware). Fuente de verdad:
   > `Desarrollo/embebido/comun/contrato.h`.
+- **Métrica derivada (+1)**: el **DPV** (déficit de presión de vapor, kPa) no se sensa: la
+  ingesta lo calcula con la temperatura del aire y la humedad ambiental de cada lectura
+  (`readings/VaporPressureDeficit`), lo guarda en la zona y en `zone_reading`, y el dashboard
+  lo muestra con su tramo. Son 10 sensadas + 1 derivada; es informativo y no está en el
+  contrato MQTT. Lo usan las reglas de hongos y plagas (F-F1, F-F2, F-P1).
 - **Estados de salud**: `Saludable` · `En observación` (warning) · `Crítico` ·
   `Fuera de servicio` (offline).
 - **Diagnósticos de IA**: Sano, Clorosis (trastorno nutricional), Estrés solar,

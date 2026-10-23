@@ -37,6 +37,7 @@ class ReadingRecorderTest {
         z.setNRaw(150.0);
         z.setPRaw(45.0);
         z.setKRaw(180.0);
+        z.setDpvRaw(0.8);
         return z;
     }
 
@@ -66,7 +67,7 @@ class ReadingRecorderTest {
         assertThat(r.getN()).isEqualTo(150.0);
         assertThat(r.getP()).isEqualTo(45.0);
         assertThat(r.getK()).isEqualTo(180.0);
-        assertThat(r.getDpv()).isNull();
+        assertThat(r.getDpv()).isEqualTo(0.8);
     }
 
     @Test

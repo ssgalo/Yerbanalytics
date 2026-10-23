@@ -21,6 +21,7 @@ import com.yerbanalytics.backend.readings.ReadingCheck;
 import com.yerbanalytics.backend.readings.ReadingMetrics;
 import com.yerbanalytics.backend.readings.ReadingOrigin;
 import com.yerbanalytics.backend.readings.ReadingRecorder;
+import com.yerbanalytics.backend.readings.VaporPressureDeficit;
 import com.yerbanalytics.backend.readings.ReadingValidationGuard;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttTelemetryPayload;
@@ -247,7 +248,7 @@ public class NurseryService {
                     alerta,
                     off,
                     zoneSectors.size(),
-                    new LecturaZona(zoneMetrics, ze.getLastReadingTime(), zoneAgo, isStale),
+                    new LecturaZona(zoneMetrics, isStale ? null : VaporDeficit.of(ze.getDpvRaw()), ze.getLastReadingTime(), zoneAgo, isStale),
                     new NodoTestigo(
                             ze.getNodoMac(),
                             ze.getNodoBattery(),
@@ -600,6 +601,12 @@ public class NurseryService {
             // Marca propia: si la sonda cae, el resto de la lectura sigue refrescando la zona
             // y sólo esta marca delata que la humedad está congelada (StaleSensorRule).
             zona.setHumSusTs(tsMs);
+        }
+        // El DPV deriva de T y HR de ESTA lectura; si falta alguna (o se descartó) conserva el valor y la marca viejos.
+        Double dpv = VaporPressureDeficit.calculate(check.accepted().get("temp"), check.accepted().get("humAmb"));
+        if (dpv != null) {
+            zona.setDpvRaw(VaporPressureDeficit.round(dpv));
+            zona.setDpvTs(tsMs);
         }
         if (payload.mac() != null && !payload.mac().isBlank()) zona.setNodoMac(payload.mac().trim());
         if (payload.battery() != null) zona.setNodoBattery(payload.battery());

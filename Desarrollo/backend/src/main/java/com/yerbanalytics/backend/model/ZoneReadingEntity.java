@@ -84,7 +84,7 @@ public class ZoneReadingEntity {
     @Column(name = "k")
     private Double k;
 
-    /** Déficit de presión de vapor (kPa). Lo calcula {@code add-metrica-dpv}; hasta entonces queda nulo. */
+    /** Déficit de presión de vapor (kPa). Lo calcula la ingesta; queda nulo hasta que la zona tenga T y HR. */
     @Column(name = "dpv")
     private Double dpv;
 }

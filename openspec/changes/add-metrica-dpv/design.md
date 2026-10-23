@@ -31,3 +31,14 @@ Se usa `ReadingHistory` (`latest(zone, n, onlyPulse)` y `max(zone, ReadingMetric
 ### D-5 — Frontend
 Tipo `Zona.lectura.dpv` y tarjeta en el detalle de zona con el color de su tramo (token existente
 `--ok/--warn/--crit` según corresponda; nunca hex). En modo `mock`, un valor determinístico derivado de T y HR del mock.
+
+### D-6 — Cómo quedó implementado (nombres en inglés, CLAUDE.md §7)
+- `readings/VaporPressureDeficit` (cálculo puro y redondeo), `readings/VaporPressureBand` (tramos y etiquetas) y `dto/VaporDeficit`
+  (`value`, `band`, `label`). `ZonaEntity.dpvRaw`/`dpvTs`; **no** pasa por `raw()/setRaw()`, que son las diez sensadas.
+- El DTO va en `LecturaZona.dpv`, **fuera** de `metrics`: así no necesita `MetricSpec`, ni umbrales editables (`umbral_metrica`), ni lo toca
+  la validación de rango de S-03, ni entra en las alertas por métrica. Con el nodo fuera de servicio viaja `null`.
+- Se calcula con T y HR **aceptadas en esa lectura**: una descartada por S-03 cuenta como ausente y el DPV conserva el valor anterior.
+- La consulta para las reglas es `ReadingHistory` tal cual (D-4): `ReadingMetric.DPV` ya existía desde `add-historial-lecturas`.
+- Frontend: fila `VaporDeficitRow` en `SensingCard` (no abre histórico: no hay serie del DPV en el dashboard). Tono por tramo en
+  `features/map/vaporBand.ts`: saturado y demanda alta = atención, calor seco = crítico visual, confortable y transición = ok.
+  Mock: `data/mock/vaporDeficit.ts`, espejo de la fórmula y los tramos del backend.
