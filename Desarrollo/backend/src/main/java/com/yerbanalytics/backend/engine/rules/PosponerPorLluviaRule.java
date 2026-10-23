@@ -51,6 +51,11 @@ public class PosponerPorLluviaRule implements Rule {
     }
 
     @Override
+    public String supuestoSinPronostico() {
+        return "se asume que no llueve: no se pospone el riego";
+    }
+
+    @Override
     public String label() {
         return "🌧️ Posponer por lluvia (R-03)";
     }

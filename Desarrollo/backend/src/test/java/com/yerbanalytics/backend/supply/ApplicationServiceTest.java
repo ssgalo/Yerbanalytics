@@ -236,6 +236,26 @@ class ApplicationServiceTest {
         assertThat(pendingRows).isEmpty();
     }
 
+    // --- O-03: sin pronóstico ---
+
+    @Test
+    void withoutAForecastRainDoesNotBlockTheApplication() {
+        when(weather.getForecastSinEspera()).thenReturn(null);
+
+        assertThat(requestFertilizer().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
+    }
+
+    @Test
+    void withoutAForecastTheLastReadingDecidesTheTemperature() {
+        when(weather.getForecastSinEspera()).thenReturn(null);
+        sector.getZona().setTempRaw(35.0);
+
+        ApplicationOutcome outcome = requestFertilizer();
+
+        assertThat(outcome.status()).isEqualTo(ApplicationOutcome.Status.DEFERRED);
+        assertThat(outcome.reason()).contains("P-D3");
+    }
+
     @Test
     void aTreatmentOpensItsEffectivenessFollowUp() {
         var followUp = new com.yerbanalytics.backend.effectiveness.FollowUp(

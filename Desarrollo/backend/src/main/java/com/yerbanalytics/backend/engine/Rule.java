@@ -70,6 +70,14 @@ public interface Rule extends ConsumidorParametros, DemoControllable {
     }
 
     /**
+     * Lo que la regla asume cuando no hay pronóstico (reglas_v2 §10, O-01…O-03), por ejemplo «no llueve». Vacío si no usa el
+     * pronóstico. Cuando el contexto no trae uno, la traza lo muestra para que el Inspector diga qué se asumió.
+     */
+    default String supuestoSinPronostico() {
+        return "";
+    }
+
+    /**
      * Evalúa la regla contra el snapshot inmutable del sector. Los umbrales se leen y se comparan
      * a través de la {@link Evaluacion}, que sólo deja leer los {@link #parametros()} declarados y
      * registra cada comparación en la traza: decidir y registrar son el mismo gesto.

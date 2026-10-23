@@ -151,7 +151,7 @@ public class RuleOrchestrator {
             trazas.add(new TrazaRegla(rule.name(), branch, rule.priority(), EstadoRegla.EVALUADA,
                     List.copyOf(ev.comparaciones()),
                     actions.stream().map(a -> new AccionTrazada(a.type(), a.motivo())).toList(),
-                    null));
+                    null, null, supuestoUsado(rule, ctx)));
 
             // Analizar acciones para actualizar el estado de los bloqueos de rama
             for (RuleAction action : actions) {
@@ -185,6 +185,12 @@ public class RuleOrchestrator {
     /** {@code true} si alguna acción pide aplicar un insumo porque lo dice el diagnóstico (P-D1). */
     private static boolean pideAplicacionPorDiagnostico(List<RuleAction> actions) {
         return actions.stream().anyMatch(a -> a.detalle() instanceof DetalleInsumo insumo && insumo.fromDiagnosis());
+    }
+
+    /** O-01…O-03: lo que la regla asumió porque el contexto no trae pronóstico; {@code null} si lo trae o la regla no lo usa. */
+    private static String supuestoUsado(Rule rule, RuleContext ctx) {
+        String supuesto = rule.supuestoSinPronostico();
+        return ctx.forecast() != null || supuesto == null || supuesto.isBlank() ? null : "Sin pronóstico: " + supuesto;
     }
 
     private static TrazaEvaluacion armarTraza(RuleContext ctx, OrigenEvaluacion origen,

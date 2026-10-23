@@ -132,6 +132,28 @@ class ShadingRuleTest {
     }
 
     @Test
+    @DisplayName("O-04: sin pronóstico (ni red) el día del plan avanza con el reloj y los horarios rigen igual")
+    void planDeRustificacion_avanzaConElRelojSinPronostico() {
+        ShadingRule rule = new ShadingRule(rustificacionRepository, "2026-10-01");
+        when(rustificacionRepository.findAllByOrderByOrdenAsc()).thenReturn(List.of(
+                new RustificacionEtapaEntity(1, 1, 2, 40), new RustificacionEtapaEntity(2, 3, 5, 60)));
+
+        // Día 2 del plan: etapa de 40 % → cerrada. Sector abierto: la cierra.
+        sector.setActuadorShade(100);
+        RuleContext dia2 = new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
+                "ok", Instant.parse("2026-10-02T15:00:00Z"), null, false);
+        assertThat(evaluar(rule, dia2).get(0).motivo()).contains("[apertura=0]");
+
+        // Tres días sin red después (día 5): etapa de 60 % → abierta. Sector cerrado: la abre.
+        sector.setActuadorShade(0);
+        RuleContext dia5 = new RuleContext(sector, zona, List.of(), List.of(), RuleContextTestFactory.defaultConfig(),
+                "ok", Instant.parse("2026-10-05T15:00:00Z"), null, false);
+        List<RuleAction> acciones = evaluar(rule, dia5);
+        assertThat(acciones.get(0).type()).isEqualTo(ActionType.MOVER_MEDIASOMBRA);
+        assertThat(acciones.get(0).motivo()).doesNotContain("[apertura=0]");
+    }
+
+    @Test
     @DisplayName("ShadingRule: apertura diferente al plan → MOVER_MEDIASOMBRA")
     void aperturaDiferenteAlPlan_moverMediasombra() {
         String hoy = LocalDate.now(com.yerbanalytics.backend.config.ZonaHorariaVivero.ZONA).format(DateTimeFormatter.ISO_LOCAL_DATE);
