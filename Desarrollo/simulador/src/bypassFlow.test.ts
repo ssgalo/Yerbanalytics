@@ -5,7 +5,7 @@ import type { DemoRule, DemoRuleUpdate } from './types';
 
 function rule(name: string, bypassKeys: string[], bypassed: string[] = []): DemoRule {
   return {
-    name, label: name, branch: 'INSUMO', priority: 22, enabled: true,
+    name, label: name, branch: 'INSUMO', priority: 22, enabled: true, operationalActive: true, effectiveEnabled: true,
     cooldownKeys: [], bypassKeys, cooldownMinutes: {}, bypassed,
   };
 }

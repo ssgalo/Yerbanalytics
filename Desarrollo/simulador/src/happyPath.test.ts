@@ -77,7 +77,9 @@ const rule_ = (name: string, enabled: boolean, bypassed: string[]): DemoRule => 
   label: name,
   branch: 'INSUMO',
   priority: 12,
-  enabled,
+  enabled: true,
+  operationalActive: enabled,
+  effectiveEnabled: enabled,
   cooldownKeys: [],
   bypassKeys: ['window', 'daily'],
   cooldownMinutes: {},
@@ -90,6 +92,8 @@ const windowRule = (bypassed: string[]): DemoRule => ({
   branch: 'RIEGO',
   priority: 8,
   enabled: true,
+  operationalActive: true,
+  effectiveEnabled: true,
   cooldownKeys: [],
   bypassKeys: ['window'],
   cooldownMinutes: {},
@@ -462,4 +466,12 @@ test('progress ignores a snapshot without the sector, and readProgress survives 
 
 test('defaults stay in sync', () => {
   assert.equal(DEFAULT_THRESHOLDS['riego.umbral-humedad'], 45);
+});
+
+test('simulator: SupplyRule apagada en el vivero (demo sin tocar) se prende por demo y completa el insumo', async () => {
+  // enabled=true es la capa de demo sin tocar; lo que manda es effectiveEnabled=false (estado operativo apagado).
+  const { deps, calls } = fakeDeps();
+  const out = await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
+  assert.ok(calls.includes('update:SupplyRule:enabled'));
+  assert.equal(out.readout?.allActed, true);
 });

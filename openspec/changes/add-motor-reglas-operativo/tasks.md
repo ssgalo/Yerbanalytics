@@ -76,9 +76,9 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 11.3 GREEN: se borran `SeguimientoForm`, `LimitesActuadoresForm`, sus tests y los campos de `ConfigOperativa`/`configValidation`; `RustificacionPage` + ruta + entrada del Sidebar; textos de `ConfiguracionPage` y `PreferencesPage` sin el motor.
 
 ## 12. Simulador (D-9)
-- [ ] 12.1 RED: `RuleToggles` (o su modelo) muestra la leyenda "Apagada en el vivero" en una regla con `operationalActive: false`, con el interruptor habilitado.
-- [ ] 12.2 RED: `happyPath` sigue prendiendo `SupplyRule` por demo y completa el tramo de insumo (test de regresión).
-- [ ] 12.3 GREEN: tipos (`DemoRule.operationalActive`), `RuleToggles`, `happyPath`; escenarios que asumían etiquetas con emoji.
+- [x] 12.1 RED: `RuleToggles` (o su modelo) muestra la leyenda "Apagada en el vivero" en una regla con `operationalActive: false`, con el interruptor habilitado.
+- [x] 12.2 RED: `happyPath` sigue prendiendo `SupplyRule` por demo y completa el tramo de insumo (test de regresión).
+- [x] 12.3 GREEN: tipos (`DemoRule.operationalActive`), `RuleToggles`, `happyPath`; escenarios que asumían etiquetas con emoji.
 
 ## 13. Documentación
 - [ ] 13.1 CLAUDE.md: invariante de D-15 en §4 ("Sin controles de demo"), §6 ("Modos de operación", "Patrón para agregar una nueva regla": `code()`, `objective()`, `effect()`, `protection()`, estado operativo) y §6.2; regla "sin emojis" en §4 "Convenciones de estilo"; §4 Sidebar con la vista Rustificación real y Umbrales sólo con bandas; endpoints `PUT /api/rules/{name}/estado`; §6 lista de migraciones con `migracion-umbrales-al-motor.sql` y el conteo reconciliado con los archivos de `resources/`.

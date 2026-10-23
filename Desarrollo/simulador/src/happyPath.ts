@@ -349,9 +349,9 @@ export async function runHappyPath(
       // La dosificación v1 arranca retirada y la aplicación pasa por las precondiciones de la v2: se enciende la regla,
       // se saltean la ventana horaria y el límite diario, y se asegura stock en los tanques de la zona.
       const supplyRule = rules.find((r) => r.name === SUPPLY_RULE);
-      if (supplyRule && !supplyRule.enabled) {
+      if (supplyRule && !supplyRule.effectiveEnabled) {
         await deps.updateRule(SUPPLY_RULE, { enabled: true });
-        deps.log('✓ Dosificación (SupplyRule) encendida: arranca retirada hasta que entren las reglas de aplicación de la v2');
+        deps.log('✓ Dosificación (SupplyRule) encendida: estaba apagada en el vivero o retirada; el override de demo gana');
         leftActive.push('dosificación encendida');
       }
       const preconditions = rules.find((r) => r.name === PRECONDITIONS_RULE);
@@ -400,8 +400,8 @@ export async function runHappyPath(
       deps.log('✓ Sin clima simulado: rige el pronóstico real');
       // No se enciende nada (este modo no toca reglas), pero si la dosificación sigue retirada el insumo nunca va a actuar.
       const supplyRule = (await deps.getRules()).find((r) => r.name === SUPPLY_RULE);
-      if (supplyRule && !supplyRule.enabled) {
-        const warning = 'La dosificación (SupplyRule) está retirada: el insumo no va a actuar. Encendela en el panel de reglas o arrancá el backend con YERBANALYTICS_REGLAS_RETIRADAS vacío.';
+      if (supplyRule && !supplyRule.effectiveEnabled) {
+        const warning = 'La dosificación (SupplyRule) está apagada: el insumo no va a actuar. Encendela en Motor de reglas del dashboard o prendela con el panel de reglas de la demo.';
         warnings.push(warning);
         deps.log(`⚠ ${warning}`);
       }

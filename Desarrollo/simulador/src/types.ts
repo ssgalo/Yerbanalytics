@@ -144,7 +144,12 @@ export interface DemoRule {
   label: string;
   branch: string;
   priority: number;
+  /** Capa de demo: `false` sólo si el simulador la apagó explícitamente. No es lo que corre. */
   enabled: boolean;
+  /** Lo que decidió el vivero en Motor de reglas (sólo lectura: el simulador no lo escribe). */
+  operationalActive: boolean;
+  /** Si la regla corre ahora: el override explícito de demo gana; si no, el estado operativo. */
+  effectiveEnabled: boolean;
   /** Cooldown keys this rule declares (one numeric input per key). */
   cooldownKeys: string[];
   /** Bypass keys this rule declares (one toggle per key). */

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
 import type { DemoRule } from '../types';
+import { nextEnabled, operationalLegend } from '../ruleToggleModel';
 
 export function RuleToggles() {
   const [rules, setRules] = useState<DemoRule[]>([]);
@@ -27,7 +28,7 @@ export function RuleToggles() {
     setSaving(rule.name);
     setError(null);
     try {
-      const updated = await api.updateDemoRule(rule.name, { enabled: !rule.enabled });
+      const updated = await api.updateDemoRule(rule.name, { enabled: nextEnabled(rule) });
       setRules((prev) => prev.map((r) => (r.name === rule.name ? updated : r)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -104,16 +105,17 @@ export function RuleToggles() {
 
       <div className="ruleList">
         {rules.map((rule) => (
-          <div key={rule.name} className={`ruleRow ${rule.enabled ? '' : 'ruleDisabled'}`}>
+          <div key={rule.name} className={`ruleRow ${rule.effectiveEnabled ? '' : 'ruleDisabled'}`}>
             <div className="ruleHeader">
               <label className="ruleToggle">
                 <input
                   type="checkbox"
-                  checked={rule.enabled}
+                  checked={rule.effectiveEnabled}
                   disabled={saving !== null}
                   onChange={() => void toggleEnabled(rule)}
                 />
                 <span className="ruleLabel">{rule.label}</span>
+                {operationalLegend(rule) && <span className="ruleMeta">{operationalLegend(rule)}</span>}
                 <span className="ruleMeta">
                   {rule.branch} · prioridad {rule.priority}
                 </span>
