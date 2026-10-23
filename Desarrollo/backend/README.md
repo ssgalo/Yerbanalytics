@@ -436,7 +436,7 @@ y el intervalo del pulso de sensado y evaluación (configuración operativa).
   del sector (qué recibió cada regla contra qué umbral). Vive en memoria: `204` si todavía no se
   evaluó desde el arranque, `404` si el sector no existe. Una regla de diagnóstico sin diagnóstico
   nuevo figura `OMITIDA_SIN_DIAGNOSTICO_NUEVO`.
-- `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros`.
+- `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros` y `activa` (`false` en las apagadas, como las retiradas: el historial no las dibuja).
 
 El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Parámetros* (edición
 del catálogo) e *Inspector* (el grafo coloreado con la última evaluación de un sector).

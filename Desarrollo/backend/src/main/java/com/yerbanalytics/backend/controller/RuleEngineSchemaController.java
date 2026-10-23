@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.dto.RuleNodeDto;
 import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.zone.ZoneRuleEngine;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import org.springframework.http.ResponseEntity;
@@ -46,10 +47,13 @@ public class RuleEngineSchemaController {
 
     private final RuleOrchestrator ruleOrchestrator;
     private final ZoneRuleEngine zoneRuleEngine;
+    private final RuleOverrides overrides;
 
-    public RuleEngineSchemaController(RuleOrchestrator ruleOrchestrator, ZoneRuleEngine zoneRuleEngine) {
+    public RuleEngineSchemaController(RuleOrchestrator ruleOrchestrator, ZoneRuleEngine zoneRuleEngine,
+                                      RuleOverrides overrides) {
         this.ruleOrchestrator = ruleOrchestrator;
         this.zoneRuleEngine = zoneRuleEngine;
+        this.overrides = overrides;
     }
 
     /**
@@ -76,16 +80,16 @@ public class RuleEngineSchemaController {
         List<RuleEdgeDto> edges = new ArrayList<>();
 
         // Nodo de inicio (no es una regla, es el punto de entrada global)
-        nodes.add(new RuleNodeDto("start", "Inicio Evaluación", "input", -1, "GLOBAL", List.of()));
+        nodes.add(new RuleNodeDto("start", "Inicio Evaluación", "input", -1, "GLOBAL", List.of(), true));
         
         // Nodo de aborto global
-        nodes.add(new RuleNodeDto("abort-GLOBAL", "Pipeline Detenido", "output", 999, "GLOBAL", List.of()));
+        nodes.add(new RuleNodeDto("abort-GLOBAL", "Pipeline Detenido", "output", 999, "GLOBAL", List.of(), true));
 
         // Nodos de aborto y éxito por rama
         for (com.yerbanalytics.backend.engine.RuleBranch branch : com.yerbanalytics.backend.engine.RuleBranch.values()) {
             if (branch == com.yerbanalytics.backend.engine.RuleBranch.GLOBAL) continue;
-            nodes.add(new RuleNodeDto("abort-" + branch.name(), "Bloqueo " + branch.name(), "output", 999, branch.name(), List.of()));
-            nodes.add(new RuleNodeDto("success-" + branch.name(), "Evaluado OK", "output", 1000, branch.name(), List.of()));
+            nodes.add(new RuleNodeDto("abort-" + branch.name(), "Bloqueo " + branch.name(), "output", 999, branch.name(), List.of(), true));
+            nodes.add(new RuleNodeDto("success-" + branch.name(), "Evaluado OK", "output", 1000, branch.name(), List.of(), true));
         }
 
         // Agrupar reglas por rama, preservando el orden de prioridad interno
@@ -99,7 +103,8 @@ public class RuleEngineSchemaController {
         List<RuleView> globalRules = rulesByBranch.getOrDefault(com.yerbanalytics.backend.engine.RuleBranch.GLOBAL, List.of());
         for (RuleView rule : globalRules) {
             String ruleId = rule.name();
-            nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), "GLOBAL", rule.parameters()));
+            nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), "GLOBAL", rule.parameters(),
+                    overrides.isEnabled(ruleId)));
             edges.add(new RuleEdgeDto("e_" + lastGlobalId + "_" + ruleId, lastGlobalId, ruleId, "Continúa"));
             edges.add(new RuleEdgeDto("e_" + ruleId + "_abort", ruleId, "abort-GLOBAL", "Bloquea"));
             lastGlobalId = ruleId;
@@ -116,7 +121,8 @@ public class RuleEngineSchemaController {
 
             for (RuleView rule : branchRules) {
                 String ruleId = rule.name();
-                nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), branch.name(), rule.parameters()));
+                nodes.add(new RuleNodeDto(ruleId, rule.label(), "default", rule.priority(), branch.name(), rule.parameters(),
+                        overrides.isEnabled(ruleId)));
                 
                 // Arista: prevNodeId -> esta regla
                 edges.add(new RuleEdgeDto("e_" + prevNodeId + "_" + ruleId, prevNodeId, ruleId, "Continúa"));
