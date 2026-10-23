@@ -83,8 +83,8 @@ class ChlorosisSolarWiringTest {
     }
 
     @Test
-    @DisplayName("la rustificación se resuelve hoy con el plan global")
-    void hardeningComesFromTheGlobalPlan() {
+    @DisplayName("la rustificación se resuelve con el plan de la macro-zona")
+    void hardeningComesFromTheZonePlan() {
         assertThat(hardening).isInstanceOf(ZonePlanHardeningPhase.class);
     }
 
