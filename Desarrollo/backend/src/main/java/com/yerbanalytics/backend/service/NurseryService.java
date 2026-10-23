@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.dto.*;
+import com.yerbanalytics.backend.effectiveness.VerificationReads;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ContextoRiego;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
@@ -89,6 +90,8 @@ public class NurseryService {
     private ZoneRuleEngine zoneRules;
     /** Opcional (por setter): el plan de nutrición que se muestra en el detalle de cada zona. Sin él, el snapshot no lo trae. */
     private NutritionPlanService nutritionPlan;
+    /** Opcional (por setter): las lecturas de verificación de E-01, que se guardan sin correr el motor. */
+    private VerificationReads verificationReads;
     private final PulsoSensadoService pulsos;
     private final EscalamientoNodoService escalamiento;
     private final ReadingRecorder readings;
@@ -109,6 +112,15 @@ public class NurseryService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setNutritionPlan(NutritionPlanService nutritionPlan) {
         this.nutritionPlan = nutritionPlan;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setVerificationReads(VerificationReads verificationReads) {
+        this.verificationReads = verificationReads;
+    }
+
+    private boolean isVerificationReading(String zoneId, long receivedMs) {
+        return verificationReads != null && verificationReads.consume(zoneId, receivedMs);
     }
 
     public NurseryService(NurseryProperties properties,
@@ -605,7 +617,9 @@ public class NurseryService {
         // telemetría (pulso sin motor, segunda respuesta, arranque del nodo, secuencia LECTURA) sólo actualiza
         // la lectura y el estado de los sectores. Una lectura que todavía espera su relectura no es la respuesta
         // definitiva: el pulso queda pendiente y el motor decide cuando llegue la que corrige (o la descartada).
-        PulsoSensadoService.PulseResponse pulseResponse = check.awaitsReread()
+        // La lectura de verificación de E-01 (que pidió el servicio de efectividad tras un riego) tampoco es del pulso: se guarda
+        // y nada más, así el pico de humedad del riego no dispara reglas ni cuenta como respuesta.
+        PulsoSensadoService.PulseResponse pulseResponse = check.awaitsReread() || isVerificationReading(zoneId, recepcionMs)
                 ? PulsoSensadoService.PulseResponse.NONE
                 : pulsos.recordResponse(zoneId, recepcionMs);
         boolean ejecutaMotor = pulseResponse.runsEngine();
