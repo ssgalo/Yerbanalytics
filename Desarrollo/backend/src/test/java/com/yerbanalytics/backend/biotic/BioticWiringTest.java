@@ -38,12 +38,12 @@ class BioticWiringTest {
     private List<DemoControllable> controllables;
 
     @Test
-    @DisplayName("F-F1 y F-P1 corren en la cadena por sector, en la rama de insumos y después de la mediasombra")
+    @DisplayName("F-F1 y F-P1 corren en la cadena por sector, en la rama de insumos (la mediasombra es de la zona desde #66)")
     void sectorRulesAreInTheChain() {
         List<String> names = orchestrator.getRules().stream().map(Rule::name).toList();
 
         assertThat(names).contains("FungalDamageRule", "FoliarPestRule");
-        assertThat(names.indexOf("ShadingRule")).isLessThan(names.indexOf("FungalDamageRule"));
+        assertThat(names).doesNotContain("ShadingRule");
         assertThat(names.indexOf("FungalDamageRule")).isLessThan(names.indexOf("FoliarPestRule"));
         assertThat(orchestrator.getRules()).filteredOn(r -> r.name().equals("FungalDamageRule") || r.name().equals("FoliarPestRule"))
                 .allSatisfy(r -> {
