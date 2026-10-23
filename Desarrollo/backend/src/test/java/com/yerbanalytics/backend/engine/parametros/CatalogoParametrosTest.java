@@ -207,4 +207,25 @@ class CatalogoParametrosTest {
         assertThat(cat.violaciones(conCambios(cat, Map.of("seguridad.rango-hum-min", "10", "seguridad.rango-hum-max", "90"))))
                 .isEmpty();
     }
+
+    @Test
+    void restriccionCruzada_laLuzBajaDelEstresEsMenorQueLaAlta() {
+        CatalogoParametros cat = catalogoRiegoV2();
+
+        // F-S3 (luz baja) y F-S1 (luz alta) tienen que dejar una franja intermedia: con las dos iguales no la hay.
+        assertThat(cat.violaciones(conCambios(cat, Map.of("estres.luz-baja", "70", "estres.luz-alta", "70"))))
+                .extracting(RestriccionCruzada::mensaje)
+                .containsExactly("La luz baja del estrés solar debe ser menor que la luz alta.");
+        assertThat(cat.violaciones(conCambios(cat, Map.of("estres.luz-baja", "50", "estres.luz-alta", "90")))).isEmpty();
+    }
+
+    @Test
+    void restriccionCruzada_laTemperaturaBajaDelEstresEsMenorQueLaAlta() {
+        CatalogoParametros cat = catalogoRiegoV2();
+
+        assertThat(cat.violaciones(conCambios(cat, Map.of("estres.temp-baja", "30", "estres.temp-alta", "30"))))
+                .extracting(RestriccionCruzada::mensaje)
+                .containsExactly("La temperatura baja del estrés solar debe ser menor que la alta.");
+        assertThat(cat.violaciones(conCambios(cat, Map.of("estres.temp-baja", "28", "estres.temp-alta", "34")))).isEmpty();
+    }
 }

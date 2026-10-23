@@ -7,6 +7,8 @@ public enum FamiliaParametro {
     INSUMO,
     NUTRICION,
     BIOTICO,
+    CLOROSIS,
+    ESTRES,
     MEDIASOMBRA,
     DIAGNOSTICO,
     READINGS,

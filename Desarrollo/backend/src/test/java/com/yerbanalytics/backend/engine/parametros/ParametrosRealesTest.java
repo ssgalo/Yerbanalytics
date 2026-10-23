@@ -60,6 +60,15 @@ class ParametrosRealesTest {
             Map.entry("biotico.horas-dpv-acaros", 72.0),
             Map.entry("biotico.sectores-foco", 3.0),                 // F-04
             Map.entry("biotico.horas-foco", 72.0),
+            Map.entry("clorosis.humedad-asfixia", 80.0),             // reglas_v2 §8.5 F-C1
+            Map.entry("clorosis.humedad-horas", 48.0),
+            Map.entry("clorosis.ce-salinidad", 2.0),
+            Map.entry("clorosis.ph-ferrica", 6.5),
+            Map.entry("estres.luz-alta", 80.0),                      // reglas_v2 §8.5 F-S1
+            Map.entry("estres.temp-alta", 32.0),
+            Map.entry("estres.humedad-reposicion", 55.0),
+            Map.entry("estres.luz-baja", 60.0),                      // F-S3
+            Map.entry("estres.temp-baja", 30.0),
             Map.entry("insumo.reingreso-horas", 24.0),               // reglas_v2 §8.3
             Map.entry("insumo.stock-aviso", 20.0),
             Map.entry("insumo.pendiente-vence-dias", 7.0),           // add-dosificacion-base D-5
@@ -253,6 +262,33 @@ class ParametrosRealesTest {
     }
 
     @Test
+    void losParametrosDeClorosisYEstresSolarSonLosDeReglasV2Seccion8_5() {
+        record Esperado(String clave, FamiliaParametro familia, TipoParametro tipo, String unidad, String fabrica,
+                        Double min, Double max) {}
+        List<Esperado> esperados = List.of(
+                new Esperado("clorosis.humedad-asfixia", FamiliaParametro.CLOROSIS, TipoParametro.NUMERO, "%", "80", 70.0, 90.0),
+                new Esperado("clorosis.humedad-horas", FamiliaParametro.CLOROSIS, TipoParametro.ENTERO, "h", "48", 24.0, 72.0),
+                new Esperado("clorosis.ce-salinidad", FamiliaParametro.CLOROSIS, TipoParametro.NUMERO, "dS/m", "2", 1.5, 3.0),
+                new Esperado("clorosis.ph-ferrica", FamiliaParametro.CLOROSIS, TipoParametro.NUMERO, "", "6.5", 6.0, 7.0),
+                new Esperado("estres.luz-alta", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "%", "80", 60.0, 100.0),
+                new Esperado("estres.temp-alta", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "°C", "32", 28.0, 36.0),
+                new Esperado("estres.humedad-reposicion", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "%", "55", 45.0, 65.0),
+                new Esperado("estres.luz-baja", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "%", "60", 40.0, 80.0),
+                new Esperado("estres.temp-baja", FamiliaParametro.ESTRES, TipoParametro.NUMERO, "°C", "30", 25.0, 32.0));
+
+        for (Esperado e : esperados) {
+            DefinicionParametro d = catalogo.definicion(e.clave()).orElseThrow();
+            assertThat(d.familia()).as(e.clave()).isEqualTo(e.familia());
+            assertThat(d.tipo()).as(e.clave()).isEqualTo(e.tipo());
+            assertThat(d.unidad()).as(e.clave()).isEqualTo(e.unidad());
+            assertThat(d.fabrica()).as(e.clave()).isEqualTo(e.fabrica());
+            assertThat(d.min()).as(e.clave()).isEqualTo(e.min());
+            assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
+            assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2 §8.5");
+        }
+    }
+
+    @Test
     void lasTemperaturasPredisponentesNuncaQuedanInvertidas() {
         // Los rangos de cada una no se tocan (10–22 y 24–35): por eso no hace falta una restricción cruzada.
         DefinicionParametro min = catalogo.definicion("biotico.temp-predisponente-min").orElseThrow();
@@ -320,7 +356,7 @@ class ParametrosRealesTest {
 
     @Test
     void losValoresDeFabricaCumplenLasRestriccionesCruzadas() {
-        assertThat(catalogo.restricciones()).hasSize(9);
+        assertThat(catalogo.restricciones()).hasSize(11);
         assertThat(catalogo.violaciones(catalogo.fabricas())).isEmpty();
     }
 }
