@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.biotic;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
@@ -56,7 +58,22 @@ public class FoliarPestRule extends BioticDiagnosisBase {
 
     @Override
     public String label() {
-        return "🐛 Plaga foliar (F-P1)";
+        return "Plaga foliar";
+    }
+
+    @Override
+    public String code() {
+        return "F-P1";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.SANITY;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.ACTS;
     }
 
     @Override

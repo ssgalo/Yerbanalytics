@@ -176,7 +176,7 @@ class ChlorosisNonNutritionalRuleTest {
         assertThat(rule.cooldownKeys()).isEmpty();
         assertThat(rule.bypassKeys()).isEmpty();
         assertThat(rule.name()).isEqualTo("ChlorosisNonNutritionalRule");
-        assertThat(rule.label()).contains("F-C1");
+        assertThat(rule.code()).isEqualTo("F-C1");
         assertThat(rule.parametros()).extracting(DefinicionParametro::clave).containsExactlyInAnyOrder(
                 "diagnostico.confianza-minima", "diagnostico.vigencia-horas", "clorosis.humedad-asfixia",
                 "clorosis.humedad-horas", "clorosis.ce-salinidad", "clorosis.ph-ferrica");

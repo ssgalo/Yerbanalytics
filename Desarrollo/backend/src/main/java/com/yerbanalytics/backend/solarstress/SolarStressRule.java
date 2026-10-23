@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.solarstress;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
@@ -72,7 +74,22 @@ public class SolarStressRule implements Rule {
 
     @Override
     public String label() {
-        return "☀️ Estrés solar con radiación alta (F-S1)";
+        return "Estrés solar con radiación alta";
+    }
+
+    @Override
+    public String code() {
+        return "F-S1";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.IRRIGATION;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.ACTS;
     }
 
     @Override

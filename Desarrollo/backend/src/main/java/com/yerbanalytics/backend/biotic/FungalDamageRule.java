@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.biotic;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosBiotico;
@@ -55,7 +57,22 @@ public class FungalDamageRule extends BioticDiagnosisBase {
 
     @Override
     public String label() {
-        return "🍄 Daño fúngico (F-F1)";
+        return "Daño fúngico";
+    }
+
+    @Override
+    public String code() {
+        return "F-F1";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.SANITY;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.ACTS;
     }
 
     @Override

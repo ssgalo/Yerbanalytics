@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.solarstress;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DiagnosisGate;
@@ -61,7 +63,22 @@ public class SolarStressUnexplainedRule implements Rule {
 
     @Override
     public String label() {
-        return "🔍 Estrés solar sin radiación alta (F-S3)";
+        return "Estrés solar sin radiación alta";
+    }
+
+    @Override
+    public String code() {
+        return "F-S3";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.SANITY;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.WARNS;
     }
 
     @Override

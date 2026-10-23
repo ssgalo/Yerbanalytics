@@ -164,6 +164,6 @@ class FoliarPestRuleTest {
         assertThat(rule.usaDiagnostico()).isTrue();
         assertThat(rule.bypassKeys()).containsExactly("persistence");
         assertThat(rule.name()).isEqualTo("FoliarPestRule");
-        assertThat(rule.label()).contains("F-P1");
+        assertThat(rule.code()).isEqualTo("F-P1");
     }
 }

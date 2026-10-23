@@ -154,7 +154,7 @@ class FungalConditionRuleTest {
         assertThat(rule.branch()).isEqualTo(RuleBranch.INSUMO);
         assertThat(rule.bypassKeys()).containsExactly("readings");
         assertThat(rule.name()).isEqualTo("FungalConditionRule");
-        assertThat(rule.label()).contains("F-F2");
+        assertThat(rule.code()).isEqualTo("F-F2");
         assertThat(rule.parametros()).extracting(p -> p.clave()).containsExactlyInAnyOrder(
                 "biotico.dpv-saturado", "biotico.temp-predisponente-min", "biotico.temp-predisponente-max",
                 "biotico.humedad-predisponente");

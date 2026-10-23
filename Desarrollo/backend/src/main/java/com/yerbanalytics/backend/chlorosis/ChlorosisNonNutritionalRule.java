@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.chlorosis;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.CancelPendingApplication;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
@@ -69,7 +71,22 @@ public class ChlorosisNonNutritionalRule implements Rule {
 
     @Override
     public String label() {
-        return "🧪 Clorosis con causa no nutricional (F-C1)";
+        return "Clorosis con causa no nutricional";
+    }
+
+    @Override
+    public String code() {
+        return "F-C1";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.NUTRITION;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.WARNS;
     }
 
     @Override

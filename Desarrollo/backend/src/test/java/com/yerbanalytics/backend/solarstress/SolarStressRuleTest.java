@@ -210,7 +210,7 @@ class SolarStressRuleTest {
         assertThat(rule.bypassKeys()).containsExactlyInAnyOrder("window", "samples");
         assertThat(rule.cooldownKeys()).isEmpty();
         assertThat(rule.name()).isEqualTo("SolarStressRule");
-        assertThat(rule.label()).contains("F-S1");
+        assertThat(rule.code()).isEqualTo("F-S1");
         assertThat(rule.parametros()).extracting(DefinicionParametro::clave).contains(
                 "diagnostico.confianza-minima", "estres.luz-alta", "estres.temp-alta", "estres.humedad-reposicion",
                 "riego.ventana-normal", "riego.humedad-objetivo", "riego.litros-por-punto", "riego.volumen-max-evento",

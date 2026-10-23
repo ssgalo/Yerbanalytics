@@ -111,7 +111,7 @@ class ChlorosisNutritionalRuleTest {
         assertThat(rule.branch()).isEqualTo(RuleBranch.INSUMO);
         assertThat(rule.usaDiagnostico()).isTrue();
         assertThat(rule.name()).isEqualTo("ChlorosisNutritionalRule");
-        assertThat(rule.label()).contains("F-C2");
+        assertThat(rule.code()).isEqualTo("F-C2");
         assertThat(rule.parametros()).extracting(DefinicionParametro::clave)
                 .containsExactlyInAnyOrder("diagnostico.confianza-minima", "diagnostico.vigencia-horas");
     }

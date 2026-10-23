@@ -261,7 +261,7 @@ class OutbreakRuleTest {
         assertThat(rule.branch()).isEqualTo(RuleBranch.INSUMO);
         assertThat(rule.cooldownKeys()).containsExactly("window");
         assertThat(rule.name()).isEqualTo("OutbreakRule");
-        assertThat(rule.label()).contains("F-04");
+        assertThat(rule.code()).isEqualTo("F-04");
         assertThat(rule.parametros()).extracting(p -> p.clave()).containsExactlyInAnyOrder(
                 "biotico.sectores-foco", "biotico.horas-foco", "diagnostico.confianza-minima");
     }

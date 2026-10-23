@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.effectiveness;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.chlorosis.ChlorosisNutritionalRule;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.Severity;
@@ -68,7 +70,22 @@ public class EffectivenessService implements DemoControllable, ConsumidorParamet
 
     @Override
     public String label() {
-        return "📈 Evaluación de efectividad";
+        return "Evaluación de efectividad";
+    }
+
+    @Override
+    public String code() {
+        return "E-01, E-02, E-03, F-05";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.FOLLOW_UP;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.WARNS;
     }
 
     @Override

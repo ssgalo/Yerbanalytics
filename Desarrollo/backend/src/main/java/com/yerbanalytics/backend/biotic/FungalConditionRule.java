@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.biotic;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
@@ -64,7 +66,22 @@ public class FungalConditionRule implements ZoneRule {
 
     @Override
     public String label() {
-        return "💧 Condición predisponente al hongo (F-F2)";
+        return "Condición predisponente al hongo";
+    }
+
+    @Override
+    public String code() {
+        return "F-F2";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.SANITY;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.WARNS;
     }
 
     @Override

@@ -1,5 +1,8 @@
 package com.yerbanalytics.backend.engine.rules;
 
+import java.util.Optional;
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.effectiveness.EffectivenessBlockService;
 import com.yerbanalytics.backend.effectiveness.EffectivenessKind;
 import com.yerbanalytics.backend.engine.ActionType;
@@ -52,7 +55,27 @@ public class IneffectiveActionRule implements Rule {
 
     @Override
     public String label() {
-        return "🚧 Acción sin efectividad (S-06)";
+        return "Acción sin efectividad";
+    }
+
+    @Override
+    public String code() {
+        return "S-06";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.PROTECTION;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.PROTECTS;
+    }
+
+    @Override
+    public Optional<String> protection() {
+        return Optional.of("El motor vuelve a repetir el riego o el tratamiento que ya se comprobó que no funcionó, en lugar de frenar y esperar una revisión.");
     }
 
     @Override

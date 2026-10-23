@@ -119,7 +119,7 @@ class ReglasArquitecturaTest {
     private static final Set<String> PROTECCIONES_ESPERADAS = Set.of(
             "ManualLockRule", "EscalamientoNodo", "StaleSensorRule", "ReadingValidationGuard",
             "IncompleteHardwareRule", "HydraulicFaultRule", "HardwareFaultService", "SustratoSaturadoRule",
-            "CicloLecturaRiegoRule", "ShadeFaultRule", "DailyDoseLimitRule");
+            "CicloLecturaRiegoRule", "ShadeFaultRule", "DailyDoseLimitRule", "IneffectiveActionRule");
 
     /**
      * Los pictogramas de Unicode (el equivalente de {@code \p{Extended_Pictographic}}, que Java 17 no tiene). Quedan
@@ -201,6 +201,42 @@ class ReglasArquitecturaTest {
                 .containsEntry("ManualLockRule", RuleObjective.PROTECTION)
                 .containsEntry("SupplyRule", RuleObjective.NUTRITION)
                 .containsEntry("ShadingRule", RuleObjective.SHADE)
-                .containsEntry("FollowUpRule", RuleObjective.FOLLOW_UP);
+                .containsEntry("EffectivenessService", RuleObjective.FOLLOW_UP);
+    }
+
+    /** Las piezas que trajo el stack de reglas_v2 (#64-#68): código, objetivo, efecto y si protegen. */
+    private record Esperada(String code, RuleObjective objective, RuleEffect effect) {}
+
+    private static final Map<String, Esperada> DEL_STACK = Map.of(
+            "FungalDamageRule", new Esperada("F-F1", RuleObjective.SANITY, RuleEffect.ACTS),
+            "FoliarPestRule", new Esperada("F-P1", RuleObjective.SANITY, RuleEffect.ACTS),
+            "FungalConditionRule", new Esperada("F-F2", RuleObjective.SANITY, RuleEffect.WARNS),
+            "OutbreakRule", new Esperada("F-04", RuleObjective.SANITY, RuleEffect.ACTS),
+            "ChlorosisNonNutritionalRule", new Esperada("F-C1", RuleObjective.NUTRITION, RuleEffect.WARNS),
+            "ChlorosisNutritionalRule", new Esperada("F-C2", RuleObjective.NUTRITION, RuleEffect.ACTS),
+            "SolarStressRule", new Esperada("F-S1", RuleObjective.IRRIGATION, RuleEffect.ACTS),
+            "SolarStressUnexplainedRule", new Esperada("F-S3", RuleObjective.SANITY, RuleEffect.WARNS),
+            "IneffectiveActionRule", new Esperada("S-06", RuleObjective.PROTECTION, RuleEffect.PROTECTS),
+            "EffectivenessService", new Esperada("E-01, E-02, E-03, F-05", RuleObjective.FOLLOW_UP, RuleEffect.WARNS));
+
+    @Test
+    @DisplayName("las piezas del stack de reglas_v2 declaran código, objetivo y efecto de la tabla")
+    void lasPiezasDelStackDeclaranSuPresentacion() throws Exception {
+        Map<String, DemoControllable> porNombre = new HashMap<>();
+        piezas().forEach(p -> porNombre.put(p.name(), p));
+        assertThat(porNombre.keySet()).containsAll(DEL_STACK.keySet());
+        DEL_STACK.forEach((nombre, esperada) -> {
+            DemoControllable p = porNombre.get(nombre);
+            assertThat(p.code()).as("%s code", nombre).isEqualTo(esperada.code());
+            assertThat(p.objective()).as("%s objective", nombre).isEqualTo(esperada.objective());
+            assertThat(p.effect()).as("%s effect", nombre).isEqualTo(esperada.effect());
+        });
+    }
+
+    @Test
+    @DisplayName("S-06 declara qué pasa si se apaga: el motor repite lo que no funcionó")
+    void laProteccionDeS06DiceLoQueHaceElMotorSinElla() throws Exception {
+        DemoControllable s06 = piezas().stream().filter(p -> p.name().equals("IneffectiveActionRule")).findFirst().orElseThrow();
+        assertThat(s06.protection()).hasValueSatisfying(t -> assertThat(t).containsIgnoringCase("repet"));
     }
 }

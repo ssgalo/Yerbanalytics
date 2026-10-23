@@ -231,7 +231,7 @@ class FungalDamageRuleTest {
         assertThat(rule.usaDiagnostico()).isTrue();
         assertThat(rule.bypassKeys()).containsExactly("persistence");
         assertThat(rule.name()).isEqualTo("FungalDamageRule");
-        assertThat(rule.label()).contains("F-F1");
+        assertThat(rule.code()).isEqualTo("F-F1");
     }
 
     @Test

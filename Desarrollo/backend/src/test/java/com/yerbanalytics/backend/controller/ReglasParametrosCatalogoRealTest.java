@@ -242,6 +242,6 @@ class ReglasParametrosCatalogoRealTest {
 
         assertThat(regla(json, "ManualLockRule").get("objetivo").asText()).isEqualTo("PROTECTION");
         assertThat(regla(json, "HardwareFaultService").get("efecto").asText()).isEqualTo("PROTECTS");
-        assertThat(regla(json, "FollowUpRule").get("efecto").asText()).isEqualTo("WARNS");
+        assertThat(regla(json, "EffectivenessService").get("efecto").asText()).isEqualTo("WARNS");
     }
 }

@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.biotic;
 
+import com.yerbanalytics.backend.engine.RuleEffect;
+import com.yerbanalytics.backend.engine.RuleObjective;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleOutbreakTreatment;
@@ -84,7 +86,22 @@ public class OutbreakRule implements ZoneRule {
 
     @Override
     public String label() {
-        return "🔥 Foco biótico (F-04)";
+        return "Foco biótico";
+    }
+
+    @Override
+    public String code() {
+        return "F-04";
+    }
+
+    @Override
+    public RuleObjective objective() {
+        return RuleObjective.SANITY;
+    }
+
+    @Override
+    public RuleEffect effect() {
+        return RuleEffect.ACTS;
     }
 
     @Override
