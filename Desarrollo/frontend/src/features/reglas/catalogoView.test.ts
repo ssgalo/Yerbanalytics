@@ -46,6 +46,51 @@ describe('agruparPorObjetivo · orden de las piezas', () => {
   });
 });
 
+describe('agruparPorObjetivo · ubicación de un parámetro compartido', () => {
+  const base = catalogoDeFabrica();
+  const regla = (id: string, objetivo: ReglaCatalogo['objetivo']): ReglaCatalogo => ({
+    ...base.reglas[0],
+    id,
+    codigo: '',
+    label: id,
+    objetivo,
+    parametros: [],
+  });
+  const ubicar = (usadoPor: string[], reglas: ReglaCatalogo[]): string | undefined => {
+    const parametro = { ...base.parametros[0], clave: 'x.compartido', usadoPor };
+    const c = { ...base, reglas, parametros: [parametro] };
+    return agruparPorObjetivo(c).find((g) => g.compartidos.some((p) => p.clave === 'x.compartido'))
+      ?.objetivo;
+  };
+
+  it('gana el grupo con más consumidores con interruptor, aunque el primero en pantalla sea otro', () => {
+    // Caso real: diagnostico.confianza-minima y vigencia-horas los usan sobre todo reglas de Sanidad, pero F-S1 es de Riego.
+    const reglas = [
+      regla('F-S1', 'IRRIGATION'),
+      regla('S-A', 'SANITY'),
+      regla('S-B', 'SANITY'),
+      regla('S-C', 'SANITY'),
+    ];
+    expect(ubicar(['F-S1', 'S-A', 'S-B', 'S-C'], reglas)).toBe('SANITY');
+  });
+
+  it('empate: el primero en el orden de la pantalla', () => {
+    const reglas = [regla('s', 'SANITY'), regla('r', 'IRRIGATION')];
+    expect(ubicar(['s', 'r'], reglas)).toBe('IRRIGATION');
+  });
+
+  it('los consumidores sin interruptor no votan', () => {
+    // DespachoRiego (Riego) y una regla de Nutrición: vota sólo la regla.
+    expect(ubicar(['DespachoRiego', 'n'], [regla('n', 'NUTRITION')])).toBe('NUTRITION');
+    // Dos servicios de Riego no pesan más que una regla de Sanidad.
+    expect(ubicar(['DespachoRiego', 'ReadingPurge', 's'], [regla('s', 'SANITY')])).toBe('SANITY');
+  });
+
+  it('si ninguno tiene interruptor, el primer grupo en orden donde aparece un consumidor', () => {
+    expect(ubicar(['HistorialService', 'DespachoRiego'], [])).toBe('IRRIGATION');
+  });
+});
+
 describe('agruparPorObjetivo', () => {
   it('agrupa en el orden fijado, con Sanidad entre Nutrición y Mediasombra', () => {
     const grupos = agruparPorObjetivo(catalogoDeFabrica());
@@ -136,7 +181,7 @@ describe('agruparPorObjetivo', () => {
     expect(grupo('NUTRITION', c)!.apagadas).toBe(2);
   });
 
-  it('un parámetro compartido se edita una vez: en el primer grupo, en el orden, donde tiene un consumidor', () => {
+  it('un parámetro compartido se edita una vez, en el grupo con más consumidores con interruptor', () => {
     const c = catalogoDeFabrica();
 
     // Lo usan R-01, R-03, R-05, R-06 (Riego) y la alerta de falla hidráulica (Protecciones): vive en Riego.
@@ -146,8 +191,8 @@ describe('agruparPorObjetivo', () => {
     expect(grupo('PROTECTION', c)!.compartidos.map((p) => p.clave)).not.toContain(
       'riego.umbral-humedad',
     );
-    // Lo lee una protección y el despacho: gana Riego, que va antes.
-    expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).toContain(
+    // Lo lee una protección y el despacho: el despacho no tiene interruptor y no vota, así que va con la protección.
+    expect(grupo('PROTECTION', c)!.compartidos.map((p) => p.clave)).toContain(
       'seguridad.antiguedad-max-lectura',
     );
     // El diagnóstico de IA lo leen la dosificación y las reglas F-*: gana Riego (F-S1), que va antes.

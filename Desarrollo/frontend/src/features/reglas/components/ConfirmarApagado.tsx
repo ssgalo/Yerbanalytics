@@ -34,6 +34,8 @@ export function ConfirmarApagado({
   const falta = esProteccion && motivo.trim() === '';
 
   const cancelar = () => {
+    // Con el pedido en vuelo no hay a qué volver: el resultado decide cómo se cierra.
+    if (ocupado) return;
     onCancelar();
     anchor.focus();
   };
@@ -44,6 +46,7 @@ export function ConfirmarApagado({
       onClose={cancelar}
       label={esProteccion ? 'Confirmar apagado de la protección' : 'Confirmar apagado de la regla'}
       role="alertdialog"
+      modal
       width={380}
       alignEnd
     >

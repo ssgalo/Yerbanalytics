@@ -143,7 +143,8 @@ ReglaCatalogoDto(
 | Apagar una protección sin `motivo` (blank) | `400 { error: "MOTIVO_REQUERIDO" }` |
 | Apagar una protección sin `confirmaProteccion: true` | `400 { error: "CONFIRMACION_REQUERIDA", consecuencia }` |
 | `motivo` > 500 caracteres | `400 { error: "MOTIVO_DEMASIADO_LARGO" }` |
-| Mismo estado que el vigente | `200` sin escribir ni registrar nada |
+| Mismo estado que el vigente (con fila, o prender lo que ya corre) | `200` sin escribir ni registrar nada |
+| Apagar lo que sólo la siembra (`retiradas`) tiene apagado, sin fila | Se trata como cambio: pide motivo/confirmación si es una protección, guarda la fila (quién, cuándo, por qué) y deja el evento de historial. Es una decisión explícita de una persona y vale registrarla; así el estado deja de depender de la lista |
 
 Prender nunca pide motivo ni confirmación (vuelve a lo seguro o a lo de fábrica); si viene, se guarda.
 
@@ -289,7 +290,8 @@ Pestañas: **Reglas** (reemplaza a *Parámetros*) e **Inspector**. `?tab=` se co
 - **Umbrales en línea**: cada parámetro propio con `Field` + `InputUnit` (unidad), rango y valor de fábrica como `hint`,
   marca de modificado. Reutiliza `ParametroField`.
 - **Compartidos**: un parámetro con `usadoPor.length > 1` se edita **una sola vez**, en el bloque "Compartidos del grupo"
-  del primer grupo (en el orden de arriba) donde aparece uno de sus consumidores. En cada tarjeta que lo usa figura en
+  del grupo con **más consumidores con interruptor** (empate: el primero en el orden de arriba; los consumidores sin
+  interruptor, como el despacho, no votan salvo que sean los únicos: entonces, el primer grupo donde aparece uno). En cada tarjeta que lo usa figura en
   sólo lectura con "Compartido con N reglas" y un enlace al bloque. `riego.umbral-humedad` (R-01, R-03, R-05, R-06,
   `HardwareFaultService`) vive en Riego; los `diagnostico.*` de las F-* vivirán en Sanidad.
 - **Consumidores sin interruptor** (`DespachoRiego`, `ReadingPurge`, `PulsoSensado`, `ApplicationService`, `TankService`,
@@ -440,3 +442,10 @@ Se resolvieron al cerrar el design (23/10/2026), sin bloquear la implementación
 7. **Precedencia con la demo** (resuelta al cerrar, decisión final): no hay precedencia porque no hay dos fuentes. Motor de
    reglas es la única fuente de verdad del encendido; la demo conserva sólo cooldowns y bypass, y el happy path avisa en vez
    de prender `SupplyRule`.
+
+## Concurrencia del interruptor
+
+`ReglasEstadoService.cambiar` se serializa **por regla** con un candado por nombre, tomado por fuera de la transacción
+(`TransactionTemplate`) para que cubra también el commit: la comprobación de "mismo estado", la fila y el evento de historial
+son atómicos frente a otro pedido para la misma regla. `OperationalRuleStates` aplica el cambio al cache *vigente* al
+confirmar (no al mapa capturado antes), así un `reload()` intermedio no pierde la actualización.

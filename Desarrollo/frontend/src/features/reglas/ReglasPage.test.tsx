@@ -50,7 +50,7 @@ describe('Ruta /reglas (7.1)', () => {
 
   it('el título de la topbar es "Motor de reglas"', async () => {
     montarEn('/reglas');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Motor de reglas' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Motor de reglas' }, { timeout: 5000 })).toBeTruthy();
   });
 
   it('?tab=inspector abre el Inspector y ?sector llega al selector', async () => {

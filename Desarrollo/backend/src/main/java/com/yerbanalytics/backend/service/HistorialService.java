@@ -304,7 +304,8 @@ public class HistorialService {
         e.setSev(s.getDiagnosisSev());
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        e.setRegla(ruleName);
+        guardarDelMotor(e);
     }
 
     /**

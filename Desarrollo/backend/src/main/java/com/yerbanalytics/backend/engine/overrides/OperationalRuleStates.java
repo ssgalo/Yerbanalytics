@@ -85,7 +85,7 @@ public class OperationalRuleStates {
     @Transactional
     public RuleState set(String name, boolean active, String reason, String user) {
         // El cache se carga ANTES de escribir: una lectura después podría ver la fila sin commit.
-        Map<String, RuleState> loaded = states();
+        states();
         RuleStateEntity row = new RuleStateEntity(name, active, reason, user, System.currentTimeMillis());
         repository.save(row);
         RuleState state = RuleState.of(row);
@@ -93,11 +93,12 @@ public class OperationalRuleStates {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    loaded.put(name, state);
+                    // Sobre el cache vigente al confirmar, no el de antes: un reload() intermedio lo reemplazó.
+                    states().put(name, state);
                 }
             });
         } else {
-            loaded.put(name, state);
+            states().put(name, state);
         }
         return state;
     }

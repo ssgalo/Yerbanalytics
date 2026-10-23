@@ -5,7 +5,7 @@
    con la SaveBar (todo o nada); el interruptor es una acción, se confirma y se aplica en el momento, sin tocar
    ese borrador. El borrador NO vive acá: lo posee `ReglasPage`, porque esta pestaña se desmonta al ir al Inspector.
    ============================================================ */
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Callout } from '@/components/ui/Callout';
 import { Input } from '@/components/ui/Field';
 import { SaveBar } from '@/components/ui/EstadosPantalla';
@@ -187,12 +187,35 @@ export function ReglasTab({
     }
   };
 
-  const aplicarEstado = async (regla: ReglaCatalogo, cambio: CambioEstadoRegla) => {
+  /**
+   * Foco que se devuelve al interruptor cuando termina el pedido. El interruptor está deshabilitado mientras
+   * `cambiando`, así que se enfoca en el efecto de abajo, ya con el pedido terminado.
+   */
+  const focoPendiente = useRef<{ reglaId: string; anchor: HTMLElement } | null>(null);
+  useEffect(() => {
+    const pendiente = focoPendiente.current;
+    if (!pendiente || cambiando) return;
+    focoPendiente.current = null;
+    // El nodo original o, si se volvió a dibujar, el interruptor de la tarjeta de la regla.
+    const destino = pendiente.anchor.isConnected
+      ? pendiente.anchor
+      : document
+          .getElementById(idTarjeta(pendiente.reglaId))
+          ?.querySelector<HTMLElement>('[role="switch"]');
+    destino?.focus();
+  }, [cambiando]);
+
+  const aplicarEstado = async (
+    regla: ReglaCatalogo,
+    cambio: CambioEstadoRegla,
+    anchor: HTMLElement | null = null,
+  ) => {
     setCambiando(true);
     setErrorEstado(null);
     try {
       const nueva = await onCambiarEstado(regla.id, cambio);
       setApagando(null);
+      if (anchor) focoPendiente.current = { reglaId: regla.id, anchor };
       setAviso({
         tono: 'ok',
         texto: `«${regla.label}» quedó ${nueva.activa ? 'prendida' : 'apagada'}.`,
@@ -353,11 +376,15 @@ export function ReglasTab({
           ocupado={cambiando}
           onCancelar={() => setApagando(null)}
           onConfirmar={(motivo) =>
-            void aplicarEstado(apagando.regla, {
-              activa: false,
-              ...(motivo ? { motivo } : {}),
-              ...(apagando.regla.proteccion !== null ? { confirmaProteccion: true } : {}),
-            })
+            void aplicarEstado(
+              apagando.regla,
+              {
+                activa: false,
+                ...(motivo ? { motivo } : {}),
+                ...(apagando.regla.proteccion !== null ? { confirmaProteccion: true } : {}),
+              },
+              apagando.anchor,
+            )
           }
         />
       )}

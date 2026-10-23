@@ -19,3 +19,12 @@ El velo detrás de un diálogo modal SHALL usar el token `--scrim` de `tokens.cs
 #### Scenario: Popup del razonamiento
 - **WHEN** se abre el razonamiento del motor desde el historial
 - **THEN** el fondo del velo es `var(--scrim)`
+
+### Requirement: Tokens de «Compartido»
+`tokens.css` SHALL definir `--shared-soft`, `--shared-line` y `--shared-ink` (con su espejo en `theme.ts` si se necesita en JS)
+para marcar un parámetro que usan varias reglas. No son colores de estado ni de acento. El catálogo `/sistema-diseno` SHALL
+listarlos.
+
+#### Scenario: Catálogo
+- **WHEN** se abre `/sistema-diseno`
+- **THEN** la sección Color muestra los tres tokens de Compartido

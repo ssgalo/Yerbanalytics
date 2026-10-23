@@ -31,8 +31,9 @@ apagada por la demo SHALL decirlo.
 - **THEN** aparece como tarjeta de ejecución con sus parámetros y sin `Switch`
 
 ### Requirement: Parámetros compartidos se editan una vez
-Un parámetro que usan dos o más piezas SHALL editarse en un único lugar (el bloque de compartidos del primer grupo donde
-aparece un consumidor) y SHALL mostrarse en cada tarjeta que lo usa en sólo lectura con "Compartido con N reglas" y un
+Un parámetro que usan dos o más piezas SHALL editarse en un único lugar (el bloque de compartidos del grupo con más
+consumidores con interruptor; empate, el primero en el orden de la pantalla; los consumidores sin interruptor no votan salvo
+que sean los únicos) y SHALL mostrarse en cada tarjeta que lo usa en sólo lectura con "Compartido con N reglas" y un
 enlace a ese lugar.
 
 #### Scenario: Umbral de humedad

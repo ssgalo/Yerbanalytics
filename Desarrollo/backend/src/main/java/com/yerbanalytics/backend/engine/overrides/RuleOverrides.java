@@ -28,7 +28,7 @@ public interface RuleOverrides {
         }
     };
 
-    /** {@code false} if the rule is off (operational state, or the explicit demo override when it exists). */
+    /** {@code false} if the rule is off in the nursery: only the operational state decides (demo has no on/off switch). */
     boolean isEnabled(String ruleName);
 
     /** Cooldown (minutes) that replaces the configured one for {@code key}, if any. {@code 0} means no cooldown. */

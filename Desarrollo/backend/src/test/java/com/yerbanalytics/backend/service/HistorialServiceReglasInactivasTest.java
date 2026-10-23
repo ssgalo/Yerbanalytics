@@ -105,6 +105,19 @@ class HistorialServiceReglasInactivasTest {
     }
 
     @Test
+    @DisplayName("una inacción del motor guarda la regla y las piezas apagadas en ese momento")
+    void unaInaccionTambienLoGuarda() {
+        when(overrides.inactiveNames()).thenReturn(Set.of("SupplyRule", "FueraDeVentanaRiegoRule"));
+
+        service.registrarInaccion(sector, com.yerbanalytics.backend.engine.ActionType.NOOP_INFO,
+                "RiegoPorDeficitRule", "motivo");
+
+        HistorialEventoEntity e = guardado();
+        assertThat(e.getRegla()).isEqualTo("RiegoPorDeficitRule");
+        assertThat(e.getReglasInactivas()).isEqualTo("FueraDeVentanaRiegoRule,SupplyRule");
+    }
+
+    @Test
     @DisplayName("un evento que no es una decisión del motor no lo guarda")
     void lasConfiguracionesNoLoGuardan() {
         when(overrides.inactiveNames()).thenReturn(Set.of("SupplyRule"));

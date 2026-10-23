@@ -16,6 +16,11 @@ interface PopoverProps {
   alignEnd?: boolean;
   /** `alertdialog` para una confirmación destructiva. */
   role?: 'dialog' | 'alertdialog';
+  /**
+   * Modal (confirmaciones destructivas): `aria-modal`, el Tab no sale del panel y un clic afuera no lo cierra.
+   * Escape sigue llamando a `onClose`, que decide si cierra (p. ej. no, con un pedido en vuelo) y a quién devuelve el foco.
+   */
+  modal?: boolean;
   /** Sin relleno: el contenido trae el suyo (p. ej. los filtros de columna). */
   flush?: boolean;
   className?: string;
@@ -23,6 +28,8 @@ interface PopoverProps {
 
 const GAP = 6;
 const MARGIN = 8;
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Bajo el ancla; si no entra abajo y hay más lugar arriba, arriba. Nunca fuera de la pantalla. */
 function place(anchor: HTMLElement, panel: HTMLElement, width: number, alignEnd: boolean): CSSProperties {
@@ -56,6 +63,7 @@ export function Popover({
   width = 320,
   alignEnd = false,
   role = 'dialog',
+  modal = false,
   flush = false,
   className,
 }: PopoverProps) {
@@ -89,13 +97,39 @@ export function Popover({
       ?.focus();
     function onPointer(e: MouseEvent) {
       const t = e.target as Node;
-      if (panelRef.current?.contains(t) || anchor?.contains(t)) return;
+      if (modal || panelRef.current?.contains(t) || anchor?.contains(t)) return;
       closeRef.current();
     }
+    function trap(e: KeyboardEvent) {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (!panel.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
     function onKey(e: KeyboardEvent) {
+      if (modal && e.key === 'Tab') {
+        trap(e);
+        return;
+      }
       if (e.key !== 'Escape') return;
       closeRef.current();
-      anchor?.focus();
+      if (!modal) anchor?.focus();
     }
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
@@ -103,12 +137,13 @@ export function Popover({
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
     };
-  }, [anchor]);
+  }, [anchor, modal]);
 
   return createPortal(
     <div
       ref={panelRef}
       role={role}
+      aria-modal={modal ? true : undefined}
       aria-label={label}
       className={cx(styles.popover, !flush && styles.padded, className)}
       style={position ?? { visibility: 'hidden', width }}

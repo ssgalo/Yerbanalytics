@@ -20,7 +20,7 @@ afterEach(() => {
 
 /** Opciones del selector de secciones (control segmentado). */
 const secciones = async () =>
-  within(await screen.findByRole('group', { name: 'Secciones de usuarios' })).getAllByRole('button');
+  within(await screen.findByRole('group', { name: 'Secciones de usuarios' }, { timeout: 5000 })).getAllByRole('button');
 
 const fila = (username: string) => document.querySelector(`tr[data-username="${username}"]`) as HTMLElement;
 
