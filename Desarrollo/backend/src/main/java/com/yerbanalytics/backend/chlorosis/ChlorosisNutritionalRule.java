@@ -11,6 +11,7 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.Severity;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.hardening.HardeningPhase;
@@ -71,9 +72,10 @@ public class ChlorosisNutritionalRule implements Rule {
         return true;
     }
 
+    /** Los de la compuerta del diagnóstico, en un literal como en las demás reglas: el test anti-drift del frontend lo lee del código. */
     @Override
     public List<DefinicionParametro> parametros() {
-        return DiagnosisGate.PARAMETERS;
+        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosDiagnostico.VALIDITY_HOURS);
     }
 
     @Override

@@ -454,6 +454,13 @@ const EVALUADORES: Record<string, Evaluador> = {
   FungalDamageRule: () => noop('Sin un diagnóstico de daño fúngico que tratar: no se aplica fitosanitario.'),
   FoliarPestRule: () => noop('Sin un diagnóstico de plaga foliar que tratar: no se aplica fitosanitario.'),
 
+  // Clorosis y estrés solar: actúan una vez por diagnóstico nuevo, y la demo no tiene historial de diagnósticos ni de
+  // lecturas, así que muestran siempre el estado de reposo.
+  ChlorosisNonNutritionalRule: () => noop('Sin una clorosis con causa no nutricional que descartar.'),
+  ChlorosisNutritionalRule: () => noop('Sin una clorosis nutricional que fertilizar.'),
+  SolarStressRule: () => noop('Sin un estrés solar con radiación alta que reponer con agua.'),
+  SolarStressUnexplainedRule: () => noop('Sin un estrés solar sin radiación alta que avisar.'),
+
   // Reglas de macro-zona (bióticas y plan de nutrición): la demo no tiene motor ni historial de lecturas, así que
   // muestran siempre el estado de reposo. Corren una vez por zona, después de los sectores.
   FungalConditionRule: () => noop('Las condiciones de la macro-zona no favorecen al hongo.'),

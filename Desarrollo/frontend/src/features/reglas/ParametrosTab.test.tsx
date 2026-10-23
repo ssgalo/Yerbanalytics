@@ -70,7 +70,7 @@ describe('ParametrosTab · agrupación (7.2)', () => {
       expect.stringMatching(/Historial de lecturas/),
       expect.stringMatching(/Lectura de los nodos/),
       expect.stringMatching(/Nodo sin respuesta/),
-      expect.stringMatching(/Riego · 7 reglas/),
+      expect.stringMatching(/Riego · 8 reglas/),
       expect.stringMatching(/Ejecución del riego/),
       expect.stringMatching(/Insumos/),
       expect.stringMatching(/Aplicación de insumos/),
@@ -229,8 +229,10 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
 
     expect(screen.getByText('⏸️ Pausa tras una aplicación (R-06)')).toBeTruthy();
     expect(screen.queryByText('🌧️ Posponer por lluvia (R-03)')).toBeNull();
-    // Al buscar, las coincidencias se abren solas
-    expect(screen.getByLabelText(/Pausa de riego tras una aplicación/)).toBeTruthy();
+    // F-S1 (estrés solar) respeta la misma pausa: la regla también coincide, con el mismo parámetro compartido.
+    expect(screen.getByText('☀️ Estrés solar con radiación alta (F-S1)')).toBeTruthy();
+    // Al buscar, las coincidencias se abren solas: el parámetro figura bajo cada regla que lo usa.
+    expect(screen.getAllByLabelText(/Pausa de riego tras una aplicación/)).toHaveLength(2);
   });
 
   it('filtra por rama', () => {
@@ -260,7 +262,8 @@ describe('ParametrosTab · búsqueda y filtros (7.5)', () => {
     const fila = document.querySelector(`[data-clave="${COMPARTIDO}"]`) as HTMLElement;
     expect(within(fila).getByText(/Usado por: .*fuera de ventana.*Pausa tras.*Posponer por lluvia.*Riego por déficit/)).toBeTruthy();
     // El consumidor que no es una regla se rotula por su nombre, no por el id de la clase.
-    expect(screen.getByText(/Usado por: Ejecución del riego/)).toBeTruthy();
+    const simultaneos = document.querySelector('[data-clave="riego.sectores-simultaneos"]') as HTMLElement;
+    expect(within(simultaneos).getByText(/Usado por: Ejecución del riego/)).toBeTruthy();
     // Una fila por parámetro del catálogo.
     expect(document.querySelectorAll('[data-clave]')).toHaveLength(catalogoDeFabrica().parametros.length);
   });

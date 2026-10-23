@@ -219,6 +219,61 @@
       "parametros": [
         "nutricion.intervalo-plan"
       ]
+    },
+    {
+      "id": "ChlorosisNonNutritionalRule",
+      "label": "🧪 Clorosis con causa no nutricional (F-C1)",
+      "rama": "INSUMO",
+      "prioridad": 24,
+      "parametros": [
+        "diagnostico.confianza-minima",
+        "diagnostico.vigencia-horas",
+        "clorosis.humedad-asfixia",
+        "clorosis.humedad-horas",
+        "clorosis.ce-salinidad",
+        "clorosis.ph-ferrica"
+      ]
+    },
+    {
+      "id": "ChlorosisNutritionalRule",
+      "label": "🌿 Clorosis nutricional (F-C2)",
+      "rama": "INSUMO",
+      "prioridad": 25,
+      "parametros": [
+        "diagnostico.confianza-minima",
+        "diagnostico.vigencia-horas"
+      ]
+    },
+    {
+      "id": "SolarStressRule",
+      "label": "☀️ Estrés solar con radiación alta (F-S1)",
+      "rama": "RIEGO",
+      "prioridad": 26,
+      "parametros": [
+        "diagnostico.confianza-minima",
+        "diagnostico.vigencia-horas",
+        "estres.luz-alta",
+        "estres.temp-alta",
+        "estres.humedad-reposicion",
+        "riego.ventana-normal",
+        "riego.pausa-tras-aplicacion",
+        "riego.humedad-objetivo",
+        "riego.litros-por-punto",
+        "riego.volumen-max-evento",
+        "riego.caudal-emisor"
+      ]
+    },
+    {
+      "id": "SolarStressUnexplainedRule",
+      "label": "🔍 Estrés solar sin radiación alta (F-S3)",
+      "rama": "SEGUIMIENTO",
+      "prioridad": 27,
+      "parametros": [
+        "diagnostico.confianza-minima",
+        "diagnostico.vigencia-horas",
+        "estres.luz-baja",
+        "estres.temp-baja"
+      ]
     }
   ],
   "parametros": [
@@ -548,7 +603,8 @@
       "refSpec": "reglas_v2 §5 R-01 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "RiegoPorDeficitRule"
+        "RiegoPorDeficitRule",
+        "SolarStressRule"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -568,7 +624,8 @@
       "refSpec": "reglas_v2 §5 R-01 / §11 Riego",
       "modificado": false,
       "usadoPor": [
-        "RiegoPorDeficitRule"
+        "RiegoPorDeficitRule",
+        "SolarStressRule"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -589,7 +646,8 @@
       "modificado": false,
       "usadoPor": [
         "DeficitCriticoRule",
-        "RiegoPorDeficitRule"
+        "RiegoPorDeficitRule",
+        "SolarStressRule"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -610,7 +668,8 @@
       "modificado": false,
       "usadoPor": [
         "DeficitCriticoRule",
-        "RiegoPorDeficitRule"
+        "RiegoPorDeficitRule",
+        "SolarStressRule"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -671,8 +730,9 @@
       "refSpec": "reglas_v2 §5 R-05 / §11 Riego",
       "modificado": false,
       "usadoPor": [
+        "DespachoRiego",
         "FueraDeVentanaRiegoRule",
-        "DespachoRiego"
+        "SolarStressRule"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -734,8 +794,9 @@
       "refSpec": "reglas_v2 §5 R-06 / §11 Riego",
       "modificado": false,
       "usadoPor": [
+        "DespachoRiego",
         "PausaTrasAplicacionRule",
-        "DespachoRiego"
+        "SolarStressRule"
       ],
       "updatedBy": null,
       "updatedTs": null
@@ -1385,6 +1446,186 @@
       "updatedTs": null
     },
     {
+      "clave": "clorosis.humedad-asfixia",
+      "etiqueta": "Humedad de sustrato que asfixia la raíz",
+      "descripcion": "Con la humedad de sustrato media por encima de esta, la clorosis se atribuye a asfixia radicular y no se fertiliza.",
+      "familia": "CLOROSIS",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "80",
+      "fabrica": "80",
+      "min": 70.0,
+      "max": 90.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-C1",
+      "modificado": false,
+      "usadoPor": [
+        "ChlorosisNonNutritionalRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "clorosis.humedad-horas",
+      "etiqueta": "Horas de la humedad media",
+      "descripcion": "Cuántas horas hacia atrás se promedia la humedad de sustrato para detectar la asfixia radicular.",
+      "familia": "CLOROSIS",
+      "tipo": "ENTERO",
+      "unidad": "h",
+      "valor": "48",
+      "fabrica": "48",
+      "min": 24.0,
+      "max": 72.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-C1",
+      "modificado": false,
+      "usadoPor": [
+        "ChlorosisNonNutritionalRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "clorosis.ce-salinidad",
+      "etiqueta": "CE que indica salinidad",
+      "descripcion": "Con la conductividad del sustrato igual o mayor a esta, la clorosis se atribuye a salinidad y no se fertiliza.",
+      "familia": "CLOROSIS",
+      "tipo": "NUMERO",
+      "unidad": "dS/m",
+      "valor": "2",
+      "fabrica": "2",
+      "min": 1.5,
+      "max": 3.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §8.5 F-C1",
+      "modificado": false,
+      "usadoPor": [
+        "ChlorosisNonNutritionalRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "clorosis.ph-ferrica",
+      "etiqueta": "pH que indica clorosis férrica",
+      "descripcion": "Con el pH del sustrato igual o mayor a este, la clorosis se atribuye a pH alto (clorosis férrica) y no se fertiliza.",
+      "familia": "CLOROSIS",
+      "tipo": "NUMERO",
+      "unidad": "",
+      "valor": "6.5",
+      "fabrica": "6.5",
+      "min": 6.0,
+      "max": 7.0,
+      "decimales": 1,
+      "refSpec": "reglas_v2 §8.5 F-C1",
+      "modificado": false,
+      "usadoPor": [
+        "ChlorosisNonNutritionalRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "estres.luz-alta",
+      "etiqueta": "Luz alta",
+      "descripcion": "Con una lectura de luz igual o mayor a esta entre las 10 y las 16 h de las últimas 48 h, el estrés solar se atribuye a la radiación (F-S1).",
+      "familia": "ESTRES",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "80",
+      "fabrica": "80",
+      "min": 60.0,
+      "max": 100.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-S1",
+      "modificado": false,
+      "usadoPor": [
+        "SolarStressRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "estres.temp-alta",
+      "etiqueta": "Temperatura alta",
+      "descripcion": "Con una temperatura del aire igual o mayor a esta en las últimas 48 h, el estrés solar se atribuye al calor (F-S1).",
+      "familia": "ESTRES",
+      "tipo": "NUMERO",
+      "unidad": "°C",
+      "valor": "32",
+      "fabrica": "32",
+      "min": 28.0,
+      "max": 36.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-S1",
+      "modificado": false,
+      "usadoPor": [
+        "SolarStressRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "estres.humedad-reposicion",
+      "etiqueta": "Humedad bajo la que se repone el agua",
+      "descripcion": "Con estrés solar por radiación, si la humedad de sustrato es menor a esta se hace un riego de reposición del sector.",
+      "familia": "ESTRES",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "55",
+      "fabrica": "55",
+      "min": 45.0,
+      "max": 65.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-S1",
+      "modificado": false,
+      "usadoPor": [
+        "SolarStressRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "estres.luz-baja",
+      "etiqueta": "Luz baja",
+      "descripcion": "Si en las últimas 48 h la luz no llegó a este valor (y la temperatura tampoco a la baja), el estrés solar no se explica por la radiación (F-S3).",
+      "familia": "ESTRES",
+      "tipo": "NUMERO",
+      "unidad": "%",
+      "valor": "60",
+      "fabrica": "60",
+      "min": 40.0,
+      "max": 80.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-S3",
+      "modificado": false,
+      "usadoPor": [
+        "SolarStressUnexplainedRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "estres.temp-baja",
+      "etiqueta": "Temperatura baja",
+      "descripcion": "Si en las últimas 48 h la temperatura no llegó a este valor (y la luz tampoco a la baja), el estrés solar no se explica por la radiación (F-S3).",
+      "familia": "ESTRES",
+      "tipo": "NUMERO",
+      "unidad": "°C",
+      "valor": "30",
+      "fabrica": "30",
+      "min": 25.0,
+      "max": 32.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.5 F-S3",
+      "modificado": false,
+      "usadoPor": [
+        "SolarStressUnexplainedRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
       "clave": "mediasombra.uv-umbral",
       "etiqueta": "Índice UV de protección",
       "descripcion": "Con un índice UV de pronóstico igual o mayor a este, la mediasombra pasa a posición protectora.",
@@ -1420,9 +1661,13 @@
       "modificado": false,
       "usadoPor": [
         "ApplicationService",
+        "ChlorosisNonNutritionalRule",
+        "ChlorosisNutritionalRule",
         "FoliarPestRule",
         "FungalDamageRule",
         "OutbreakRule",
+        "SolarStressRule",
+        "SolarStressUnexplainedRule",
         "SupplyRule"
       ],
       "updatedBy": null,
@@ -1444,8 +1689,12 @@
       "modificado": false,
       "usadoPor": [
         "ApplicationService",
+        "ChlorosisNonNutritionalRule",
+        "ChlorosisNutritionalRule",
         "FoliarPestRule",
-        "FungalDamageRule"
+        "FungalDamageRule",
+        "SolarStressRule",
+        "SolarStressUnexplainedRule"
       ],
       "updatedBy": null,
       "updatedTs": null

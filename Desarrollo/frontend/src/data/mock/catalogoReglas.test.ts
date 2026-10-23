@@ -81,8 +81,8 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
 const DIR_ENGINE = resolve(__dirname, '../../../../backend/src/main/java/com/yerbanalytics/backend/engine');
 const DIR_PARAMETROS = resolve(DIR_ENGINE, 'parametros');
 const DIR_REGLAS = resolve(DIR_ENGINE, 'rules');
-/** Las reglas de las features (plan de nutrición, reglas bióticas) viven con su feature, no con las de sector. */
-const DIRS_REGLAS_DE_FEATURE = [resolve(DIR_ENGINE, '..', 'nutrition'), resolve(DIR_ENGINE, '..', 'biotic')];
+/** Las reglas de las features (plan de nutrición, bióticas, clorosis, estrés solar) viven con su feature, no con las de sector. */
+const DIRS_REGLAS_DE_FEATURE = ['nutrition', 'biotic', 'chlorosis', 'solarstress'].map((dir) => resolve(DIR_ENGINE, '..', dir));
 
 interface EntradaEnum {
   /** `Clase.CONSTANTE` en el código Java (p. ej. `ParametrosRiego.UMBRAL_HUMEDAD`): lo que usan las reglas. */

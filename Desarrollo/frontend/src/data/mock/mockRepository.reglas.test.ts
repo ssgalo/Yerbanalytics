@@ -105,8 +105,10 @@ describe('MockRepository · esquema del DAG', () => {
     expect(par('FueraDeVentanaRiegoRule', 'PausaTrasAplicacionRule')).toBe(true);
     expect(par('PausaTrasAplicacionRule', 'PosponerPorLluviaRule')).toBe(true);
     expect(par('PosponerPorLluviaRule', 'RiegoPorDeficitRule')).toBe(true);
-    expect(par('RiegoPorDeficitRule', 'success-RIEGO')).toBe(true);
-    expect(par('FollowUpRule', 'success-SEGUIMIENTO')).toBe(true);
+    expect(par('RiegoPorDeficitRule', 'SolarStressRule')).toBe(true);
+    expect(par('SolarStressRule', 'success-RIEGO')).toBe(true);
+    expect(par('FollowUpRule', 'SolarStressUnexplainedRule')).toBe(true);
+    expect(par('SolarStressUnexplainedRule', 'success-SEGUIMIENTO')).toBe(true);
   });
 });
 

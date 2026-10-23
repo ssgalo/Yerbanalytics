@@ -24,6 +24,7 @@ describe('agruparPorRama', () => {
       'PausaTrasAplicacionRule',
       'PosponerPorLluviaRule',
       'RiegoPorDeficitRule',
+      'SolarStressRule',
     ]);
   });
 
@@ -69,7 +70,7 @@ describe('filtrarReglas', () => {
 
   it('sin filtros devuelve todas', () => {
     const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, sinFiltros)).toHaveLength(22);
+    expect(filtrarReglas(c, sinFiltros)).toHaveLength(26);
   });
 
   it('busca por nombre de regla o de alguno de sus parámetros, sin importar tildes ni mayúsculas', () => {
@@ -99,6 +100,8 @@ describe('filtrarReglas', () => {
       'OutbreakRule',
       'LowEcRule',
       'NutritionPlanRule',
+      'ChlorosisNonNutritionalRule',
+      'ChlorosisNutritionalRule',
     ]);
   });
 
