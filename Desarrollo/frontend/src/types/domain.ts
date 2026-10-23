@@ -807,12 +807,10 @@ export interface ReglaCatalogo {
   efecto: EfectoRegla;
   prioridad: number;
   parametros: string[];
-  /** Estado operativo: lo que decidió el vivero. */
+  /** Estado operativo: lo que decidió el vivero; única fuente de verdad del encendido (la demo no lo cambia). */
   activa: boolean;
   /** `false` si arranca apagada de fábrica (una retirada). */
   activaPorDefecto: boolean;
-  /** El override explícito del simulador la apaga (siempre `false` fuera del modo demo). */
-  apagadaPorDemo: boolean;
   /** Si es una protección: qué pasa al apagarla. `null` si no lo es. */
   proteccion: string | null;
   /** `null` si nunca se cambió el interruptor. */

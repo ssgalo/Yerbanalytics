@@ -99,11 +99,6 @@ describe('ReglaCard', () => {
     expect(aviso.textContent).toContain('Consecuencia: Se riega con el sustrato saturado.');
   });
 
-  it('avisa si la demo la apagó', () => {
-    montar('RiegoPorDeficitRule', { apagadaPorDemo: true });
-    expect(screen.getByText(/Apagada por la demo/)).toBeTruthy();
-  });
-
   it('un clic en el interruptor pide el cambio con el botón como ancla', () => {
     const { onCambiarEstado } = montar('RiegoPorDeficitRule');
 

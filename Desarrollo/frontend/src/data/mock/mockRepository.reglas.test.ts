@@ -81,7 +81,7 @@ describe('MockRepository · estado de las reglas', () => {
   it('el catálogo de fábrica trae las retiradas apagadas y el resto prendidas, sin cambios registrados', async () => {
     const c = await nuevo().getCatalogoReglas();
     expect(regla(c, 'SupplyRule')).toMatchObject({ activa: false, activaPorDefecto: false, estado: null });
-    expect(regla(c, 'RiegoPorDeficitRule')).toMatchObject({ activa: true, activaPorDefecto: true, apagadaPorDemo: false });
+    expect(regla(c, 'RiegoPorDeficitRule')).toMatchObject({ activa: true, activaPorDefecto: true });
   });
 
   it('apagar una regla de acción no pide motivo y deja quién, cuándo y el motivo si vino', async () => {

@@ -11,7 +11,6 @@
       "parametros": [],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Un sector o una macro-zona bloqueados a mano vuelven a regarse y dosificarse solos.",
       "estado": null
     },
@@ -26,7 +25,6 @@
       "parametros": [],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Se ordena a actuadores que no están registrados.",
       "estado": null
     },
@@ -41,7 +39,6 @@
       "parametros": [],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Un sector con falla hidráulica marcada se riega y dosifica solo.",
       "estado": null
     },
@@ -58,7 +55,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "El motor decide con lecturas viejas o con la humedad congelada.",
       "estado": null
     },
@@ -76,7 +72,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Se riega con el sustrato saturado.",
       "estado": null
     },
@@ -93,7 +88,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Un sector puede regarse más de una vez por ciclo de lectura.",
       "estado": null
     },
@@ -113,7 +107,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -130,7 +123,6 @@
       ],
       "activa": false,
       "activaPorDefecto": false,
-      "apagadaPorDemo": false,
       "proteccion": "Se dosifica sin el tope diario de dosis de la v1.",
       "estado": null
     },
@@ -149,7 +141,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -168,7 +159,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -189,7 +179,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -211,7 +200,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -228,7 +216,6 @@
       ],
       "activa": false,
       "activaPorDefecto": false,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -243,7 +230,6 @@
       "parametros": [],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Se mueve la malla de una zona bloqueada, sin malla registrada o con la malla averiada.",
       "estado": null
     },
@@ -260,7 +246,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -283,7 +268,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -298,7 +282,6 @@
       "parametros": [],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -317,7 +300,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -334,7 +316,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     },
@@ -351,7 +332,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Un nodo que no responde nunca pasa a fuera de servicio y su macro-zona no va a estado seguro.",
       "estado": null
     },
@@ -378,7 +358,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Se aceptan lecturas fuera del rango físico y el motor decide con ellas.",
       "estado": null
     },
@@ -395,7 +374,6 @@
       ],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": "Los errores que publica el nodo se ignoran: ninguna falla se marca.",
       "estado": null
     },
@@ -410,7 +388,6 @@
       "parametros": [],
       "activa": true,
       "activaPorDefecto": true,
-      "apagadaPorDemo": false,
       "proteccion": null,
       "estado": null
     }

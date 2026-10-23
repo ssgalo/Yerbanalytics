@@ -16,7 +16,6 @@ const regla: ReglaCatalogo = {
   parametros: ['riego.saturacion-bloqueo'],
   activa: false,
   activaPorDefecto: true,
-  apagadaPorDemo: false,
   proteccion: 'Se riega con el sustrato saturado.',
   estado: { motivo: 'sonda en recalibración', updatedBy: 'Ana', updatedTs: 1759514400000 },
 };

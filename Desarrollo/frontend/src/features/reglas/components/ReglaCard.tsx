@@ -111,12 +111,6 @@ export function ReglaCard({
             )}
           </Callout>
         )}
-        {regla.apagadaPorDemo && (
-          <Callout tone="warn" role="status">
-            Apagada por la demo: el simulador la apagó en modo demo y mientras tanto no corre,
-            aunque acá figure {regla.activa ? 'activa' : 'apagada'}.
-          </Callout>
-        )}
 
         {params.length > 0 && (
           <div className={styles.parametros}>
