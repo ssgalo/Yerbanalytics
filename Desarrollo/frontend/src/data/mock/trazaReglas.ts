@@ -449,8 +449,15 @@ const EVALUADORES: Record<string, Evaluador> = {
 
   FollowUpRule: () => noop('Seguimiento post-acción: sin acciones pendientes de evaluar.'),
 
-  // Reglas de macro-zona (plan de nutrición): la demo no tiene motor ni historial de lecturas, así que muestran
-  // siempre el estado de reposo. Corren una vez por zona, después de los sectores.
+  // Reglas bióticas por sector (F-F1, F-P1): actúan una vez por diagnóstico nuevo, y la demo no tiene historial de
+  // diagnósticos ni de lecturas, así que muestran siempre el estado de reposo.
+  FungalDamageRule: () => noop('Sin un diagnóstico de daño fúngico que tratar: no se aplica fitosanitario.'),
+  FoliarPestRule: () => noop('Sin un diagnóstico de plaga foliar que tratar: no se aplica fitosanitario.'),
+
+  // Reglas de macro-zona (bióticas y plan de nutrición): la demo no tiene motor ni historial de lecturas, así que
+  // muestran siempre el estado de reposo. Corren una vez por zona, después de los sectores.
+  FungalConditionRule: () => noop('Las condiciones de la macro-zona no favorecen al hongo.'),
+  OutbreakRule: () => noop('No hay un foco biótico en la macro-zona.'),
   LowEcRule: () => noop('CE media dentro del rango: el plan de nutrición no se adelanta.'),
   NutritionPlanRule: () => noop('Todavía no: el plan de nutrición de la macro-zona sigue su intervalo.'),
 };
@@ -459,7 +466,7 @@ const EVALUADORES: Record<string, Evaluador> = {
  * Reglas que deciden sobre la macro-zona entera. No pertenecen a la cadena del sector: un corte de la rama de insumos
  * (ABORT_INSUMO) o del pipeline (ABORT_ALL) de un sector no las apaga.
  */
-const REGLAS_DE_ZONA = new Set(['LowEcRule', 'NutritionPlanRule']);
+const REGLAS_DE_ZONA = new Set(['FungalConditionRule', 'OutbreakRule', 'LowEcRule', 'NutritionPlanRule']);
 
 /** Huella estable de los valores vigentes (FNV-1a), como el `parametrosHash` del backend. */
 function huella(catalogo: CatalogoReglas): string {

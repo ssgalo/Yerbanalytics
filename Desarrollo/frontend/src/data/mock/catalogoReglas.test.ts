@@ -81,8 +81,8 @@ describe('catalogoReglas.fixture.json · consistencia interna', () => {
 const DIR_ENGINE = resolve(__dirname, '../../../../backend/src/main/java/com/yerbanalytics/backend/engine');
 const DIR_PARAMETROS = resolve(DIR_ENGINE, 'parametros');
 const DIR_REGLAS = resolve(DIR_ENGINE, 'rules');
-/** Las reglas de macro-zona (plan de nutrición) viven con su feature, no con las de sector. */
-const DIR_REGLAS_DE_ZONA = resolve(DIR_ENGINE, '..', 'nutrition');
+/** Las reglas de las features (plan de nutrición, reglas bióticas) viven con su feature, no con las de sector. */
+const DIRS_REGLAS_DE_FEATURE = [resolve(DIR_ENGINE, '..', 'nutrition'), resolve(DIR_ENGINE, '..', 'biotic')];
 
 interface EntradaEnum {
   /** `Clase.CONSTANTE` en el código Java (p. ej. `ParametrosRiego.UMBRAL_HUMEDAD`): lo que usan las reglas. */
@@ -166,7 +166,7 @@ export function parametrosPorRegla(
 
 function leerReglasDelBackend(): Record<string, string> {
   const fuentes: Record<string, string> = {};
-  for (const dir of [DIR_REGLAS, DIR_REGLAS_DE_ZONA]) {
+  for (const dir of [DIR_REGLAS, ...DIRS_REGLAS_DE_FEATURE]) {
     for (const f of readdirSync(dir).filter((n) => /^\w+Rule\.java$/.test(n))) {
       fuentes[f.replace('.java', '')] = readFileSync(resolve(dir, f), 'utf8');
     }
@@ -220,7 +220,7 @@ describe('parametrosPorRegla (el lector del anti-drift)', () => {
   });
 });
 
-describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS) || !existsSync(DIR_REGLAS_DE_ZONA))(
+describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS) || !DIRS_REGLAS_DE_FEATURE.every(existsSync))(
   'catalogoReglas.fixture.json · reglas y usadoPor contra el código del backend',
   () => {
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));

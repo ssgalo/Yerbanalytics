@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
+import com.yerbanalytics.backend.engine.traza.TrazaRegla;
 import com.yerbanalytics.backend.engine.zone.ZoneRuleContext;
 import com.yerbanalytics.backend.engine.zone.ZoneRuleEngine;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -102,6 +103,10 @@ class NutritionPlanFlowIntegrationTest {
         return new ZoneRuleContext(zone, sectors, now, hardware, Map.of(), false, Set.of(), RuleOverrides.NONE);
     }
 
+    private static TrazaRegla traceOf(List<TrazaRegla> trace, String ruleName) {
+        return trace.stream().filter(t -> t.ruleId().equals(ruleName)).findFirst().orElseThrow();
+    }
+
     private long planApplications() {
         return sectors.stream()
                 .map(s -> applications.findFirstBySectorIdAndSupplyOrderByTsDesc(s.getId(), Supply.FERTILIZER))
@@ -119,10 +124,11 @@ class NutritionPlanFlowIntegrationTest {
         assertThat(planApplications()).isEqualTo(100);
         assertThat(zone.getNutritionBatchStartTs()).as("la tanda se cerró en el mismo ciclo").isNull();
         assertThat(zone.getLastPlanApplicationTs()).isNotNull();
-        assertThat(trace).extracting(t -> t.ruleId()).containsExactly("LowEcRule", "NutritionPlanRule");
-        assertThat(trace.get(1).estado()).isEqualTo(EstadoRegla.EVALUADA);
-        assertThat(trace.get(1).acciones()).extracting(a -> a.tipo().name())
-                .contains("UPDATE_NUTRITION_PLAN", "ALERTA");
+        assertThat(trace).extracting(t -> t.ruleId())
+                .containsExactly("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule");
+        var plan = traceOf(trace, NutritionPlanRule.NAME);
+        assertThat(plan.estado()).isEqualTo(EstadoRegla.EVALUADA);
+        assertThat(plan.acciones()).extracting(a -> a.tipo().name()).contains("UPDATE_NUTRITION_PLAN", "ALERTA");
     }
 
     @Test
@@ -213,7 +219,7 @@ class NutritionPlanFlowIntegrationTest {
         var trace = engine.evaluate(context(Instant.now()));
 
         assertThat(planApplications()).isZero();
-        assertThat(trace.get(1).estado()).isEqualTo(EstadoRegla.OMITIDA_DESHABILITADA);
+        assertThat(traceOf(trace, NutritionPlanRule.NAME).estado()).isEqualTo(EstadoRegla.OMITIDA_DESHABILITADA);
     }
 
     @Test

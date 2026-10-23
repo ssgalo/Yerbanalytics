@@ -73,7 +73,7 @@ public enum ParametrosInsumo implements DefinicionParametro {
             TipoParametro.NUMERO, "%", "20", 10.0, 50.0, 0, "reglas_v2 §8.3"),
     FUNGICIDE_CAP("insumo.tope-fitosanitario",
             "Tope de fitosanitarios por sector",
-            "Cuántos fitosanitarios puede recibir un sector en la ventana de días siguiente antes de bloquearse hasta una revisión: con un solo producto, repetirlo arriesga resistencia.",
+            "Cuántos fitosanitarios puede recibir un sector dentro de la ventana de días del tope antes de bloquearse hasta una revisión: con un solo producto, repetirlo arriesga resistencia.",
             TipoParametro.ENTERO, "aplicaciones", "3", 2.0, 5.0, 0, "reglas_v2 §8.5 F-06"),
     FUNGICIDE_CAP_DAYS("insumo.tope-fitosanitario-dias",
             "Ventana del tope de fitosanitarios",

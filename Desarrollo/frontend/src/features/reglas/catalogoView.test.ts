@@ -69,7 +69,7 @@ describe('filtrarReglas', () => {
 
   it('sin filtros devuelve todas', () => {
     const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, sinFiltros)).toHaveLength(18);
+    expect(filtrarReglas(c, sinFiltros)).toHaveLength(22);
   });
 
   it('busca por nombre de regla o de alguno de sus parámetros, sin importar tildes ni mayúsculas', () => {
@@ -93,6 +93,10 @@ describe('filtrarReglas', () => {
     expect(filtrarReglas(c, { ...sinFiltros, rama: 'INSUMO' }).map((r) => r.id)).toEqual([
       'DailyDoseLimitRule',
       'SupplyRule',
+      'FungalDamageRule',
+      'FoliarPestRule',
+      'FungalConditionRule',
+      'OutbreakRule',
       'LowEcRule',
       'NutritionPlanRule',
     ]);
@@ -200,8 +204,8 @@ describe('agruparPorConsumidor', () => {
       'insumo.dosis-fitosanitario',
       'insumo.lluvia-impide-horas',
       'insumo.reingreso-horas',
+      'insumo.tope-fitosanitario-dias',
       'insumo.pendiente-vence-dias',
-      'diagnostico.vigencia-horas',
     ]);
     expect(grupos[3]).toMatchObject({ id: 'ApplicationPreconditions', titulo: 'Cuándo se puede aplicar un insumo' });
     expect(grupos[3].parametros.map((p) => p.clave)).toEqual([
@@ -212,6 +216,7 @@ describe('agruparPorConsumidor', () => {
       'insumo.temp-max-aplicar',
       'insumo.humedad-min-aplicar',
       'insumo.lluvia-impide-mm',
+      'insumo.tope-fitosanitario',
     ]);
     expect(grupos[4]).toMatchObject({ id: 'TankService', titulo: 'Tanques de insumo' });
     expect(grupos[4].parametros.map((p) => p.clave)).toEqual(['insumo.stock-aviso']);

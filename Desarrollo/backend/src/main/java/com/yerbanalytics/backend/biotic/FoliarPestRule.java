@@ -7,6 +7,7 @@ import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosBiotico;
+import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.model.SectorEntity;
@@ -27,10 +28,10 @@ import java.util.Optional;
  * {@code biotico.horas-dpv-acaros} horas; el mismo diagnóstico en {@code biotico.capturas-seguidas} capturas diarias
  * seguidas. Si no se cumple ninguna, deja un {@code INFO} y espera.
  *
- * <p>Ver {@link BioticDiagnosisRule} para el esqueleto compartido con F-F1.
+ * <p>Ver {@link BioticDiagnosisBase} para el esqueleto compartido con F-F1.
  */
 @Component
-public class FoliarPestRule extends BioticDiagnosisRule {
+public class FoliarPestRule extends BioticDiagnosisBase {
 
     /** Prioridad: justo después de F-F1; única entre las reglas por sector. */
     private static final int PRIORITY = 16;
@@ -59,8 +60,9 @@ public class FoliarPestRule extends BioticDiagnosisRule {
     }
 
     @Override
-    protected List<DefinicionParametro> environmentParameters() {
-        return List.of(ParametrosBiotico.DPV_DRY_HEAT, ParametrosBiotico.MITE_DPV_HOURS);
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosDiagnostico.VALIDITY_HOURS,
+                ParametrosBiotico.CONSECUTIVE_CAPTURES, ParametrosBiotico.DPV_DRY_HEAT, ParametrosBiotico.MITE_DPV_HOURS);
     }
 
     @Override

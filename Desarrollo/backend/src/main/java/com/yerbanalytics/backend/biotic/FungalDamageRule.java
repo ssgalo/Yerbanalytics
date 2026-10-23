@@ -3,6 +3,7 @@ package com.yerbanalytics.backend.biotic;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosBiotico;
+import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.engine.traza.Operador;
 import com.yerbanalytics.backend.model.ZoneReadingEntity;
@@ -22,10 +23,10 @@ import java.util.Optional;
  * {@code biotico.dpv-saturado} en las dos últimas lecturas de pulso, ambas de las últimas 24 h; el mismo diagnóstico en
  * {@code biotico.capturas-seguidas} capturas diarias seguidas. Si no, espera a las próximas capturas.
  *
- * <p>Ver {@link BioticDiagnosisRule} para el esqueleto compartido con F-P1.
+ * <p>Ver {@link BioticDiagnosisBase} para el esqueleto compartido con F-P1.
  */
 @Component
-public class FungalDamageRule extends BioticDiagnosisRule {
+public class FungalDamageRule extends BioticDiagnosisBase {
 
     /** Prioridad: después de la mediasombra y antes del seguimiento; única entre las reglas por sector. */
     private static final int PRIORITY = 15;
@@ -58,8 +59,9 @@ public class FungalDamageRule extends BioticDiagnosisRule {
     }
 
     @Override
-    protected List<DefinicionParametro> environmentParameters() {
-        return List.of(ParametrosBiotico.FUNGAL_MOISTURE, ParametrosBiotico.DPV_SATURATED);
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosDiagnostico.VALIDITY_HOURS,
+                ParametrosBiotico.CONSECUTIVE_CAPTURES, ParametrosBiotico.FUNGAL_MOISTURE, ParametrosBiotico.DPV_SATURATED);
     }
 
     @Override

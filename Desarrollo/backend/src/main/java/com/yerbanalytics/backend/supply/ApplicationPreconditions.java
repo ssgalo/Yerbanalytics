@@ -85,7 +85,7 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
     @Override
     public List<DefinicionParametro> parametros() {
         return List.of(ParametrosInsumo.FERTILIZER_INTERVAL, ParametrosInsumo.FUNGICIDE_INTERVAL,
-                ParametrosInsumo.FUNGICIDE_CAP, ParametrosInsumo.FUNGICIDE_CAP_DAYS,
+                ParametrosInsumo.FUNGICIDE_CAP,
                 ParametrosInsumo.MORNING_WINDOW, ParametrosInsumo.AFTERNOON_WINDOW,
                 ParametrosInsumo.MAX_APPLICATION_TEMP, ParametrosInsumo.MIN_APPLICATION_MOISTURE,
                 ParametrosInsumo.RAIN_BLOCKS_MM);
@@ -129,8 +129,8 @@ public class ApplicationPreconditions implements DemoControllable, ConsumidorPar
             return PreconditionResult.met();
         }
         return PreconditionResult.rejectCap(String.format(
-                "F-06: el sector ya recibió %d fitosanitarios en %.0f días (tope %.0f); hace falta registrar la revisión",
-                f.fungicidesInCapWindow(), params.number(ParametrosInsumo.FUNGICIDE_CAP_DAYS), cap));
+                "F-06: el sector ya recibió %d fitosanitarios dentro de la ventana del tope (máximo %.0f); hace falta registrar la revisión",
+                f.fungicidesInCapWindow(), cap));
     }
 
     // --- P-D2 ---

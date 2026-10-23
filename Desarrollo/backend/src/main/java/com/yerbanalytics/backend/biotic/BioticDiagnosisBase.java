@@ -9,7 +9,6 @@ import com.yerbanalytics.backend.engine.Rule;
 import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
-import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosBiotico;
 import com.yerbanalytics.backend.engine.parametros.ParametrosDiagnostico;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -18,7 +17,6 @@ import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.supply.Supply;
 import com.yerbanalytics.backend.supply.ValidDiagnosis;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -43,19 +41,15 @@ import java.util.Set;
  * <p><b>Simulador:</b> el bypass {@value #BYPASS_PERSISTENCE} da el diagnóstico por visto en las capturas seguidas que pide
  * el catálogo.
  */
-abstract class BioticDiagnosisRule implements Rule {
+abstract class BioticDiagnosisBase implements Rule {
 
     /** Bypass key: the diagnosis counts as seen in the consecutive captures the catalog asks for. */
     public static final String BYPASS_PERSISTENCE = "persistence";
 
-    private static final List<DefinicionParametro> COMMON_PARAMETERS = List.of(
-            ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosDiagnostico.VALIDITY_HOURS,
-            ParametrosBiotico.CONSECUTIVE_CAPTURES);
-
     private final BioticKind kind;
     private final DiagnosisHistory diagnoses;
 
-    protected BioticDiagnosisRule(BioticKind kind, DiagnosisHistory diagnoses) {
+    protected BioticDiagnosisBase(BioticKind kind, DiagnosisHistory diagnoses) {
         this.kind = kind;
         this.diagnoses = diagnoses;
     }
@@ -76,19 +70,11 @@ abstract class BioticDiagnosisRule implements Rule {
         return Set.of(BYPASS_PERSISTENCE);
     }
 
-    @Override
-    public final List<DefinicionParametro> parametros() {
-        List<DefinicionParametro> all = new ArrayList<>(COMMON_PARAMETERS);
-        all.addAll(environmentParameters());
-        return List.copyOf(all);
-    }
-
-    /** Los parámetros del catálogo que lee {@link #favorableEnvironment}. */
-    protected abstract List<DefinicionParametro> environmentParameters();
-
     /**
      * Si el ambiente de la macro-zona favorece al problema, por qué (para el motivo de la acción); vacío si no. Lee las
-     * lecturas por {@code ReadingHistory} y registra cada comparación en la traza.
+     * lecturas por {@code ReadingHistory} y registra cada comparación en la traza. Los parámetros que lee los declara la
+     * regla concreta en su {@code parametros()}, junto con los comunes: la confianza y la vigencia del diagnóstico
+     * (P-D1) y {@code biotico.capturas-seguidas}.
      */
     protected abstract Optional<String> favorableEnvironment(RuleContext ctx, Evaluacion ev);
 

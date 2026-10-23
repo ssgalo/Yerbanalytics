@@ -173,6 +173,6 @@ describe('resumenTraza', () => {
   it('el bloqueo total aclara que no se evaluó el resto', () => {
     const r = resumen({ bloqueoManual: true });
     expect(r).toContainEqual(expect.objectContaining({ tipo: 'bloqueo', ruleId: 'ManualLockRule' }));
-    expect(r).toContainEqual(expect.objectContaining({ tipo: 'noAlcanzada', texto: expect.stringMatching(/15 reglas/) }));
+    expect(r).toContainEqual(expect.objectContaining({ tipo: 'noAlcanzada', texto: expect.stringMatching(/17 reglas/) }));
   });
 });
