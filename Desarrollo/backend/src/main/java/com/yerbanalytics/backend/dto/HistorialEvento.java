@@ -31,5 +31,10 @@ public record HistorialEvento(
         /** Volumen de riego ordenado, en litros; nulo si no es un riego. */
         Double volumenL,
         /** Duración de apertura ordenada, en segundos; nulo si no es un riego. */
-        Integer duracionSeg
+        Integer duracionSeg,
+        /**
+         * Piezas apagadas cuando el motor tomó la decisión (lista vacía si todas estaban prendidas); nulo si el evento es
+         * anterior a este registro o no es una decisión del motor. Sirve para dibujar el grafo de razonamiento fiel.
+         */
+        java.util.List<String> reglasInactivas
 ) {}

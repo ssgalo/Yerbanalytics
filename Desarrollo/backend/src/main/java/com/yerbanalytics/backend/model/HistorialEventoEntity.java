@@ -126,4 +126,12 @@ public class HistorialEventoEntity {
     /** Duración de apertura de la válvula ordenada, en segundos. */
     @Column(name = "duracion_seg")
     private Integer duracionSeg;
+
+    /**
+     * Piezas apagadas (estado efectivo) en el momento en que el motor registró esta decisión: nombres separados por
+     * coma, ordenados. Vacío si estaba todo prendido; {@code null} en un evento anterior a este registro o que no es una
+     * decisión del motor. Con esto el grafo del historial dibuja lo que corrió entonces, no lo que está prendido hoy.
+     */
+    @Column(name = "reglas_inactivas", columnDefinition = "TEXT")
+    private String reglasInactivas;
 }

@@ -8,6 +8,7 @@ import com.yerbanalytics.backend.dto.HistorialEvento;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.NivelAlerta;
+import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.NodeErrorType;
@@ -16,6 +17,7 @@ import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
@@ -54,14 +56,31 @@ public class HistorialService {
     private final double umbralRecuperacion;
     /** Reloj del vivero: el mismo que usa el despacho de riego para sellar y comparar los eventos. */
     private final Clock reloj;
+    /** Estado efectivo de las piezas: de ahí sale qué estaba apagado al registrar cada decisión del motor. */
+    private final RuleOverrides overrides;
 
+    /** Sin overrides: ninguna pieza figura apagada. */
+    public HistorialService(HistorialRepository historialRepository,
+                            SectorRepository sectorRepository,
+                            ConfiguracionService configuracionService,
+                            long latencyMs,
+                            String latencyLabel,
+                            double umbralRecuperacion,
+                            Clock reloj) {
+        this(historialRepository, sectorRepository, configuracionService, latencyMs, latencyLabel, umbralRecuperacion,
+                reloj, RuleOverrides.NONE);
+    }
+
+    @Autowired
     public HistorialService(HistorialRepository historialRepository,
                             SectorRepository sectorRepository,
                             @Lazy ConfiguracionService configuracionService,
                             @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
                             @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
                             @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion,
-                            Clock reloj) {
+                            Clock reloj,
+                            RuleOverrides overrides) {
+        this.overrides = overrides;
         this.historialRepository = historialRepository;
         this.sectorRepository = sectorRepository;
         this.configuracionService = configuracionService;
@@ -104,7 +123,7 @@ public class HistorialService {
                 + (detalle.recortado() ? " (duración recortada al máximo de la válvula)." : "."));
         e.setAccion("Electroválvula abierta · riego autónomo en curso.");
         withSeguimiento(e, detalle.humedad());
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /**
@@ -129,7 +148,7 @@ public class HistorialService {
         e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /** Regla con la que queda en el historial un riego que se cortó antes de tiempo (ver {@link #registrarCorteRiego}). */
@@ -157,7 +176,7 @@ public class HistorialService {
         e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /**
@@ -184,7 +203,7 @@ public class HistorialService {
         e.setLectura("Aplicación de " + insumo.toLowerCase() + " pedida por la regla " + regla + ".");
         e.setDecision("Las precondiciones de aplicación se cumplen: se ordenan " + ml + " ml de "
                 + insumo.toLowerCase() + ".");
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /** Registra una dosificación de insumo, con seguimiento de la métrica afectada. */
@@ -342,6 +361,18 @@ public class HistorialService {
     }
 
     /**
+     * Guarda una decisión del motor junto con las piezas que estaban apagadas en este momento: el grafo del historial
+     * tiene que dibujar lo que corrió entonces, no lo que esté prendido cuando alguien lo mire. Un evento sin regla no es
+     * una decisión del motor y queda con {@code null}.
+     */
+    private void guardarDelMotor(HistorialEventoEntity e) {
+        if (e.getRegla() != null) {
+            e.setReglasInactivas(String.join(",", new TreeSet<>(overrides.inactiveNames())));
+        }
+        historialRepository.save(e);
+    }
+
+    /**
      * Registra que alguien prendió o apagó una regla desde Motor de reglas: qué regla (con su código), el nuevo estado,
      * quién, por qué y, si apagó una protección, qué implica. No va a la auditoría de seguridad: apagar una regla es
      * operar el vivero y acá es donde se busca "¿por qué no se regó?".
@@ -397,7 +428,7 @@ public class HistorialService {
         e.setSev(EMDASH);
         e.setEvoShow(false);
         e.setBloqueoRepeticion(false);
-        historialRepository.save(e);
+        guardarDelMotor(e);
     }
 
     /** Registra que alguien inició o eliminó el plan de rustificación de una macro-zona. */
@@ -606,8 +637,17 @@ public class HistorialService {
                 e.getRegla(),
                 e.getAlerta(),
                 e.getVolumenL(),
-                e.getDuracionSeg()
+                e.getDuracionSeg(),
+                reglasInactivas(e.getReglasInactivas())
         );
+    }
+
+    /** {@code null} (evento anterior al registro) sigue siendo {@code null}; vacío es "todas estaban prendidas". */
+    private static List<String> reglasInactivas(String guardadas) {
+        if (guardadas == null) {
+            return null;
+        }
+        return guardadas.isBlank() ? List.of() : List.of(guardadas.split(","));
     }
 
     private ColorPair verdictColor(String verdict) {

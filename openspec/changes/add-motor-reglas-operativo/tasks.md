@@ -36,9 +36,9 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 4.2 GREEN: `DespachoRiego` consulta el estado efectivo antes de esos tres descartes.
 
 ## 5. Backend: historial fiel a la ejecución (D-11)
-- [ ] 5.1 RED: `HistorialServiceTest`: un evento del motor guarda `reglasInactivas` con las piezas apagadas en ese momento; el DTO lo expone como lista.
-- [ ] 5.2 RED: `RuleEngineSchemaControllerTest`: `RuleNodeDto.activaPorDefecto`.
-- [ ] 5.3 GREEN: columna `historial_evento.reglas_inactivas`, `ActionRecord` del backend, `RuleNodeDto.activaPorDefecto`.
+- [x] 5.1 RED: `HistorialServiceTest`: un evento del motor guarda `reglasInactivas` con las piezas apagadas en ese momento; el DTO lo expone como lista.
+- [x] 5.2 RED: `RuleEngineSchemaControllerTest`: `RuleNodeDto.activaPorDefecto`.
+- [x] 5.3 GREEN: columna `historial_evento.reglas_inactivas`, `ActionRecord` del backend, `RuleNodeDto.activaPorDefecto`.
 
 ## 6. Backend: Umbrales al motor (D-14)
 - [ ] 6.1 RED: `ParametrosRealesTest` con `seguimiento.latencia-min` y `seguimiento.delta-min` (familia `SEGUIMIENTO`, rangos, fábrica 2 y 5); `CatalogoParametros` exige que `HistorialService` los declare.

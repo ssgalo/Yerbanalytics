@@ -18,6 +18,9 @@ import java.util.List;
  * @param activa   {@code false} si la regla está apagada (p. ej. las retiradas de
  *                 {@code yerbanalytics.reglas.retiradas}): no corre, y el historial no la dibuja.
  *                 Los nodos especiales siempre van activos.
+ * @param activaPorDefecto {@code false} si la regla está retirada ({@code yerbanalytics.reglas.retiradas}): así arranca
+ *                 sin que nadie la haya prendido. El historial lo usa para los eventos viejos, que no guardaron qué
+ *                 reglas estaban apagadas. Los nodos especiales siempre van en {@code true}.
  */
 public record RuleNodeDto(
         String id,
@@ -27,5 +30,6 @@ public record RuleNodeDto(
         int priority,
         String branch,
         List<String> parametros,
-        boolean activa
+        boolean activa,
+        boolean activaPorDefecto
 ) {}
