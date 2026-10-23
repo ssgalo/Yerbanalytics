@@ -130,6 +130,9 @@ ResultadoComandoZona parsearComandoZona(const char* payload, unsigned int len, c
   if (n > 0) {
     strlcpy(commandId, doc[KEY_COMMAND_ID] | "", n);
   }
+  if (!doc[KEY_ACTUADOR].isNull()) {
+    return ResultadoComandoZona::ACTUADOR;
+  }
   const char* accion = doc[KEY_ACCION] | "";
   if (strcasecmp(accion, ACCION_LEER_AHORA) == 0) {
     return ResultadoComandoZona::LEER_AHORA;

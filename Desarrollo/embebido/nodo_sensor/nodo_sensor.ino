@@ -53,6 +53,9 @@ static void onMensajeMqtt(char *topic, byte *payload, unsigned int length)
   case util_json::ResultadoComandoZona::ACCION_DESCONOCIDA:
     Serial.printf("[main] Comando de zona ignorado (commandId '%s'): acción desconocida\n", commandId);
     break;
+  case util_json::ResultadoComandoZona::ACTUADOR:
+    // La mediasombra es de la zona, pero la mueve el nodo que actúa, no el que sensa.
+    break;
   default:
     Serial.println("[main] Comando de zona ignorado: JSON inválido");
     break;
