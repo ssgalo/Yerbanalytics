@@ -32,6 +32,8 @@ export const WINDOW_BYPASS_KEY = 'window';
  * aplicación de la v2. En modo simulador el happy path la enciende (es un interruptor de demo, como el bypass de R-05).
  */
 export const SUPPLY_RULE = 'SupplyRule';
+/** Aviso cuando la dosificación está apagada: el encendido se cambia sólo en Motor de reglas. */
+export const SUPPLY_LEG_WARNING = 'Prendé «Dosificación de insumo» en Motor de reglas para probar el tramo de insumo.';
 
 /**
  * Las precondiciones de aplicación (P-D1…P-D5). En modo simulador se saltean la ventana horaria (como R-05) y el límite de
@@ -346,23 +348,24 @@ export async function runHappyPath(
       // No se restaura: el despacho del riego revalida las guardas al abrir la válvula, después de que el motor decide.
       if (windowRule) leftActive.push('bypass de la ventana horaria de riego');
 
-      // La dosificación v1 arranca retirada y la aplicación pasa por las precondiciones de la v2: se enciende la regla,
-      // se saltean la ventana horaria y el límite diario, y se asegura stock en los tanques de la zona.
+      // El tramo de insumo pasa por las precondiciones de la v2: se saltean la ventana horaria y el límite diario, y se
+      // asegura stock en los tanques de la zona. Pero el encendido es sólo de Motor de reglas: si la dosificación está
+      // apagada en el vivero la demo no la prende; avisa y saltea ese tramo, sin cortar el resto.
       const supplyRule = rules.find((r) => r.name === SUPPLY_RULE);
       if (supplyRule && !supplyRule.enabled) {
-        await deps.updateRule(SUPPLY_RULE, { enabled: true });
-        deps.log('✓ Dosificación (SupplyRule) encendida: arranca retirada hasta que entren las reglas de aplicación de la v2');
-        leftActive.push('dosificación encendida');
-      }
-      const preconditions = rules.find((r) => r.name === PRECONDITIONS_RULE);
-      const preconditionsBypass = preconditions ? withBypasses(preconditions, PRECONDITIONS_BYPASS_KEYS) : null;
-      if (preconditions && preconditionsBypass) {
-        await deps.updateRule(PRECONDITIONS_RULE, { bypassed: preconditionsBypass });
-        deps.log('✓ Ventana horaria y límite diario de aplicación salteados: la demo anda a cualquier hora y se puede repetir');
-      }
-      if (preconditions) leftActive.push('bypass de la ventana y del límite diario de aplicación');
-      if (conditions.ensureTankStock) {
-        for (const line of await deps.ensureTankStock(target.zonaId)) deps.log(line);
+        deps.log(`⚠ ${SUPPLY_LEG_WARNING}`);
+        warnings.push(SUPPLY_LEG_WARNING);
+      } else {
+        const preconditions = rules.find((r) => r.name === PRECONDITIONS_RULE);
+        const preconditionsBypass = preconditions ? withBypasses(preconditions, PRECONDITIONS_BYPASS_KEYS) : null;
+        if (preconditions && preconditionsBypass) {
+          await deps.updateRule(PRECONDITIONS_RULE, { bypassed: preconditionsBypass });
+          deps.log('✓ Ventana horaria y límite diario de aplicación salteados: la demo anda a cualquier hora y se puede repetir');
+        }
+        if (preconditions) leftActive.push('bypass de la ventana y del límite diario de aplicación');
+        if (conditions.ensureTankStock) {
+          for (const line of await deps.ensureTankStock(target.zonaId)) deps.log(line);
+        }
       }
 
       if (conditions.clima) {
@@ -401,9 +404,8 @@ export async function runHappyPath(
       // No se enciende nada (este modo no toca reglas), pero si la dosificación sigue retirada el insumo nunca va a actuar.
       const supplyRule = (await deps.getRules()).find((r) => r.name === SUPPLY_RULE);
       if (supplyRule && !supplyRule.enabled) {
-        const warning = 'La dosificación (SupplyRule) está retirada: el insumo no va a actuar. Encendela en el panel de reglas o arrancá el backend con YERBANALYTICS_REGLAS_RETIRADAS vacío.';
-        warnings.push(warning);
-        deps.log(`⚠ ${warning}`);
+        warnings.push(SUPPLY_LEG_WARNING);
+        deps.log(`⚠ ${SUPPLY_LEG_WARNING}`);
       }
       // Nada debe pisar al nodo real: se suelta cualquier lectura fijada que haya quedado.
       await deps.pinReadings(target.zonaId, {});

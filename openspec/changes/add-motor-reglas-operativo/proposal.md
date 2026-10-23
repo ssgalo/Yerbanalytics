@@ -23,8 +23,9 @@ por defecto de la mediasombra, que es parte de la rustificación.
   sector, reglas de macro-zona y los servicios `ApplicationPreconditions`, `EscalamientoNodoService`,
   `ReadingValidationGuard`, `HardwareFaultService`, `HorarioMediasombraService`) se prende o apaga desde Motor
   de reglas. Se persiste en una tabla nueva (`regla_estado`), sobrevive reinicios y vale en modo `REAL`.
-- **Estado efectivo = override explícito de demo, si existe; si no, el operativo.** El override de demo sigue en memoria,
-  sólo existe en modo demo y sólo lo escribe el simulador (así el happy path de Demo Expo puede prender `SupplyRule`). `yerbanalytics.reglas.retiradas` pasa a ser la
+- **Estado efectivo = el operativo** (Motor de reglas es la única fuente de verdad del encendido). La capa de demo sigue en
+  memoria, sólo existe en modo demo, sólo la escribe el simulador y guarda únicamente cooldowns y bypass; el happy path de Demo
+  Expo ya no prende `SupplyRule`, avisa. `yerbanalytics.reglas.retiradas` pasa a ser la
   siembra del estado operativo cuando no hay fila.
 - **Todas las reglas son conmutables, incluidas las protecciones** (S-01…S-05, R-04, guarda de ciclo,
   disponibilidad de la mediasombra). Apagar una protección exige confirmación en la UI con su consecuencia y,
@@ -42,7 +43,7 @@ por defecto de la mediasombra, que es parte de la rustificación.
   catálogo del motor; `insumoDosisMax24hMl` se borra; el horario por defecto de la mediasombra se muda a la
   vista de Rustificación. Migración manual nueva.
 - **Invariante nuevo en CLAUDE.md**: existe un interruptor operativo en producción; los controles de demo
-  (cooldowns, bypass, apagado de demo) siguen viviendo sólo en el simulador.
+  (cooldowns, bypass) siguen viviendo sólo en el simulador.
 
 ## Fuera de alcance
 

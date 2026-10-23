@@ -43,6 +43,7 @@ describe('Sidebar · permisos (7.3)', () => {
     expect(enlacesDe('Gestión')).toEqual([
       'Historial',
       'Umbrales',
+      'Rustificación',
       'Criterio de diagnóstico',
       'Motor de reglas',
       'Hardware',
@@ -101,6 +102,7 @@ describe('Sidebar · grupo Configuración', () => {
     expect(grupoConfiguracion().getAttribute('aria-expanded')).toBe('true');
     expect(enlacesDe('Configuración', 'group')).toEqual([
       'Umbrales',
+      'Rustificación',
       'Criterio de diagnóstico',
       'Motor de reglas',
       'Hardware',

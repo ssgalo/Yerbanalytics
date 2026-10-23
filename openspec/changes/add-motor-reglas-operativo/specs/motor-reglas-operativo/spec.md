@@ -23,21 +23,17 @@ por defecto: apagada si figura en `yerbanalytics.reglas.retiradas`, prendida si 
 - **THEN** sigue prendida, porque tiene fila
 
 ### Requirement: Estado efectivo único
-El estado efectivo de una pieza SHALL ser el override explícito de la capa de demo cuando existe (sólo con `yerbanalytics.demo.enabled=true`) y, si no, el estado operativo. Todo lo que consulta si una pieza corre
+El estado efectivo de una pieza SHALL ser su estado operativo: Motor de reglas es la única fuente de verdad del encendido y la capa de demo (sólo con `yerbanalytics.demo.enabled=true`) SHALL guardar únicamente cooldowns y bypass. Todo lo que consulta si una pieza corre
 (orquestador por sector, motor de macro-zona, despacho de riego, servicios, `RuleNodeDto.activa` de
-`GET /api/rules/schema`) SHALL usar ese mismo estado. Sin modo demo la capa de demo SHALL estar vacía y el efectivo SHALL ser el operativo.
+`GET /api/rules/schema`) SHALL usar ese mismo estado. `PUT /api/demo/rules/{name}` SHALL rechazar con `400` todo cuerpo que traiga `enabled`.
 
-#### Scenario: En modo demo, el override explícito del simulador gana
-- **WHEN** una regla está apagada en el vivero y el simulador la prende por `PUT /api/demo/rules/{name}`
-- **THEN** la regla corre mientras dure el override y `GET /api/demo/rules` informa `operationalActive: false` y `enabled: true`
+#### Scenario: La demo no puede prender ni apagar
+- **WHEN** el simulador pide `PUT /api/demo/rules/{name}` con `enabled` sobre una regla, prendida o apagada en el vivero
+- **THEN** responde `400` ("El encendido se cambia en Motor de reglas.") y el estado de la regla no cambia
 
-#### Scenario: Sin override de demo rige el estado operativo
-- **WHEN** el simulador nunca tocó una regla, o la capa de demo se limpió
-- **THEN** la regla corre si y sólo si está prendida en el vivero
-
-#### Scenario: La demo apaga lo prendido
-- **WHEN** una regla está prendida en el vivero y el simulador la apaga en modo demo
-- **THEN** la regla no corre, `GET /api/rules/parametros` la informa con `activa: true` y `apagadaPorDemo: true`
+#### Scenario: Cooldowns y bypass no cambian el estado
+- **WHEN** el simulador cambia cooldowns o bypass de una regla apagada en el vivero, o limpia la capa de demo
+- **THEN** la regla corre si y sólo si está prendida en el vivero, y `GET /api/demo/rules` informa su `enabled` (sólo lectura) igual al operativo
 
 #### Scenario: Sin modo demo
 - **WHEN** `yerbanalytics.demo.enabled=false`
@@ -80,7 +76,7 @@ requerir un `motivo` no vacío (hasta 500 caracteres) y `confirmaProteccion: tru
 ### Requirement: Cambio de estado por API con permiso
 El estado operativo SHALL cambiarse sólo por `PUT /api/rules/{name}/estado`, con el permiso `reglas.editar`, declarado en
 `MapaPermisos`. `GET /api/rules/parametros` SHALL listar todas las piezas conmutables con su código, objetivo, efecto,
-estado operativo, estado por defecto, apagado por demo, consecuencia (si es protección) y último cambio.
+estado operativo, estado por defecto, consecuencia (si es protección) y último cambio.
 
 #### Scenario: Usuario sin permiso
 - **WHEN** un Operario pide `PUT /api/rules/RiegoPorDeficitRule/estado`

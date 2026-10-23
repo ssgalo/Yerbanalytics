@@ -10,6 +10,7 @@
    ============================================================ */
 import type {
   ActionRecord,
+  CambioEstadoRegla,
   CambioParametro,
   CatalogoReglas,
   Configuracion,
@@ -23,6 +24,7 @@ import type {
   NuevaTopologia,
   NuevoDispositivo,
   OrigenEvaluacion,
+  ReglaCatalogo,
   ManualLock,
   NewManualLock,
   NewTankLoad,
@@ -117,6 +119,11 @@ export interface DataRepository {
    * restablece el valor de fábrica. Si algo es inválido rechaza con `ParametrosInvalidosError`.
    */
   saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas>;
+  /**
+   * Prende o apaga una pieza del motor, en el momento (no entra al borrador de parámetros). Devuelve la pieza
+   * actualizada. Rechaza con `EstadoReglaError` si falta el motivo o la confirmación de una protección.
+   */
+  setEstadoRegla(nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo>;
   /** Esquema base del DAG del motor (topología estática, con los parámetros de cada regla). */
   getRuleSchema(): Promise<DagSchema>;
   /**

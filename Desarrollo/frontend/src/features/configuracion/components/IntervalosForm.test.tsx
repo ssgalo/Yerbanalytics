@@ -32,7 +32,7 @@ describe('IntervalosForm · pulso de sensado y evaluación', () => {
 
   it('la ayuda explica el pulso anclado a las 02:00', () => {
     mount();
-    expect(screen.getByText(/anclada a las 02:00.*macro-zonas.*motor/)).toBeTruthy();
+    expect(screen.getByText(/anclada a las 02:00.*macro-zonas/)).toBeTruthy();
   });
 
   it('emite el valor en minutos', () => {

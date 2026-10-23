@@ -1448,7 +1448,7 @@ class DespachoRiegoTest {
     private void apagar(String... reglas) {
         TestRuleOverrides overrides = new TestRuleOverrides();
         for (String regla : reglas) {
-            overrides.put(regla, new RuleOverride(false, Map.of(), Set.of()));
+            overrides.turnOff(regla);
         }
         despacho.setOverrides(overrides);
     }

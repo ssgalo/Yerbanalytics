@@ -309,7 +309,7 @@ class HardwareFaultServiceTest {
     @Test
     @DisplayName("apagado desde el simulador: no marca ni alerta (el sector no se marca averiado)")
     void apagado() {
-        overrides.put(HardwareFaultService.NAME, new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff(HardwareFaultService.NAME);
 
         Outcome outcome = service.report(flow(NodeErrorType.NO_FLOW, "MZ-1-012", "0"));
 

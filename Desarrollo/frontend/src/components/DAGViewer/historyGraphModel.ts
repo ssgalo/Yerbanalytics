@@ -3,8 +3,11 @@
 
    El historial guarda la regla que decidió (`regla`), no la evaluación entera. Lo demás se infiere
    del orden del motor: las globales corren antes que las ramas, y dentro de una rama corren por
-   prioridad hasta la que decidió. Sólo entran las reglas activas (`activa`); las apagadas no
-   corren, así que no se dibujan. Funciones puras; `HistoryGraph` sólo las pinta.
+   prioridad hasta la que decidió. Se dibujan las reglas como estaban CUANDO se decidió: cada evento del
+   motor guarda las que estaban apagadas (`reglasInactivas`) y sólo esas se excluyen, así que apagar una regla
+   hoy no la borra de las ejecuciones pasadas. Un evento anterior a ese registro (`null`) excluye las apagadas
+   de fábrica (`activaPorDefecto: false`); la regla que decidió se dibuja siempre. Funciones puras;
+   `HistoryGraph` sólo las pinta.
    ============================================================ */
 import type { ActionRecord, DagSchema, RuleNode } from '@/types/domain';
 
@@ -49,26 +52,31 @@ const RULE_BY_TYPE: Record<string, string> = {
   Mediasombra: 'ShadingRule',
 };
 
-/** El backend antepone un emoji a cada etiqueta de regla; el historial no los muestra. */
-export const plainLabel = (label: string): string =>
-  label.replace(/^[\p{Extended_Pictographic}\p{Emoji_Component}️‍\s]+/u, '').trim() || label;
+/** Todas las reglas del esquema (activas o no), por prioridad. */
+const allRules = (schema: DagSchema): RuleNode[] =>
+  schema.nodes.filter((n) => n.type === 'default').sort((a, b) => a.priority - b.priority);
 
-const isActive = (n: RuleNode) => n.type === 'default' && n.activa !== false;
-
-/** Reglas activas del esquema, por prioridad. */
-export function activeRules(schema: DagSchema): RuleNode[] {
-  return schema.nodes.filter(isActive).sort((a, b) => a.priority - b.priority);
-}
+/** Eventos que no son una decisión del motor sobre un sector: no tienen evaluación que mostrar. */
+const NO_EVALUATION = new Set(['Alerta', 'Configuración']);
 
 /**
- * Regla activa que decidió el evento, o `null` si no hay una evaluación que mostrar. Las alertas son
- * de la macro-zona: avisan algo, no son una decisión sobre un sector.
+ * Regla que decidió el evento (esté prendida o no hoy), o `null` si no hay una evaluación que mostrar. Las
+ * alertas son de la macro-zona y un cambio de configuración es una decisión de una persona, no del motor.
  */
 export function decidingRule(schema: DagSchema, event: ActionRecord): RuleNode | null {
-  if (event.tipo === 'Alerta') return null;
-  const rules = activeRules(schema);
+  if (NO_EVALUATION.has(event.tipo)) return null;
   const id = event.regla || RULE_BY_TYPE[event.tipo];
-  return rules.find((r) => r.id === id) ?? null;
+  return allRules(schema).find((r) => r.id === id) ?? null;
+}
+
+/** Reglas que corrieron cuando se tomó la decisión de este evento, por prioridad. */
+export function rulesAtDecision(schema: DagSchema, event: ActionRecord): RuleNode[] {
+  const decided = decidingRule(schema, event)?.id;
+  const inactive = event.reglasInactivas;
+  return allRules(schema).filter((r) => {
+    if (r.id === decided) return true;
+    return inactive ? !inactive.includes(r.id) : r.activaPorDefecto !== false;
+  });
 }
 
 /** La acción se hizo (no quedó pospuesta ni abortada). */
@@ -85,7 +93,7 @@ export function historyGraph(
   onlyExecuted = false,
 ): { nodes: HistoryNode[]; edges: HistoryEdge[] } {
   const decided = decidingRule(schema, event);
-  const rules = activeRules(schema);
+  const rules = rulesAtDecision(schema, event);
 
   const ran = (r: RuleNode): boolean => {
     if (!decided) return false;
@@ -109,7 +117,7 @@ export function historyGraph(
 
   let last = nodes[0];
   for (const r of rules.filter((x) => x.branch === 'GLOBAL')) {
-    const node: HistoryNode = { id: r.id, label: plainLabel(r.label), kind: 'rule', branch: 'GLOBAL', state: stateOf(r) };
+    const node: HistoryNode = { id: r.id, label: r.label, kind: 'rule', branch: 'GLOBAL', state: stateOf(r) };
     nodes.push(node);
     link(last, node);
     last = node;
@@ -132,7 +140,7 @@ export function historyGraph(
     link(lastGlobal, lane);
     let prev = lane;
     for (const r of branchRules) {
-      const node: HistoryNode = { id: r.id, label: plainLabel(r.label), kind: 'rule', branch, state: stateOf(r) };
+      const node: HistoryNode = { id: r.id, label: r.label, kind: 'rule', branch, state: stateOf(r) };
       nodes.push(node);
       link(prev, node);
       prev = node;

@@ -35,7 +35,7 @@ export const CATALOGO_PERMISOS: readonly PermisoCatalogo[] = [
   { codigo: 'configuracion.ver', grupo: 'Configuración', descripcion: 'Ver la configuración agronómica', lectura: null },
   { codigo: 'configuracion.editar', grupo: 'Configuración', descripcion: 'Editar la configuración agronómica', lectura: 'configuracion.ver' },
   { codigo: 'reglas.ver', grupo: 'Motor de reglas', descripcion: 'Grafo del motor y trazas de evaluación', lectura: null },
-  { codigo: 'reglas.editar', grupo: 'Motor de reglas', descripcion: 'Editar el catálogo de parámetros', lectura: 'reglas.ver' },
+  { codigo: 'reglas.editar', grupo: 'Motor de reglas', descripcion: 'Editar los parámetros del motor y prender o apagar reglas', lectura: 'reglas.ver' },
   { codigo: 'hardware.ver', grupo: 'Hardware', descripcion: 'Estado del hardware', lectura: null },
   { codigo: 'hardware.gestionar', grupo: 'Hardware', descripcion: 'Alta y recambio de dispositivos', lectura: 'hardware.ver' },
   { codigo: 'hardware.reparar', grupo: 'Hardware', descripcion: 'Registrar la reparación de un dispositivo averiado', lectura: 'hardware.ver' },

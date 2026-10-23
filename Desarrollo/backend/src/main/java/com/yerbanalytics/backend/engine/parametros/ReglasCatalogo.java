@@ -5,7 +5,6 @@ import com.yerbanalytics.backend.dto.UltimoCambioReglaDto;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
 import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import com.yerbanalytics.backend.engine.overrides.RuleState;
 import org.springframework.stereotype.Component;
 
@@ -23,12 +22,10 @@ public class ReglasCatalogo {
 
     private final DemoControllableRegistry registry;
     private final OperationalRuleStates states;
-    private final RuleOverridesStore demo;
 
-    public ReglasCatalogo(DemoControllableRegistry registry, OperationalRuleStates states, RuleOverridesStore demo) {
+    public ReglasCatalogo(DemoControllableRegistry registry, OperationalRuleStates states) {
         this.registry = registry;
         this.states = states;
-        this.demo = demo;
     }
 
     /** Todas las piezas, por prioridad y luego por nombre. */
@@ -62,7 +59,6 @@ public class ReglasCatalogo {
                 parametros,
                 estado != null ? estado.active() : activaPorDefecto,
                 activaPorDefecto,
-                demo.explicitEnabled(name).map(enabled -> !enabled).orElse(false),
                 pieza.protection().orElse(null),
                 estado != null ? new UltimoCambioReglaDto(estado.reason(), estado.updatedBy(), estado.updatedTs()) : null);
     }

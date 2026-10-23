@@ -438,8 +438,33 @@ y el intervalo del pulso de sensado y evaluación (configuración operativa).
   nuevo figura `OMITIDA_SIN_DIAGNOSTICO_NUEVO`.
 - `GET /api/rules/schema`: grafo de reglas; cada nodo de regla trae sus `parametros` y `activa` (`false` en las apagadas, como las retiradas: el historial no las dibuja).
 
-El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Parámetros* (edición
-del catálogo) e *Inspector* (el grafo coloreado con la última evaluación de un sector).
+El dashboard lo muestra en la sección **Motor de reglas** (`/reglas`): pestaña *Reglas* (cada regla con su
+interruptor y sus parámetros, agrupadas por objetivo) e *Inspector* (el grafo coloreado con la última evaluación de un
+sector).
+
+#### Estado operativo de las reglas (`add-motor-reglas-operativo`)
+
+Prender o apagar una regla es una **decisión del vivero**, no un control de demo:
+
+- `PUT /api/rules/{name}/estado` (`reglas.editar`; cuerpo `{activa, motivo, confirmaProteccion}`) cambia el interruptor.
+  Se persiste en `regla_estado` (con quién, cuándo y por qué), vale también en modo `REAL`, sobrevive reinicios y deja un
+  evento en el historial. `404` si la pieza no existe; `400` con `error` = `ACTIVA_REQUERIDA`, `MOTIVO_REQUERIDO`,
+  `CONFIRMACION_REQUERIDA` (trae la `consecuencia`) o `MOTIVO_DEMASIADO_LARGO`. Si ya estaba así, no escribe.
+- **Sin fila rige la siembra**: apagada si figura en `yerbanalytics.reglas.retiradas`, prendida si no. La fila nace
+  cuando una persona toca el interruptor (`OperationalRuleStates`).
+- **Protecciones**: apagar una protección (`protection()` de la regla: p. ej. `StaleSensorRule`, `DailyDoseLimitRule`)
+  exige motivo y `confirmaProteccion: true`. R-03, R-05 y R-06 no lo son: son frenos agronómicos de R-01.
+- **Fuente única del encendido**: el motor consulta un único bean, `EffectiveRuleOverrides`, y su `isEnabled` es **siempre el
+  estado operativo**: la demo no tiene interruptor y sólo conserva cooldowns y bypass. En `GET /api/demo/rules`, `enabled` es
+  ese estado (sólo lectura, lo que corre); `PUT /api/demo/rules/{name}` con `enabled` responde `400` («El encendido se cambia
+  en Motor de reglas.»). El catálogo (`GET /api/rules/parametros`) no trae `apagadaPorDemo`. El simulador no tiene
+  `reglas.editar`: no escribe el estado operativo.
+
+> **Migración manual pendiente · umbrales al motor.** `resources/migracion-umbrales-al-motor.sql`: el seguimiento
+> post-acción (`seguimiento_latencia_min`, `seguimiento_delta_min`) pasa al catálogo y se borra
+> `insumo_dosis_max_24h_ml` de `configuracion_operativa`. **Hay que arrancar el backend nuevo una vez** (crea
+> `parametro_regla` y `regla_estado`), detenerlo, correr el script y volver a arrancar. Es idempotente; sin correrlo
+> el backend arranca, pero crear una fila operativa nueva falla por el `NOT NULL` de las columnas viejas.
 
 ### Pulso de sensado: el único momento en que decide el motor
 
@@ -460,7 +485,7 @@ backend caído no se recupera.
   Pide a todas las zonas y sólo se usa por API: Demo Expo usa la secuencia `LECTURA` con `ejecutarMotor`,
   que emite un pulso con motor sólo de su zona (ver "Secuencias"). No corre las franjas. Un programado
   que encuentra uno en curso se omite (queda en el log).
-- **Reintentos** (parámetros `sensado.*` del catálogo, editables en Motor de reglas → Parámetros): a una
+- **Reintentos** (parámetros `sensado.*` del catálogo, editables en Motor de reglas → Reglas): a una
   zona pendiente se le reenvía el pedido tras `sensado.espera-respuesta` (60 s) y después cada
   `sensado.espera-reintento` (1 min), hasta `sensado.reintentos` (2) reintentos; vencido el último plazo
   queda sin respuesta en ese pulso y no se evalúa. Un cambio guardado rige en el tick siguiente. Se
@@ -885,7 +910,7 @@ Suspende la actuación autónoma sobre un **sector** o una **macro-zona**. Se cr
 - `ManualLockRule` (prioridad 0, `ABORT_ALL`) corta la cadena del sector. La mediasombra es de la zona: un bloqueo **de la
   zona** corta su rama en las reglas de zona (`ShadeFaultRule`) y frena también al horario de la mediasombra; un bloqueo de
   un solo sector no la toca.
-- Desde el simulador: apagar la regla, el bypass `lock` y el escenario «Bloqueo manual» (README del simulador).
+- Desde el simulador: el bypass `lock` (la regla se apaga en Motor de reglas) y el escenario «Bloqueo manual» (README del simulador).
 
 ## Lectura inválida (S-03) y hardware incompleto (S-04)
 
@@ -911,7 +936,7 @@ rango del catálogo (`seguridad.rango-hum|temp|ph|ce|luz-min|max`; bordes inclui
    Una lectura válida reinicia la cuenta.
 
 - El contador de relecturas es por (zona, métrica, ciclo) y vive en memoria; la racha vive en la base y sobrevive a un reinicio.
-- Desde el simulador: apagar la pieza `ReadingValidationGuard` (acepta cualquier valor), el bypass `retries` (no pide
+- Desde el simulador: el bypass `retries` de `ReadingValidationGuard` (apagarla, para que acepte cualquier valor, se hace en Motor de reglas) (no pide
   relecturas) y el escenario «Lectura inválida».
 - El guard es consumidor de parámetros y depende con `@Lazy` del catálogo **y** del servicio de configuración (éste depende
   del catálogo): sin eso el contexto no arranca (`ReadingValidationGuardWiringTest`).
@@ -959,7 +984,7 @@ y `simulador/server/contract.ts`).
   sin activar (quedó abierta) pide **cubrir a mano**.
 - **Un mismo hecho por dos caminos (D-6):** la falla de la malla llega por el tópico y por el ack `falla_mecanica`
   (`SeguimientoComandosService` la entrega al mismo servicio). Mientras la marca siga con el mismo tipo, el segundo aviso es
-  `DUPLICATE` y no alerta. Con el receptor apagado desde el simulador, el ack alerta como antes.
+  `DUPLICATE` y no alerta. Con el receptor apagado en Motor de reglas, el ack alerta como antes.
 - **Reparación (D-5):** `POST /api/hardware/{id}/reparacion {detalle}` (permiso `hardware.reparar`; el detalle es obligatorio; `400`
   sin detalle o dispositivo inexistente, `409` si no tiene falla) limpia la marca, deja el evento
   **«Reparación»** en el historial con usuario y detalle y una alerta `INFO`. En el siguiente pulso el sector vuelve a evaluarse.
@@ -1001,7 +1026,7 @@ Dos cosas mueven la malla, y no se pisan:
   - `GET /api/zonas/{zona}/rustificacion` → plan vigente o `204` (permiso `vivero.ver`).
   - `POST /api/zonas/{zona}/rustificacion {fechaInicio, etapas: [{dias, abiertaDesde, abiertaHasta}]}` → `400`/`409 {error}`.
   - `POST /api/zonas/{zona}/rustificacion/cancelar` (eliminar) → `409` si no hay plan. Los dos con `configuracion.editar`.
-- **Simulador:** `HorarioMediasombraService` es `DemoControllable` (se apaga); `ShadeFaultRule` admite los bypass `fault` y
+- **Simulador:** `HorarioMediasombraService` es `DemoControllable` (se apaga desde Motor de reglas); `ShadeFaultRule` admite los bypass `fault` y
   `hardware`. Las secuencias de Demo Expo (abrir / cerrar / desplegar-esperar-enrollar) siguen igual, ahora por el comando de zona.
 
 ## Aplicación de insumos (`add-dosificacion-base` · reglas_v2 §8.1–8.3)
@@ -1043,11 +1068,11 @@ fertilizante o fitosanitario emite `ACTIVAR_BOMBA` con un `DetalleInsumo(supply,
 - **API de tanques.** `GET /api/tanques` (`insumos.ver`) y `POST /api/tanques/{zona}/{insumo}/recarga` (`insumos.gestionar`) con
   `{liters, capacityLiters?}`: la primera carga declara la capacidad; una carga que desborda el tanque se rechaza (`400`). La carga queda en
   el historial de la macro-zona con el usuario.
-- **Control desde el simulador** (`/api/demo/rules/ApplicationPreconditions`): apagada, no se aplica nada y queda constancia; bypass
+- **Control desde el simulador** (`/api/demo/rules/ApplicationPreconditions`): apagada (en Motor de reglas), no se aplica nada y queda constancia; bypass
   `diagnosis`, `daily`, `window`, `temperature`, `rain`, `moisture` y `stock`; cooldowns `interval-fertilizer` e `interval-fungicide`.
 
 > **La dosificación v1 queda retirada pero no borrada.** `SupplyRule` (estado crítico + confianza) y `DailyDoseLimitRule` (1 dosis cada 24 h)
-> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `RuleOverridesStore`; en la traza figuran «deshabilitadas»). Hoy el único camino
+> arrancan **apagadas** (`yerbanalytics.reglas.retiradas`, ver `OperationalRuleStates`; en la traza figuran «deshabilitadas»). Hoy el único camino
 > productivo que pide aplicaciones es el **plan de nutrición** (N-01, ver abajo), que no decide con el diagnóstico de IA: lo que reemplaza a
 > `SupplyRule` son las reglas por diagnóstico F-* (todavía no están), así que borrarla dejaría al vivero sin dosificación por diagnóstico. Para
 > probarla de punta a punta: `YERBANALYTICS_REGLAS_RETIRADAS=ninguna` (cualquier valor que no sea el nombre de una regla; un valor
@@ -1093,7 +1118,7 @@ Fertilizante foliar **en todos los sectores de la macro-zona cada N días**, sin
   `batchOpen`, `advanced`).
 - **Dosis.** Las aplica el `ApplicationService` con `insumo.dosis-fertilizante` (10 ml de fábrica, 1–50): la v2 dice 100 ml por sector, pero el
   firmware sólo acepta 50 ml por comando (ver «Aplicación de insumos»). El plan no tiene una dosis propia.
-- **Parámetros** (familia `NUTRICION`, editables en Motor de reglas → Parámetros): `nutricion.intervalo-plan`, `nutricion.ce-baja`,
+- **Parámetros** (familia `NUTRICION`, editables en Motor de reglas → Reglas): `nutricion.intervalo-plan`, `nutricion.ce-baja`,
   `nutricion.ce-lecturas`, `nutricion.sin-fertilizar-dias`.
 - **Si una regla de zona lanza**, la excepción se propaga como en las de sector (la ingesta revierte y el pulso siguiente lo reintenta) y antes
   se guarda la traza parcial con esa regla en `ERROR`.
@@ -1313,8 +1338,11 @@ simulación. Los usa el simulador (`Desarrollo/simulador/`), nunca el dashboard.
   de decisión: `name`, `label`, `branch`, `priority`, `cooldownKeys()` y `bypassKeys()`. `Rule` lo extiende, y
   también lo implementan las reglas por macro-zona y los servicios que deciden fuera de la cadena por sector.
   `DemoControllableRegistry` las reúne a todas; nombres duplicados hacen fallar el arranque.
-- `PUT /api/demo/rules/{nombre}` apaga o enciende una pieza y fija sus cooldowns (minutos; `0` los elimina) y
-  bypass. `404` si el nombre no existe; `400` si una clave de cooldown o bypass no la declara la pieza.
+- **La demo no prende ni apaga** (ver «Estado operativo de las reglas»): el encendido es sólo del estado que fijó el vivero en
+  Motor de reglas. `GET /api/demo/rules` trae `enabled` (ese estado, sólo lectura), los cooldowns y los bypass.
+- `PUT /api/demo/rules/{nombre}` fija los cooldowns de una pieza (minutos; `0` los elimina) y sus
+  bypass. `404` si el nombre no existe; `400` si una clave de cooldown o bypass no la declara la pieza, o si el cuerpo trae
+  `enabled`.
   `PUT /api/demo/rules/cooldowns/zero` alcanza a todas, no sólo a las de la cadena por sector. Los overrides
   viven en memoria: un reinicio los borra.
 - Quien decide consulta `RuleOverrides` **antes de actuar**: apagada no actúa ni corta nada y lo deja en su

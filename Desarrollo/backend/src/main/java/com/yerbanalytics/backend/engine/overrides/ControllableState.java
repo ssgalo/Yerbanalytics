@@ -1,11 +1,9 @@
 package com.yerbanalytics.backend.engine.overrides;
 
 /**
- * Una pieza controlable junto con su override de demo y los dos estados que lo rodean.
+ * Una pieza controlable junto con su override de demo (cooldowns y bypass) y su estado de encendido.
  *
- * @param operationalActive lo que decidió el vivero (sin la capa de demo)
- * @param effectiveEnabled  si la pieza corre ahora: el override explícito de demo, si existe, y si no el operativo
+ * @param enabled si la pieza corre ahora: el estado operativo, el que se cambia en Motor de reglas (la demo no lo toca)
  */
-public record ControllableState(DemoControllable controllable, RuleOverride override,
-                                boolean operationalActive, boolean effectiveEnabled) {
+public record ControllableState(DemoControllable controllable, RuleOverride override, boolean enabled) {
 }

@@ -26,6 +26,8 @@ export const VISTAS = {
   diagnosticos: { ruta: '/diagnosticos', permisos: ['diagnosticos.ver', 'vivero.ver'] },
   historial: { ruta: '/historial', permisos: ['historial.ver'] },
   configuracion: { ruta: '/configuracion', permisos: ['configuracion.ver'] },
+  // Rustificación: el horario por defecto de la mediasombra (configuración) y el plan de cada macro-zona (se lista con el vivero).
+  rustificacion: { ruta: '/rustificacion', permisos: ['configuracion.ver', 'vivero.ver'] },
   // Preferencias es parte de la misma configuración agronómica: mismo permiso.
   preferencias: { ruta: '/preferencias', permisos: ['configuracion.ver'] },
   // El criterio de diagnóstico se lee con `diagnosticos.ver` (`GET /api/configuracion/diagnostico`)
@@ -45,6 +47,7 @@ const ORDEN: readonly ClaveVista[] = [
   'diagnosticos',
   'historial',
   'configuracion',
+  'rustificacion',
   'criterioDiagnostico',
   'reglas',
   'hardware',

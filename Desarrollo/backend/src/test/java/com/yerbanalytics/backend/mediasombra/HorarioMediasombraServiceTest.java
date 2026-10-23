@@ -212,7 +212,7 @@ class HorarioMediasombraServiceTest {
     @Test
     @DisplayName("apagado desde el simulador no hace nada")
     void apagado() {
-        overrides.put(HorarioMediasombraService.NAME, new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff(HorarioMediasombraService.NAME);
         a(9, 0);
 
         verify(mediasombra, never()).mover(any(), anyBoolean(), anyString(), anyString());

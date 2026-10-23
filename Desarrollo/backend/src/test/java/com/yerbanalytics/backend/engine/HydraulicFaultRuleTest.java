@@ -85,7 +85,7 @@ class HydraulicFaultRuleTest {
     @DisplayName("bypass 'fault': el sector con la falla marcada se evalúa como si estuviera sano")
     void bypassFault() {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(HydraulicFaultRule.NAME, new RuleOverride(true, Map.of(), Set.of("fault")));
+        store.put(HydraulicFaultRule.NAME, new RuleOverride(Map.of(), Set.of("fault")));
 
         assertThat(rule.evaluate(ctx(SIN_CAUDAL).withOverrides(store), ev(rule)))
                 .extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);

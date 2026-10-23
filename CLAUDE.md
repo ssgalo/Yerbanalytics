@@ -129,7 +129,7 @@ hardware real.
   LDR. **F-S2 (cerrar la malla de la zona) no está implementada**; ya no está bloqueada: el dueño de la malla por horario que le faltaba es `HorarioMediasombraService` (#66).
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
-  está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
+  está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Rustificación.
   Pasada la última etapa, la última se sostiene hasta que alguien elimina el plan. **No es parte del
   motor**: lo ejecuta `HorarioMediasombraService`, que actúa sólo en los bordes de la ventana; el motor
   puede cerrar la malla igual (pico de UV) y queda así hasta la próxima apertura.
@@ -189,8 +189,9 @@ npm run dev          # http://localhost:5173
   > `.env.demo`). Se resuelve al arrancar: cambiar de modo exige reiniciar el dashboard.
   > Ninguna vista consulta el modo al backend.
   > **Sin controles de demo:** Ninguna interfaz ni botón de demo interactiva (bypass de reglas,
-  > botón "Leer ahora", clima ficticio) vive en este dashboard; todo control de demo vive
-  > exclusivamente en el simulador (`Desarrollo/simulador/`).
+  > cooldowns en cero, botón "Leer ahora", clima ficticio) vive en este dashboard; todo control de demo vive
+  > exclusivamente en el simulador (`Desarrollo/simulador/`). **El interruptor de una regla en Motor de reglas no es un
+  > control de demo**: es una operación del vivero (ver §6, "Interruptor operativo vs. controles de demo").
 - **Tipos de dominio** (`src/types/domain.ts`): contratos compartidos.
 - **Componentes del sistema de diseño** (`src/components/ui/`): Button, Chip, StateGlyph, Callout,
   Field/Input/Select/InputUnit, Segmented, FilterChip, Switch, SaveBar, Skeleton, EmptyState,
@@ -198,7 +199,8 @@ npm run dev          # http://localhost:5173
   sin barra, con fade y flechas en los bordes); y los previos Card, Badge,
   StatusDot, ProgressBar, Sparkline, Icon.
 - **Shell** (`src/components/layout/`): AppLayout, Sidebar, Topbar, AlertsDropdown. En el Sidebar,
-  **Configuración** es un grupo desplegable (Umbrales —la vista `/configuracion`—, Rustificación,
+  **Configuración** es un grupo desplegable (Umbrales —la vista `/configuracion`, sólo las bandas de alerta de las
+  métricas—, Rustificación —`/rustificacion`: horario por defecto de la mediasombra y resumen del plan de cada macro-zona—,
   Criterio de diagnóstico, Motor de reglas, Hardware, Topología, Usuarios, Preferencias); se abre
   solo al entrar a una de sus vistas. Umbrales, Rustificación y Preferencias editan partes de la
   misma configuración agronómica (`useConfigDraft`): cada una guarda el recurso entero. Criterio de
@@ -206,8 +208,8 @@ npm run dev          # http://localhost:5173
   colapsa a íconos (botón de la Topbar, borde de la sidebar o Ctrl/⌘ + B; estado en
   `hooks/SidebarContext`, recordado por navegador).
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
-  diagnostics, reglas, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
-  *Parámetros* (edita el catálogo de umbrales) e *Inspector* (el grafo de reglas con la última
+  diagnostics, reglas, historial, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
+  *Reglas* (cada regla con su interruptor operativo y sus parámetros, por objetivo) e *Inspector* (el grafo de reglas con la última
   evaluación de un sector). **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
   se ve u oculta con un interruptor en Configuración → Preferencias.
 - **Routing**: react-router (`src/router.tsx`).
@@ -223,6 +225,8 @@ que lo usa** (`src/styles/tokens.test.ts` falla si vuelve un token retirado o un
   bordes de campo con `--line-field`.
 - **El estado tiene forma además de color** (`StateGlyph`, `SectorCell`): círculo, medio círculo,
   rombo, aro.
+- **Sin emojis** en la interfaz ni en los textos que manda el backend (etiquetas de reglas incluidas): los íconos salen
+  de `Icon` y los estados de `StateGlyph`.
 - **Tipografía**: Archivo en tres anchos. Toda regla con `--font-display` lleva
   `font-stretch: var(--w-exp)`; tablas y metadatos, `var(--w-cond)`.
 - Estilos estáticos → **CSS Modules**. Valores dinámicos (color por estado, ancho
@@ -274,7 +278,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay dieciséis scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay diecisiete scripts para correr a mano (ninguno se aplica solo; `migracion-captura-imagenes.sql` es DDL de
+> referencia y no hace falta):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -306,6 +311,9 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   (copia el valor editado al fertilizante).
 > - `resources/migracion-mediasombra-por-zona.sql` — la mediasombra pasa del sector a la zona (una por zona), borra
 >   `sector.actuador_shade` y `rustificacion_etapa`. **Sin ella no se pueden crear sectores** (la columna vieja es `NOT NULL`).
+> - `resources/migracion-umbrales-al-motor.sql` — el seguimiento post-acción pasa al catálogo del motor y se borra
+>   `insumo_dosis_max_24h_ml`. **Correr con el backend nuevo ya arrancado una vez** (crea `parametro_regla` y `regla_estado`);
+>   sin ella no se puede crear una fila operativa nueva (columnas viejas `NOT NULL`).
 >
 > Detalle en el README del backend.
 
@@ -320,6 +328,7 @@ cd Desarrollo/backend
   Cada zona trae `lectura` (las 10 métricas evaluadas) y `nodo` (batería/señal del testigo).
 - `GET/PUT /api/rules/parametros`, `GET /api/rules/evaluaciones/{sectorId}`, `GET /api/rules/schema`
   → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
+  `PUT /api/rules/{name}/estado` → interruptor operativo de una regla (`reglas.editar`; apagar una protección pide motivo y confirmación).
 - `POST /api/pasadas`, `GET /api/pasadas/actual`, `POST /api/pasadas/actual/cancelar` → pasada del
   riel (también diaria, a hora configurable: `pasadaDiariaActiva`/`pasadaDiariaHora` en la
   configuración); `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
@@ -427,9 +436,10 @@ cd Desarrollo/backend
   reparto del riego. Son `DemoControllable` y declaran sus umbrales en el catálogo como cualquier regla, y su traza se suma a la del sector en el
   Inspector. Antes de escribir una regla nueva, decidir si es de sector (`Rule`) o de zona (`ZoneRule`). Detalle en el README del backend ("Plan de nutrición" y "Reglas bióticas").
 - **Patrón para agregar una nueva regla agronómica**:
-  - Toda pieza que decide una acción (regla por sector, por macro-zona o servicio) es un **`DemoControllable`** (`engine/overrides/`; `Rule` ya lo extiende): así aparece en `GET /api/demo/rules`, se apaga y declara sus `cooldownKeys()`/`bypassKeys()`. Las reglas nuevas también necesitan su escenario en el simulador (`Desarrollo/simulador/src/scenarios/`; ver su README).
+  - Toda pieza que decide una acción (regla por sector, por macro-zona o servicio) es un **`DemoControllable`** (`engine/overrides/`; `Rule` ya lo extiende): así aparece en `GET /api/demo/rules` (con su estado de encendido en sólo lectura) y declara sus `cooldownKeys()`/`bypassKeys()`. Las reglas nuevas también necesitan su escenario en el simulador (`Desarrollo/simulador/src/scenarios/`; ver su README).
   - Toda regla nueva debe seguir estrictamente el patrón de las existentes: implementar `Rule`, anotarse como `@Component`, definir `priority()` ascendente, `name()`, `label()` legible para el usuario, `branch()` (GLOBAL, RIEGO, INSUMO, MEDIASOMBRA, SEGUIMIENTO) y declarar sus umbrales en `parametros()`.
-  - **Feature Flag (FF) de activación por regla**: Toda regla debe soportar su flag de activación (`enabled: true/false`, ON/OFF) gestionado por `RuleOrchestrator` para poder ser encendida o apagada a merced. En producción arranca siempre encendida; en modo demo se puede apagar dinámicamente (`OMITIDA_DESHABILITADA`).
+  - Toda regla se presenta con `code()` (el de `reglas_v2`, o ninguno), `objective()` y `effect()`, y declara `protection()` (texto de la consecuencia de apagarla) si su efecto es `PROTECTS`; `ReglasArquitecturaTest` lo verifica. El `label()` va sin emojis y sin el código.
+  - **Interruptor de activación por regla**: lo gestiona `OperationalRuleStates` (estado operativo, `regla_estado`) y lo consulta el motor por `RuleOverrides` (`EffectiveRuleOverrides`: el efectivo es siempre el operativo; la demo no tiene interruptor de encendido). Una regla no implementa su propio flag. Las retiradas (`yerbanalytics.reglas.retiradas`) son sólo el estado por defecto, mientras nadie decida otra cosa; apagada figura `OMITIDA_DESHABILITADA`.
   - **Flags de Cooldowns y variables de bypass en modo demo**: Si la regla impone restricciones temporales (esperas entre riegos, límites por hora, ventanas horarias, pausas tras insumos) o variables que condicionan la acción, debe implementar las flags de cooldown o variables de bypass correspondientes:
     - **Cada regla puede tener más de una flag de cooldown o variable a bypasear**: Por ejemplo, una regla puede tener un cooldown de ciclo de lectura Y una guarda de riego en curso, o una pausa tras aplicación Y un límite de dosis.
     - En producción (`yerbanalytics.mode=REAL`), cada regla aplica estrictamente los valores y cooldowns establecidos por el usuario en la configuración agronómica.
@@ -440,8 +450,14 @@ cd Desarrollo/backend
   `demo/`; con demo apagado no existe suscripción, endpoint ni bean (el código productivo sólo ve `TelemetryAdmission`).
 - **Modos de operación y Feature Flags**:
   - Controlado por `yerbanalytics.mode` (`REAL` | `SIMULATED`) y `yerbanalytics.demo.enabled` (`false` | `true`), sobreescribible en Docker por `YERBANALYTICS_MODE` y `YERBANALYTICS_DEMO_ENABLED`.
-  - En modo `REAL` (producción), el backend no expone ningún rastro de simulación: los endpoints `/api/demo/**` no se registran (retornan 404), no existen tablas demo en base de datos y todas las reglas respetan sus cooldowns productivos.
-  - **Aislamiento estricto: ninguna implementación de demo en la app productiva.** Todo lo que se haga para demo (botón "Leer ahora", switches para encender/apagar reglas, bypass de cooldowns, ingreso de clima simulado) DEBE vivir exclusivamente en el simulador (`Desarrollo/simulador/`). El frontend productivo (`Desarrollo/frontend/`) no debe tener ningún rastro, botón ni vista de demo.
+  - En modo `REAL` (producción), el backend no expone ningún rastro de simulación: los endpoints `/api/demo/**` no se registran (retornan 404), no existen tablas demo en base de datos y todas las reglas respetan sus cooldowns productivos. El estado operativo de las reglas sí rige en `REAL`.
+  - **Interruptor operativo vs. controles de demo.** Prender o apagar una regla es una **operación del vivero**: vive en
+    Motor de reglas (`PUT /api/rules/{name}/estado`, permiso `reglas.editar`), se persiste en `regla_estado`, vale en modo
+    `REAL` y sobrevive reinicios. Apagar una protección exige motivo y confirmación. Es **la única fuente de verdad del
+    encendido**: la demo no puede prender ni apagar reglas (`PUT /api/demo/rules/{name}` con `enabled` da 400). Los
+    **controles de demo** —cooldowns en cero, bypass de guardas, clima simulado, "Leer ahora"— siguen viviendo sólo en el
+    simulador, en memoria, y existen sólo en modo demo. El simulador no escribe ni pisa el estado operativo.
+  - **Aislamiento estricto: ninguna implementación de demo en la app productiva.** Todo control de demo (botón "Leer ahora", bypass de cooldowns, clima simulado) DEBE vivir exclusivamente en el simulador (`Desarrollo/simulador/`). El frontend productivo (`Desarrollo/frontend/`) no debe tener ningún rastro, botón ni vista de demo; su único interruptor de reglas es el operativo.
 
 
 ## 6.1 Captura de imágenes (`Desarrollo/camara*/` + `Desarrollo/contratos/`)
@@ -532,8 +548,10 @@ Invariantes a respetar al tocar esta área:
   pasadas y el servicio de inferencia. **No toca `/api/camara/v1/**`**, que es el contrato del
   dispositivo.
 - **Toda funcionalidad y control de demo vive exclusivamente acá, NUNCA en la app productiva.**
-  El botón "Leer ahora", los controles de clima ficticio, el bypass de cooldowns y los interruptores de
-  activación de reglas son herramientas del simulador (`:5180`). El frontend productivo (`Desarrollo/frontend/`)
+  El botón "Leer ahora", los controles de clima ficticio, el bypass de cooldowns y los controles de reglas
+  (sólo cooldowns y bypass) son herramientas del simulador (`:5180`); **no tiene interruptor de encendido**: cada regla muestra su
+  estado operativo en sólo lectura («Apagada en el vivero — se cambia en Motor de reglas») y el happy path avisa en vez de prender
+  `SupplyRule`. La cuenta Servicio no tiene `reglas.editar`. El frontend productivo (`Desarrollo/frontend/`)
   no contiene ninguna implementación, vista ni control de demo.
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.

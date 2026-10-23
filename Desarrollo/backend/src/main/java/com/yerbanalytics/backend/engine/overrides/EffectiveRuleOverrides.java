@@ -2,7 +2,6 @@ package com.yerbanalytics.backend.engine.overrides;
 
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -11,14 +10,13 @@ import java.util.Set;
  * si una pieza corre.
  *
  * <pre>
- * isEnabled(n)          = override explícito de demo (si existe) ; si no, el estado operativo
+ * isEnabled(n)          = estado operativo (única fuente de verdad del encendido)
  * cooldownMinutes(n, k) = demo
  * isBypassed(n, k)      = demo
  * </pre>
  *
- * El override de demo sólo existe con {@code yerbanalytics.demo.enabled=true}: sin modo demo la capa está vacía y el
- * efectivo es el operativo. Con modo demo, el override explícito del simulador gana, para prender o apagar (así el happy
- * path de Demo Expo puede prender una regla retirada). Un override que sólo trae cooldowns o bypass no decide el estado.
+ * La capa de demo sólo existe con {@code yerbanalytics.demo.enabled=true} y trae únicamente cooldowns y bypass: no
+ * tiene interruptor, así que prender o apagar una pieza se hace sólo en Motor de reglas.
  */
 @Component
 public class EffectiveRuleOverrides implements RuleOverrides {
@@ -33,7 +31,7 @@ public class EffectiveRuleOverrides implements RuleOverrides {
 
     @Override
     public boolean isEnabled(String ruleName) {
-        return demo.explicitEnabled(ruleName).orElseGet(() -> operational.isActive(ruleName));
+        return operational.isActive(ruleName);
     }
 
     @Override
@@ -46,21 +44,8 @@ public class EffectiveRuleOverrides implements RuleOverrides {
         return demo.isBypassed(ruleName, key);
     }
 
-    /** Lo que decidió el vivero, sin la capa de demo. */
-    public boolean isOperationallyActive(String ruleName) {
-        return operational.isActive(ruleName);
-    }
-
     @Override
     public Set<String> inactiveNames() {
-        Set<String> out = new HashSet<>(operational.inactiveNames());
-        demo.snapshot().forEach((name, override) -> override.explicitEnabled().ifPresent(enabled -> {
-            if (enabled) {
-                out.remove(name);
-            } else {
-                out.add(name);
-            }
-        }));
-        return out;
+        return operational.inactiveNames();
     }
 }

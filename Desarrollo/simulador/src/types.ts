@@ -144,6 +144,7 @@ export interface DemoRule {
   label: string;
   branch: string;
   priority: number;
+  /** Si la regla corre ahora: lo decidió el vivero en Motor de reglas (sólo lectura: el simulador no lo escribe). */
   enabled: boolean;
   /** Cooldown keys this rule declares (one numeric input per key). */
   cooldownKeys: string[];
@@ -155,9 +156,8 @@ export interface DemoRule {
   bypassed: string[];
 }
 
-/** Body for PUT /api/demo/rules/{ruleName}. All fields optional. */
+/** Body for PUT /api/demo/rules/{ruleName}. All fields optional. El encendido no se manda: el backend lo rechaza (400). */
 export interface DemoRuleUpdate {
-  enabled?: boolean;
   cooldownMinutes?: Record<string, number>;
   bypassed?: string[];
 }

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MockRepository } from './mockRepository';
 import fixture from './catalogoReglas.fixture.json';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
+import { EstadoReglaError } from '@/data/estadoReglaError';
 import type { CatalogoReglas } from '@/types/domain';
 
 const nuevo = () => new MockRepository(20260613);
@@ -71,17 +72,109 @@ describe('MockRepository · catálogo de reglas', () => {
   });
 });
 
+/** Servicios que deciden y están en el catálogo, pero no son reglas de la cadena: no tienen nodo en el DAG. */
+const SERVICIOS = ['EscalamientoNodo', 'ReadingValidationGuard', 'HardwareFaultService', 'HorarioMediasombraService', 'ApplicationPreconditions'];
+
+describe('MockRepository · estado de las reglas', () => {
+  const regla = (c: CatalogoReglas, id: string) => c.reglas.find((r) => r.id === id)!;
+
+  it('el catálogo de fábrica trae las retiradas apagadas y el resto prendidas, sin cambios registrados', async () => {
+    const c = await nuevo().getCatalogoReglas();
+    expect(regla(c, 'SupplyRule')).toMatchObject({ activa: false, activaPorDefecto: false, estado: null });
+    expect(regla(c, 'RiegoPorDeficitRule')).toMatchObject({ activa: true, activaPorDefecto: true });
+  });
+
+  it('apagar una regla de acción no pide motivo y deja quién, cuándo y el motivo si vino', async () => {
+    const repo = nuevo();
+
+    const res = await repo.setEstadoRegla('RiegoPorDeficitRule', { activa: false, motivo: 'riego manual esta semana' });
+
+    expect(res).toMatchObject({ id: 'RiegoPorDeficitRule', activa: false });
+    expect(res.estado).toMatchObject({ motivo: 'riego manual esta semana' });
+    expect(res.estado!.updatedBy).toBeTruthy();
+    expect(res.estado!.updatedTs).toEqual(expect.any(Number));
+    expect(regla(await repo.getCatalogoReglas(), 'RiegoPorDeficitRule').activa).toBe(false);
+  });
+
+  it('apagar una protección exige motivo y luego confirmación, con la consecuencia', async () => {
+    const repo = nuevo();
+
+    await expect(repo.setEstadoRegla('SustratoSaturadoRule', { activa: false })).rejects.toMatchObject({
+      codigo: 'MOTIVO_REQUERIDO',
+    });
+    const sinConfirmar = repo.setEstadoRegla('SustratoSaturadoRule', { activa: false, motivo: 'recalibración' });
+    await expect(sinConfirmar).rejects.toBeInstanceOf(EstadoReglaError);
+    await expect(sinConfirmar).rejects.toMatchObject({
+      codigo: 'CONFIRMACION_REQUERIDA',
+      consecuencia: 'Se riega con el sustrato saturado.',
+    });
+    expect(regla(await repo.getCatalogoReglas(), 'SustratoSaturadoRule').activa).toBe(true);
+
+    const ok = await repo.setEstadoRegla('SustratoSaturadoRule', {
+      activa: false,
+      motivo: 'recalibración',
+      confirmaProteccion: true,
+    });
+    expect(ok).toMatchObject({ activa: false, estado: { motivo: 'recalibración' } });
+  });
+
+  it('un motivo de más de 500 caracteres se rechaza', async () => {
+    await expect(
+      nuevo().setEstadoRegla('RiegoPorDeficitRule', { activa: false, motivo: 'x'.repeat(501) }),
+    ).rejects.toMatchObject({ codigo: 'MOTIVO_DEMASIADO_LARGO' });
+  });
+
+  it('prender nunca pide motivo ni confirmación, y el mismo estado no cambia nada', async () => {
+    const repo = nuevo();
+
+    const igual = await repo.setEstadoRegla('RiegoPorDeficitRule', { activa: true });
+    expect(igual.estado).toBeNull();
+
+    const prendida = await repo.setEstadoRegla('SupplyRule', { activa: true });
+    expect(prendida).toMatchObject({ activa: true, activaPorDefecto: false });
+    expect(prendida.estado).not.toBeNull();
+  });
+
+  it('una pieza desconocida falla', async () => {
+    await expect(nuevo().setEstadoRegla('NoExiste', { activa: false })).rejects.toThrow(/NoExiste/);
+  });
+
+  it('el esquema refleja el estado efectivo, el de fábrica y el código', async () => {
+    const repo = nuevo();
+    await repo.setEstadoRegla('RiegoPorDeficitRule', { activa: false });
+
+    const { nodes } = await repo.getRuleSchema();
+    const nodo = (id: string) => nodes.find((n) => n.id === id)!;
+
+    expect(nodo('RiegoPorDeficitRule')).toMatchObject({ activa: false, activaPorDefecto: true, codigo: 'R-01' });
+    expect(nodo('SupplyRule')).toMatchObject({ activa: false, activaPorDefecto: false });
+    expect(nodo('start')).toMatchObject({ activa: true, activaPorDefecto: true });
+  });
+
+  it('cada cambio queda en el historial como un evento de Configuración con la regla', async () => {
+    const repo = nuevo();
+    await repo.setEstadoRegla('RiegoPorDeficitRule', { activa: false, motivo: 'prueba' });
+
+    const [primero] = await repo.getHistory({ tipo: 'Configuración' });
+
+    expect(primero).toMatchObject({ tipo: 'Configuración', regla: 'RiegoPorDeficitRule' });
+    expect(primero.decision).toMatch(/apagada/i);
+    expect(primero.decision).toMatch(/prueba/);
+  });
+});
+
 describe('MockRepository · esquema del DAG', () => {
-  it('trae start, las 16 reglas con sus parámetros y los terminales por rama', async () => {
+  it('trae start, las reglas de la cadena con sus parámetros y los terminales por rama (sin los servicios)', async () => {
     const schema = await nuevo().getRuleSchema();
     const ids = schema.nodes.map((n) => n.id);
 
     expect(ids).toContain('start');
-    for (const r of (fixture as CatalogoReglas).reglas) {
+    for (const r of (fixture as CatalogoReglas).reglas.filter((x) => !SERVICIOS.includes(x.id))) {
       const nodo = schema.nodes.find((n) => n.id === r.id)!;
-      expect(nodo).toMatchObject({ label: r.label, branch: r.rama, priority: r.prioridad });
+      expect(nodo).toMatchObject({ label: r.label, branch: r.rama, priority: r.prioridad, codigo: r.codigo });
       expect(nodo.parametros).toEqual(r.parametros);
     }
+    for (const s of SERVICIOS) expect(ids).not.toContain(s);
     for (const rama of ['RIEGO', 'INSUMO', 'MEDIASOMBRA', 'SEGUIMIENTO']) {
       expect(ids).toContain(`success-${rama}`);
       expect(ids).toContain(`abort-${rama}`);

@@ -12,9 +12,8 @@ import java.util.List;
  * @param rama             {@code GLOBAL | RIEGO | INSUMO | MEDIASOMBRA | SEGUIMIENTO}
  * @param objetivo         grupo de la pantalla: {@code IRRIGATION | NUTRITION | SANITY | SHADE | FOLLOW_UP | PROTECTION}
  * @param efecto           chip de la tarjeta: {@code ACTS | WARNS | PROTECTS}
- * @param activa           estado operativo (lo que decidió el vivero): si corre cuando no hay override de demo
+ * @param activa           estado operativo (lo que decidió el vivero): si corre; es la única fuente de verdad del encendido
  * @param activaPorDefecto {@code false} si figura en {@code yerbanalytics.reglas.retiradas}: así arranca sin fila
- * @param apagadaPorDemo   {@code true} si el override explícito del simulador la apaga (siempre {@code false} sin modo demo)
  * @param proteccion       texto de lo que pasa al apagarla si es una protección; {@code null} si no lo es
  * @param estado           último cambio del interruptor; {@code null} si nunca se cambió
  */
@@ -29,7 +28,6 @@ public record ReglaCatalogoDto(
         List<String> parametros,
         boolean activa,
         boolean activaPorDefecto,
-        boolean apagadaPorDemo,
         String proteccion,
         UltimoCambioReglaDto estado
 ) {}

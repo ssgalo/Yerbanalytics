@@ -6,7 +6,7 @@
   z-index: 60;
   display: flex;
   padding: 24px;
-  background: rgba(21, 35, 27, 0.42);
+  background: var(--scrim);
   animation: ybFade 0.14s both;
 }
 

@@ -8,7 +8,8 @@ import java.util.Set;
  *
  * <p>All fields are optional — only the ones present are applied.
  *
- * @param enabled        turn the rule on or off; {@code null} = keep current
+ * @param enabled        not accepted: sending it is a {@code 400}. On/off is changed only from Motor de reglas; the field
+ *                       exists so the API can say so instead of silently ignoring it
  * @param cooldownMinutes replacement cooldown map; {@code null} = keep current
  * @param bypassed       replacement bypass key set; {@code null} = keep current
  */

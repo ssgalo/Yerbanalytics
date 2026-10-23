@@ -46,13 +46,13 @@ describe('RuleGraph con traza (Inspector)', () => {
     const linea = within(nodo('RiegoPorDeficitRule')).getByTestId('comparacion-1');
     expect(linea.textContent).toContain('38 %');
     expect(linea.textContent).toContain('45 %');
-    expect(linea.textContent).toContain('✓');
+    expect(linea.textContent).toContain('Se cumple');
   });
 
-  it('humedad sobre el umbral: ✗ en la regla y terminal "No se regó"', () => {
+  it('humedad sobre el umbral: no se cumple en la regla y terminal "No se regó"', () => {
     render(<RuleGraph schema={schema} traza={traza({ humSus: 55 })} />);
 
-    expect(within(nodo('RiegoPorDeficitRule')).getByTestId('comparacion-1').textContent).toContain('✗');
+    expect(within(nodo('RiegoPorDeficitRule')).getByTestId('comparacion-1').textContent).toContain('No se cumple');
     expect(within(nodo('success-RIEGO')).getByText('No se regó')).toBeTruthy();
   });
 

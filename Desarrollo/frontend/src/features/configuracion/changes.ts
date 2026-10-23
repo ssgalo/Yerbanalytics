@@ -14,9 +14,6 @@ const BANDAS: (keyof MetricThreshold)[] = [
 
 /* Lo que el operador edita; quién y cuándo, y lo que calcula el backend, no cuentan. */
 const OPERATIVA: (keyof ConfigOperativa)[] = [
-  'insumoDosisMax24hMl',
-  'seguimientoLatenciaMin',
-  'seguimientoDeltaMin',
   'intervaloSensadoMinutos',
   'pasadaDiariaActiva',
   'pasadaDiariaHora',
