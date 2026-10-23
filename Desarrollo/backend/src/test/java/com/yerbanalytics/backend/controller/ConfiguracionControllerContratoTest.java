@@ -41,7 +41,7 @@ class ConfiguracionControllerContratoTest {
     private ConfiguracionService service;
 
     private static Configuracion cfg() {
-        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, "Ana", 1L, false, "11:00", 14580), List.of());
+        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, "Ana", 1L, false, "11:00", 14580));
     }
 
     @Test

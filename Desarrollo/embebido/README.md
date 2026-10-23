@@ -244,6 +244,12 @@ Fuente de verdad: `comun/contrato.h`. Los espejos del backend son `ContratoNodo.
 | `{"actuador":"pump","accion":"OFF"}` | Corta el insumo del sector |
 | `{"actuador":"shade","accion":"SET","parametros":{"targetPct":40}}` | `targetPct` es el % de **apertura**: desde `MEDIASOMBRA_UMBRAL_APERTURA_PCT` (50) enrolla, por debajo desenrolla. Hay una sola mediasombra: manda el último comando |
 
+**La mediasombra es de la macro-zona** (`add-rustificacion-por-macrozona`): el backend manda el `shade SET` por el
+**comando de zona** (`nursery/zone/{zona}/command`, el del `LEER_AHORA`, con `"actuador":"shade"`) y el nodo contesta por el
+**ack de zona** (`nursery/zone/{zona}/ack`, `contratoTopicAckZona`). Internamente el comando lleva `sector = CONTRATO_SECTOR_ZONA`
+(0). `nodo_actuador` ahora también se suscribe al comando de zona (4ª suscripción) y `nodo_sensor` ignora el de la malla. Un
+`shade SET` por el tópico de un sector se sigue aceptando. **Pendiente de compilar y probar en el hardware.**
+
 - Todos llevan `commandId`.
 - `accion` no distingue mayúsculas y acepta también los nombres históricos (`open`, `inject`,
   `close`, `move`).

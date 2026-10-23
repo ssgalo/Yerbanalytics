@@ -41,8 +41,17 @@ const TIPO_LABEL: Record<string, string> = Object.fromEntries(
   TIPO_OPTIONS.map((t) => [t.value, t.label]),
 );
 
-/** Actuadores que un sector debe tener para considerarse completo (HU-18 CA-04). */
-const ACTUADORES_REQUERIDOS = [ELECTROVALVULA, BOMBA, MEDIASOMBRA];
+/**
+ * Actuadores que un sector debe tener para considerarse completo (HU-18 CA-04). La mediasombra no: es de la
+ * macro-zona, como el nodo testigo.
+ */
+const ACTUADORES_REQUERIDOS = [ELECTROVALVULA, BOMBA];
+
+/** Equipos de la macro-zona: se asocian a una zona, no a un sector (a lo sumo uno de cada tipo por zona). */
+export const TIPOS_DE_ZONA: readonly string[] = [NODO_TESTIGO, MEDIASOMBRA];
+
+/** `true` si el tipo se registra por macro-zona (nodo testigo, mediasombra). */
+export const esTipoDeZona = (tipo: string | undefined | null): boolean => !!tipo && TIPOS_DE_ZONA.includes(tipo);
 
 // Umbrales (espejo de application.properties; el mock usa los valores de producción).
 const BATERIA_MIN = 20;
@@ -88,27 +97,33 @@ export function buildFleet(now: number = Date.now()): RawDispositivo[] {
     nodo('DEV-004', 'A4:CF:12:9A:00:04', 'MZ-4', 90, -60, now - 26 * HOUR),
     nodo('DEV-005', 'A4:CF:12:9A:00:05', 'MZ-5', 64, -70, now - 45 * 1000),
     nodo('DEV-006', 'A4:CF:12:9A:00:06', 'MZ-6', 82, -66, now - 50 * 1000),
+    // Mediasombras: una por macro-zona, como el nodo testigo. MZ-6 sin mediasombra.
+    malla('DEV-011', 'MS-1', 'MZ-1'),
+    malla('DEV-012', 'MS-2', 'MZ-2'),
+    malla('DEV-013', 'MS-3', 'MZ-3'),
+    malla('DEV-014', 'MS-4', 'MZ-4'),
+    malla('DEV-015', 'MS-5', 'MZ-5'),
     // MZ-1-001 y MZ-1-002: completos.
     act('DEV-101', 'EV-1-001', ELECTROVALVULA, 'MZ-1-001', null),
     act('DEV-102', 'BP-1-001', BOMBA, 'MZ-1-001', null),
-    act('DEV-103', 'MS-1-001', MEDIASOMBRA, 'MZ-1-001', null),
     act('DEV-104', 'EV-1-002', ELECTROVALVULA, 'MZ-1-002', null),
     act('DEV-105', 'BP-1-002', BOMBA, 'MZ-1-002', null),
-    act('DEV-106', 'MS-1-002', MEDIASOMBRA, 'MZ-1-002', null),
     // MZ-1-003: incompleto (falta la bomba peristáltica).
     act('DEV-107', 'EV-1-003', ELECTROVALVULA, 'MZ-1-003', null),
-    act('DEV-108', 'MS-1-003', MEDIASOMBRA, 'MZ-1-003', null),
-    // MZ-3-010: incompleto (faltan bomba y mediasombra).
+    // MZ-3-010: incompleto (falta la bomba).
     act('DEV-109', 'EV-3-010', ELECTROVALVULA, 'MZ-3-010', null),
     // MZ-5-042: completo pero con la electroválvula averiada (HU-21 CA-04).
     act('DEV-110', 'EV-5-042', ELECTROVALVULA, 'MZ-5-042', 'SIN_CAUDAL', now - 2 * HOUR),
     act('DEV-111', 'BP-5-042', BOMBA, 'MZ-5-042', null),
-    act('DEV-112', 'MS-5-042', MEDIASOMBRA, 'MZ-5-042', null),
   ];
 }
 
 function nodo(id: string, serial: string, zonaId: string, bateria: number, senal: number, ultimoUpdate: number): RawDispositivo {
   return { id, serial, tipo: NODO_TESTIGO, zonaId, sectorId: null, bateria, senal, ultimoUpdate, falla: null, fallaDesde: null };
+}
+
+function malla(id: string, serial: string, zonaId: string): RawDispositivo {
+  return { id, serial, tipo: MEDIASOMBRA, zonaId, sectorId: null, bateria: null, senal: null, ultimoUpdate: null, falla: null, fallaDesde: null };
 }
 
 function act(
@@ -224,15 +239,16 @@ export function altaError(fleet: RawDispositivo[], nuevo: NuevoDispositivo): str
   if (fleet.some((d) => d.serial === serial)) {
     return `Ya existe un dispositivo con el serial/MAC «${serial}».`;
   }
-  if (nuevo.tipo === NODO_TESTIGO) {
+  if (esTipoDeZona(nuevo.tipo)) {
+    const esNodo = nuevo.tipo === NODO_TESTIGO;
     const zonaId = nuevo.zonaId?.trim();
-    if (!zonaId) return 'El nodo testigo debe asociarse a una macro-zona.';
+    if (!zonaId) return `${esNodo ? 'El nodo testigo' : 'La mediasombra'} debe asociarse a una macro-zona.`;
     if (!ZONA_IDS.includes(zonaId)) return `La macro-zona «${zonaId}» no existe.`;
-    if (fleet.some((d) => d.tipo === NODO_TESTIGO && d.zonaId === zonaId)) {
-      return `La macro-zona «${zonaId}» ya tiene un nodo testigo.`;
+    if (fleet.some((d) => d.tipo === nuevo.tipo && d.zonaId === zonaId)) {
+      return `La macro-zona «${zonaId}» ya tiene ${esNodo ? 'un nodo testigo' : 'una mediasombra'}.`;
     }
     // El sector del nodo testigo es opcional; si se informa tiene que ser de la macro-zona.
-    const nodoSector = nuevo.sectorId?.trim();
+    const nodoSector = esNodo ? nuevo.sectorId?.trim() : undefined;
     if (nodoSector && zonaIdDe(nodoSector) !== zonaId) {
       return `El sector «${nodoSector}» no pertenece a la macro-zona «${zonaId}».`;
     }
@@ -260,13 +276,14 @@ export function nextDeviceId(fleet: RawDispositivo[]): string {
 export function altaDispositivo(fleet: RawDispositivo[], nuevo: NuevoDispositivo): RawDispositivo {
   const error = altaError(fleet, nuevo);
   if (error) throw new Error(error);
-  const esNodo = nuevo.tipo === NODO_TESTIGO;
+  const deZona = esTipoDeZona(nuevo.tipo);
   const raw: RawDispositivo = {
     id: nextDeviceId(fleet),
     serial: nuevo.serial.trim(),
     tipo: nuevo.tipo,
-    zonaId: esNodo ? (nuevo.zonaId?.trim() ?? null) : null,
-    sectorId: nuevo.sectorId?.trim() || null,
+    zonaId: deZona ? (nuevo.zonaId?.trim() ?? null) : null,
+    // Sólo el nodo testigo lleva sector (opcional); la mediasombra es de la macro-zona y no tiene.
+    sectorId: deZona ? (nuevo.tipo === NODO_TESTIGO ? nuevo.sectorId?.trim() || null : null) : (nuevo.sectorId?.trim() ?? null),
     bateria: null,
     senal: null,
     ultimoUpdate: null,
@@ -295,8 +312,8 @@ export function recambioDispositivo(fleet: RawDispositivo[], id: string, nuevo: 
 }
 
 /**
- * Registra la reparación de un dispositivo averiado (S-05, HU-21 CA-04): levanta la falla, igual que el backend. Reparar la
- * mediasombra levanta la marca de la malla de toda la macro-zona. El detalle es obligatorio.
+ * Registra la reparación de un dispositivo averiado (S-05, HU-21 CA-04): levanta la falla, igual que el backend. La
+ * mediasombra es una por macro-zona: repararla devuelve la malla de la zona a lo autónomo. El detalle es obligatorio.
  */
 export function repararDispositivo(fleet: RawDispositivo[], id: string, detalle: string): void {
   if (!detalle.trim()) throw new Error('El detalle de la reparación es obligatorio.');
@@ -304,13 +321,6 @@ export function repararDispositivo(fleet: RawDispositivo[], id: string, detalle:
   if (!raw) throw new Error(`El dispositivo «${id}» no existe.`);
   if (!raw.falla) throw new Error(`El dispositivo «${id}» no tiene una falla registrada.`);
 
-  const zona = raw.sectorId ? zonaIdDe(raw.sectorId) : null;
-  const reparados =
-    raw.tipo === MEDIASOMBRA && zona
-      ? fleet.filter((d) => d.tipo === MEDIASOMBRA && d.falla && d.sectorId && zonaIdDe(d.sectorId) === zona)
-      : [raw];
-  for (const d of reparados) {
-    d.falla = null;
-    d.fallaDesde = null;
-  }
+  raw.falla = null;
+  raw.fallaDesde = null;
 }

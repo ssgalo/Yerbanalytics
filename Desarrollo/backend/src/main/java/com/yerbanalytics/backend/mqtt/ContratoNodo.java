@@ -78,6 +78,16 @@ public final class ContratoNodo {
     public static final String TOPIC_ACK_SUSCRIPCION = "nursery/zone/+/sector/+/ack";
 
     /**
+     * Ack de un comando de zona con actuador: hoy sólo la mediasombra, que es de la macro-zona y no tiene sector
+     * (add-rustificacion-por-macrozona). Mismo payload que el ack del sector. Espeja {@code contratoTopicAckZona} de
+     * {@code contrato.h}.
+     */
+    public static final String TOPIC_ACK_ZONA = "nursery/zone/%s/ack";
+
+    /** Suscripción a los acks de zona de todas las macro-zonas. */
+    public static final String TOPIC_ACK_ZONA_SUSCRIPCION = "nursery/zone/+/ack";
+
+    /**
      * Errores del nodo (S-05): el nodo detecta una falla, corta el actuador y la publica UNA vez en el tópico de su
      * zona. Con el id de la zona. Espeja {@code contratoTopicErrores} de {@code contrato.h}. QoS 1, sin retain.
      * Los tipos están en {@link NodeErrorType}.

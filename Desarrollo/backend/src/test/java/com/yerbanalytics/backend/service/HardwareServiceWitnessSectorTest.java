@@ -74,6 +74,17 @@ class HardwareServiceWitnessSectorTest {
     }
 
     @Test
+    void laMediasombraEsDeLaZonaYNuncaGuardaSector() {
+        service.registrarDispositivo(new Dispositivo(null, "DD:EE:FF", HardwareService.MEDIASOMBRA, null, "MZ-1",
+                "MZ-1-045", null, null, null, null, null, null, null, null, null, false, null, null));
+
+        assertThat(guardados).singleElement().satisfies(d -> {
+            assertThat(d.getZonaId()).isEqualTo("MZ-1");
+            assertThat(d.getSectorId()).isNull();
+        });
+    }
+
+    @Test
     void elSectorDelNodoEsOpcional() {
         service.registrarDispositivo(nodo(null));
 

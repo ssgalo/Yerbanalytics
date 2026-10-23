@@ -5,7 +5,7 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleOrchestrator;
 import com.yerbanalytics.backend.engine.overrides.DemoControllable;
 import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
-import com.yerbanalytics.backend.hardening.GlobalPlanHardeningPhase;
+import com.yerbanalytics.backend.hardening.ZonePlanHardeningPhase;
 import com.yerbanalytics.backend.hardening.HardeningPhase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,7 +85,7 @@ class ChlorosisSolarWiringTest {
     @Test
     @DisplayName("la rustificación se resuelve hoy con el plan global")
     void hardeningComesFromTheGlobalPlan() {
-        assertThat(hardening).isInstanceOf(GlobalPlanHardeningPhase.class);
+        assertThat(hardening).isInstanceOf(ZonePlanHardeningPhase.class);
     }
 
     private RuleBranch branch(String name) {

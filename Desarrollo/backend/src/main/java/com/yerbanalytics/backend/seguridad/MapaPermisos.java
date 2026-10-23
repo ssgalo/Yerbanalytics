@@ -91,6 +91,12 @@ public final class MapaPermisos {
         // Plan de nutrición de una macro-zona: el intervalo es configuración agronómica (el plan se lee del snapshot).
         permiso(r, put, "/api/zonas/*/plan-nutricion", Permiso.CONFIGURACION_EDITAR);
 
+        // Plan de rustificación de una macro-zona: se ve en el detalle de la zona (como el snapshot) y se inicia o
+        // elimina con permiso de configuración agronómica.
+        permiso(r, get, "/api/zonas/*/rustificacion", Permiso.VIVERO_VER);
+        permiso(r, post, "/api/zonas/*/rustificacion", Permiso.CONFIGURACION_EDITAR);
+        permiso(r, post, "/api/zonas/*/rustificacion/cancelar", Permiso.CONFIGURACION_EDITAR);
+
         permiso(r, get, "/api/diagnosticos/**", Permiso.DIAGNOSTICOS_VER);
         permiso(r, post, "/api/diagnosticos", Permiso.DIAGNOSTICOS_REGISTRAR);
 

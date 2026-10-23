@@ -10,7 +10,8 @@ import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
 /**
- * Entrada del ACK de actuadores ({@code nursery/zone/{zona}/sector/{sector}/ack}). Parsea una sola vez y
+ * Entrada del ACK de actuadores ({@code nursery/zone/{zona}/sector/{sector}/ack}, y el de la mediasombra, que es de
+ * la zona: {@code nursery/zone/{zona}/ack}, con sector {@code null}). Parsea una sola vez y
  * delega a dos consumidores: el seguimiento de comandos (alertas por falla o silencio) y las secuencias de
  * Demo Expo. Un JSON roto se loguea y se descarta, nunca tira abajo el adaptador. Zona y sector salen del
  * tópico, no del payload. Un adaptador propio (ver {@code MqttConfig}) lo alimenta.
@@ -43,7 +44,9 @@ public class AckActuadorReceiver {
                 return;
             }
             String[] partes = partesDelTopico(message);
-            if (partes.length != 6 || !"ack".equals(partes[5])) {
+            boolean deSector = partes.length == 6 && "ack".equals(partes[5]);
+            boolean deZona = partes.length == 4 && "ack".equals(partes[3]);
+            if (!deSector && !deZona) {
                 log.warn("ACK MQTT en un tópico inesperado, se descarta");
                 return;
             }
@@ -53,7 +56,7 @@ public class AckActuadorReceiver {
                     texto(raiz.get("status")),
                     detalle == null || detalle.isNull() ? null : detalle,
                     partes[IDX_ZONA],
-                    partes[IDX_SECTOR]);
+                    deSector ? partes[IDX_SECTOR] : null);
             entregar(ack);
         } catch (Exception e) {
             log.warn("ACK de actuador MQTT ilegible, se descarta — {}", e.getMessage());

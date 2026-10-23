@@ -35,7 +35,35 @@ static SistemaColas sys;
 
 static char topicComando[CANT_SECTORES + 1][96];   // índice 1 y 2
 static char topicAck[CANT_SECTORES + 1][96];
+static char topicComandoZona[96];   // la mediasombra es de la macro-zona: su shade SET llega por acá
+static char topicAckZona[96];
 static char topicErrores[96];
+
+// ----------------------------------------------------------------------------
+//  Comando de zona con actuador: la mediasombra es de la macro-zona (una por zona). Se encola como cualquier
+//  comando, con sector CONTRATO_SECTOR_ZONA: su ack sale por el tópico de zona. Sólo la mediasombra es de la zona.
+// ----------------------------------------------------------------------------
+static void encolarComandoDeZona(byte *payload, unsigned int length)
+{
+  Comando cmd = {};
+  cmd.sector = CONTRATO_SECTOR_ZONA;
+  bool ok = util_json::parsearComando((const char *)payload, length, cmd);
+  if (!ok || cmd.actuador != TipoActuador::MEDIASOMBRA)
+  {
+    Ack err = {};
+    strlcpy(err.commandId, cmd.commandId, sizeof(err.commandId));
+    err.sector = CONTRATO_SECTOR_ZONA;
+    err.status = EstadoAck::ERROR;
+    err.targetPct = -1;
+    strlcpy(err.tipoDetalle, "comando_invalido", sizeof(err.tipoDetalle));
+    xQueueSend(sys.ack, &err, 0);
+    return;
+  }
+  if (xQueueSend(sys.comandos, &cmd, 0) != pdTRUE)
+  {
+    Serial.println("[main] Cola de comandos llena; comando de zona descartado");
+  }
+}
 
 // ----------------------------------------------------------------------------
 //  Callback MQTT: parsea y encola (no ejecuta ni publica acá).
@@ -47,6 +75,18 @@ static void onMensajeMqtt(char *topic, byte *payload, unsigned int length)
     ComandoRiel cr;
     util_json::parsearComandoRiel((const char *)payload, length, cr);
     xQueueOverwrite(sys.comandoRiel, &cr); // el último gana
+    return;
+  }
+
+  if (strcmp(topic, topicComandoZona) == 0)
+  {
+    // Este nodo no sensa: del comando de zona sólo le toca el de la mediasombra (con "actuador").
+    char commandId[40];
+    if (util_json::parsearComandoZona((const char *)payload, length, commandId, sizeof(commandId)) ==
+        util_json::ResultadoComandoZona::ACTUADOR)
+    {
+      encolarComandoDeZona(payload, length);
+    }
     return;
   }
 
@@ -91,6 +131,16 @@ static bool publicarAck(const Ack &a)
   char buf[256];
   size_t escritos = util_json::serializarAck(a, buf, sizeof(buf));
   buf[escritos] = '\0';
+  if (a.sector == CONTRATO_SECTOR_ZONA)
+  {
+    // La mediasombra es de la macro-zona: su ack va por el tópico de zona.
+    if (!net_mqtt::publicar(topicAckZona, buf, QOS_ACK))
+    {
+      return false;
+    }
+    Serial.printf("[main] Ack de zona publicado: %s\n", buf);
+    return true;
+  }
   int sector = (a.sector >= 1 && a.sector <= CANT_SECTORES) ? a.sector : 1;
   if (!net_mqtt::publicar(topicAck[sector], buf, QOS_ACK))
   {
@@ -204,6 +254,8 @@ void setup()
     contratoTopicAck(topicAck[s], sizeof(topicAck[s]), s);
   }
   contratoTopicErrores(topicErrores, sizeof(topicErrores));
+  contratoTopicComandoZona(topicComandoZona, sizeof(topicComandoZona));
+  contratoTopicAckZona(topicAckZona, sizeof(topicAckZona));
 
   // Recursos FreeRTOS (este nodo consume comandos y produce acks y eventos del riel).
   sys.telemetria = nullptr;
@@ -221,6 +273,7 @@ void setup()
     net_mqtt::suscribir(topicComando[s], QOS_COMANDO);
   }
   net_mqtt::suscribir(TOPIC_RIEL_COMANDO, QOS_RIEL_COMANDO);
+  net_mqtt::suscribir(topicComandoZona, QOS_COMANDO_ZONA);   // shade SET de la mediasombra (4ª: MAX_SUSCRIPCIONES)
 
   // Drivers y tareas de actuación.
   task_actuacion::iniciarDrivers();

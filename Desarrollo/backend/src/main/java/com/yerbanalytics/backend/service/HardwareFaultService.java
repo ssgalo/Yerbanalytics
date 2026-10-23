@@ -10,7 +10,7 @@ import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.rules.HydraulicFaultRule;
-import com.yerbanalytics.backend.engine.rules.ShadeFaultRule;
+import com.yerbanalytics.backend.mediasombra.ShadeFaultRule;
 import com.yerbanalytics.backend.exception.HardwareConflictException;
 import com.yerbanalytics.backend.exception.InvalidHardwareException;
 import com.yerbanalytics.backend.model.DispositivoEntity;
@@ -30,8 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Fallas de los dispositivos del vivero (S-05, {@code reglas_v2} §4): las marca a partir de lo que informa el nodo y
@@ -151,8 +149,8 @@ public class HardwareFaultService implements ConsumidorParametros, DemoControlla
             }
             targets = dispositivoRepository.findBySectorIdAndTipo(error.sectorId(), HardwareService.ELECTROVALVULA);
         } else {
-            targets = zoneSectorIds.isEmpty() ? List.of()
-                    : dispositivoRepository.findBySectorIdInAndTipoIn(zoneSectorIds, List.of(HardwareService.MEDIASOMBRA));
+            // La malla es de la macro-zona: se registra con la zona, como el nodo testigo.
+            targets = dispositivoRepository.findByZonaIdAndTipo(error.zoneId(), HardwareService.MEDIASOMBRA);
         }
 
         String code = error.type().wireValue();
@@ -207,8 +205,8 @@ public class HardwareFaultService implements ConsumidorParametros, DemoControlla
     // ------------------------------------------------------------------
 
     /**
-     * Levanta la falla del dispositivo: lo devuelve a lo autónomo en el siguiente pulso. Reparar la mediasombra levanta la
-     * marca de la malla de toda la macro-zona.
+     * Levanta la falla del dispositivo: lo devuelve a lo autónomo en el siguiente pulso. La mediasombra es una por
+     * macro-zona: repararla devuelve la malla de la zona a lo autónomo.
      *
      * @throws InvalidHardwareException  si falta el detalle o el dispositivo no existe (400)
      * @throws HardwareConflictException si el dispositivo no tiene una falla registrada (409)
@@ -226,16 +224,15 @@ public class HardwareFaultService implements ConsumidorParametros, DemoControlla
             throw new HardwareConflictException("El dispositivo «" + deviceId + "» no tiene una falla registrada.");
         }
 
-        SectorEntity sector = sectorRepository.findById(device.getSectorId()).orElse(null);
-        ZonaEntity zona = sector != null ? sector.getZona() : null;
         boolean isShade = HardwareService.MEDIASOMBRA.equals(device.getTipo());
+        SectorEntity sector = device.getSectorId() != null ? sectorRepository.findById(device.getSectorId()).orElse(null) : null;
+        ZonaEntity zona = isShade
+                ? (device.getZonaId() != null ? zonaRepository.findById(device.getZonaId()).orElse(null) : null)
+                : (sector != null ? sector.getZona() : null);
 
-        List<DispositivoEntity> repaired = isShade && zona != null ? shadesWithFault(zona.getId()) : List.of(device);
-        repaired.forEach(d -> {
-            d.setFalla(null);
-            d.setFallaDesde(null);
-        });
-        dispositivoRepository.saveAll(repaired.isEmpty() ? List.of(device) : repaired);
+        device.setFalla(null);
+        device.setFallaDesde(null);
+        dispositivoRepository.save(device);
 
         String zonaId = zona != null ? zona.getId() : "—";
         String zonaName = zona != null ? zona.getName() : "Sistema";
@@ -248,13 +245,6 @@ public class HardwareFaultService implements ConsumidorParametros, DemoControlla
                             + " registró la reparación (" + NodeErrorType.describe(code) + "). "
                             + "Vuelve a lo autónomo en el siguiente pulso.");
         }
-    }
-
-    private List<DispositivoEntity> shadesWithFault(String zoneId) {
-        Set<String> sectorIds = sectorRepository.findByZonaId(zoneId).stream()
-                .map(SectorEntity::getId).collect(Collectors.toSet());
-        return dispositivoRepository.findBySectorIdInAndTipoIn(sectorIds, List.of(HardwareService.MEDIASOMBRA)).stream()
-                .filter(d -> !isBlank(d.getFalla())).toList();
     }
 
     private void alert(ZonaEntity zona, String rule, NivelAlerta level, String text) {

@@ -308,8 +308,9 @@ public class SecuenciaService implements UsoDelHardware {
             throw new SecuenciaRechazadaException("Ya hay una lectura de sensores en curso. Esperá a que termine.");
         }
         ZonaEntity zona = zonaDestino();
+        // Sólo el riego es de un sector; la mediasombra es de la zona y la lectura también.
         String sectorId = null;
-        if (!LECTURA.equals(tipo)) {
+        if (RIEGO.equals(tipo)) {
             sectorId = zona.getSectors().stream().map(SectorEntity::getId).min(Comparator.naturalOrder())
                     .orElseThrow(() -> new SecuenciaRechazadaException(
                             "La zona " + zona.getId() + " no tiene sectores."));
@@ -462,7 +463,14 @@ public class SecuenciaService implements UsoDelHardware {
 
     private void publicarComando(SecuenciaInterna p, Paso paso, String actuador, String accion,
                                  Map<String, Object> parametros) {
-        ComandoActuadorPublisher.Resultado r = actuadores.publicar(p.zonaId, p.sectorId, actuador, accion, parametros);
+        // La mediasombra es de la macro-zona: va por el comando de zona (su ack vuelve por nursery/zone/{z}/ack).
+        boolean malla = "shade".equals(actuador);
+        ComandoActuadorPublisher.Resultado r = malla
+                ? actuadores.publicarZona(p.zonaId, actuador, accion, parametros)
+                : actuadores.publicar(p.zonaId, p.sectorId, actuador, accion, parametros);
+        if (malla && r.publicado()) {
+            registrarPosicionMalla(p.zonaId, parametros);
+        }
         paso.commandId = r.commandId();
         paso.publicadoEn = reloj.millis();
         paso.venceAckEn = paso.publicadoEn + timeoutAckSeg(p, paso) * 1000L;
@@ -470,6 +478,17 @@ public class SecuenciaService implements UsoDelHardware {
             String detalle = detallePublicacion(r.error());
             cerrarYSeguir(p, paso, ERROR, "PUBLICACION_FALLIDA",
                     CERRAR.equals(paso.tipo) ? detalle + avisoDeApagadoSolo(p) : detalle);
+        }
+    }
+
+    /** Anota en la zona la posición que la secuencia le ordenó a la malla (la última orden, no una lectura). */
+    private void registrarPosicionMalla(String zonaId, Map<String, Object> parametros) {
+        Object apertura = parametros.get("targetPct");
+        if (apertura instanceof Number n) {
+            zonaRepo.findById(zonaId).ifPresent(z -> {
+                z.setMediasombraAbierta(n.intValue() >= APERTURA_ENROLLADA / 2);
+                zonaRepo.save(z);
+            });
         }
     }
 

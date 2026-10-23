@@ -36,7 +36,8 @@ class HardwareServiceCoverageTest {
     void setUp() {
         dispositivos = mock(DispositivoRepository.class);
         service = new HardwareService(dispositivos, mock(ZonaRepository.class), mock(SectorRepository.class), 20);
-        when(dispositivos.findByZonaIdAndTipo(anyString(), anyString())).thenAnswer(inv -> List.copyOf(nodos));
+        when(dispositivos.findByZonaIdAndTipo(anyString(), anyString())).thenAnswer(inv -> nodos.stream()
+                .filter(d -> d.getTipo().equals(inv.getArgument(1))).toList());
         when(dispositivos.findBySectorIdInAndTipoIn(anyCollection(), anyCollection())).thenAnswer(inv -> List.copyOf(actuadores));
     }
 
@@ -59,19 +60,17 @@ class HardwareServiceCoverageTest {
     }
 
     @Test
-    @DisplayName("un sector con electroválvula, bomba y mediasombra y el nodo de su zona está completo")
+    @DisplayName("un sector con electroválvula y bomba y el nodo de su zona está completo")
     void sectorCompleto() {
         nodoTestigo();
         actuadores.add(actuador(HardwareService.ELECTROVALVULA, "MZ-1-001"));
         actuadores.add(actuador(HardwareService.BOMBA, "MZ-1-001"));
-        actuadores.add(actuador(HardwareService.MEDIASOMBRA, "MZ-1-001"));
 
         HardwareCoverage c = service.coverageOf("MZ-1", SECTORES).get("MZ-1-001");
 
-        assertThat(c).isEqualTo(new HardwareCoverage(true, true, true, true));
+        assertThat(c).isEqualTo(new HardwareCoverage(true, true, true));
         assertThat(c.canIrrigate()).isTrue();
         assertThat(c.canDose()).isTrue();
-        assertThat(c.canShade()).isTrue();
     }
 
     @Test
@@ -83,7 +82,7 @@ class HardwareServiceCoverageTest {
         Map<String, HardwareCoverage> cobertura = service.coverageOf("MZ-1", SECTORES);
 
         assertThat(cobertura).containsOnlyKeys(SECTORES.toArray(String[]::new));
-        assertThat(cobertura.get("MZ-1-003")).isEqualTo(new HardwareCoverage(false, false, true, false));
+        assertThat(cobertura.get("MZ-1-003")).isEqualTo(new HardwareCoverage(false, false, true));
     }
 
     @Test
@@ -114,27 +113,6 @@ class HardwareServiceCoverageTest {
     }
 
     @Test
-    @DisplayName("la mediasombra se exige a la zona: alcanza con una registrada en cualquiera de sus sectores")
-    void mediasombraDeLaZona() {
-        nodoTestigo();
-        actuadores.add(actuador(HardwareService.MEDIASOMBRA, "MZ-1-003"));
-
-        Map<String, HardwareCoverage> cobertura = service.coverageOf("MZ-1", SECTORES);
-
-        assertThat(cobertura.values()).allSatisfy(c -> assertThat(c.canShade()).isTrue());
-    }
-
-    @Test
-    @DisplayName("una zona sin ninguna mediasombra no puede mover la malla en ningún sector")
-    void zonaSinMediasombra() {
-        nodoTestigo();
-        actuadores.add(actuador(HardwareService.ELECTROVALVULA, "MZ-1-001"));
-
-        assertThat(service.coverageOf("MZ-1", SECTORES).values())
-                .allSatisfy(c -> assertThat(c.canShade()).isFalse());
-    }
-
-    @Test
     @DisplayName("un dispositivo con falla sigue estando mapeado: reportar fallas es de S-05")
     void laFallaNoDesmapea() {
         nodoTestigo();
@@ -158,5 +136,42 @@ class HardwareServiceCoverageTest {
     @DisplayName("sin sectores no hay nada que consultar")
     void sinSectores() {
         assertThat(service.coverageOf("MZ-1", List.of())).isEmpty();
+    }
+    // ------------------------------------------------------------------ la mediasombra es de la zona
+
+    private void mediasombraDeZona(String falla) {
+        DispositivoEntity m = new DispositivoEntity();
+        m.setId("DEV-011");
+        m.setSerial("MS-1");
+        m.setTipo(HardwareService.MEDIASOMBRA);
+        m.setZonaId("MZ-1");
+        m.setFalla(falla);
+        nodos.add(m);
+    }
+
+    @Test
+    @DisplayName("la mediasombra es de la zona: registrada y sana")
+    void mallaRegistrada() {
+        mediasombraDeZona(null);
+
+        assertThat(service.mallaDe("MZ-1")).isEqualTo(new com.yerbanalytics.backend.engine.MallaZona(true, null));
+    }
+
+    @Test
+    @DisplayName("una zona sin mediasombra registrada no la tiene, aunque tenga su nodo testigo")
+    void zonaSinMalla() {
+        nodoTestigo();
+
+        assertThat(service.mallaDe("MZ-1").registrada()).isFalse();
+        assertThat(service.mallaDe("MZ-1").motivoSinComando(false)).contains("no tiene mediasombra");
+    }
+
+    @Test
+    @DisplayName("la falla de la mediasombra es de la zona")
+    void mallaAveriada() {
+        mediasombraDeZona("MEDIASOMBRA_FIN_DE_CARRERA");
+
+        assertThat(service.mallaDe("MZ-1").tieneFalla()).isTrue();
+        assertThat(service.mallaDe("MZ-1").falla()).isEqualTo("MEDIASOMBRA_FIN_DE_CARRERA");
     }
 }

@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS sector (
     diagnosis_sev VARCHAR(255) NOT NULL,
     actuador_valve VARCHAR(255) NOT NULL,
     actuador_pump VARCHAR(255) NOT NULL,
-    actuador_shade INTEGER NOT NULL,
     last_reading_time BIGINT,
     hum_sus_raw DOUBLE PRECISION,
     hum_amb_raw DOUBLE PRECISION,
@@ -49,13 +48,6 @@ CREATE TABLE IF NOT EXISTS configuracion_operativa (
     seguimiento_delta_min DOUBLE PRECISION NOT NULL,
     updated_by VARCHAR(255),
     updated_ts BIGINT
-);
-
-CREATE TABLE IF NOT EXISTS rustificacion_etapa (
-    orden INTEGER PRIMARY KEY,
-    dia_desde INTEGER NOT NULL,
-    dia_hasta INTEGER NOT NULL,
-    apertura_pct INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS umbral_metrica (

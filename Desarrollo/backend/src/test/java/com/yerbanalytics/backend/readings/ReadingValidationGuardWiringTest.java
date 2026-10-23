@@ -7,7 +7,6 @@ import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
 import com.yerbanalytics.backend.engine.parametros.ParametroReglaRepository;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
-import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import com.yerbanalytics.backend.service.HistorialService;
@@ -42,7 +41,6 @@ class ReadingValidationGuardWiringTest {
             ctx.registerBean(ParametroReglaRepository.class, () -> mock(ParametroReglaRepository.class));
             ctx.registerBean(ConfiguracionOperativaRepository.class, () -> mock(ConfiguracionOperativaRepository.class));
             ctx.registerBean(UmbralMetricaRepository.class, () -> mock(UmbralMetricaRepository.class));
-            ctx.registerBean(RustificacionEtapaRepository.class, () -> mock(RustificacionEtapaRepository.class));
             ctx.registerBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
             ctx.register(CatalogoParametros.class, CatalogoParametrosService.class, ConfiguracionService.class,
                     ReadingValidationGuard.class);

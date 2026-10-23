@@ -76,7 +76,7 @@ enum class TipoAccion { ENCENDER, APAGAR, POSICIONAR, DESCONOCIDA };
 
 struct Comando {
   char  commandId[40];      // id para deduplicación (opcional; "" si no vino)
-  int   sector;             // 1 o 2: según el tópico por el que llegó
+  int   sector;             // 1 o 2: según el tópico por el que llegó; CONTRATO_SECTOR_ZONA (0): comando de zona
   TipoActuador actuador;
   TipoAccion   accion;
   long  durationSec;        // parámetro riego (0 si no vino)
@@ -93,7 +93,7 @@ enum class EstadoAck { SUCCESS, ERROR, EN_CURSO };
 
 struct Ack {
   char  commandId[40];
-  int   sector;             // 1 o 2: el ack se publica en el tópico de este sector
+  int   sector;             // 1 o 2: el ack va al tópico de este sector; CONTRATO_SECTOR_ZONA (0): al de la zona
   EstadoAck status;
   char  tipoDetalle[24];    // p.ej. "ok", "limite_excedido", "falla_mecanica", "reemplazado"
   long  durationSec;        // datos de cierre (según actuador)

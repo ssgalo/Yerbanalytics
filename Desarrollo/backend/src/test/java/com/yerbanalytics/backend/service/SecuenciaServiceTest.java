@@ -76,6 +76,9 @@ class SecuenciaServiceTest {
                 zona(ZONA, "MZ-2-003", SECTOR, "MZ-2-002")));
         when(actuadores.publicar(anyString(), anyString(), anyString(), anyString(), anyMap()))
                 .thenAnswer(i -> new Resultado(true, "cmd-" + seq.incrementAndGet(), null));
+        // La mediasombra es de la zona: sus comandos van por el tópico de zona.
+        when(actuadores.publicarZona(anyString(), anyString(), anyString(), anyMap()))
+                .thenAnswer(i -> new Resultado(true, "cmd-" + seq.incrementAndGet(), null));
         when(zonaPublisher.leerAhora(anyString()))
                 .thenAnswer(i -> new ComandoZonaPublisher.Resultado(true, "lec-" + seq.incrementAndGet(), null));
         service = new SecuenciaService(actuadores, zonaPublisher, pulsos, zonaRepo,
@@ -136,7 +139,11 @@ class SecuenciaServiceTest {
     }
 
     private void verificarPublicado(String actuador, String accion, Map<String, Object> parametros) {
-        verify(actuadores).publicar(ZONA, SECTOR, actuador, accion, parametros);
+        if ("shade".equals(actuador)) {
+            verify(actuadores).publicarZona(ZONA, actuador, accion, parametros);
+        } else {
+            verify(actuadores).publicar(ZONA, SECTOR, actuador, accion, parametros);
+        }
     }
 
     // ================================================================ RIEGO
@@ -445,6 +452,7 @@ class SecuenciaServiceTest {
                     .isInstanceOf(SecuenciaRechazadaException.class)
                     .hasMessage("Ya hay una secuencia en curso.");
             verify(actuadores, times(1)).publicar(anyString(), anyString(), anyString(), anyString(), anyMap());
+            verify(actuadores, never()).publicarZona(anyString(), anyString(), anyString(), anyMap());
         }
 
         @Test
@@ -519,7 +527,7 @@ class SecuenciaServiceTest {
             Secuencia s = iniciar("MEDIASOMBRA", null, 7);
 
             assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(null, 7));
-            assertThat(s.sectorId()).isEqualTo(SECTOR);
+            assertThat(s.sectorId()).as("la mediasombra es de la zona").isNull();
             assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("DESPLEGAR", "ESPERAR", "ENROLLAR");
             verificarPublicado("shade", "SET", Map.of("targetPct", 0));
 
@@ -627,14 +635,27 @@ class SecuenciaServiceTest {
     class MediasombraAbrirCerrar {
 
         @Test
-        @DisplayName("MEDIASOMBRA_ABRIR: un paso ENROLLAR que publica SET 100 en el primer sector de la zona")
+        @DisplayName("MEDIASOMBRA_ABRIR: un paso ENROLLAR que publica SET 100 por el comando de la zona")
         void planDeAbrir() {
             Secuencia s = iniciar("MEDIASOMBRA_ABRIR", null, null);
 
             assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("ENROLLAR");
-            assertThat(s.sectorId()).isEqualTo(SECTOR);
+            assertThat(s.sectorId()).isNull();
             assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(null, null));
             verificarPublicado("shade", "SET", Map.of("targetPct", 100));
+        }
+
+        @Test
+        @DisplayName("la posición ordenada queda en la zona (la malla es de la macro-zona)")
+        void registraLaPosicionEnLaZona() {
+            ZonaEntity z = new ZonaEntity();
+            z.setId(ZONA);
+            when(zonaRepo.findById(ZONA)).thenReturn(java.util.Optional.of(z));
+
+            iniciar("MEDIASOMBRA_ABRIR", null, null);
+
+            assertThat(z.getMediasombraAbierta()).isTrue();
+            verify(zonaRepo).save(z);
         }
 
         @Test
@@ -696,7 +717,7 @@ class SecuenciaServiceTest {
 
             assertThat(paso(1).codigoError()).isEqualTo("FALLA_MECANICA");
             assertThat(secuencia().estado()).isEqualTo("FALLIDA");
-            verify(actuadores, times(1)).publicar(anyString(), anyString(), anyString(), anyString(), anyMap());
+            verify(actuadores, times(1)).publicarZona(anyString(), anyString(), anyString(), anyMap());
         }
 
         @Test

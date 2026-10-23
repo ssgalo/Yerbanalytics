@@ -108,6 +108,10 @@ Sin esto, el backend registraría una alerta `ActuadorSinRespuesta` por cada com
 comandos de otras zonas son de un nodo real y sólo se loguean. Las reglas de cada ack están en
 `server/contract.ts` (`simulatedAck`).
 
+**La mediasombra es de la macro-zona** (una por zona): el backend manda su `shade SET` por el comando de zona
+(`nursery/zone/{zona}/command`, con `"actuador":"shade"`, el mismo tópico del `LEER_AHORA`) y el simulador contesta el ack
+por `nursery/zone/{zona}/ack`. Abrir y cerrar la malla desde *Demo Expo* (secuencias) funciona igual que antes.
+
 **Cola de cargas del nodo.** El simulador se comporta como el firmware (`actuacion/cola_cargas`): corre a lo sumo
 `SIM_NODE_MAX_LOADS` cargas a la vez (riego de un sector, insumo de un sector, movimiento de la mediasombra; por
 defecto **1**, lo que aguanta la fuente del prototipo) y encola el resto en orden de llegada. Con la cola mandan los

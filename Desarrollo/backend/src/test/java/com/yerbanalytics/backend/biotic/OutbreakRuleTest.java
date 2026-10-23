@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("F-04 · Foco")
 class OutbreakRuleTest {
 
-    private static final HardwareCoverage WITH_PUMP = new HardwareCoverage(true, true, true, true);
+    private static final HardwareCoverage WITH_PUMP = new HardwareCoverage(true, true, true);
 
     private SectorGrid grid;
     private FungicideLog fungicides;
@@ -218,7 +218,7 @@ class OutbreakRuleTest {
         List<SectorEntity> sectors = zoneWith("Daño fúngico", 20, 10, 11, 21);
         Map<String, HardwareCoverage> hardware = new HashMap<>();
         sectors.forEach(s -> hardware.put(s.getId(), WITH_PUMP));
-        hardware.put("MZ-1-009", new HardwareCoverage(true, false, true, true));
+        hardware.put("MZ-1-009", new HardwareCoverage(true, false, true));
         ZoneRuleContext ctx = new ZoneRuleContext(zone, sectors, NOW, hardware, Map.of(), false, Set.of(), RuleOverrides.NONE);
 
         List<RuleAction> actions = rule.evaluate(ctx, new Evaluacion(rule, ReglaTestSupport.fabrica()));

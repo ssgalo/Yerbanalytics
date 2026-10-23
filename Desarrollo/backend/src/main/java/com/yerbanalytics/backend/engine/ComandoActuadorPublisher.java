@@ -2,6 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.MqttCommandGateway;
 import com.yerbanalytics.backend.service.SeguimientoComandosService;
 import org.slf4j.Logger;
@@ -21,7 +22,9 @@ import java.util.UUID;
  * { "commandId": "uuid-v4", "actuador": "valve" | "pump" | "shade",
  *   "accion": "ON" | "OFF" | "SET", "parametros": { ... } }
  * </pre>
- * en el tópico {@code nursery/zone/{zonaId}/sector/{sectorId}/command}.
+ * en el tópico {@code nursery/zone/{zonaId}/sector/{sectorId}/command}. La mediasombra es de la macro-zona y va por
+ * el comando de zona ({@code nursery/zone/{zonaId}/command}, {@link #publicarZona}); su ack vuelve por
+ * {@code nursery/zone/{zonaId}/ack}.
  *
  * <p>Cada comando publicado queda en {@link SeguimientoComandosService}, que espera el ack del nodo
  * y alerta si informa una falla o no contesta a tiempo.
@@ -61,7 +64,20 @@ public class ComandoActuadorPublisher {
 
     public Resultado publicar(String zonaId, String sectorId, String actuador, String accion,
                               Map<String, Object> parametros) {
-        String topic = String.format(TOPIC_COMMAND, zonaId, sectorId);
+        return enviar(String.format(TOPIC_COMMAND, zonaId, sectorId), zonaId, sectorId, actuador, accion, parametros);
+    }
+
+    /**
+     * Comando a un actuador de la macro-zona (la mediasombra), por el tópico de comando de zona. El seguimiento lo
+     * registra sin sector.
+     */
+    public Resultado publicarZona(String zonaId, String actuador, String accion, Map<String, Object> parametros) {
+        return enviar(String.format(ContratoNodo.TOPIC_COMANDO_ZONA, zonaId), zonaId, null, actuador, accion, parametros);
+    }
+
+    private Resultado enviar(String topic, String zonaId, String sectorId, String actuador, String accion,
+                             Map<String, Object> parametros) {
+        String destino = sectorId != null ? "Sector " + sectorId : "Zona " + zonaId;
         String commandId = UUID.randomUUID().toString();
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -73,14 +89,14 @@ public class ComandoActuadorPublisher {
         try {
             String json = objectMapper.writeValueAsString(payload);
             gateway.send(topic, json);
-            log.info("Sector {}: comando MQTT publicado → topic={} payload={}", sectorId, topic, json);
+            log.info("{}: comando MQTT publicado → topic={} payload={}", destino, topic, json);
             seguimiento.registrarEnvio(commandId, zonaId, sectorId, actuador, parametros);
             return new Resultado(true, commandId, null);
         } catch (JsonProcessingException e) {
-            log.error("Sector {}: error serializando comando MQTT — {}", sectorId, e.getMessage());
+            log.error("{}: error serializando comando MQTT — {}", destino, e.getMessage());
             return new Resultado(false, commandId, "No se pudo serializar el comando: " + e.getMessage());
         } catch (Exception e) {
-            log.warn("Sector {}: no se pudo publicar el comando MQTT ({}) — {}", sectorId, topic, e.getMessage());
+            log.warn("{}: no se pudo publicar el comando MQTT ({}) — {}", destino, topic, e.getMessage());
             return new Resultado(false, commandId, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
     }

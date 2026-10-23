@@ -33,8 +33,9 @@ class NutritionWiringTest {
     @Test
     @DisplayName("el motor de zonas corre la sanidad antes que la rutina y N-02 antes que N-01: la CE baja adelanta el plan en el mismo pulso")
     void engineRunsLowEcBeforeThePlan() {
+        // Las de la mediasombra, también de zona, van antes y no cambian este orden.
         assertThat(engine.getRules()).extracting(ZoneRule::name)
-                .containsExactly("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule");
+                .containsSubsequence("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule");
     }
 
     @Test

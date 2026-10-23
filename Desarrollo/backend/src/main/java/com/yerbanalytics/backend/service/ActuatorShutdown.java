@@ -1,28 +1,31 @@
 package com.yerbanalytics.backend.service;
 
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
+import com.yerbanalytics.backend.mediasombra.MediasombraService;
 import com.yerbanalytics.backend.model.DispositivoEntity;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.repository.DispositivoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Ordena el cierre de los equipos <b>registrados</b> (Hardware) en un conjunto de sectores: válvula {@code OFF},
- * bomba {@code OFF} y mediasombra cerrada. Quien llama elige qué tipos de equipo: el estado seguro de una zona
- * ({@link ZoneSafeState}) cierra los tres; el bloqueo manual ({@link ManualLockService}) sólo agua y bombas.
+ * Ordena el cierre de los equipos <b>registrados</b> (Hardware) de una macro-zona: válvula {@code OFF} y bomba
+ * {@code OFF} de los sectores pedidos, y la mediasombra de la zona cerrada. Quien llama elige qué tipos de equipo: el
+ * estado seguro de una zona ({@link ZoneSafeState}) cierra los tres; el bloqueo manual ({@link ManualLockService}) sólo
+ * agua y bombas.
  *
  * <p>Publica primero los {@code OFF} y al final la mediasombra, que lleva {@code prioridad: "INMEDIATA"}: el nodo
- * serializa las cargas ({@code add-cola-actuadores-nodo}) y esta es la única orden que no espera turno.
+ * serializa las cargas ({@code add-cola-actuadores-nodo}) y esta es la única orden que no espera turno. La malla es de
+ * la macro-zona: va por el comando de zona, y sólo si la zona tiene una registrada.
  *
  * <p>Sale por el mismo {@link ComandoActuadorPublisher} que las reglas y las secuencias de Demo Expo, así
  * {@link SeguimientoComandosService} vigila cada orden hasta su ack. Una orden que no sale no frena a las demás.
@@ -53,27 +56,28 @@ public class ActuatorShutdown {
 
     private final DispositivoRepository devices;
     private final ComandoActuadorPublisher publisher;
+    private final MediasombraService mediasombra;
 
-    public ActuatorShutdown(DispositivoRepository devices, ComandoActuadorPublisher publisher) {
+    public ActuatorShutdown(DispositivoRepository devices, ComandoActuadorPublisher publisher,
+                            @Lazy MediasombraService mediasombra) {
         this.devices = devices;
         this.publisher = publisher;
+        this.mediasombra = mediasombra;
     }
 
     /**
-     * Cierra los equipos de los {@code types} registrados en {@code sectorIds}, uno por sector y tipo.
-     * Sin sectores o sin equipos registrados no publica nada.
+     * Cierra los equipos de los {@code types} registrados en {@code sectorIds}, uno por sector y tipo, y la mediasombra
+     * de la zona si {@code types} la incluye. Sin equipos registrados no publica nada.
      */
     public Result close(String zoneId, Collection<String> sectorIds, Collection<String> types) {
-        if (sectorIds.isEmpty()) {
-            return new Result(0, 0);
-        }
         Set<String> seen = new LinkedHashSet<>();
         int commands = 0;
         int failed = 0;
         // Los OFF primero y la malla al final: el instante en que se suman cargas (la malla arranca ya, aunque haya
         // otras corriendo) queda en milisegundos, no mientras todavía se están cerrando las válvulas.
-        List<DispositivoEntity> found = new ArrayList<>(devices.findBySectorIdInAndTipoIn(sectorIds, types));
-        found.sort(Comparator.comparing((DispositivoEntity d) -> HardwareService.MEDIASOMBRA.equals(d.getTipo())));
+        List<String> sectorTypes = types.stream().filter(t -> !HardwareService.MEDIASOMBRA.equals(t)).toList();
+        List<DispositivoEntity> found = new ArrayList<>(sectorIds.isEmpty() || sectorTypes.isEmpty() ? List.of()
+                : devices.findBySectorIdInAndTipoIn(sectorIds, sectorTypes));
         for (DispositivoEntity device : found) {
             Order order = ORDERS.get(device.getTipo());
             if (order == null || !seen.add(device.getSectorId() + "|" + device.getTipo())) {
@@ -85,22 +89,36 @@ public class ActuatorShutdown {
                 failed++;
             }
         }
+        if (types.contains(HardwareService.MEDIASOMBRA)
+                && !devices.findByZonaIdAndTipo(zoneId, HardwareService.MEDIASOMBRA).isEmpty()) {
+            if (publish(zoneId, null, ORDERS.get(HardwareService.MEDIASOMBRA))) {
+                commands++;
+                mediasombra.registrarPosicion(zoneId, false);
+            } else {
+                failed++;
+            }
+        }
         return new Result(commands, failed);
     }
 
     private boolean publish(String zoneId, String sectorId, Order order) {
         try {
-            ComandoActuadorPublisher.Resultado r = publisher.publicar(zoneId, sectorId, order.actuator(),
-                    order.action(), order.parameters());
+            ComandoActuadorPublisher.Resultado r = sectorId == null
+                    ? publisher.publicarZona(zoneId, order.actuator(), order.action(), order.parameters())
+                    : publisher.publicar(zoneId, sectorId, order.actuator(), order.action(), order.parameters());
             if (!r.publicado()) {
-                log.warn("Sector {}: la orden de cierre {} {} no se publicó — {}",
-                        sectorId, order.actuator(), order.action(), r.error());
+                log.warn("{}: la orden de cierre {} {} no se publicó — {}",
+                        donde(zoneId, sectorId), order.actuator(), order.action(), r.error());
             }
             return r.publicado();
         } catch (RuntimeException e) {
-            log.warn("Sector {}: falló la orden de cierre {} {} — {}",
-                    sectorId, order.actuator(), order.action(), e.getMessage());
+            log.warn("{}: falló la orden de cierre {} {} — {}",
+                    donde(zoneId, sectorId), order.actuator(), order.action(), e.getMessage());
             return false;
         }
+    }
+
+    private static String donde(String zoneId, String sectorId) {
+        return sectorId != null ? "Sector " + sectorId : "Zona " + zoneId;
     }
 }

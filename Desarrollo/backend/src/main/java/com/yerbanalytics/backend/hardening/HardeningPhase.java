@@ -9,8 +9,7 @@ import java.time.Instant;
  * terminó (reglas_v2 §7). Las reglas que se comportan distinto «durante la rustificación» (F-C2: un amarillamiento leve es
  * esperable con el cambio de luz) preguntan acá y no saben de dónde sale el plan.
  *
- * <p>Hoy lo responde el plan global ({@link GlobalPlanHardeningPhase}); cuando llegue el plan por macro-zona
- * ({@code add-rustificacion-por-macrozona}) se reemplaza esa implementación y ninguna regla cambia.
+ * <p>Lo responde el plan de la macro-zona ({@link ZonePlanHardeningPhase}, {@code add-rustificacion-por-macrozona}).
  */
 public interface HardeningPhase {
 

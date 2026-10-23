@@ -66,6 +66,9 @@ Los nombres de clases y métodos de la spec ya estaban en inglés y se mantienen
 - **D-3, rustificación**: en lugar de dejar la condición en falso se usa el plan **global** (fecha de siembra + etapas de `rustificacion_etapa`, el mismo dato que lee
   `ShadingRule`) detrás de la interfaz `HardeningPhase`; «en curso o finalizado» = desde el primer día de la primera etapa. Sin fecha de siembra, con una ilegible o sin
   etapas no cuenta. Cuando llegue el plan por macro-zona se reemplaza la implementación.
+  **Actualizado al integrar `add-rustificacion-por-macrozona` (#66):** el plan global y su tabla se eliminaron. `ZonePlanHardeningPhase` reemplaza a
+  `GlobalPlanHardeningPhase`: hay rustificación si hoy rige una etapa del plan de la zona (`PlanRustificacionService.etapaDe`, lo mismo que mueve la malla).
+  Pasada la última etapa sigue rigiendo hasta que se elimina el plan, así que «en curso o finalizado» se conserva. Ninguna regla cambió.
 - **Compuerta del diagnóstico compartida**: `engine/DiagnosisGate` + `engine/Severity` (movida desde `biotic/`) para las bióticas, la clorosis y el estrés solar.
 - **D-4, F-S1 por el despacho**: la orden entra a la cola con `regla = SolarStressRule`. `DespachoRiego` ya trataba toda solicitud que no es R-02 como riego común (ventana,
   R-06, lluvia, ciclo); se sumó que el bypass `window` de F-S1 también lo salte el despacho. La regla vive en la rama de riego, después de R-01, así los cortes de
