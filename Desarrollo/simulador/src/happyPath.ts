@@ -147,6 +147,8 @@ export function summarizeTrace(trace: EvaluationTrace): HappyPathReadout {
   const riego = branchReadout(trace, 'RIEGO', 'ACTIVAR_VALVULA', 'Riego');
   const insumo = branchReadout(trace, 'INSUMO', 'ACTIVAR_BOMBA', 'Insumo');
   const shade = branchReadout(trace, 'MEDIASOMBRA', 'MOVER_MEDIASOMBRA', 'Mediasombra');
+  // La mediasombra es de la macro-zona: su rama llega con la traza de la zona, sumada a la del sector. Un backend anterior
+  // pegaba la apertura al motivo ([apertura=N]); el actual ya dice «Mediasombra cerrada/abierta».
   const opening = /\[apertura=(\d+)\]/.exec(shade.detail);
   // El hardware es binario: la orden lleva 100 (abierta) o 0 (cerrada) y el texto no muestra porcentajes.
   const mediasombra = shade.acted && opening

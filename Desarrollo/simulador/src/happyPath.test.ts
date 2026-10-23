@@ -180,6 +180,15 @@ test('readout: opening at or above the firmware threshold (50) is open, not clos
   assert.match(r.mediasombra.detail, /^Mediasombra abierta · Plan de rustificación/);
 });
 
+test('readout: the zone rule says the position in the reason, without [apertura=N]', () => {
+  const motivo = 'Mediasombra cerrada por pico de radiación UV (índice 9.5 ≥ umbral 7.0).';
+  const r = summarizeTrace(
+    trace([rule({ ruleId: 'ShadingRule', rama: 'MEDIASOMBRA', acciones: [{ tipo: 'MOVER_MEDIASOMBRA', motivo }] })]),
+  );
+  assert.equal(r.mediasombra.acted, true);
+  assert.equal(r.mediasombra.detail, motivo);
+});
+
 /* ---- thresholds with a visible warning ---- */
 
 test('loadThresholds: catalog ok, no warning', async () => {
