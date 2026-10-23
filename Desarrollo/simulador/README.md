@@ -245,6 +245,24 @@ de sustrato ≥ 45 %) y el stock del tanque antes de publicar la orden de bomba.
 - **`SUPPLY` ya no usa la temperatura** para volver crítico al sector: usa `humAmb` = 98 %. Con calor (> 30 °C) P-D3 no deja aplicar,
   así que un sector crítico por calor jamás podría dosificarse.
 
+**Plan de nutrición (add-plan-nutricion · N-01 y N-02).** Son reglas **de macro-zona**: el motor las corre una vez por zona,
+después de evaluar sus sectores, en el pulso con motor. Aparecen en Telemetría → Control de reglas como cualquier otra pieza
+(`NutritionPlanRule` y `LowEcRule`, rama `INSUMO`) y se pueden apagar.
+
+| Escenario | Qué hace | Qué se ve |
+|---|---|---|
+| `NUTRITION_PLAN` «Plan de nutrición (N-01)» | Lleva el cooldown `interval` de `NutritionPlanRule` a 0 (el plan vence en el próximo pulso) y asegura stock en los tanques de la zona (`ensureTankStock`) | El pulso pide fertilizante para los sectores de la zona (cada uno se aplica en su próxima ventana apta) y queda un `INFO` en el historial de la zona. En el detalle de la macro-zona, la tarjeta «Plan de nutrición» pasa a «Aplicando» o, si ya se aplicaron todos, a la próxima fecha |
+| `LOW_EC` «CE baja (N-02)» | Fija `ce` = 0,3 dS/m (el umbral `nutricion.ce-baja` menos 0,2) en la **respuesta al pulso** (`pinnedReadings`), activa el bypass `samples` de `LowEcRule` (necesita el backend en modo demo) y lleva el cooldown `no-fertilized` a 0 | N-02 adelanta el plan en ese mismo pulso (N-01 corre justo después) y deja el `INFO` «CE baja: la fertilización de base del sustrato podría estar agotada»; la tarjeta dice «Adelantado por CE baja» o «Aplicando» |
+
+- `NUTRITION_PLAN` y `LOW_EC` **no se combinan con «Nodo sin respuesta»** (el motor no decide sin respuesta); `NUTRITION_PLAN` tampoco con
+  `LOCK` (con la zona bloqueada el plan queda vencido esperando). Entre sí sí se combinan, y con `APPLICATION_PRECONDITIONS` también:
+  dejan cumplidas P-D3…P-D5 para ver los sectores aplicados en el mismo pulso (la ventana horaria se saltea con el bypass `window`).
+- Si la zona ya tiene una **tanda abierta** (sectores esperando su ventana) o el plan ya está adelantado, N-01 no vuelve a pedir y N-02 no vuelve a
+  avisar: es a propósito (una alerta por evento). Esperá a que termine o mirá el estado en la tarjeta de la zona.
+- Los bypasses que pide un escenario (`bypassRules`) se **suman** a los que el operador ya tenía activos (`src/bypassFlow.ts`); nunca los reemplazan. Con
+  el backend sin modo demo la corrida sigue y lo avisa en su registro.
+- La emisión automática tiene que estar activa en `LOW_EC` (la CE viaja en la respuesta al pulso); al terminar, soltá la zona en «Lecturas fijadas».
+
 **Lecturas fijadas.** La respuesta a un `LEER_AHORA` es la lectura con la que decide el motor, y la emisión automática la
 arma al azar: una lectura que el escenario publicó antes del pulso queda pisada por ella. Por eso un escenario puede pedir
 `pinnedReadings`: métricas que viajan en **cada** respuesta de la zona destino (`PUT /api/pinned-readings/{zona}`, en memoria,

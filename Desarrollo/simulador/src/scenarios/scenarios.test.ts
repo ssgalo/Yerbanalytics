@@ -86,6 +86,7 @@ test('the registry keeps the order and keys of the original catalog', () => {
     [
       'R01', 'R02', 'R04', 'R03', 'SHADING', 'SUPPLY', 'NODE_OFFLINE', 'LOCK', 'INVALID_READING', 'INCOMPLETE_HARDWARE',
       'FAULT_NO_FLOW', 'FAULT_OVERFLOW', 'FAULT_SHADE_LIMIT', 'REPAIR', 'APPLICATION_PRECONDITIONS',
+      'NUTRITION_PLAN', 'LOW_EC',
     ],
   );
 });
@@ -497,4 +498,107 @@ test('backend rules with no scenario are the ones no scenario lists as exercised
 test('with every backend rule covered nothing is left without a scenario', () => {
   const covered = SCENARIOS.flatMap((s) => s.backendRules).map(demoRule);
   assert.deepEqual(rulesWithoutScenario(covered), []);
+});
+
+/* ------------------------------------------------------------------ plan de nutrición (N-01, N-02) */
+
+test('N-01 makes the plan fall due at the next pulse: interval cooldown to zero and tanks with stock', () => {
+  const r = calculateConditions(['NUTRITION_PLAN'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.needsCooldownReset, true, 'el intervalo del plan es un cooldown de NutritionPlanRule');
+  assert.equal(r.ensureTankStock, true, 'sin stock cada aplicación se rechaza y la tanda se descarta');
+  assert.deepEqual(r.bypassRules, {});
+  assert.deepEqual(r.pinnedMetrics, {});
+  assert.equal(r.diagnostico, null, 'el plan no decide con el diagnóstico de IA');
+  assert.match(r.resumen.join(' | '), /interval/);
+});
+
+test('N-01 exercises NutritionPlanRule and N-02 exercises LowEcRule, both in the supplies branch', () => {
+  const byKey = Object.fromEntries(SCENARIOS.map((s) => [s.key, s]));
+
+  assert.deepEqual(byKey.NUTRITION_PLAN.backendRules, ['NutritionPlanRule']);
+  assert.deepEqual(byKey.LOW_EC.backendRules, ['LowEcRule']);
+  assert.equal(byKey.NUTRITION_PLAN.branch, 'INSUMO');
+  assert.equal(byKey.LOW_EC.branch, 'INSUMO');
+});
+
+test('N-02 pins a CE of 0.3 dS/m on the pulse answer, with the factory threshold', () => {
+  const r = calculateConditions(['LOW_EC'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.pinnedMetrics.ce, 0.3, 'bajo el umbral de fábrica (0,5 dS/m)');
+  assert.equal(r.telemetria.ce, 1.4, 'la lectura sana no se toca: la CE baja viaja fijada en la respuesta al pulso');
+  assert.match(r.resumen.join(' | '), /ce = 0\.3 dS\/m/);
+});
+
+test('N-02 turns on the samples bypass of LowEcRule and zeroes the not-fertilized wait', () => {
+  const r = calculateConditions(['LOW_EC'], thresholds);
+
+  assert.deepEqual(r.bypassRules, { LowEcRule: ['samples'] });
+  assert.equal(r.needsCooldownReset, true, 'los días sin fertilizar son el cooldown no-fertilized');
+  assert.match(r.resumen.join(' | '), /samples/);
+});
+
+test('N-02 reads under the threshold even when the agronomist moves it', () => {
+  for (const ceBaja of [0.3, 0.5, 0.8, 1.0]) {
+    const r = calculateConditions(['LOW_EC'], { ...thresholds, ceBaja });
+
+    assert.ok(r.pinnedMetrics.ce < ceBaja, `ce ${r.pinnedMetrics.ce} < umbral ${ceBaja}`);
+    assert.ok(r.pinnedMetrics.ce > 0, 'una conductividad positiva');
+  }
+});
+
+test('the low-EC threshold comes from the catalog and falls back to the v2 value', () => {
+  assert.equal(DEFAULT_THRESHOLDS['nutricion.ce-baja'], 0.5);
+  assert.equal(buildThresholds([]).ceBaja, 0.5);
+  const fromCatalog = buildThresholds([
+    { clave: 'nutricion.ce-baja', valor: '0.8' } as unknown as Parameters<typeof buildThresholds>[0][number],
+  ]);
+  assert.equal(fromCatalog.ceBaja, 0.8);
+});
+
+test('N-01 and N-02 combine: both fire and the metrics do not collide', () => {
+  const r = calculateConditions(['NUTRITION_PLAN', 'LOW_EC'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.pinnedMetrics.ce, 0.3);
+  assert.deepEqual(r.bypassRules, { LowEcRule: ['samples'] });
+  assert.equal(r.ensureTankStock, true);
+});
+
+test('both combine with the application preconditions modifier', () => {
+  const r = calculateConditions(['NUTRITION_PLAN', 'APPLICATION_PRECONDITIONS'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.equal(r.telemetria.humSus, 55, 'P-D5');
+  assert.equal(r.clima?.probLluviaPct, 0, 'P-D4');
+});
+
+test('N-01 conflicts with a silent node and with a lock, whatever the selection order', () => {
+  for (const other of ['NODE_OFFLINE', 'LOCK']) {
+    for (const selected of [['NUTRITION_PLAN', other], [other, 'NUTRITION_PLAN']]) {
+      const r = calculateConditions(selected, thresholds);
+
+      assert.equal(r.conflictos.length, 1, `${selected.join('+')}`);
+      assert.deepEqual(r.bypassRules, {}, 'con un conflicto no se aplica nada');
+    }
+  }
+});
+
+test('N-02 conflicts with a silent node: nobody answers the pulse that carries the CE', () => {
+  assert.equal(calculateConditions(['LOW_EC', 'NODE_OFFLINE'], thresholds).conflictos.length, 1);
+});
+
+test('N-02 does not conflict with the invalid-reading scenario: they pin different metrics', () => {
+  const r = calculateConditions(['LOW_EC', 'INVALID_READING'], thresholds);
+
+  assert.equal(r.conflictos.length, 0);
+  assert.ok('ce' in r.pinnedMetrics && 'humSus' in r.pinnedMetrics);
+});
+
+test('without the nutrition scenarios no bypass is asked for', () => {
+  for (const key of ['R01', 'R02', 'SUPPLY', 'LOCK', 'APPLICATION_PRECONDITIONS']) {
+    assert.deepEqual(calculateConditions([key], thresholds).bypassRules, {}, key);
+  }
 });
