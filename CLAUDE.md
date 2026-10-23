@@ -55,8 +55,8 @@ hardware real.
 - **Plantín**: unidad de análisis. El modelo diagnostica UN plantín por imagen
   (el riel/gantry lo aísla y encuadra).
 - **Sector**: agrupación de ~100 tubetes con 1 microaspersor. El vivero tiene 600
-  sectores en 6 macro-zonas (MZ-1 … MZ-6). **Los actuadores son por sector; el
-  sensado NO.**
+  sectores en 6 macro-zonas (MZ-1 … MZ-6). **La electroválvula y la bomba son por sector; el
+  sensado y la mediasombra, NO** (son de la macro-zona).
 - **Nodo testigo**: hay UNO por macro-zona. Su lectura vale para los 100 sectores
   de esa MZ, así que las métricas se modelan y se muestran a nivel macro-zona
   (`Zona.lectura`), no de sector. Lo que diferencia a un sector de otro dentro de
@@ -85,7 +85,8 @@ hardware real.
 - **Criterio de diagnóstico**: bandas de severidad por clase y orden de criticidad; lo edita el
   agrónomo (Configuración → Criterio de diagnóstico). Los umbrales y bandas de **confianza** son del
   equipo y viven en el entorno del servicio de inferencia, no en el dashboard.
-- **Actuadores**: electroválvula (riego), bomba peristáltica (insumos), mediasombra.
+- **Actuadores**: electroválvula (riego) y bomba peristáltica (insumos), por sector; **mediasombra, una por
+  macro-zona** (se registra como el nodo testigo, con la zona; su `shade SET` va por el comando de zona).
 - **Orden de captura**: pedido de una foto cenital, con el sector y la **posición de riel**.
   Es la entidad de primera clase del pipeline de visión: la imagen se sube citando su
   identificador, y sin esa correlación el sistema no sabría de qué sector es la foto.
@@ -115,7 +116,9 @@ hardware real.
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
-  El backend todavía no lo implementa (ver `openspec/changes/add-rustificacion-por-macrozona/`).
+  Pasada la última etapa, la última se sostiene hasta que alguien elimina el plan. **No es parte del
+  motor**: lo ejecuta `HorarioMediasombraService`, que actúa sólo en los bordes de la ventana; el motor
+  puede cerrar la malla igual (pico de UV) y queda así hasta la próxima apertura.
 - **Roles** (fijos): Administrador, Ingeniero Agrónomo, Productor Viverista, Operario y
   **Servicio** (cuentas de integraciones: simulador, servicio de inferencia; no para personas).
 - **Permiso**: código del catálogo fijo en `seguridad/Permiso.java` (`reglas.ver`,
@@ -257,7 +260,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay catorce scripts para correr a mano (ninguno se aplica solo):
+> ni borra lo obsoleto, así que hay quince scripts para correr a mano (ninguno se aplica solo):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
 >   al catálogo de parámetros de reglas (y copia el umbral de riego editado).
@@ -285,6 +288,8 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 >   los usa desde el simulador) a una matriz ya sembrada.
 > - `resources/migracion-dosis-por-insumo.sql` — `insumo.dosis-ml` pasa a `insumo.dosis-fertilizante`/`insumo.dosis-fitosanitario`
 >   (copia el valor editado al fertilizante).
+> - `resources/migracion-mediasombra-por-zona.sql` — la mediasombra pasa del sector a la zona (una por zona), borra
+>   `sector.actuador_shade` y `rustificacion_etapa`. **Sin ella no se pueden crear sectores** (la columna vieja es `NOT NULL`).
 >
 > Detalle en el README del backend.
 
@@ -305,6 +310,9 @@ cd Desarrollo/backend
 - `POST /api/pulsos {ejecutarMotor}` → pulso de sensado manual de todas las zonas, sólo por API; `409` si hay
   uno en curso. En Demo Expo, la lectura con motor es la secuencia `LECTURA` con `ejecutarMotor` (sólo la zona
   de la secuencia). Ver "Pulso de sensado" en el README del backend.
+- `GET/POST /api/zonas/{zona}/rustificacion`, `POST /api/zonas/{zona}/rustificacion/cancelar` → plan de rustificación de la
+  macro-zona (leer con `vivero.ver`; iniciar/eliminar con `configuracion.editar`). Ver "Mediasombra por macro-zona y plan de
+  rustificación" en el README del backend.
 - `PUT /api/zonas/{zona}/plan-nutricion {intervalDays}` → intervalo del plan de nutrición de la macro-zona (permiso `configuracion.editar`; 3–30
   días). El plan se lee de `GET /api/nursery` → `zonas[].nutritionPlan`. Ver "Plan de nutrición" en el README del backend.
 - `GET /api/tanques`, `POST /api/tanques/{zona}/{insumo}/recarga {liters, capacityLiters?}` → tanques de insumo por macro-zona y
@@ -379,6 +387,12 @@ cd Desarrollo/backend
   `spring.config.import`): el Administrador (`YERBANALYTICS_ADMIN_*`) y una lista genérica
   `YERBANALYTICS_USUARIOS_INICIALES` (`usuario:ROL:clave,…`). Se crean si no existen y nunca se pisan.
   Sus claves de desarrollo coinciden con los `env.example` del simulador y de la inferencia.
+- **La mediasombra es de la macro-zona, y todo lo suyo también** (`mediasombra/`): el equipo se registra con la zona, la
+  posición vive en `zona.mediasombra_abierta`, el comando sale por `nursery/zone/{z}/command` y el ACK vuelve por
+  `nursery/zone/{z}/ack`. Sus reglas (`ShadeFaultRule`, `ShadingRule`) son `ZoneRule`; el plan de rustificación y el
+  horario por defecto los ejecuta `HorarioMediasombraService`, **fuera del motor** y sólo en los bordes de la ventana, así no
+  pisa lo que decida una regla. El único que publica la malla es `MediasombraService` (el estado seguro y las secuencias
+  publican por su cuenta y registran la posición).
 - **Las reglas que deciden sobre una macro-zona entera son `ZoneRule`** (`engine/zone/`), no `Rule`: el plan de nutrición (N-01, N-02) es de la zona
   y la CE que lo adelanta también (hay un nodo testigo por zona). `ZoneRuleEngine` las corre **una vez por zona**, en `updateTelemetry` después de los
   sectores y sólo con el motor encendido (pulso con motor); decide la regla y ejecuta `ZoneActionExecutor`/`NutritionPlanService`, igual que el
@@ -496,7 +510,9 @@ Invariantes a respetar al tocar esta área:
 - **El contrato MQTT queda espejado en tres lugares** (firmware, `ContratoNodo.java`,
   `simulador/server/contract.ts`). Fuente de verdad: `Desarrollo/embebido/comun/contrato.h`.
   El del riel (`nursery/rail/*`) está en ese mismo header y en `mqtt/ContratoRiel.java`. Los errores del nodo
-  (`nursery/zone/{zona}/errores`, S-05) también: `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType` y `buildNodeError` del simulador. El comando de
+  (`nursery/zone/{zona}/errores`, S-05) también: `ContratoNodo.TOPIC_ERRORS*`, `NodeErrorType` y `buildNodeError` del simulador. El
+  `shade SET` por el comando de zona y su ACK de zona (`nursery/zone/{zona}/ack`: `contratoTopicAckZona`, `ContratoNodo.TOPIC_ACK_ZONA`,
+  `zoneAckTopic` del simulador) también. El comando de
   zona "leer ahora" (`nursery/zone/{z}/command`) también está en los tres espejos. Y los ACK intermedios del nodo
   (`status: "EN_CURSO"` con `detalle.tipo` `en_cola` / `iniciado`, `cola_llena`, las claves `posicion` / `esperaMaxSec`) y
   `parametros.prioridad = "INMEDIATA"` del `shade SET` de seguridad (cola de cargas del nodo, `add-cola-actuadores-nodo`):
