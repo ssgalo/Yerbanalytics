@@ -195,9 +195,11 @@ describe('agruparPorObjetivo', () => {
     expect(grupo('PROTECTION', c)!.compartidos.map((p) => p.clave)).toContain(
       'seguridad.antiguedad-max-lectura',
     );
-    // El diagnóstico de IA lo leen la dosificación y las reglas F-*: gana Riego (F-S1), que va antes.
+    // El diagnóstico de IA lo leen sobre todo las reglas de Sanidad (F-F1, F-P1, F-S3 y, la confianza, también F-04),
+    // más que las de Nutrición (F-C1, F-C2, la dosificación) o Riego (F-S1): vive en Sanidad aunque F-S1 vaya antes.
     for (const clave of ['diagnostico.confianza-minima', 'diagnostico.vigencia-horas']) {
-      expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).toContain(clave);
+      expect(grupo('SANITY', c)!.compartidos.map((p) => p.clave)).toContain(clave);
+      expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).not.toContain(clave);
       expect(grupo('NUTRITION', c)!.compartidos.map((p) => p.clave)).not.toContain(clave);
     }
 
