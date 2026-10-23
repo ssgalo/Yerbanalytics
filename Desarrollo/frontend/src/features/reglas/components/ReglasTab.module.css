@@ -113,7 +113,6 @@
   align-items: center;
   gap: 8px;
 }
-.auditoria,
 .usadoPor {
   font-size: var(--t-12);
   color: var(--muted);
@@ -195,4 +194,47 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* Compartidos: bloque con su propio color, distinto de los grupos y de los estados */
+.compartidos {
+  background: var(--shared-soft);
+  border: 1px solid var(--shared-line);
+}
+.chipCompartido {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--shared-line);
+  background: var(--shared-soft);
+  color: var(--shared-ink);
+  font-size: var(--t-12);
+  font-weight: 600;
+}
+.usadoPor {
+  display: flex;
+}
+.listaReglas {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.listaReglas li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-13);
+  color: var(--ink);
+}
+
+.prioridad {
+  margin-left: 8px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-stretch: var(--w-cond);
+  color: var(--muted);
 }

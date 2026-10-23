@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { Callout } from '@/components/ui/Callout';
 import { Input } from '@/components/ui/Field';
 import { SaveBar } from '@/components/ui/EstadosPantalla';
-import { FilterChip, FilterChips } from '@/components/ui/Seleccion';
+import { FilterChip, FilterChips, Segmented } from '@/components/ui/Seleccion';
 import { Toast } from '@/components/ui/Toast';
 import { EstadoReglaError } from '@/data/estadoReglaError';
 import { ParametrosInvalidosError } from '@/data/parametrosError';
@@ -34,6 +34,7 @@ import {
   indicePorClave,
   nombreConsumidor,
   SIN_FILTROS,
+  type OrdenPiezas,
   type Filtros,
 } from './catalogoView';
 import { Compartidos } from './components/Compartidos';
@@ -61,6 +62,15 @@ interface ReglasTabProps {
 
 type Aviso = { tono: 'ok' | 'crit'; texto: string } | null;
 
+const CLAVE_ORDEN = 'reglas.orden';
+const leerOrden = (): OrdenPiezas => {
+  try {
+    return localStorage.getItem(CLAVE_ORDEN) === 'prioridad' ? 'prioridad' : 'codigo';
+  } catch {
+    return 'codigo';
+  }
+};
+
 export function ReglasTab({
   catalogo,
   saving,
@@ -72,6 +82,15 @@ export function ReglasTab({
   soloLectura = false,
 }: ReglasTabProps) {
   const [filtros, setFiltros] = useState<Filtros>(SIN_FILTROS);
+  const [orden, setOrden] = useState<OrdenPiezas>(leerOrden);
+  const elegirOrden = (o: OrdenPiezas) => {
+    setOrden(o);
+    try {
+      localStorage.setItem(CLAVE_ORDEN, o);
+    } catch {
+      /* sin almacenamiento, sólo no se recuerda */
+    }
+  };
   const [erroresServidor, setErroresServidor] = useState<Map<string, string>>(new Map());
   const [erroresGenerales, setErroresGenerales] = useState<string[]>([]);
   /** Diálogo de apagado abierto: la pieza y su interruptor. */
@@ -93,6 +112,13 @@ export function ReglasTab({
     }),
     [catalogo],
   );
+  const codigos = useMemo(
+    () =>
+      Object.fromEntries(
+        catalogo.reglas.flatMap((r) => (r.codigo ? [[r.id, r.codigo] as const] : [])),
+      ),
+    [catalogo],
+  );
   const erroresCliente = useMemo(
     () => erroresDelBorrador(catalogo, borrador),
     [catalogo, borrador],
@@ -100,8 +126,8 @@ export function ReglasTab({
   const cambios = useMemo(() => cambiosDelBorrador(catalogo, borrador), [catalogo, borrador]);
   const editadas = useMemo(() => new Set(cambios.map((c) => c.clave)), [cambios]);
   const grupos = useMemo(
-    () => agruparPorObjetivo(catalogo, filtros, editadas),
-    [catalogo, filtros, editadas],
+    () => agruparPorObjetivo(catalogo, filtros, editadas, orden),
+    [catalogo, filtros, editadas, orden],
   );
 
   const totalApagadas = catalogo.reglas.filter((r) => !r.activa).length;
@@ -249,6 +275,15 @@ export function ReglasTab({
             Con cambios
           </FilterChip>
         </FilterChips>
+        <Segmented<OrdenPiezas>
+          label="Orden de las reglas"
+          options={[
+            { value: 'codigo', label: 'Por código' },
+            { value: 'prioridad', label: 'Por prioridad del motor' },
+          ]}
+          value={orden}
+          onChange={elegirOrden}
+        />
       </div>
 
       {soloLectura && (
@@ -284,12 +319,18 @@ export function ReglasTab({
               <span className={styles.grupoDesc}>{g.descripcion}</span>
             </div>
             {g.compartidos.length > 0 && (
-              <Compartidos parametros={g.compartidos} nombres={nombres} {...comunes} />
+              <Compartidos
+                parametros={g.compartidos}
+                nombres={nombres}
+                codigos={codigos}
+                {...comunes}
+              />
             )}
             {g.reglas.map((r) => (
               <ReglaCard
                 key={r.id}
                 regla={r}
+                mostrarPrioridad={orden === 'prioridad'}
                 indice={indice}
                 destacada={r.id === reglaInicial}
                 onCambiarEstado={onCambiarEstado_}

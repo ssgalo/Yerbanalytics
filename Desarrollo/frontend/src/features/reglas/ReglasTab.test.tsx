@@ -8,7 +8,10 @@ import { ReglasTab } from './ReglasTab';
 import type { Borrador } from './borrador';
 import { catalogoDeFabrica } from './__fixtures__/catalogos';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 function montar(extra: Partial<Parameters<typeof ReglasTab>[0]> = {}) {
   const catalogo = catalogoDeFabrica();
@@ -61,7 +64,47 @@ describe('ReglasTab · parámetros en lote', () => {
     expect(document.querySelectorAll('input[id="param-riego.umbral-humedad"]')).toHaveLength(1);
     const bloque = screen.getAllByRole('region', { name: 'Compartidos del grupo' })[0];
     expect(bloque.contains(campo('riego.umbral-humedad'))).toBe(true);
-    expect(within(bloque).getByText(/Compartido con 5 reglas/)).toBeTruthy();
+    expect(within(bloque).queryByText(/Compartido con 5 reglas/)).toBeNull();
+  });
+
+  it('"Lo usan N reglas" abre una lista con código y nombre, y Escape la cierra devolviendo el foco', () => {
+    montar();
+    const bloque = screen.getAllByRole('region', { name: 'Compartidos del grupo' })[0];
+    const boton = within(bloque).getAllByRole('button', { name: /Lo usan 5 reglas/ })[0];
+
+    fireEvent.click(boton);
+    const lista = screen.getByRole('dialog', { name: /Reglas que lo usan/ });
+    expect(within(lista).getAllByRole('listitem')).toHaveLength(5);
+    expect(within(lista).getAllByText(/^R-\d+/).length).toBeGreaterThan(0);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /Reglas que lo usan/ })).toBeNull();
+    expect(document.activeElement).toBe(boton);
+  });
+
+  it('el Segmented cambia el orden de las piezas y muestra la prioridad sólo por prioridad', () => {
+    localStorage.clear();
+    montar();
+    const orden = () =>
+      within(screen.getAllByRole('region', { name: /Riego/ })[0])
+        .getAllByRole('heading', { level: 3 })
+        .map((h) => h.textContent ?? '')
+        .filter((t) => /· R-\d+/.test(t))
+        .map((t) => t.match(/R-\d+/)![0]);
+    const porCodigo = orden();
+    expect(porCodigo).toEqual(
+      [...porCodigo].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
+    );
+    expect(screen.queryAllByLabelText(/^Prioridad del motor/)).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Por prioridad del motor' }));
+    expect(screen.getAllByLabelText(/^Prioridad del motor/).length).toBeGreaterThan(0);
+    expect(localStorage.getItem('reglas.orden')).toBe('prioridad');
+  });
+
+  it('no muestra quién modificó un parámetro', () => {
+    montar();
+    expect(screen.queryByText(/Modificado por/)).toBeNull();
   });
 
   it('un valor inválido bloquea el guardado y se puede descartar', () => {

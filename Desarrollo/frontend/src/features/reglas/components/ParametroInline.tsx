@@ -4,7 +4,7 @@ import { Chip } from '@/components/ui/Chip';
 import { formatearValor } from '@/lib/parametrosValidation';
 import { unidadSegunValor } from '@/lib/plural';
 import type { ParametroRegla } from '@/types/domain';
-import { fechaCorta, idParametro } from './anclas';
+import { idParametro } from './anclas';
 import styles from './ReglasTab.module.css';
 
 interface ParametroInlineProps {
@@ -118,12 +118,6 @@ export function ParametroInline({
       >
         {control}
       </Field>
-      {p.modificado && p.updatedBy && !editado && (
-        <div className={styles.auditoria}>
-          Modificado por {p.updatedBy}
-          {p.updatedTs ? ` · ${fechaCorta(p.updatedTs)}` : ''}
-        </div>
-      )}
       {pie}
       {(p.modificado || editado) && !soloLectura && (
         <button type="button" className={styles.link} disabled={disabled} onClick={onRestablecer}>

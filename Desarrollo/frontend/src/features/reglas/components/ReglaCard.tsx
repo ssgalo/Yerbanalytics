@@ -30,6 +30,8 @@ interface ReglaCardProps {
   soloLectura?: boolean;
   /** Llegó por `?regla=`: se resalta. */
   destacada?: boolean;
+  /** Orden por prioridad del motor: la muestra, discreta, para que el orden se entienda. */
+  mostrarPrioridad?: boolean;
   onCambiarEstado: (regla: ReglaCatalogo, activa: boolean, anchor: HTMLElement) => void;
   onEditar: (p: ParametroRegla, texto: string) => void;
   onRestablecer: (p: ParametroRegla) => void;
@@ -44,6 +46,7 @@ export function ReglaCard({
   disabled,
   soloLectura,
   destacada,
+  mostrarPrioridad,
   onCambiarEstado,
   onEditar,
   onRestablecer,
@@ -62,6 +65,14 @@ export function ReglaCard({
             <h3 id={`${titulo}-nombre`} className={styles.nombre}>
               {regla.label}
               {regla.codigo && <span className={styles.codigo}> · {regla.codigo}</span>}
+              {mostrarPrioridad && (
+                <span
+                  className={styles.prioridad}
+                  aria-label={`Prioridad del motor ${regla.prioridad}`}
+                >
+                  {regla.prioridad}
+                </span>
+              )}
             </h3>
             <span className={styles.chips}>
               <Chip tone={efecto.tono}>{efecto.texto}</Chip>
@@ -114,7 +125,9 @@ export function ReglaCard({
                 <div key={p.clave} className={styles.compartido} data-clave={p.clave}>
                   <span className={styles.compartidoNombre}>{p.etiqueta}</span>
                   <b>{formatearValor(p, valorMostrado(p, borrador))}</b>
-                  <Chip tone="line">Compartido con {p.usadoPor.length} reglas</Chip>
+                  <span className={styles.chipCompartido}>
+                    Compartido con {p.usadoPor.length} reglas
+                  </span>
                   <button
                     type="button"
                     className={styles.link}

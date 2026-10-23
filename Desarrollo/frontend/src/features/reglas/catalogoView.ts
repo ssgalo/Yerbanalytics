@@ -157,6 +157,30 @@ function objetivoDeCompartido(
   return ORDEN_OBJETIVOS.find((o) => objetivos.includes(o)) ?? null;
 }
 
+export type OrdenPiezas = 'codigo' | 'prioridad';
+
+/** Primer código de una pieza ("S-01, S-04" → "S-01"); "" si no tiene. */
+const primerCodigo = (r: ReglaCatalogo): string => r.codigo.split(',')[0].trim();
+
+/** Por código en orden natural (R-02 antes que R-10), sin código al final por label; o por prioridad del motor. */
+export function comparadorPiezas(
+  orden: OrdenPiezas,
+): (a: ReglaCatalogo, b: ReglaCatalogo) => number {
+  const porPrioridad = (a: ReglaCatalogo, b: ReglaCatalogo) =>
+    a.prioridad - b.prioridad || a.id.localeCompare(b.id);
+  if (orden === 'prioridad') return porPrioridad;
+  return (a, b) => {
+    const ca = primerCodigo(a);
+    const cb = primerCodigo(b);
+    if (ca && cb) {
+      return ca.localeCompare(cb, 'es', { numeric: true }) || porPrioridad(a, b);
+    }
+    if (ca) return -1;
+    if (cb) return 1;
+    return a.label.localeCompare(b.label, 'es') || porPrioridad(a, b);
+  };
+}
+
 /**
  * Las piezas del catálogo en sus grupos, con sus consumidores sin interruptor y los parámetros compartidos del grupo.
  * Un grupo sin nada que mostrar (tras los filtros o de fábrica) no sale. `editadas` son las claves con cambios sin guardar.
@@ -165,6 +189,7 @@ export function agruparPorObjetivo(
   catalogo: CatalogoReglas,
   filtros: Filtros = SIN_FILTROS,
   editadas: ReadonlySet<string> = new Set(),
+  orden: OrdenPiezas = 'codigo',
 ): GrupoObjetivo[] {
   const indice = indicePorClave(catalogo);
   const piezas = new Map(catalogo.reglas.map((r) => [r.id, r]));
@@ -214,9 +239,7 @@ export function agruparPorObjetivo(
       objetivo,
       titulo: NOMBRE_OBJETIVO[objetivo],
       descripcion: DESCRIPCION_OBJETIVO[objetivo],
-      reglas: delGrupo
-        .filter(pasaRegla)
-        .sort((a, b) => a.prioridad - b.prioridad || a.id.localeCompare(b.id)),
+      reglas: delGrupo.filter(pasaRegla).sort(comparadorPiezas(orden)),
       consumidores: [...consumidores]
         .map(([id, parametros]) => ({
           id,

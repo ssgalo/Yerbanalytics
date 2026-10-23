@@ -18,6 +18,34 @@ const grupo = (
   editadas = new Set<string>(),
 ) => agruparPorObjetivo(c, f, editadas).find((g) => g.objetivo === objetivo);
 
+describe('agruparPorObjetivo · orden de las piezas', () => {
+  it('ordena por código natural (primer código si es compuesto) y deja sin código al final por label', () => {
+    const c = catalogoDeFabrica();
+    const base = c.reglas[0];
+    const mk = (id: string, codigo: string, label: string, prioridad: number): ReglaCatalogo => ({
+      ...base,
+      id,
+      codigo,
+      label,
+      prioridad,
+      objetivo: 'IRRIGATION',
+    });
+    const reglas = [
+      mk('a', '', 'Zeta', 1),
+      mk('b', 'R-10', 'B', 2),
+      mk('c', 'R-02', 'C', 3),
+      mk('d', 'R-01, R-04', 'D', 4),
+      mk('e', '', 'Álamo', 5),
+    ];
+    const g = agruparPorObjetivo({ ...c, reglas }).find((x) => x.objetivo === 'IRRIGATION');
+    expect(g?.reglas.map((r) => r.id)).toEqual(['d', 'c', 'b', 'e', 'a']);
+    const p = agruparPorObjetivo({ ...c, reglas }, SIN_FILTROS, new Set(), 'prioridad').find(
+      (x) => x.objetivo === 'IRRIGATION',
+    );
+    expect(p?.reglas.map((r) => r.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+});
+
 describe('agruparPorObjetivo', () => {
   it('agrupa en el orden fijado y no dibuja un grupo sin piezas (Sanidad)', () => {
     const grupos = agruparPorObjetivo(catalogoDeFabrica());
@@ -63,7 +91,9 @@ describe('agruparPorObjetivo', () => {
   });
 
   it('dentro de cada grupo, por prioridad; R-04 (protege) está en Riego y no en Protecciones', () => {
-    const riego = grupo('IRRIGATION')!;
+    const riego = agruparPorObjetivo(catalogoDeFabrica(), SIN_FILTROS, new Set(), 'prioridad').find(
+      (g) => g.objetivo === 'IRRIGATION',
+    )!;
 
     expect(riego.reglas.map((r) => r.id)).toEqual([
       'SustratoSaturadoRule',
