@@ -32,7 +32,7 @@ describe('flota de hardware (HU-18 / HU-21)', () => {
 
   it('cuenta los KPIs de la flota', () => {
     const hw = buildHardware(buildFleet(FIXED_NOW), FIXED_NOW);
-    expect(hw.total).toBe(18);
+    expect(hw.total).toBe(19); // 6 nodos + 5 mediasombras (una por zona, MZ-6 sin) + 8 actuadores de sector
     expect(hw.bateriaBaja).toBe(1);
     expect(hw.averiados).toBe(1);
     expect(hw.fueraDeServicio).toBeGreaterThanOrEqual(2); // nodo caído + averiado
@@ -42,10 +42,23 @@ describe('flota de hardware (HU-18 / HU-21)', () => {
     const hw = buildHardware(buildFleet(FIXED_NOW), FIXED_NOW);
     const ids = hw.incompletos.map((s) => s.sectorId);
     expect(ids).toContain('MZ-1-003'); // falta la bomba
-    expect(ids).toContain('MZ-3-010'); // faltan bomba y mediasombra
+    expect(ids).toContain('MZ-3-010'); // falta la bomba
     expect(ids).not.toContain('MZ-1-001'); // completo
     const mz3 = hw.incompletos.find((s) => s.sectorId === 'MZ-3-010')!;
-    expect(mz3.faltantes.length).toBe(2);
+    // La mediasombra es de la macro-zona: no se exige al sector.
+    expect(mz3.faltantes).toEqual(['Bomba peristáltica']);
+  });
+
+  it('la mediasombra se registra por macro-zona, como el nodo testigo, y a lo sumo una por zona', () => {
+    const fleet = buildFleet(FIXED_NOW);
+    expect(fleet.filter((d) => d.tipo === 'mediasombra').every((d) => d.zonaId && !d.sectorId)).toBe(true);
+    expect(altaError(fleet, { serial: 'MS-X', tipo: 'mediasombra', zonaId: 'MZ-1', sectorId: null })).toBe(
+      'La macro-zona «MZ-1» ya tiene una mediasombra.',
+    );
+    expect(altaError(fleet, { serial: 'MS-6', tipo: 'mediasombra', zonaId: 'MZ-6', sectorId: null })).toBeNull();
+    expect(altaError(fleet, { serial: 'MS-Y', tipo: 'mediasombra', zonaId: null, sectorId: 'MZ-6-001' })).toBe(
+      'La mediasombra debe asociarse a una macro-zona.',
+    );
   });
 });
 

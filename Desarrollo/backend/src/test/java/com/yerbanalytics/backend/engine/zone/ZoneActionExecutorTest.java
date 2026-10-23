@@ -10,6 +10,7 @@ import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
 import com.yerbanalytics.backend.nutrition.NutritionPlanService;
+import com.yerbanalytics.backend.mediasombra.MediasombraService;
 import com.yerbanalytics.backend.service.HistorialService;
 import com.yerbanalytics.backend.supply.ApplicationOutcome;
 import com.yerbanalytics.backend.supply.ApplicationService;
@@ -52,7 +53,7 @@ class ZoneActionExecutorTest {
         history = mock(HistorialService.class);
         applications = mock(ApplicationService.class);
         when(applications.request(any(), any(), anyString(), anyBoolean())).thenReturn(ApplicationOutcome.applied());
-        executor = new ZoneActionExecutor(plan, history, applications);
+        executor = new ZoneActionExecutor(plan, history, applications, mock(MediasombraService.class));
         ZonaEntity zone = new ZonaEntity();
         zone.setId("MZ-2");
         zone.setName("Macro-zona 2");

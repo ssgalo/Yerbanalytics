@@ -9,7 +9,6 @@ import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
-import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,14 +44,12 @@ class ConfiguracionServiceIntervaloTest {
     void setUp() {
         UmbralMetricaRepository umbrales = mock(UmbralMetricaRepository.class);
         operativaRepo = mock(ConfiguracionOperativaRepository.class);
-        RustificacionEtapaRepository rustificacionRepo = mock(RustificacionEtapaRepository.class);
         catalogo = mock(CatalogoParametrosService.class);
         when(umbrales.findAll()).thenReturn(List.of());
         when(operativaRepo.findById(1)).thenReturn(Optional.empty());
-        when(rustificacionRepo.findAllByOrderByOrdenAsc()).thenReturn(List.of());
         when(operativaRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
-        service = new ConfiguracionService(umbrales, operativaRepo, rustificacionRepo,
+        service = new ConfiguracionService(umbrales, operativaRepo,
                 mock(HistorialService.class), catalogo);
     }
 
@@ -65,8 +62,7 @@ class ConfiguracionServiceIntervaloTest {
                 sp.label(), sp.unit(), sp.dec(), sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1],
                 sp.crit()[0], sp.crit()[1], false)).toList();
         return new Configuracion(umbrales,
-                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, "x", 1L, pasadaActiva, pasadaHora, null),
-                List.of());
+                new ConfiguracionOperativa(15, 2, 5.0, intervaloSensadoMinutos, "x", 1L, pasadaActiva, pasadaHora, null));
     }
 
     private ConfiguracionOperativaEntity savedEntity() {

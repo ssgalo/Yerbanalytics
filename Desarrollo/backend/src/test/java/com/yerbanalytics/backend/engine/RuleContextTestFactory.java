@@ -54,6 +54,8 @@ public final class RuleContextTestFactory {
                 240,    // intervaloSensadoMinutos
                 null,   // pasadaDiariaActiva (null se lee como false)
                 null,   // pasadaDiariaHora (null se lee como "11:00")
+                null,   // mediasombraAbiertaDesde (null se lee como "08:00")
+                null,   // mediasombraAbiertaHasta (null se lee como "17:00")
                 "test",
                 System.currentTimeMillis()
         );
@@ -73,7 +75,6 @@ public final class RuleContextTestFactory {
         s.setDiagnosisSev("—");
         s.setActuadorValve("Cerrada");
         s.setActuadorPump("En espera");
-        s.setActuadorShade(50);
         return s;
     }
 

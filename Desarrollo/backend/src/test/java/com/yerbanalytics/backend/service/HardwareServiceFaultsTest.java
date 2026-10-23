@@ -74,19 +74,6 @@ class HardwareServiceFaultsTest {
     }
 
     @Test
-    @DisplayName("la falla de la mediasombra de un sector es de la macro-zona: la ven todos sus sectores")
-    void fallaDeLaMallaEsDeLaZona() {
-        actuador(HardwareService.MEDIASOMBRA, "MZ-1-002", "MEDIASOMBRA_FIN_DE_CARRERA");
-
-        Map<String, HardwareFaults> faults = service.faultsOf(SECTORES);
-
-        assertThat(faults.values()).allSatisfy(f -> {
-            assertThat(f.shade()).isEqualTo("MEDIASOMBRA_FIN_DE_CARRERA");
-            assertThat(f.hydraulic()).isNull();
-        });
-    }
-
-    @Test
     @DisplayName("una falla en blanco no cuenta, y la bomba averiada no saca al sector del riego")
     void enBlancoYBomba() {
         actuador(HardwareService.ELECTROVALVULA, "MZ-1-001", "  ");

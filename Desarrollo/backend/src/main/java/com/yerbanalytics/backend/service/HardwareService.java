@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.HardwareData;
 import com.yerbanalytics.backend.dto.SectorIncompleto;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.engine.HardwareFaults;
+import com.yerbanalytics.backend.engine.MallaZona;
 import com.yerbanalytics.backend.model.DispositivoEntity;
 import com.yerbanalytics.backend.model.SectorEntity;
 import com.yerbanalytics.backend.model.ZonaEntity;
@@ -45,8 +46,14 @@ public class HardwareService {
     public static final String BOMBA = "bomba_peristaltica";
     public static final String MEDIASOMBRA = "mediasombra";
 
-    /** Actuadores que un sector debe tener para considerarse completo (HU-18 CA-04). */
-    private static final List<String> ACTUADORES_REQUERIDOS = List.of(ELECTROVALVULA, BOMBA, MEDIASOMBRA);
+    /**
+     * Actuadores que un sector debe tener para considerarse completo (HU-18 CA-04). La mediasombra no: es de la
+     * macro-zona, como el nodo testigo.
+     */
+    private static final List<String> ACTUADORES_REQUERIDOS = List.of(ELECTROVALVULA, BOMBA);
+
+    /** Equipos de la macro-zona (con {@code zonaId}, sin sector; a lo sumo uno de cada tipo por zona). */
+    public static final Set<String> TIPOS_DE_ZONA = Set.of(NODO_TESTIGO, MEDIASOMBRA);
 
     private static final Map<String, String> TIPO_LABEL = Map.of(
             NODO_TESTIGO, "Nodo sensor testigo",
@@ -132,27 +139,23 @@ public class HardwareService {
         }
         boolean zoneNode = !dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO).isEmpty();
         Map<String, Set<String>> typesBySector = new HashMap<>();
-        boolean zoneShade = false;
         for (DispositivoEntity d : dispositivoRepository.findBySectorIdInAndTipoIn(
-                sectorIds, List.of(ELECTROVALVULA, BOMBA, MEDIASOMBRA))) {
+                sectorIds, List.of(ELECTROVALVULA, BOMBA))) {
             typesBySector.computeIfAbsent(d.getSectorId(), k -> new HashSet<>()).add(d.getTipo());
-            zoneShade |= MEDIASOMBRA.equals(d.getTipo());
         }
         Map<String, HardwareCoverage> out = new LinkedHashMap<>();
         for (String sectorId : sectorIds) {
             Set<String> types = typesBySector.getOrDefault(sectorId, Set.of());
-            out.put(sectorId, new HardwareCoverage(types.contains(ELECTROVALVULA), types.contains(BOMBA),
-                    zoneNode, zoneShade));
+            out.put(sectorId, new HardwareCoverage(types.contains(ELECTROVALVULA), types.contains(BOMBA), zoneNode));
         }
         return out;
     }
 
     /**
-     * Qué actuadores de cada sector de la macro-zona están marcados como averiados (S-05), en UNA consulta. La falla de la
-     * electroválvula es del sector; la de la mediasombra, aunque viva en el dispositivo de un sector, es de la
-     * macro-zona y la ven todos. La bomba averiada no se mira: no hay forma de que el nodo la marque y el hardware
-     * admite una sola por sector. Cada sector de {@code sectorIds} figura en el resultado. Lo arma el motor una vez por
-     * zona y evaluación; las reglas sólo lo leen.
+     * Qué actuadores de cada sector de la macro-zona están marcados como averiados (S-05), en UNA consulta: hoy, la
+     * electroválvula. La bomba averiada no se mira: no hay forma de que el nodo la marque y el hardware admite una sola
+     * por sector. La mediasombra es de la zona: ver {@link #mallaDe}. Cada sector de {@code sectorIds} figura en el
+     * resultado. Lo arma el motor una vez por zona y evaluación; las reglas sólo lo leen.
      */
     @Transactional(readOnly = true)
     public Map<String, HardwareFaults> faultsOf(Collection<String> sectorIds) {
@@ -160,24 +163,25 @@ public class HardwareService {
             return Map.of();
         }
         Map<String, String> hydraulicBySector = new HashMap<>();
-        String shade = null;
-        for (DispositivoEntity d : dispositivoRepository.findBySectorIdInAndTipoIn(
-                sectorIds, List.of(ELECTROVALVULA, MEDIASOMBRA))) {
+        for (DispositivoEntity d : dispositivoRepository.findBySectorIdInAndTipoIn(sectorIds, List.of(ELECTROVALVULA))) {
             String falla = blankToNull(d.getFalla());
-            if (falla == null) {
-                continue;
-            }
-            if (MEDIASOMBRA.equals(d.getTipo())) {
-                shade = shade != null ? shade : falla;
-            } else if (ELECTROVALVULA.equals(d.getTipo())) {
+            if (falla != null && ELECTROVALVULA.equals(d.getTipo())) {
                 hydraulicBySector.put(d.getSectorId(), falla);
             }
         }
         Map<String, HardwareFaults> out = new LinkedHashMap<>();
         for (String sectorId : sectorIds) {
-            out.put(sectorId, new HardwareFaults(hydraulicBySector.get(sectorId), shade));
+            out.put(sectorId, new HardwareFaults(hydraulicBySector.get(sectorId)));
         }
         return out;
+    }
+
+    /** La mediasombra de la macro-zona: si está registrada (S-04) y si está averiada (S-05). */
+    @Transactional(readOnly = true)
+    public MallaZona mallaDe(String zonaId) {
+        List<DispositivoEntity> mallas = dispositivoRepository.findByZonaIdAndTipo(zonaId, MEDIASOMBRA);
+        String falla = mallas.stream().map(d -> blankToNull(d.getFalla())).filter(f -> f != null).findFirst().orElse(null);
+        return new MallaZona(!mallas.isEmpty(), falla);
     }
 
     private Dispositivo toDto(DispositivoEntity e, Map<String, Integer> pulsosSinRespuesta) {
@@ -276,18 +280,22 @@ public class HardwareService {
 
         String zonaId = null;
         String sectorId = null;
-        if (NODO_TESTIGO.equals(tipo)) {
+        if (TIPOS_DE_ZONA.contains(tipo)) {
+            boolean esNodo = NODO_TESTIGO.equals(tipo);
             zonaId = trim(dto.zonaId());
             if (zonaId == null) {
-                throw new InvalidHardwareException("El nodo testigo debe asociarse a una macro-zona.");
+                throw new InvalidHardwareException((esNodo ? "El nodo testigo" : "La mediasombra")
+                        + " debe asociarse a una macro-zona.");
             }
             if (zonaRepository.findById(zonaId).isEmpty()) {
                 throw new InvalidHardwareException("La macro-zona «" + zonaId + "» no existe.");
             }
-            if (!dispositivoRepository.findByZonaIdAndTipo(zonaId, NODO_TESTIGO).isEmpty()) {
-                throw new HardwareConflictException("La macro-zona «" + zonaId + "» ya tiene un nodo testigo.");
+            if (!dispositivoRepository.findByZonaIdAndTipo(zonaId, tipo).isEmpty()) {
+                throw new HardwareConflictException("La macro-zona «" + zonaId + "» ya tiene "
+                        + (esNodo ? "un nodo testigo." : "una mediasombra."));
             }
-            sectorId = witnessSectorOf(zonaId, dto.sectorId());
+            // Sólo el nodo testigo lleva sector (opcional); la mediasombra es de la macro-zona y no tiene.
+            sectorId = esNodo ? witnessSectorOf(zonaId, dto.sectorId()) : null;
         } else {
             sectorId = trim(dto.sectorId());
             if (sectorId == null) {

@@ -73,7 +73,7 @@ describe('validación de configuración (HU-15 CA-03..06)', () => {
   it('el horario por defecto de la mediasombra es válido y exige cierre posterior a la apertura', () => {
     const cfg = buildConfig();
     expect(cfg.operativa.mediasombraAbiertaDesde).toBe('08:00');
-    expect(cfg.operativa.mediasombraAbiertaHasta).toBe('18:00');
+    expect(cfg.operativa.mediasombraAbiertaHasta).toBe('17:00');
     cfg.operativa = { ...cfg.operativa, mediasombraAbiertaDesde: '18:00', mediasombraAbiertaHasta: '08:00' };
     expect(operativaErrors(cfg.operativa)).toEqual([
       'Horario de la mediasombra: la hora de cierre debe ser posterior a la de apertura.',

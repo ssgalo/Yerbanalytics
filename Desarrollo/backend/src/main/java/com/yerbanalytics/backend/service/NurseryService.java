@@ -222,7 +222,7 @@ public class NurseryService {
                             se.getDiagnosisConfidence()
                     );
                     reason = "Fuera de servicio";
-                    actuators = new Actuadores("Cerrada", "En espera", se.getActuadorShade());
+                    actuators = new Actuadores("Cerrada", "En espera");
                 } else {
                     finalStatus = se.getStatus();
                     // El color sale del estado, no de la columna: así una fila guardada con la paleta
@@ -240,8 +240,7 @@ public class NurseryService {
                             // Derivado por tiempo del despacho (Regando / En cola / Cerrada): la columna
                             // sector.actuador_valve es legado y nadie la escribe ni la lee para decidir.
                             despacho.estadoValvula(se.getId()),
-                            supplyDose != null ? supplyDose.estadoBomba(se.getId(), se.getActuadorPump()) : se.getActuadorPump(),
-                            se.getActuadorShade()
+                            supplyDose != null ? supplyDose.estadoBomba(se.getId(), se.getActuadorPump()) : se.getActuadorPump()
                     );
                     reason = se.getReason();
                 }
@@ -293,7 +292,8 @@ public class NurseryService {
                             ze.getNodoSignal(),
                             ze.getNodoBattery() != null && ze.getNodoBattery() < bateriaMinPct
                     ),
-                    nutritionPlan != null ? nutritionPlan.status(ze) : null
+                    nutritionPlan != null ? nutritionPlan.status(ze) : null,
+                    ze.getMediasombraAbierta() == null ? null : (ze.getMediasombraAbierta() ? "abierta" : "cerrada")
             ));
         }
 
@@ -744,9 +744,10 @@ public class NurseryService {
         }
         sectorRepository.saveAll(sectors);
 
-        // Las reglas de la macro-zona (plan de nutrición) corren UNA vez, con los sectores ya evaluados y la misma lectura.
+        // Las reglas de la macro-zona (plan de nutrición, mediasombra) corren UNA vez, con los sectores ya evaluados y la misma lectura.
         if (ejecutaMotor && zoneRules != null) {
-            zoneRules.evaluate(zona, sectors, ahora, hardwarePorSector, fallasPorSector);
+            zoneRules.evaluate(zona, sectors, ahora, hardwarePorSector, fallasPorSector, forecast,
+                    hardwareService.mallaDe(zoneId));
         }
 
         // Heartbeat del nodo testigo de la zona: batería/señal/último update (HU-21 CA-01).

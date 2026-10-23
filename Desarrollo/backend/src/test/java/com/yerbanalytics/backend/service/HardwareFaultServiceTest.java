@@ -63,8 +63,7 @@ class HardwareFaultServiceTest {
     private HardwareFaultService service;
     private ZonaEntity zona;
     private DispositivoEntity valvula;
-    private DispositivoEntity mallaS1;
-    private DispositivoEntity mallaS2;
+    private DispositivoEntity malla;
 
     @BeforeEach
     void setUp() {
@@ -83,11 +82,11 @@ class HardwareFaultServiceTest {
         when(sectores.findByZonaId("MZ-1")).thenReturn(List.of(sector("MZ-1-011"), sector("MZ-1-012")));
 
         valvula = dispositivo("DEV-101", HardwareService.ELECTROVALVULA, "MZ-1-012");
-        mallaS1 = dispositivo("DEV-103", HardwareService.MEDIASOMBRA, "MZ-1-011");
-        mallaS2 = dispositivo("DEV-203", HardwareService.MEDIASOMBRA, "MZ-1-012");
+        // La mediasombra es de la macro-zona: se registra con la zona, como el nodo testigo.
+        malla = dispositivo("DEV-011", HardwareService.MEDIASOMBRA, null);
+        malla.setZonaId("MZ-1");
         when(dispositivos.findBySectorIdAndTipo("MZ-1-012", HardwareService.ELECTROVALVULA)).thenReturn(List.of(valvula));
-        when(dispositivos.findBySectorIdInAndTipoIn(anyCollection(), eq(List.of(HardwareService.MEDIASOMBRA))))
-                .thenReturn(List.of(mallaS1, mallaS2));
+        when(dispositivos.findByZonaIdAndTipo("MZ-1", HardwareService.MEDIASOMBRA)).thenReturn(List.of(malla));
 
         service = new HardwareFaultService(dispositivos, sectores, zonas, historial, catalogo, overrides,
                 Clock.fixed(AHORA, ZoneOffset.UTC));
@@ -238,16 +237,14 @@ class HardwareFaultServiceTest {
     class Mediasombra {
 
         @Test
-        @DisplayName("marca la mediasombra de TODOS los sectores de la macro-zona: la malla es de la zona")
+        @DisplayName("marca la mediasombra de la macro-zona: la malla es de la zona")
         void marcaLaMallaDeLaZona() {
             Outcome outcome = service.report(shade("CERRADA"));
 
             assertThat(outcome).isEqualTo(Outcome.REGISTERED);
-            assertThat(List.of(mallaS1, mallaS2)).allSatisfy(d -> {
-                assertThat(d.getFalla()).isEqualTo("MEDIASOMBRA_FIN_DE_CARRERA");
-                assertThat(d.getFallaDesde()).isEqualTo(AHORA.toEpochMilli());
-            });
-            verify(dispositivos).saveAll(List.of(mallaS1, mallaS2));
+            assertThat(malla.getFalla()).isEqualTo("MEDIASOMBRA_FIN_DE_CARRERA");
+            assertThat(malla.getFallaDesde()).isEqualTo(AHORA.toEpochMilli());
+            verify(dispositivos).saveAll(List.of(malla));
         }
 
         @Test
@@ -291,8 +288,7 @@ class HardwareFaultServiceTest {
         @Test
         @DisplayName("una zona sin mediasombra registrada: no hay qué marcar, pero la alerta sale")
         void sinMediasombraRegistrada() {
-            when(dispositivos.findBySectorIdInAndTipoIn(anyCollection(), eq(List.of(HardwareService.MEDIASOMBRA))))
-                    .thenReturn(List.of());
+            when(dispositivos.findByZonaIdAndTipo("MZ-1", HardwareService.MEDIASOMBRA)).thenReturn(List.of());
 
             assertThat(service.report(shade("CERRADA"))).isEqualTo(Outcome.REGISTERED);
             verify(dispositivos, never()).saveAll(any());
@@ -348,7 +344,7 @@ class HardwareFaultServiceTest {
 
             assertThat(valvula.getFalla()).isNull();
             assertThat(valvula.getFallaDesde()).isNull();
-            verify(dispositivos).saveAll(List.of(valvula));
+            verify(dispositivos).save(valvula);
             verify(historial).registrarReparacion(eq("operario1"), anyString(), eq("MZ-1-012"), eq("MZ-1"),
                     eq("Macro-zona 1"), eq("SIN_CAUDAL"), eq("Se destapó el emisor"));
             assertThat(alertaEmitida(NivelAlerta.INFO, "HydraulicFaultRule"))
@@ -356,17 +352,16 @@ class HardwareFaultServiceTest {
         }
 
         @Test
-        @DisplayName("reparar la mediasombra levanta la marca de la malla en todos los sectores de la zona")
+        @DisplayName("reparar la mediasombra de la zona levanta su marca y avisa a la macro-zona")
         void repararLaMalla() {
-            mallaS1.setFalla("MEDIASOMBRA_FIN_DE_CARRERA");
-            mallaS2.setFalla("MEDIASOMBRA_FIN_DE_CARRERA");
-            when(dispositivos.findById("DEV-103")).thenReturn(Optional.of(mallaS1));
-            when(sectores.findById("MZ-1-011")).thenReturn(Optional.of(sectorConZona("MZ-1-011")));
+            malla.setFalla("MEDIASOMBRA_FIN_DE_CARRERA");
+            when(dispositivos.findById("DEV-011")).thenReturn(Optional.of(malla));
 
-            service.repair("DEV-103", "Se cambió el fin de carrera", "operario1");
+            service.repair("DEV-011", "Se cambió el fin de carrera", "operario1");
 
-            assertThat(mallaS1.getFalla()).isNull();
-            assertThat(mallaS2.getFalla()).isNull();
+            assertThat(malla.getFalla()).isNull();
+            verify(dispositivos).save(malla);
+            assertThat(alertaEmitida(NivelAlerta.INFO, "ShadeFaultRule")).contains("Macro-zona MZ-1");
             verify(historial).registrarReparacion(eq("operario1"), anyString(), eq("—"), eq("MZ-1"),
                     eq("Macro-zona 1"), eq("MEDIASOMBRA_FIN_DE_CARRERA"), eq("Se cambió el fin de carrera"));
         }
@@ -380,7 +375,7 @@ class HardwareFaultServiceTest {
                     .isInstanceOf(InvalidHardwareException.class);
 
             assertThat(valvula.getFalla()).isEqualTo("SIN_CAUDAL");
-            verify(dispositivos, never()).saveAll(any());
+            verify(dispositivos, never()).save(any());
         }
 
         @Test

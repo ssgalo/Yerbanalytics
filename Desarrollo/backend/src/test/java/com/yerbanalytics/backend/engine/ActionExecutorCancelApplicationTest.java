@@ -36,7 +36,7 @@ class ActionExecutorCancelApplicationTest {
     void setUp() {
         history = mock(HistorialService.class);
         applications = mock(ApplicationService.class);
-        executor = new ActionExecutor(history, mock(ComandoActuadorPublisher.class), new ColaRiego(), applications);
+        executor = new ActionExecutor(history, new ColaRiego(), applications);
         ZonaEntity zone = RuleContextTestFactory.zonaBasica("MZ-1");
         SectorEntity sector = RuleContextTestFactory.sectorBasico("MZ-1-045");
         sector.setZona(zone);

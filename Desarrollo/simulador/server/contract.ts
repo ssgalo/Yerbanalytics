@@ -114,9 +114,18 @@ export interface ActuatorCommand {
   parametros?: Record<string, unknown>;
 }
 
-/** Ack topic of a sector. Mirrors contrato.h :: contratoTopicAck. */
+/**
+ * Ack topic of a command. Mirrors contrato.h :: contratoTopicAck. The shade mesh belongs to the macro-zone (one per
+ * zone, add-rustificacion-por-macrozona): its command comes on the zone command topic and its ack goes on the zone ack
+ * topic (contratoTopicAckZona), so an empty `sectorId` means "the zone's".
+ */
 export function ackTopic(zonaId: string, sectorId: string): string {
-  return `nursery/zone/${zonaId}/sector/${sectorId}/ack`;
+  return sectorId ? `nursery/zone/${zonaId}/sector/${sectorId}/ack` : zoneAckTopic(zonaId);
+}
+
+/** Ack topic of a zone-level actuator command (the shade mesh). Mirrors contrato.h :: contratoTopicAckZona. */
+export function zoneAckTopic(zonaId: string): string {
+  return `nursery/zone/${zonaId}/ack`;
 }
 
 /** Zone and sector of a command topic, or `null` if it is not one. */
@@ -339,6 +348,15 @@ export function macroZoneIndex(zonaId: string): number | null {
   const m = /^MZ-(\d+)$/.exec(zonaId);
   const n = m ? Number(m[1]) : 0;
   return n >= 1 ? n : null;
+}
+
+/**
+ * `true` for a zone command that drives the shade mesh (`actuador: "shade"`): the mesh is the macro-zone's, so the
+ * backend sends its `shade SET` on the zone command topic, not on a sector's.
+ */
+export function isZoneShadeCommand(payload: unknown): payload is ActuatorCommand {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
+  return (payload as { actuador?: unknown }).actuador === 'shade';
 }
 
 /** `true` only for a parsed payload whose `accion` is exactly `LEER_AHORA`. */

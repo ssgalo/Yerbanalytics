@@ -119,7 +119,7 @@ class NutritionPlanFlowIntegrationTest {
     void aNewZoneGetsTheBatch() {
         assertThat(sectors).hasSize(100);
 
-        var trace = engine.evaluate(context(Instant.now()));
+        var trace = nutricion(engine.evaluate(context(Instant.now())));
 
         assertThat(planApplications()).isEqualTo(100);
         assertThat(zone.getNutritionBatchStartTs()).as("la tanda se cerró en el mismo ciclo").isNull();
@@ -216,7 +216,7 @@ class NutritionPlanFlowIntegrationTest {
     void disabledFromTheSimulator() {
         overrides.put(NutritionPlanRule.NAME, new RuleOverride(false, Map.of(), Set.of()));
 
-        var trace = engine.evaluate(context(Instant.now()));
+        var trace = nutricion(engine.evaluate(context(Instant.now())));
 
         assertThat(planApplications()).isZero();
         assertThat(traceOf(trace, NutritionPlanRule.NAME).estado()).isEqualTo(EstadoRegla.OMITIDA_DESHABILITADA);
@@ -237,5 +237,10 @@ class NutritionPlanFlowIntegrationTest {
         assertThat(pending.countByZoneIdAndSupplyAndRuleName(ZONE_ID, Supply.FERTILIZER, NutritionPlanRule.NAME)).isEqualTo(1);
         assertThat(planApplications()).isEqualTo(99);
         assertThat(zone.getNutritionBatchStartTs()).isNotNull();
+    }
+    /** La traza de las reglas del plan y las bióticas que lo preceden (el motor de zonas también corre las de la mediasombra). */
+    private static List<com.yerbanalytics.backend.engine.traza.TrazaRegla> nutricion(
+            List<com.yerbanalytics.backend.engine.traza.TrazaRegla> trace) {
+        return trace.stream().filter(t -> java.util.Set.of("FungalConditionRule", "OutbreakRule", "LowEcRule", "NutritionPlanRule").contains(t.ruleId())).toList();
     }
 }

@@ -59,6 +59,6 @@ Ninguno nuevo (D-1). El TTL sigue siendo la propiedad `yerbanalytics.weather.cac
 - **El supuesto se registra en `TrazaRegla.supuesto`** (nuevo componente al final; los constructores anteriores se conservan) y no como una acción: no es una decisión de la regla.
   `Rule.supuestoSinPronostico()` se declaró sólo en R-03, la única `Rule` que usa el pronóstico. `DespachoRiego`, `ApplicationPreconditions` y `ApplicationService` no son
   reglas: su supuesto está documentado y cubierto por tests.
-- **M-02 no existe** (`add-mediasombra-v2` cancelado): O-02 queda parcial, con `ShadingRule` saltando la protección UV.
+- **M-02 no existe** (`add-mediasombra-v2` cancelado): O-02 queda parcial. Con `add-rustificacion-por-macrozona` (#66) la `ShadingRule` es de zona: sin pronóstico no cierra por UV y la malla sigue el horario. Como es `ZoneRule`, no declara `supuestoSinPronostico()` (pendiente: llevar el supuesto a las reglas de zona).
 - **`ForecastModeMonitor`** avisa por transición entre «con pronóstico» y «sin pronóstico» (vencido y ausente cuentan igual) y pide el pronóstico sin esperar en cada chequeo.
-- **O-04** se prueba sobre `ShadingRule` (el plan global) con el reloj del contexto: no depende de ninguna red.
+- **O-04**: se probaba sobre la `ShadingRule` del plan global. Al integrar #66 ese test se eliminó: el plan por macro-zona lo ejecuta `HorarioMediasombraService` por fechas y reloj (cubierto por `HorarioMediasombraServiceTest`), sin ninguna dependencia del pronóstico.
