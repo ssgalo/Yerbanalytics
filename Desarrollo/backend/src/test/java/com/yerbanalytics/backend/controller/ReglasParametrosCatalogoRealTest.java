@@ -128,7 +128,7 @@ class ReglasParametrosCatalogoRealTest {
             actual = siguiente;
         }
 
-        assertThat(cadena).containsExactly("SustratoSaturadoRule", "CicloLecturaRiegoRule", "DeficitCriticoRule",
+        assertThat(cadena).containsExactly("SustratoSaturadoRule", "CicloLecturaRiegoRule", "DeficitCriticoRule", "IneffectiveActionRule",
                 "FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule",
                 "SolarStressRule");
         for (String id : cadena) {
