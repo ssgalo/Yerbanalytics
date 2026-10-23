@@ -8,7 +8,6 @@ import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.RuleContext;
 import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
 import com.yerbanalytics.backend.engine.overrides.OperationalRuleStates;
-import com.yerbanalytics.backend.engine.overrides.RuleOverridesStore;
 import com.yerbanalytics.backend.engine.overrides.RuleStateRepository;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
@@ -96,7 +95,7 @@ class CatalogoParametrosServiceTest {
                 reglas);
         RuleStateRepository estados = org.mockito.Mockito.mock(RuleStateRepository.class);
         ReglasCatalogo piezas = new ReglasCatalogo(new DemoControllableRegistry(new ArrayList<>(reglas)),
-                new OperationalRuleStates(estados, List.of()), new RuleOverridesStore());
+                new OperationalRuleStates(estados, List.of()));
 
         lenient().when(repository.findAll()).thenAnswer(i -> new ArrayList<>(tabla.values()));
         lenient().when(repository.save(any(ParametroReglaEntity.class))).thenAnswer(i -> {

@@ -224,7 +224,7 @@ class ReglasParametrosCatalogoRealTest {
         assertThat(r01.get("efecto").asText()).isEqualTo("ACTS");
         assertThat(r01.get("activa").asBoolean()).isTrue();
         assertThat(r01.get("activaPorDefecto").asBoolean()).isTrue();
-        assertThat(r01.get("apagadaPorDemo").asBoolean()).isFalse();
+        assertThat(r01.has("apagadaPorDemo")).isFalse();
         assertThat(r01.get("proteccion").isNull()).isTrue();
         assertThat(r01.get("estado").isNull()).isTrue();
 

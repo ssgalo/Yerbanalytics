@@ -85,52 +85,39 @@ class DemoRulesControllerTest {
         }
 
         @Test
-        void apagaUnaPiezaPorZona() throws Exception {
-            mvc.perform(put("/api/demo/rules/ZoneShading")
-                            .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.enabled").value(false));
-
-            mvc.perform(get("/api/demo/rules"))
-                    .andExpect(jsonPath("$[1].enabled").value(false));
-        }
-
-        @Test
-        void informaElEstadoOperativoYElEfectivoDeCadaPieza() throws Exception {
+        void informaElEstadoOperativoDeCadaPieza() throws Exception {
             mvc.perform(get("/api/demo/rules"))
                     .andExpect(jsonPath("$[0].name").value("StaleSensorRule"))
-                    .andExpect(jsonPath("$[0].operationalActive").value(false))
-                    .andExpect(jsonPath("$[0].effectiveEnabled").value(false))
-                    .andExpect(jsonPath("$[1].operationalActive").value(true))
-                    .andExpect(jsonPath("$[1].effectiveEnabled").value(true));
+                    .andExpect(jsonPath("$[0].enabled").value(false))
+                    .andExpect(jsonPath("$[0].operationalActive").doesNotExist())
+                    .andExpect(jsonPath("$[0].effectiveEnabled").doesNotExist())
+                    .andExpect(jsonPath("$[1].enabled").value(true));
         }
 
         @Test
-        void prenderUnaApagadaEnElViveroLaHaceCorrerYElOperativoSigueApagado() throws Exception {
+        void elEncendidoNoSeCambiaDesdeLaDemo() throws Exception {
             mvc.perform(put("/api/demo/rules/StaleSensorRule")
                             .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.enabled").value(true))
-                    .andExpect(jsonPath("$.operationalActive").value(false))
-                    .andExpect(jsonPath("$.effectiveEnabled").value(true));
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Motor de reglas")));
+
+            mvc.perform(get("/api/demo/rules"))
+                    .andExpect(jsonPath("$[0].enabled").value(false));
         }
 
         @Test
-        void limpiarLaCapaDeDemoDevuelveElEstadoOperativo() throws Exception {
+        void cooldownsYBypassNoCambianElEstado() throws Exception {
             mvc.perform(put("/api/demo/rules/StaleSensorRule")
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"));
-
-            store.clear();
-
-            mvc.perform(get("/api/demo/rules"))
-                    .andExpect(jsonPath("$[0].effectiveEnabled").value(false))
-                    .andExpect(jsonPath("$[0].enabled").value(true));
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"bypassed\":[\"window\"]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.enabled").value(false))
+                    .andExpect(jsonPath("$.bypassed[0]").value("window"));
         }
 
         @Test
         void nombreDesconocidoEs404() throws Exception {
             mvc.perform(put("/api/demo/rules/NoExiste")
-                            .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"cooldownMinutes\":{}}"))
                     .andExpect(status().isNotFound());
         }
 

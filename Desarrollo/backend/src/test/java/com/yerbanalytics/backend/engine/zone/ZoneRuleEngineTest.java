@@ -128,7 +128,7 @@ class ZoneRuleEngineTest {
 
     @Test
     void unaReglaApagadaConUnOverrideNoCorreYQuedaEnLaTraza() {
-        overrides.put("Primera", new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff("Primera");
         ZoneRule first = rule("Primera", 22, c -> {
             throw new AssertionError("no debía correr");
         });
@@ -164,7 +164,7 @@ class ZoneRuleEngineTest {
             executed.add("bypass=" + c.isBypassed("Probe", "k") + " cooldown=" + c.cooldownOverrideMinutes("Probe", "k"));
             return List.of();
         });
-        overrides.put("Probe", new RuleOverride(true, Map.of("k", 0.0), Set.of("k")));
+        overrides.put("Probe", new RuleOverride(Map.of("k", 0.0), Set.of("k")));
 
         engine(probe).evaluate(ctx());
 

@@ -11,19 +11,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * control de demo ({@link DemoRuleControlService}), que existe sólo con {@code yerbanalytics.demo.enabled=true}. No se
  * persiste, así que un reinicio vuelve al comportamiento configurado.
  *
- * <p>No decide por sí sola si una pieza corre: eso lo resuelve {@link EffectiveRuleOverrides}, donde el override explícito
- * de esta capa gana sobre el estado operativo ({@link OperationalRuleStates}), que es donde viven las reglas retiradas.
- * Un override sin interruptor explícito ({@link RuleOverride#explicitEnabled()} vacío) deja decidir al operativo.
+ * <p>Sólo guarda cooldowns y bypass. Si una pieza corre o no lo decide únicamente el estado operativo
+ * ({@link OperationalRuleStates}, donde viven también las reglas retiradas): la demo no lo puede cambiar.
  */
 @Component
 public class RuleOverridesStore {
 
     private final Map<String, RuleOverride> overrides = new ConcurrentHashMap<>();
-
-    /** El interruptor explícito de demo de una pieza; vacío si nunca se tocó (o sólo se tocaron cooldowns o bypass). */
-    public Optional<Boolean> explicitEnabled(String ruleName) {
-        return get(ruleName).explicitEnabled();
-    }
 
     public Optional<Double> cooldownMinutes(String ruleName, String key) {
         return Optional.ofNullable(get(ruleName).cooldownMinutes().get(key));
@@ -43,7 +37,7 @@ public class RuleOverridesStore {
         overrides.put(ruleName, override);
     }
 
-    /** Borra todos los overrides: vuelve a regir el estado operativo y la configuración de cada pieza. */
+    /** Borra todos los overrides: cada pieza vuelve a sus cooldowns y guardas configurados. */
     public void clear() {
         overrides.clear();
     }

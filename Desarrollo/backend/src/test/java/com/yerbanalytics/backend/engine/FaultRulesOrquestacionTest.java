@@ -138,7 +138,7 @@ class FaultRulesOrquestacionTest {
     @Test
     @DisplayName("apagada desde el simulador: no actúa y el sector averiado se evalúa como si estuviera sano")
     void apagada() {
-        overrides.put("HydraulicFaultRule", new RuleOverride(false, Map.of(), Set.of()));
+        overrides.turnOff("HydraulicFaultRule");
 
         ResultadoEvaluacion r = evaluar(40.0, VALVULA);
 
@@ -149,7 +149,7 @@ class FaultRulesOrquestacionTest {
     @Test
     @DisplayName("bypass 'fault': el sector averiado vuelve a evaluarse")
     void bypass() {
-        overrides.put("HydraulicFaultRule", new RuleOverride(true, Map.of(), Set.of("fault")));
+        overrides.put("HydraulicFaultRule", new RuleOverride(Map.of(), Set.of("fault")));
 
         ResultadoEvaluacion r = evaluar(40.0, new HardwareFaults("SIN_CAUDAL"));
 

@@ -42,7 +42,7 @@ class ReglasParametrosControllerTest {
 
     private static ReglaCatalogoDto regla(String id, String label, int prioridad) {
         return new ReglaCatalogoDto(id, label, "R-01", "RIEGO", "IRRIGATION", "ACTS", prioridad,
-                List.of("riego.umbral-humedad"), true, true, false, null, null);
+                List.of("riego.umbral-humedad"), true, true, null, null);
     }
 
     private static CatalogoReglasDto catalogo(String valorUmbral) {

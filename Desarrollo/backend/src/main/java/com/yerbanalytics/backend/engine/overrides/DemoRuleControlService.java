@@ -10,9 +10,9 @@ import java.util.TreeSet;
 
 /**
  * Casos de uso del control de demo: listar las piezas con su override, cambiarlo validando que las claves existan
- * y poner todos los cooldowns en cero. Escribe sólo en el {@link RuleOverridesStore} (la capa de demo, que gana sobre el
- * estado operativo mientras el override explícito exista); el controlador HTTP que lo usa existe únicamente con el modo
- * demo. Nunca escribe el estado operativo: eso es del vivero.
+ * y poner todos los cooldowns en cero. Escribe sólo cooldowns y bypass en el {@link RuleOverridesStore}; el controlador
+ * HTTP que lo usa existe únicamente con el modo demo. Nunca escribe el estado operativo (el encendido): eso es del
+ * vivero, desde Motor de reglas.
  */
 @Component
 public class DemoRuleControlService {
@@ -39,8 +39,7 @@ public class DemoRuleControlService {
      * @throws UnknownControllableException si el nombre no existe
      * @throws InvalidOverrideKeyException  si alguna clave de cooldown o de bypass no la declara la pieza
      */
-    public ControllableState update(String name, Boolean enabled, Map<String, Double> cooldownMinutes,
-                                    Set<String> bypassed) {
+    public ControllableState update(String name, Map<String, Double> cooldownMinutes, Set<String> bypassed) {
         DemoControllable controllable = registry.find(name).orElseThrow(() -> new UnknownControllableException(name));
         if (cooldownMinutes != null) {
             requireDeclared(name, "cooldowns", cooldownMinutes.keySet(), controllable.cooldownKeys());
@@ -51,7 +50,6 @@ public class DemoRuleControlService {
 
         RuleOverride current = store.get(name);
         store.put(name, new RuleOverride(
-                enabled != null ? enabled : current.enabled(),
                 cooldownMinutes != null ? cooldownMinutes : current.cooldownMinutes(),
                 bypassed != null ? bypassed : current.bypassed()));
         return stateOf(controllable);
@@ -66,15 +64,14 @@ public class DemoRuleControlService {
             RuleOverride current = store.get(controllable.name());
             Map<String, Double> zeroed = new HashMap<>(current.cooldownMinutes());
             controllable.cooldownKeys().forEach(key -> zeroed.put(key, 0.0));
-            store.put(controllable.name(), new RuleOverride(current.enabled(), zeroed, current.bypassed()));
+            store.put(controllable.name(), new RuleOverride(zeroed, current.bypassed()));
         }
         return list();
     }
 
     private ControllableState stateOf(DemoControllable controllable) {
         String name = controllable.name();
-        return new ControllableState(controllable, store.get(name), effective.isOperationallyActive(name),
-                effective.isEnabled(name));
+        return new ControllableState(controllable, store.get(name), effective.isEnabled(name));
     }
 
     private static void requireDeclared(String name, String kind, Set<String> given, Set<String> declared) {

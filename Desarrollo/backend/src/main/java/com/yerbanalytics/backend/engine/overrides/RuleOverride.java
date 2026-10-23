@@ -1,24 +1,22 @@
 package com.yerbanalytics.backend.engine.overrides;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
- * Runtime override of a single rule: whether it runs, the cooldowns it applies and the guards it skips.
+ * Demo override of a single rule: the cooldowns it applies and the guards it skips. Whether the rule runs is not
+ * here: the single source of truth for on/off is the operational state (Motor de reglas).
  *
  * <p>A rule may declare several cooldowns and several bypassable guards; each one is identified by a key that the
  * rule itself publishes (see the {@code COOLDOWN_*} and {@code BYPASS_*} constants of each rule).
  *
- * @param enabled         explicit demo switch: {@code false} turns the rule off, {@code true} forces it on even if the
- *                        vivero turned it off, {@code null} (never touched) leaves the operational state in charge
  * @param cooldownMinutes cooldown replacing the configured one, by key. {@code 0} removes that cooldown
  * @param bypassed        keys of the guards that are not applied
  */
-public record RuleOverride(Boolean enabled, Map<String, Double> cooldownMinutes, Set<String> bypassed) {
+public record RuleOverride(Map<String, Double> cooldownMinutes, Set<String> bypassed) {
 
-    /** A rule with no override: its operational state, its configured cooldowns and all its guards. */
-    public static final RuleOverride NONE = new RuleOverride(null, Map.of(), Set.of());
+    /** A rule with no override: its configured cooldowns and all its guards. */
+    public static final RuleOverride NONE = new RuleOverride(Map.of(), Set.of());
 
     public RuleOverride {
         cooldownMinutes = cooldownMinutes == null ? Map.of() : Map.copyOf(cooldownMinutes);
@@ -28,10 +26,5 @@ public record RuleOverride(Boolean enabled, Map<String, Double> cooldownMinutes,
                 throw new IllegalArgumentException("Cooldown '" + key + "' must be a number of minutes >= 0.");
             }
         });
-    }
-
-    /** The explicit demo switch, if there is one. Empty means the operational state decides. */
-    public Optional<Boolean> explicitEnabled() {
-        return Optional.ofNullable(enabled);
     }
 }

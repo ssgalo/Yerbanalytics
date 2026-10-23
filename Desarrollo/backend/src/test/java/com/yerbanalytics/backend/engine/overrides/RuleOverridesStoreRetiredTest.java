@@ -26,7 +26,6 @@ class RuleOverridesStoreRetiredTest {
         RuleOverridesStore store = new RuleOverridesStore();
 
         assertThat(store.snapshot()).isEmpty();
-        assertThat(store.explicitEnabled("SupplyRule")).isEmpty();
     }
 
     @Test
@@ -39,34 +38,23 @@ class RuleOverridesStoreRetiredTest {
     }
 
     @Test
-    void theDemoCanTurnARetiredRuleBackOn() {
+    void theDemoLayerCannotTurnARetiredRuleBackOn() {
         RuleOverridesStore store = new RuleOverridesStore();
         EffectiveRuleOverrides efectivo = efectivo(store, "SupplyRule");
 
-        store.put("SupplyRule", new RuleOverride(true, Map.of(), Set.of()));
-
-        assertThat(efectivo.isEnabled("SupplyRule")).isTrue();
-    }
-
-    @Test
-    void clearingLeavesTheRetiredRulesOffAgain() {
-        RuleOverridesStore store = new RuleOverridesStore();
-        EffectiveRuleOverrides efectivo = efectivo(store, "SupplyRule");
-        store.put("SupplyRule", new RuleOverride(true, Map.of(), Set.of()));
-
-        store.clear();
+        store.put("SupplyRule", new RuleOverride(Map.of("k", 0.0), Set.of("g")));
 
         assertThat(efectivo.isEnabled("SupplyRule")).isFalse();
     }
 
     @Test
-    void anOverrideWithoutAnEnabledFlagIsNotExplicit() {
+    void clearingTheDemoLayerDoesNotChangeTheOperationalState() {
         RuleOverridesStore store = new RuleOverridesStore();
+        EffectiveRuleOverrides efectivo = efectivo(store, "SupplyRule");
+        store.put("SupplyRule", new RuleOverride(Map.of("k", 0.0), Set.of()));
 
-        store.put("SupplyRule", RuleOverride.NONE);
-        store.put("Otra", new RuleOverride(null, Map.of("k", 1.0), Set.of()));
+        store.clear();
 
-        assertThat(store.explicitEnabled("SupplyRule")).isEmpty();
-        assertThat(store.explicitEnabled("Otra")).isEmpty();
+        assertThat(efectivo.isEnabled("SupplyRule")).isFalse();
     }
 }

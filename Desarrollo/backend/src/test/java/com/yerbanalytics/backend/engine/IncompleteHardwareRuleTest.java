@@ -121,7 +121,7 @@ class IncompleteHardwareRuleTest {
     @DisplayName("bypass 'hardware': el sector sin electroválvula se evalúa como si estuviera completo")
     void bypassHardware() {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(IncompleteHardwareRule.NAME, new RuleOverride(true, Map.of(), Set.of("hardware")));
+        store.put(IncompleteHardwareRule.NAME, new RuleOverride(Map.of(), Set.of("hardware")));
         RuleContext conBypass = ctx(HardwareCoverage.NONE).withOverrides(store);
 
         assertThat(rule.evaluate(conBypass, ev(rule))).extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);

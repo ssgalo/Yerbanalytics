@@ -57,7 +57,7 @@ class ShadingRulesTest {
     /** Overrides con un bypass encendido para una regla. */
     private static RuleOverrides bypass(String regla, String clave) {
         TestRuleOverrides store = new TestRuleOverrides();
-        store.put(regla, new RuleOverride(true, Map.of(), Set.of(clave)));
+        store.put(regla, new RuleOverride(Map.of(), Set.of(clave)));
         return store;
     }
 

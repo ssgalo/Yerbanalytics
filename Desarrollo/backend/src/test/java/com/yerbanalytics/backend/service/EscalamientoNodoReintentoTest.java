@@ -142,7 +142,7 @@ class EscalamientoNodoReintentoTest {
     @Test
     @DisplayName("el override retry-offline reemplaza el intervalo; en 0 pide en cada tick")
     void theSimulatorCanShortenTheWait() {
-        overrides.put("EscalamientoNodo", new RuleOverride(true, Map.of("retry-offline", 0.0), java.util.Set.of()));
+        overrides.put("EscalamientoNodo", new RuleOverride(Map.of("retry-offline", 0.0), java.util.Set.of()));
 
         service.retryOfflineNodes();
         service.retryOfflineNodes();
@@ -154,7 +154,7 @@ class EscalamientoNodoReintentoTest {
     @Test
     @DisplayName("el override retry-offline también puede alargarlo")
     void theOverrideCanAlsoBeLonger() {
-        overrides.put("EscalamientoNodo", new RuleOverride(true, Map.of("retry-offline", 2.0), java.util.Set.of()));
+        overrides.put("EscalamientoNodo", new RuleOverride(Map.of("retry-offline", 2.0), java.util.Set.of()));
         service.retryOfflineNodes();
         clearInvocations(publisher);
 

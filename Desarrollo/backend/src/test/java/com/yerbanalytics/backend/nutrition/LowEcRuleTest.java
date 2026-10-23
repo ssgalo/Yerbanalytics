@@ -158,7 +158,7 @@ class LowEcRuleTest {
     @Test
     void conElBypassSamplesUsaLaUltimaLecturaComoMedia() {
         TestRuleOverrides overrides = new TestRuleOverrides();
-        overrides.put(LowEcRule.NAME, new RuleOverride(true, Map.of(), Set.of(LowEcRule.BYPASS_SAMPLES)));
+        overrides.put(LowEcRule.NAME, new RuleOverride(Map.of(), Set.of(LowEcRule.BYPASS_SAMPLES)));
         when(plan.facts(zone)).thenReturn(withLastFertilization(idle(10, 6), 6));
         when(history.latest(eq("MZ-2"), eq(1), anyBoolean())).thenReturn(readings(0.3));
 
@@ -181,7 +181,7 @@ class LowEcRuleTest {
     void elCooldownNoFertilizedEnCeroEliminaLaEsperaDeCincoDias() {
         TestRuleOverrides overrides = new TestRuleOverrides();
         overrides.put(LowEcRule.NAME,
-                new RuleOverride(true, Map.of(LowEcRule.COOLDOWN_NO_FERTILIZED, 0.0), Set.of()));
+                new RuleOverride(Map.of(LowEcRule.COOLDOWN_NO_FERTILIZED, 0.0), Set.of()));
         when(plan.facts(zone)).thenReturn(withLastFertilization(idle(10, 1), 1));
         when(history.latest(eq("MZ-2"), anyInt(), anyBoolean())).thenReturn(sixOf(0.4));
 

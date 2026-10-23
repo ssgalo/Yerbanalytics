@@ -472,7 +472,7 @@ class ApplicationServiceTest {
     void theStockBypassSkipsTheTankCheck() {
         when(tanks.check(any(), any(), anyInt())).thenReturn(TankService.Stock.UNREGISTERED);
         overrides.put(ApplicationPreconditions.NAME,
-                new RuleOverride(true, Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_STOCK)));
+                new RuleOverride(Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_STOCK)));
 
         assertThat(requestFertilizer().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
     }
@@ -497,7 +497,7 @@ class ApplicationServiceTest {
 
     @Test
     void turnedOffNoApplicationRunsAndItLeavesARecord() {
-        overrides.put(ApplicationPreconditions.NAME, new RuleOverride(false, Map.of(), java.util.Set.of()));
+        overrides.turnOff(ApplicationPreconditions.NAME);
 
         ApplicationOutcome outcome = requestFertilizer();
 
@@ -510,7 +510,7 @@ class ApplicationServiceTest {
     void theWindowBypassLetsAnApplicationRunAtNoon() {
         clock.set(at("12:00"));
         overrides.put(ApplicationPreconditions.NAME,
-                new RuleOverride(true, Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_WINDOW)));
+                new RuleOverride(Map.of(), java.util.Set.of(ApplicationPreconditions.BYPASS_WINDOW)));
 
         assertThat(requestFertilizer().status()).isEqualTo(ApplicationOutcome.Status.APPLIED);
     }

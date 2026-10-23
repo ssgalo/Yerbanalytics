@@ -150,7 +150,7 @@ class NutritionPlanRuleTest {
     void elCooldownIntervalDelSimuladorReemplazaElIntervaloDeLaZona() {
         TestRuleOverrides overrides = new TestRuleOverrides();
         overrides.put(NutritionPlanRule.NAME,
-                new RuleOverride(true, Map.of(NutritionPlanRule.COOLDOWN_INTERVAL, 0.0), Set.of()));
+                new RuleOverride(Map.of(NutritionPlanRule.COOLDOWN_INTERVAL, 0.0), Set.of()));
 
         // Aplicado hace 1 día con intervalo de 7: con el cooldown en 0 vence ya.
         List<RuleAction> actions = evaluate(idle(7, 1), ctx(zone, sectors, overrides));

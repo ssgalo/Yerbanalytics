@@ -33,8 +33,8 @@ import java.util.stream.Collectors;
  *       pieza vuelve.</li>
  * </ul>
  *
- * <p>El estado <i>efectivo</i> que consulta el motor es {@link EffectiveRuleOverrides}: sobre éste, en modo demo, gana el
- * override explícito del simulador.
+ * <p>El estado <i>efectivo</i> que consulta el motor es {@link EffectiveRuleOverrides}, y coincide con éste: la demo no
+ * tiene interruptor de encendido, sólo cooldowns y bypass.
  */
 @Component
 public class OperationalRuleStates {

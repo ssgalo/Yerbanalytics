@@ -10,8 +10,8 @@ import java.util.Set;
 /**
  * Cualquier pieza que decide una acción del sistema: las reglas por sector, las reglas por macro-zona y los servicios
  * que revalidan o evalúan por su cuenta. La prende o apaga el vivero desde Motor de reglas (estado operativo,
- * {@code OperationalRuleStates}) y, sólo en modo demo, la apaga, acelera con cooldowns y bypass, o prende a la fuerza
- * el simulador ({@code RuleOverridesStore}); mientras el override de demo existe, gana sobre el operativo.
+ * {@code OperationalRuleStates}) y, sólo en modo demo, el simulador
+ * le acelera los cooldowns o le saltea guardas ({@code RuleOverridesStore}); el encendido nunca lo toca la demo.
  *
  * <p>Qué hace cada una con su estado (consultar {@link RuleOverrides} antes de actuar) es responsabilidad de la pieza.
  * Además de identificarse, declara cómo se presenta: {@link #code()}, {@link #objective()}, {@link #effect()} y, si es
