@@ -25,6 +25,7 @@ import type {
   ManualLock,
   NewManualLock,
   NewTankLoad,
+  NutritionPlan,
   Supply,
   TankLevel,
   ParametrosSecuencia,
@@ -145,4 +146,9 @@ export interface DataRepository {
    * 400/404) si la carga es inválida, no entra en el tanque o falta su capacidad.
    */
   loadTank(zoneId: string, supply: Supply, load: NewTankLoad): Promise<TankLevel>;
+  /**
+   * Fija los días entre aplicaciones del plan de nutrición de la macro-zona (3–30) y devuelve cómo quedó el plan. Rechaza con
+   * `NutritionPlanError` (mensaje del 400/404) si el intervalo es inválido o la zona no existe.
+   */
+  setNutritionPlanInterval(zoneId: string, intervalDays: number): Promise<NutritionPlan>;
 }

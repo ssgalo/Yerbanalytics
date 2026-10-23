@@ -150,6 +150,26 @@
       "rama": "SEGUIMIENTO",
       "prioridad": 21,
       "parametros": []
+    },
+    {
+      "id": "LowEcRule",
+      "label": "🧂 CE baja (N-02)",
+      "rama": "INSUMO",
+      "prioridad": 22,
+      "parametros": [
+        "nutricion.ce-baja",
+        "nutricion.ce-lecturas",
+        "nutricion.sin-fertilizar-dias"
+      ]
+    },
+    {
+      "id": "NutritionPlanRule",
+      "label": "🌱 Plan de nutrición (N-01)",
+      "rama": "INSUMO",
+      "prioridad": 23,
+      "parametros": [
+        "nutricion.intervalo-plan"
+      ]
     }
   ],
   "parametros": [
@@ -988,6 +1008,87 @@
       "modificado": false,
       "usadoPor": [
         "ApplicationService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "nutricion.intervalo-plan",
+      "etiqueta": "Intervalo del plan de nutrición",
+      "descripcion": "Días entre dos aplicaciones del plan de nutrición en una macro-zona. Es el valor de cada zona mientras no fije el suyo en su detalle.",
+      "familia": "NUTRICION",
+      "tipo": "NUMERO",
+      "unidad": "d",
+      "valor": "7",
+      "fabrica": "7",
+      "min": 3.0,
+      "max": 30.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.4 N-01",
+      "modificado": false,
+      "usadoPor": [
+        "NutritionPlanRule",
+        "NutritionPlanService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "nutricion.ce-baja",
+      "etiqueta": "CE baja",
+      "descripcion": "Con una CE media menor a esta (y sin fertilizar hace poco) se adelanta el plan de nutrición.",
+      "familia": "NUTRICION",
+      "tipo": "NUMERO",
+      "unidad": "dS/m",
+      "valor": "0.5",
+      "fabrica": "0.5",
+      "min": 0.3,
+      "max": 1.0,
+      "decimales": 2,
+      "refSpec": "reglas_v2 §8.4 N-02",
+      "modificado": false,
+      "usadoPor": [
+        "LowEcRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "nutricion.ce-lecturas",
+      "etiqueta": "Lecturas de CE para la media",
+      "descripcion": "Cuántas de las últimas lecturas de pulso entran en la media de CE. Con menos lecturas que éstas la regla no decide.",
+      "familia": "NUTRICION",
+      "tipo": "ENTERO",
+      "unidad": "lecturas",
+      "valor": "6",
+      "fabrica": "6",
+      "min": 3.0,
+      "max": 12.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.4 N-02",
+      "modificado": false,
+      "usadoPor": [
+        "LowEcRule"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "nutricion.sin-fertilizar-dias",
+      "etiqueta": "Días sin fertilizar para adelantar el plan",
+      "descripcion": "La CE baja sólo adelanta el plan si en la macro-zona no hubo ninguna fertilización (del plan o correctiva) en estos días.",
+      "familia": "NUTRICION",
+      "tipo": "NUMERO",
+      "unidad": "d",
+      "valor": "5",
+      "fabrica": "5",
+      "min": 3.0,
+      "max": 14.0,
+      "decimales": 0,
+      "refSpec": "reglas_v2 §8.4 N-02",
+      "modificado": false,
+      "usadoPor": [
+        "LowEcRule"
       ],
       "updatedBy": null,
       "updatedTs": null

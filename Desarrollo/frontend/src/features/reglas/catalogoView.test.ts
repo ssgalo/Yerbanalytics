@@ -69,7 +69,7 @@ describe('filtrarReglas', () => {
 
   it('sin filtros devuelve todas', () => {
     const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, sinFiltros)).toHaveLength(16);
+    expect(filtrarReglas(c, sinFiltros)).toHaveLength(18);
   });
 
   it('busca por nombre de regla o de alguno de sus parámetros, sin importar tildes ni mayúsculas', () => {
@@ -93,6 +93,8 @@ describe('filtrarReglas', () => {
     expect(filtrarReglas(c, { ...sinFiltros, rama: 'INSUMO' }).map((r) => r.id)).toEqual([
       'DailyDoseLimitRule',
       'SupplyRule',
+      'LowEcRule',
+      'NutritionPlanRule',
     ]);
   });
 

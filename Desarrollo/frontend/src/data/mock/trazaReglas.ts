@@ -448,7 +448,18 @@ const EVALUADORES: Record<string, Evaluador> = {
       : noop('Sin pico de UV: la mediasombra no se mueve.'),
 
   FollowUpRule: () => noop('Seguimiento post-acción: sin acciones pendientes de evaluar.'),
+
+  // Reglas de macro-zona (plan de nutrición): la demo no tiene motor ni historial de lecturas, así que muestran
+  // siempre el estado de reposo. Corren una vez por zona, después de los sectores.
+  LowEcRule: () => noop('CE media dentro del rango: el plan de nutrición no se adelanta.'),
+  NutritionPlanRule: () => noop('Todavía no: el plan de nutrición de la macro-zona sigue su intervalo.'),
 };
+
+/**
+ * Reglas que deciden sobre la macro-zona entera. No pertenecen a la cadena del sector: un corte de la rama de insumos
+ * (ABORT_INSUMO) o del pipeline (ABORT_ALL) de un sector no las apaga.
+ */
+const REGLAS_DE_ZONA = new Set(['LowEcRule', 'NutritionPlanRule']);
 
 /** Huella estable de los valores vigentes (FNV-1a), como el `parametrosHash` del backend. */
 function huella(catalogo: CatalogoReglas): string {
@@ -483,19 +494,20 @@ export function evaluarMotor(catalogo: CatalogoReglas, entrada: EntradaMotor): T
   let abortMediasombra: string | null = null;
 
   for (const regla of [...catalogo.reglas].sort((a, b) => a.prioridad - b.prioridad)) {
-    if (abortAll) {
+    const deZona = REGLAS_DE_ZONA.has(regla.id);
+    if (!deZona && abortAll) {
       reglas.push(omitida(regla, 'NO_ALCANZADA', abortAll));
       continue;
     }
-    if (regla.rama === 'RIEGO' && abortRiego) {
+    if (!deZona && regla.rama === 'RIEGO' && abortRiego) {
       reglas.push(omitida(regla, 'OMITIDA_RAMA_BLOQUEADA', abortRiego));
       continue;
     }
-    if (regla.rama === 'INSUMO' && abortInsumo) {
+    if (!deZona && regla.rama === 'INSUMO' && abortInsumo) {
       reglas.push(omitida(regla, 'OMITIDA_RAMA_BLOQUEADA', abortInsumo));
       continue;
     }
-    if (regla.rama === 'MEDIASOMBRA' && abortMediasombra) {
+    if (!deZona && regla.rama === 'MEDIASOMBRA' && abortMediasombra) {
       reglas.push(omitida(regla, 'OMITIDA_RAMA_BLOQUEADA', abortMediasombra));
       continue;
     }
