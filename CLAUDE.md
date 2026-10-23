@@ -393,7 +393,7 @@ cd Desarrollo/backend
   (F-C2). Detalle en el README del backend.
 - **Las reglas por diagnóstico comparten la compuerta P-D1** (`engine/DiagnosisGate`) y la lectura de la severidad (`engine/Severity`): una regla nueva que decide
   con el diagnóstico la usa y declara `DiagnosisGate.PARAMETERS` en su `parametros()`. «Durante la rustificación» se pregunta a `hardening/HardeningPhase`,
-  que hoy resuelve el plan global. Una regla de insumo que descarta la aplicación de otra la corta con `ABORT_INSUMO` y `CancelPendingApplication`.
+  que lo resuelve con el plan de la macro-zona (`ZonePlanHardeningPhase`: rige una etapa hoy). Una regla de insumo que descarta la aplicación de otra la corta con `ABORT_INSUMO` y `CancelPendingApplication`.
 - **Las reglas bióticas por sector comparten un esqueleto** (`biotic/BioticDiagnosisBase`, template method): F-F1 y F-P1 deciden igual (diagnóstico
   del tipo y vigente, y alguna de tres razones) y sólo difieren en qué ambiente favorece al problema. Cada regla concreta declara **su**
   `parametros()` con un `List.of(...)` literal (el test anti-drift del frontend lo lee del código fuente). El foco no cuenta nada por su cuenta:
