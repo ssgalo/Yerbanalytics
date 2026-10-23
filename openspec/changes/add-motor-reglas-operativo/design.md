@@ -382,9 +382,24 @@ Lo resuelto:
   `overrides.skipsGuard(...)`; los tests de #65 se pasaron a `TestRuleOverrides`.
 - **Prioridades.** Siguen únicas (`ReglasArquitecturaTest`).
 
-**Pendiente para la integración del frontend:** el dashboard todavía conoce la familia `SEGUIMIENTO` y las claves
-`seguimiento.*`; los fixtures y tests de etiquetas con emoji de #64/#65/#67 se rehacen sin emoji; la pantalla Motor de
-reglas muestra las diez piezas nuevas en su grupo sin tocar mapas.
+**Hecho (merge del motor completo y frontend).** Se mergeó `feat/motor-reglas-operativo` en la integración (con el
+cambio final de diseño: Motor de reglas es la única fuente de verdad del encendido). Lo resuelto:
+
+- **Un solo interruptor.** Los tests del stack que apagaban una regla con `RuleOverride(false, …)` o armaban el override
+  con `enabled` pasaron a `RuleOverride(cooldownMinutes, bypassed)`; apagar es `OperationalRuleStates.set(...)` (con
+  `reload()` y restauración en `@AfterEach`, como `NutritionPlanFlowIntegrationTest`). El simulador del stack no llamaba a
+  `updateRule` con `enabled`: no hubo nada que tocar ahí.
+- **Frontend.** `catalogoReglas.fixture.json` se regeneró desde las fuentes Java (sin emoji, con `codigo`, `objetivo`,
+  `efecto`, `proteccion`): 32 piezas y 79 parámetros, sin `seguimiento.*`. Las piezas del stack caen solas en su grupo por
+  `objetivo` (Riego, Nutrición, Sanidad, Mediasombra, Seguimiento, Protecciones). `EffectivenessService` es una pieza con
+  interruptor (como los demás servicios que deciden): no está en el DAG (`SERVICIOS` del mock) y ya no figura en
+  `CONSUMIDORES` ni queda `HistorialService`. Los parámetros compartidos `diagnostico.confianza-minima` y
+  `diagnostico.vigencia-horas` (los leen las F-*) se editan en Riego, el primer grupo donde tienen un consumidor
+  (`SolarStressRule`, F-S1); `riego.humedad-objetivo` y afines también los comparte F-S1.
+- **Historial e Inspector** conservan lo de ambos: «Registrar revisión» (S-06) y el chip «Bloquea» del stack, y el
+  comportamiento de `reglasInactivas` del grafo.
+- **Verificación.** Backend completo: 2168 tests, sólo falla el clima previo de `NurseryControllerTest`. Frontend:
+  `tsc`, 867 tests, lint y build. Simulador: typecheck y 263 tests.
 
 ## Riesgos
 
