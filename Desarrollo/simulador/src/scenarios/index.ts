@@ -8,6 +8,7 @@
 import type { DemoRule } from '../types';
 import { applicationPreconditions } from './applicationPreconditions';
 import { chlorosisNonNutritional, chlorosisNutritional } from './chlorosis';
+import { irrigationNoEffect, treatmentNoEffect } from './effectiveness';
 import { faultNoFlow, faultOverflow, faultShadeLimit } from './faults';
 import { foliarPest } from './foliarPest';
 import { fungalCondition } from './fungalCondition';
@@ -35,6 +36,7 @@ export const SCENARIOS: RuleScenario[] = [
   faultNoFlow, faultOverflow, faultShadeLimit, repair, applicationPreconditions, nutritionPlan, lowEc,
   fungalDamage, foliarPest, fungalCondition, outbreak, fungicideCap,
   chlorosisNutritional, chlorosisNonNutritional, solarStress, solarStressUnexplained,
+  irrigationNoEffect, treatmentNoEffect,
 ];
 
 /** Backend pieces (`GET /api/demo/rules`) that no scenario exercises. */
