@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './catalogoReglas.fixture.json';
+import { soloReglasDeLaCadena } from './reglasMock';
 import { evaluarMotor, type EntradaMotor } from './trazaReglas';
 import type { CatalogoReglas, TrazaEvaluacion, TrazaRegla } from '@/types/domain';
 
-const catalogo = fixture as CatalogoReglas;
+/** La traza evalúa las reglas de la cadena; los servicios con interruptor no corren por sector. */
+const catalogo = soloReglasDeLaCadena(fixture as CatalogoReglas);
 
 /** 2026-06-13 12:00 UTC = 09:00 hora del vivero (UTC-3): dentro de la ventana de riego. */
 const TS_DIA = '2026-06-13T12:00:00.000Z';

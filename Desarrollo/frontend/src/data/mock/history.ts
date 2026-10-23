@@ -207,7 +207,7 @@ const SCENARIOS: Scenario[] = [
 ];
 
 /** 'hace X' relativo a ahora. */
-function formatAgo(ts: number): string {
+export function formatAgo(ts: number): string {
   const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (sec < 60) return `hace ${sec} s`;
   const min = Math.floor(sec / 60);
@@ -218,7 +218,7 @@ function formatAgo(ts: number): string {
 }
 
 /** 'dd/MM HH:mm' para el filtro por rango de fechas. */
-function formatFecha(ts: number): string {
+export function formatFecha(ts: number): string {
   const d = new Date(ts);
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -262,6 +262,54 @@ function buildEvo(kind: EvoKind, antes: number | undefined, r: () => number): Ev
     verdict,
     vSoft: v.soft,
     vInk: v.ink,
+  };
+}
+
+/**
+ * Evento que deja prender o apagar una regla (tipo `Configuración`, de alcance sistema), con los mismos textos que
+ * `HistorialService.registrarEstadoRegla` del backend.
+ */
+export function buildRuleStateEvent(input: {
+  id: string;
+  regla: string;
+  etiqueta: string;
+  codigo: string;
+  activa: boolean;
+  usuario: string;
+  motivo: string | null;
+  consecuencia: string | null;
+  ts: number;
+}): ActionRecord {
+  const nombre = `«${input.etiqueta}»${input.codigo ? ` (${input.codigo})` : ''}`;
+  const rm = resMap.Efectiva;
+  const meta = ACT.Alerta;
+  return {
+    id: input.id,
+    sectorId: '—',
+    zonaName: 'Sistema',
+    tipo: 'Configuración',
+    time: formatAgo(input.ts),
+    ts: input.ts,
+    fecha: formatFecha(input.ts),
+    lectura: `Interruptor del motor de reglas: ${nombre}.`,
+    decision: `Regla ${nombre} ${input.activa ? 'prendida' : 'apagada'} por ${input.usuario}.${input.motivo ? ` Motivo: ${input.motivo}.` : ''}`,
+    accion: input.consecuencia
+      ? `Consecuencia: ${input.consecuencia}`
+      : input.activa
+        ? 'El motor vuelve a evaluarla desde el próximo pulso.'
+        : 'El motor deja de evaluarla desde el próximo pulso.',
+    res: 'Efectiva',
+    resSoft: rm.soft,
+    resInk: rm.ink,
+    sev: '—',
+    tint: meta.tint,
+    ink: meta.ink,
+    path: meta.path,
+    evo: null,
+    regla: input.regla,
+    alerta: null,
+    volumenL: null,
+    duracionSeg: null,
   };
 }
 

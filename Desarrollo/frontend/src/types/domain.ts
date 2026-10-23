@@ -357,6 +357,12 @@ export interface ActionRecord {
   volumenL?: number | null;
   /** Duración de apertura ordenada (s); sólo en eventos de tipo `Riego`. */
   duracionSeg?: number | null;
+  /**
+   * Piezas del motor que estaban apagadas cuando se tomó la decisión (el grafo de razonamiento las excluye
+   * y dibuja todas las demás). Vacío = todo estaba prendido; `null`/ausente = evento anterior a este registro
+   * o que no vino del motor: el grafo cae a las que están apagadas de fábrica.
+   */
+  reglasInactivas?: string[] | null;
 }
 
 /** Nivel de una alerta del motor (eventos `Alerta` del historial). */
@@ -710,11 +716,15 @@ export interface RuleNode {
   branch: string;
   /** Claves del catálogo de parámetros que declara la regla; vacía en los nodos especiales. */
   parametros: string[];
+  /** Código de `reglas_v2` ("R-01"); vacío si la pieza no tiene (o es un nodo especial). */
+  codigo?: string;
   /**
-   * `false` si la regla está apagada (las retiradas, `yerbanalytics.reglas.retiradas`): no corre y el
-   * historial no la dibuja. Los nodos especiales siempre vienen activos; ausente = activa.
+   * Estado EFECTIVO hoy: `false` si la regla está apagada (por el vivero o, en modo demo, por el simulador) y no
+   * corre. Los nodos especiales siempre vienen activos; ausente = activa.
    */
   activa?: boolean;
+  /** `false` si arranca apagada de fábrica (las retiradas). Sirve para reconstruir el grafo de un evento viejo. */
+  activaPorDefecto?: boolean;
 }
 
 /** Arista dirigida entre dos nodos del DAG. Espejo de `RuleEdgeDto` del backend. */
@@ -772,13 +782,51 @@ export interface ParametroRegla {
   updatedTs: number | null;
 }
 
-/** Una regla del motor con las claves de los parámetros que declara. */
+/** Grupo de la pantalla Motor de reglas (el backend lo declara por pieza). */
+export type ObjetivoRegla = 'IRRIGATION' | 'NUTRITION' | 'SANITY' | 'SHADE' | 'FOLLOW_UP' | 'PROTECTION';
+
+/** Qué hace la pieza: actúa sobre el vivero, sólo avisa o protege (apagarla exige confirmación). */
+export type EfectoRegla = 'ACTS' | 'WARNS' | 'PROTECTS';
+
+/** Último cambio del interruptor de una pieza: quién, cuándo y por qué. */
+export interface UltimoCambioRegla {
+  motivo: string | null;
+  updatedBy: string;
+  /** Epoch ms. */
+  updatedTs: number;
+}
+
+/**
+ * Una pieza del motor que decide (regla por sector, de macro-zona o servicio) con las claves de los parámetros
+ * que declara. `label` viene sin emoji ni código; `codigo` es "" si la pieza no tiene (puede ser una lista).
+ */
 export interface ReglaCatalogo {
   id: string;
   label: string;
+  codigo: string;
   rama: RamaRegla;
+  objetivo: ObjetivoRegla;
+  efecto: EfectoRegla;
   prioridad: number;
   parametros: string[];
+  /** Estado operativo: lo que decidió el vivero. */
+  activa: boolean;
+  /** `false` si arranca apagada de fábrica (una retirada). */
+  activaPorDefecto: boolean;
+  /** El override explícito del simulador la apaga (siempre `false` fuera del modo demo). */
+  apagadaPorDemo: boolean;
+  /** Si es una protección: qué pasa al apagarla. `null` si no lo es. */
+  proteccion: string | null;
+  /** `null` si nunca se cambió el interruptor. */
+  estado: UltimoCambioRegla | null;
+}
+
+/** Cuerpo de `PUT /api/rules/{name}/estado`. Prender nunca pide motivo ni confirmación. */
+export interface CambioEstadoRegla {
+  activa: boolean;
+  motivo?: string;
+  /** Obligatorio al apagar una protección. */
+  confirmaProteccion?: boolean;
 }
 
 /** Catálogo normalizado: los parámetros van una vez y las reglas los referencian por clave. */

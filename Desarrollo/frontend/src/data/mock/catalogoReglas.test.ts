@@ -191,7 +191,21 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   ApplicationService: resolve(DIR_ENGINE, '..', 'supply', 'ApplicationService.java'),
   TankService: resolve(DIR_ENGINE, '..', 'supply', 'TankService.java'),
   NutritionPlanService: resolve(DIR_ENGINE, '..', 'nutrition', 'NutritionPlanService.java'),
+  HistorialService: resolve(DIR_ENGINE, '..', 'service', 'HistorialService.java'),
+  HorarioMediasombraService: resolve(DIR_ENGINE, '..', 'mediasombra', 'HorarioMediasombraService.java'),
 };
+
+/**
+ * Servicios que deciden y el catálogo lista junto a las reglas (son `DemoControllable`, con interruptor), pero que no
+ * son una `Rule` ni una `ZoneRule`: no están en la cadena del DAG. Su prioridad sólo ordena el listado.
+ */
+const SERVICIOS_CON_INTERRUPTOR = [
+  'EscalamientoNodo',
+  'ReadingValidationGuard',
+  'HardwareFaultService',
+  'HorarioMediasombraService',
+  'ApplicationPreconditions',
+];
 
 describe('parametrosPorRegla (el lector del anti-drift)', () => {
   const constantes = new Map([
@@ -239,25 +253,32 @@ describe.skipIf(
     );
     const noRegla = parametrosPorRegla(fuentesNoRegla, constantes);
 
-    it('el fixture tiene exactamente las reglas del backend, con su prioridad', () => {
+    it('el fixture tiene exactamente las reglas del backend, con su prioridad, más los servicios con interruptor', () => {
       const prioridades = Object.fromEntries(
-        Object.entries(fuentes).map(([id, src]) => [id, Number(/PRIORITY\s*=\s*(\d+)/.exec(src)?.[1])]),
+        Object.entries(fuentes).map(([id, src]) => [
+          id,
+          Number(/PRIORITY\s*=\s*(\d+)/.exec(src)?.[1] ?? /int priority\(\)\s*\{\s*return\s*(\d+)/.exec(src)?.[1]),
+        ]),
       );
-      expect(Object.fromEntries(catalogo.reglas.map((r) => [r.id, r.prioridad]))).toEqual(prioridades);
+      const delFixture = Object.fromEntries(
+        catalogo.reglas.filter((r) => !SERVICIOS_CON_INTERRUPTOR.includes(r.id)).map((r) => [r.id, r.prioridad]),
+      );
+      expect(delFixture).toEqual(prioridades);
+      expect(catalogo.reglas.map((r) => r.id)).toEqual(expect.arrayContaining(SERVICIOS_CON_INTERRUPTOR));
     });
 
-    it('cada regla declara los mismos parámetros que el fixture (reglas[].parametros)', () => {
+    it('cada pieza declara los mismos parámetros que el fixture (reglas[].parametros)', () => {
       for (const r of catalogo.reglas) {
         expect({ regla: r.id, parametros: [...r.parametros].sort() }).toEqual({
           regla: r.id,
-          parametros: [...delBackend[r.id]].sort(),
+          parametros: [...(delBackend[r.id] ?? noRegla[r.id] ?? [])].sort(),
         });
       }
     });
 
     it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y los demás consumidores) del backend', () => {
       for (const p of catalogo.parametros) {
-        const esperado = catalogo.reglas.filter((r) => delBackend[r.id].includes(p.clave)).map((r) => r.id);
+        const esperado = catalogo.reglas.filter((r) => delBackend[r.id]?.includes(p.clave)).map((r) => r.id);
         for (const [id, claves] of Object.entries(noRegla)) {
           if (claves.includes(p.clave)) esperado.push(id);
         }

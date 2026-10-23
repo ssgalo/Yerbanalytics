@@ -24,6 +24,17 @@ describe('hardware.reparar (S-05)', () => {
   });
 });
 
+describe('reglas.editar', () => {
+  it('cubre los parámetros del motor y prender o apagar reglas (add-motor-reglas-operativo)', () => {
+    expect(CATALOGO_PERMISOS).toContainEqual(
+      expect.objectContaining({
+        codigo: 'reglas.editar',
+        descripcion: 'Editar los parámetros del motor y prender o apagar reglas',
+      }),
+    );
+  });
+});
+
 describe('matriz por defecto', () => {
   it('ningún rol tiene una edición sin su lectura', () => {
     for (const rol of ROLES) {

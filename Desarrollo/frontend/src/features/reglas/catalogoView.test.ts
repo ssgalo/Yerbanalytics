@@ -29,6 +29,7 @@ describe('agruparPorRama', () => {
 
   it('omite las ramas sin reglas y escala a decenas de reglas', () => {
     const reglas = Array.from({ length: 40 }, (_, i) => ({
+      ...catalogoDeFabrica().reglas[0],
       id: `R${i}`,
       label: `Regla ${i}`,
       rama: 'RIEGO' as const,

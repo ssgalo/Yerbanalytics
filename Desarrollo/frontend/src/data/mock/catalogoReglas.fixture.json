@@ -2,100 +2,183 @@
   "reglas": [
     {
       "id": "ManualLockRule",
-      "label": "🔒 Bloqueo manual",
+      "label": "Bloqueo manual",
+      "codigo": "S-01",
       "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
       "prioridad": 0,
-      "parametros": []
+      "parametros": [],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Un sector o una macro-zona bloqueados a mano vuelven a regarse y dosificarse solos.",
+      "estado": null
     },
     {
       "id": "IncompleteHardwareRule",
-      "label": "🧰 Hardware incompleto (S-04)",
+      "label": "Hardware incompleto",
+      "codigo": "S-04",
       "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
       "prioridad": 1,
-      "parametros": []
+      "parametros": [],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Se ordena a actuadores que no están registrados.",
+      "estado": null
     },
     {
       "id": "HydraulicFaultRule",
-      "label": "🚰 Falla hidráulica (S-05)",
+      "label": "Falla hidráulica",
+      "codigo": "S-05",
       "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
       "prioridad": 2,
-      "parametros": []
+      "parametros": [],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Un sector con falla hidráulica marcada se riega y dosifica solo.",
+      "estado": null
     },
     {
       "id": "StaleSensorRule",
-      "label": "📵 Sensor sin datos recientes",
+      "label": "Sensor sin datos recientes",
+      "codigo": "S-02",
       "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
       "prioridad": 3,
       "parametros": [
         "seguridad.antiguedad-max-lectura"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "El motor decide con lecturas viejas o con la humedad congelada.",
+      "estado": null
     },
     {
       "id": "SustratoSaturadoRule",
-      "label": "💧 Sustrato saturado (R-04)",
+      "label": "Sustrato saturado",
+      "codigo": "R-04",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "PROTECTS",
       "prioridad": 4,
       "parametros": [
         "riego.saturacion-bloqueo",
         "riego.saturacion-alerta"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Se riega con el sustrato saturado.",
+      "estado": null
     },
     {
       "id": "CicloLecturaRiegoRule",
-      "label": "🔁 Un riego por ciclo de lectura",
+      "label": "Un riego por ciclo de lectura",
+      "codigo": "",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "PROTECTS",
       "prioridad": 5,
       "parametros": [
         "riego.umbral-critico"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Un sector puede regarse más de una vez por ciclo de lectura.",
+      "estado": null
     },
     {
       "id": "DeficitCriticoRule",
-      "label": "🚨 Déficit hídrico crítico (R-02)",
+      "label": "Déficit hídrico crítico",
+      "codigo": "R-02",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "ACTS",
       "prioridad": 6,
       "parametros": [
         "riego.umbral-critico",
         "riego.volumen-max-evento",
         "riego.caudal-emisor",
         "riego.exceptuado-bloqueo"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "DailyDoseLimitRule",
-      "label": "🛑 Límite de dosis diaria",
+      "label": "Límite de dosis diaria",
+      "codigo": "",
       "rama": "INSUMO",
+      "objetivo": "NUTRITION",
+      "efecto": "PROTECTS",
       "prioridad": 7,
       "parametros": [
         "insumo.max-dosis-24h"
-      ]
+      ],
+      "activa": false,
+      "activaPorDefecto": false,
+      "apagadaPorDemo": false,
+      "proteccion": "Se dosifica sin el tope diario de dosis de la v1.",
+      "estado": null
     },
     {
       "id": "FueraDeVentanaRiegoRule",
-      "label": "🌙 Riego fuera de ventana horaria (R-05)",
+      "label": "Riego fuera de ventana horaria",
+      "codigo": "R-05",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "ACTS",
       "prioridad": 8,
       "parametros": [
         "riego.ventana-normal",
         "riego.umbral-humedad",
         "riego.umbral-critico"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "PausaTrasAplicacionRule",
-      "label": "⏸️ Pausa tras una aplicación (R-06)",
+      "label": "Pausa tras una aplicación",
+      "codigo": "R-06",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "ACTS",
       "prioridad": 9,
       "parametros": [
         "riego.pausa-tras-aplicacion",
         "riego.umbral-humedad",
         "riego.umbral-critico"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "PosponerPorLluviaRule",
-      "label": "🌧️ Posponer por lluvia (R-03)",
+      "label": "Posponer por lluvia",
+      "codigo": "R-03",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "ACTS",
       "prioridad": 10,
       "parametros": [
         "riego.lluvia-probabilidad",
@@ -103,12 +186,20 @@
         "riego.lluvia-ventana",
         "riego.umbral-humedad",
         "riego.umbral-critico"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "RiegoPorDeficitRule",
-      "label": "💦 Riego por déficit hídrico (R-01)",
+      "label": "Riego por déficit hídrico",
+      "codigo": "R-01",
       "rama": "RIEGO",
+      "objetivo": "IRRIGATION",
+      "efecto": "ACTS",
       "prioridad": 11,
       "parametros": [
         "riego.umbral-humedad",
@@ -117,59 +208,211 @@
         "riego.litros-por-punto",
         "riego.volumen-max-evento",
         "riego.caudal-emisor"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "SupplyRule",
-      "label": "🧪 Dosificación de insumo",
+      "label": "Dosificación de insumo",
+      "codigo": "",
       "rama": "INSUMO",
+      "objetivo": "NUTRITION",
+      "efecto": "ACTS",
       "prioridad": 12,
       "parametros": [
         "diagnostico.confianza-minima"
-      ]
+      ],
+      "activa": false,
+      "activaPorDefecto": false,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "ShadeFaultRule",
-      "label": "⚙️ Falla mecánica en mediasombra (S-05)",
+      "label": "Mediasombra disponible",
+      "codigo": "S-01, S-04, S-05",
       "rama": "MEDIASOMBRA",
+      "objetivo": "SHADE",
+      "efecto": "PROTECTS",
       "prioridad": 13,
-      "parametros": []
+      "parametros": [],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Se mueve la malla de una zona bloqueada, sin malla registrada o con la malla averiada.",
+      "estado": null
     },
     {
       "id": "ShadingRule",
-      "label": "⛅ Control de mediasombra",
+      "label": "Control de mediasombra",
+      "codigo": "",
       "rama": "MEDIASOMBRA",
+      "objetivo": "SHADE",
+      "efecto": "ACTS",
       "prioridad": 14,
       "parametros": [
         "mediasombra.uv-umbral"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
+    },
+    {
+      "id": "ApplicationPreconditions",
+      "label": "Precondiciones de aplicación",
+      "codigo": "P-D1, P-D2, P-D3, P-D4, P-D5",
+      "rama": "INSUMO",
+      "objetivo": "NUTRITION",
+      "efecto": "ACTS",
+      "prioridad": 20,
+      "parametros": [
+        "insumo.intervalo-fertilizante",
+        "insumo.intervalo-fitosanitario",
+        "insumo.ventana-manana",
+        "insumo.ventana-tarde",
+        "insumo.temp-max-aplicar",
+        "insumo.humedad-min-aplicar",
+        "insumo.lluvia-impide-mm"
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "FollowUpRule",
-      "label": "⏱️ Seguimiento post-acción",
+      "label": "Seguimiento post-acción",
+      "codigo": "",
       "rama": "SEGUIMIENTO",
+      "objetivo": "FOLLOW_UP",
+      "efecto": "WARNS",
       "prioridad": 21,
-      "parametros": []
+      "parametros": [],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "LowEcRule",
-      "label": "🧂 CE baja (N-02)",
+      "label": "CE baja",
+      "codigo": "N-02",
       "rama": "INSUMO",
+      "objetivo": "NUTRITION",
+      "efecto": "ACTS",
       "prioridad": 22,
       "parametros": [
         "nutricion.ce-baja",
         "nutricion.ce-lecturas",
         "nutricion.sin-fertilizar-dias"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     },
     {
       "id": "NutritionPlanRule",
-      "label": "🌱 Plan de nutrición (N-01)",
+      "label": "Plan de nutrición",
+      "codigo": "N-01",
       "rama": "INSUMO",
+      "objetivo": "NUTRITION",
+      "efecto": "ACTS",
       "prioridad": 23,
       "parametros": [
         "nutricion.intervalo-plan"
-      ]
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
+    },
+    {
+      "id": "EscalamientoNodo",
+      "label": "Nodo sin respuesta",
+      "codigo": "S-02",
+      "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
+      "prioridad": 90,
+      "parametros": [
+        "sensado.reintento-fuera-servicio"
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Un nodo que no responde nunca pasa a fuera de servicio y su macro-zona no va a estado seguro.",
+      "estado": null
+    },
+    {
+      "id": "ReadingValidationGuard",
+      "label": "Lectura inválida",
+      "codigo": "S-03",
+      "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
+      "prioridad": 91,
+      "parametros": [
+        "seguridad.rango-hum-min",
+        "seguridad.rango-hum-max",
+        "seguridad.rango-temp-min",
+        "seguridad.rango-temp-max",
+        "seguridad.rango-ph-min",
+        "seguridad.rango-ph-max",
+        "seguridad.rango-ce-min",
+        "seguridad.rango-ce-max",
+        "seguridad.rango-luz-min",
+        "seguridad.rango-luz-max",
+        "seguridad.relecturas-invalidas"
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Se aceptan lecturas fuera del rango físico y el motor decide con ellas.",
+      "estado": null
+    },
+    {
+      "id": "HardwareFaultService",
+      "label": "Errores del nodo",
+      "codigo": "S-05",
+      "rama": "GLOBAL",
+      "objetivo": "PROTECTION",
+      "efecto": "PROTECTS",
+      "prioridad": 92,
+      "parametros": [
+        "riego.umbral-humedad"
+      ],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": "Los errores que publica el nodo se ignoran: ninguna falla se marca.",
+      "estado": null
+    },
+    {
+      "id": "HorarioMediasombraService",
+      "label": "Horario de la mediasombra (plan de rustificación u horario por defecto)",
+      "codigo": "",
+      "rama": "MEDIASOMBRA",
+      "objetivo": "SHADE",
+      "efecto": "ACTS",
+      "prioridad": 93,
+      "parametros": [],
+      "activa": true,
+      "activaPorDefecto": true,
+      "apagadaPorDemo": false,
+      "proteccion": null,
+      "estado": null
     }
   ],
   "parametros": [
@@ -1250,6 +1493,46 @@
       "modificado": false,
       "usadoPor": [
         "EscalamientoNodo"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguimiento.latencia-min",
+      "etiqueta": "Espera antes de evaluar el efecto",
+      "descripcion": "Minutos que se espera, después de una acción del motor, antes de comparar la métrica y decidir si fue efectiva.",
+      "familia": "SEGUIMIENTO",
+      "tipo": "ENTERO",
+      "unidad": "min",
+      "valor": "2",
+      "fabrica": "2",
+      "min": 1.0,
+      "max": 1440.0,
+      "decimales": 0,
+      "refSpec": "HU-12 CA-02",
+      "modificado": false,
+      "usadoPor": [
+        "HistorialService"
+      ],
+      "updatedBy": null,
+      "updatedTs": null
+    },
+    {
+      "clave": "seguimiento.delta-min",
+      "etiqueta": "Recuperación mínima para considerar efectiva",
+      "descripcion": "Puntos que tiene que mejorar la métrica de la acción dentro de la espera para catalogarla como efectiva.",
+      "familia": "SEGUIMIENTO",
+      "tipo": "NUMERO",
+      "unidad": "puntos",
+      "valor": "5",
+      "fabrica": "5",
+      "min": 0.5,
+      "max": 50.0,
+      "decimales": 1,
+      "refSpec": "HU-12 CA-02",
+      "modificado": false,
+      "usadoPor": [
+        "HistorialService"
       ],
       "updatedBy": null,
       "updatedTs": null

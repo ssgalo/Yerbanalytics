@@ -50,9 +50,9 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 6.5 `migracion-umbrales-al-motor.sql` (idempotente, encabezado al estilo de `migracion-catalogo-parametros.sql`): copia los valores editados y en rango a `parametro_regla`, `RAISE NOTICE` si no; `DROP COLUMN IF EXISTS` de las tres columnas. Probarla dos veces seguidas en una base de desarrollo.
 
 ## 7. Frontend: datos y tipos
-- [ ] 7.1 RED: tests del repositorio HTTP y mock: `setEstadoRegla(name, { activa, motivo, confirmaProteccion })`; error tipado con `MOTIVO_REQUERIDO` / `CONFIRMACION_REQUERIDA`.
-- [ ] 7.2 GREEN: `ReglaCatalogo` (`codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`), `RuleNode.activaPorDefecto`/`codigo`, `ActionRecord.reglasInactivas`; `DataRepository`, `httpRepository`, `mockRepository`; `catalogoReglas.fixture.json` sin emojis y con los campos nuevos.
-- [ ] 7.3 `lib/catalogoSeguridad.ts`: descripción de `reglas.editar`.
+- [x] 7.1 RED: tests del repositorio HTTP y mock: `setEstadoRegla(name, { activa, motivo, confirmaProteccion })`; error tipado con `MOTIVO_REQUERIDO` / `CONFIRMACION_REQUERIDA`.
+- [x] 7.2 GREEN: `ReglaCatalogo` (`codigo`, `objetivo`, `efecto`, `activa`, `activaPorDefecto`, `apagadaPorDemo`, `proteccion`, `estado`), `RuleNode.activaPorDefecto`/`codigo`, `ActionRecord.reglasInactivas`; `DataRepository`, `httpRepository`, `mockRepository`; `catalogoReglas.fixture.json` sin emojis y con los campos nuevos.
+- [x] 7.3 `lib/catalogoSeguridad.ts`: descripción de `reglas.editar`.
 
 ## 8. Frontend: sin emojis (D-12)
 - [ ] 8.1 RED: `sinEmojis.test.ts` recorre `src/**/*.{ts,tsx,json}` y falla con `\p{Extended_Pictographic}` (hoy falla con `ReglaNode.tsx`, el fixture y los tests).
