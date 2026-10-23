@@ -100,6 +100,7 @@ public class RuleOrchestrator {
         String abortMediasombra = null;
         boolean diagnosticoNuevo = ctx.diagnosticoNuevo();
         boolean usoDiagnostico = false;
+        boolean pidioAplicacionPorDiagnostico = false;
 
         for (Rule rule : rules) {
             RuleBranch branch = rule.branch();
@@ -146,6 +147,7 @@ public class RuleOrchestrator {
             }
             accumulated.addAll(actions);
             usoDiagnostico |= rule.usaDiagnostico();
+            pidioAplicacionPorDiagnostico |= rule.usaDiagnostico() && pideAplicacionPorDiagnostico(actions);
             trazas.add(new TrazaRegla(rule.name(), branch, rule.priority(), EstadoRegla.EVALUADA,
                     List.copyOf(ev.comparaciones()),
                     actions.stream().map(a -> new AccionTrazada(a.type(), a.motivo())).toList(),
@@ -174,7 +176,15 @@ public class RuleOrchestrator {
             }
         }
 
-        return new ResultadoEvaluacion(accumulated, armarTraza(ctx, origen, vigentes, trazas), usoDiagnostico);
+        // Una aplicación pedida por el diagnóstico lo consume cuando se ejecuta (la diferida espera su ventana): hasta entonces
+        // sigue siendo nuevo. Que otra regla de diagnóstico sólo lo haya evaluado no alcanza para gastarlo.
+        return new ResultadoEvaluacion(accumulated, armarTraza(ctx, origen, vigentes, trazas),
+                usoDiagnostico && !pidioAplicacionPorDiagnostico);
+    }
+
+    /** {@code true} si alguna acción pide aplicar un insumo porque lo dice el diagnóstico (P-D1). */
+    private static boolean pideAplicacionPorDiagnostico(List<RuleAction> actions) {
+        return actions.stream().anyMatch(a -> a.detalle() instanceof DetalleInsumo insumo && insumo.fromDiagnosis());
     }
 
     private static TrazaEvaluacion armarTraza(RuleContext ctx, OrigenEvaluacion origen,
