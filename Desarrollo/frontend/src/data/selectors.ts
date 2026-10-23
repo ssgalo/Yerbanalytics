@@ -17,7 +17,7 @@ export function selectSectorDetail(data: NurseryData, sectorId: string): SectorD
   const latestPhoto = latestCapture?.imagenUrl
     ? latestCapture
     : data.diagnoses.find((d) => d.sectorId === sectorId && d.imagenUrl);
-  return buildSectorDetail(sector, zona.lectura, latestPhoto?.imagenUrl ?? undefined, latestCapture);
+  return buildSectorDetail(sector, zona.lectura, latestPhoto?.imagenUrl ?? undefined, latestCapture, zona.mediasombra);
 }
 
 /**

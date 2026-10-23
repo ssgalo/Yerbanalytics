@@ -278,8 +278,6 @@ function makeSector(
     finalStatus === 'critical' && diagnosis.conf && diagnosis.conf >= 85
       ? 'Dosificando'
       : 'En espera';
-  const shadePct = Math.round(rr(r, 30, 65) / 5) * 5;
-
   return {
     id,
     zona: z.id,
@@ -291,7 +289,7 @@ function makeSector(
     tip: id + ' · ' + LAB[finalStatus],
     diagnosis,
     reason,
-    actuadores: { valve, pump, shade: shadePct },
+    actuadores: { valve, pump },
     reentryUntil: null,
   };
 }
@@ -386,7 +384,10 @@ export function buildNursery(
       else if (s.status === 'offline') off++;
       else alerta++;
     }
-    return { ...z, sectors: list, sano, alerta, off, total: sectoresPorZona, lectura, nodo };
+    // La mediasombra es de la macro-zona: la última posición ordenada (MZ-6 no tiene; ver el mock de hardware).
+    // Sin sortear: no corre la semilla de los demás valores.
+    const mediasombra = z.id === 'MZ-6' ? null : zonaIdx % 2 === 0 ? 'abierta' : 'cerrada';
+    return { ...z, sectors: list, sano, alerta, off, total: sectoresPorZona, lectura, nodo, mediasombra };
   });
 
   // stats

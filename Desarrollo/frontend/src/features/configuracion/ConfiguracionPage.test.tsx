@@ -102,7 +102,7 @@ describe('Umbrales (ConfiguracionPage)', () => {
     montar(ConfiguracionPage);
     const desde = (await screen.findByLabelText('Abierta desde')) as HTMLInputElement;
     const hasta = screen.getByLabelText('Abierta hasta') as HTMLInputElement;
-    expect([desde.value, hasta.value]).toEqual(['08:00', '18:00']);
+    expect([desde.value, hasta.value]).toEqual(['08:00', '17:00']);
 
     fireEvent.change(hasta, { target: { value: '07:00' } });
 

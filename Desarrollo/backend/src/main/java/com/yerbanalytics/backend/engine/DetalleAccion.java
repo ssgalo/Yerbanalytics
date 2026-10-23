@@ -5,5 +5,6 @@ package com.yerbanalytics.backend.engine;
  * (antes la duración del riego se extraía del motivo con una regex). El motivo sigue siendo el
  * texto legible para el usuario; el detalle es lo que el sistema ejecuta.
  */
-public sealed interface DetalleAccion permits DetalleRiego, DetalleAlerta, DetalleInsumo, DetalleNutritionPlan, DetalleOutbreakTreatment, CancelPendingApplication, CancelaRiego {
+public sealed interface DetalleAccion permits DetalleRiego, DetalleAlerta, DetalleInsumo, DetalleNutritionPlan, DetalleMediasombra,
+        DetalleOutbreakTreatment, CancelPendingApplication, CancelaRiego {
 }

@@ -93,7 +93,7 @@ class NurseryServiceFaultsTest {
                 .thenReturn(Map.of("MZ-1-001", HardwareCoverage.COMPLETE, "MZ-1-002", HardwareCoverage.COMPLETE));
         // Sólo el primer sector tiene la electroválvula averiada; el segundo no figura (nada marcado).
         when(hardwareService.faultsOf(anyCollection()))
-                .thenReturn(Map.of("MZ-1-001", new HardwareFaults("SIN_CAUDAL", "MEDIASOMBRA_FIN_DE_CARRERA")));
+                .thenReturn(Map.of("MZ-1-001", new HardwareFaults("SIN_CAUDAL")));
 
         configuracion = mock(ConfiguracionService.class);
         when(configuracion.getConfiguracionOperativa()).thenReturn(RuleContextTestFactory.defaultConfig());
@@ -131,7 +131,7 @@ class NurseryServiceFaultsTest {
 
         assertThat(contextos).hasSize(2);
         assertThat(contextos.get(0).sector().getId()).isEqualTo("MZ-1-001");
-        assertThat(contextos.get(0).faults()).isEqualTo(new HardwareFaults("SIN_CAUDAL", "MEDIASOMBRA_FIN_DE_CARRERA"));
+        assertThat(contextos.get(0).faults()).isEqualTo(new HardwareFaults("SIN_CAUDAL"));
         assertThat(contextos.get(1).sector().getId()).isEqualTo("MZ-1-002");
         assertThat(contextos.get(1).faults()).isEqualTo(HardwareFaults.NONE);
     }

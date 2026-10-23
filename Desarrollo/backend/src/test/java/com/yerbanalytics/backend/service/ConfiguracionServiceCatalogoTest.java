@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.constant.NurseryConstants;
 import com.yerbanalytics.backend.dto.Configuracion;
 import com.yerbanalytics.backend.dto.ConfiguracionOperativa;
-import com.yerbanalytics.backend.dto.RustificacionEtapa;
 import com.yerbanalytics.backend.dto.UmbralMetrica;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
@@ -12,7 +11,6 @@ import com.yerbanalytics.backend.engine.parametros.ParametrosMediasombra;
 import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
-import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +37,6 @@ class ConfiguracionServiceCatalogoTest {
 
     private UmbralMetricaRepository umbrales;
     private ConfiguracionOperativaRepository operativaRepo;
-    private RustificacionEtapaRepository rustificacionRepo;
     private HistorialService historial;
     private CatalogoParametrosService catalogo;
     private ConfiguracionService service;
@@ -48,15 +45,13 @@ class ConfiguracionServiceCatalogoTest {
     void setUp() {
         umbrales = mock(UmbralMetricaRepository.class);
         operativaRepo = mock(ConfiguracionOperativaRepository.class);
-        rustificacionRepo = mock(RustificacionEtapaRepository.class);
         historial = mock(HistorialService.class);
         catalogo = mock(CatalogoParametrosService.class);
         when(umbrales.findAll()).thenReturn(List.of());
         when(operativaRepo.findById(1)).thenReturn(Optional.empty());
-        when(rustificacionRepo.findAllByOrderByOrdenAsc()).thenReturn(List.of());
         when(operativaRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
-        service = new ConfiguracionService(umbrales, operativaRepo, rustificacionRepo, historial, catalogo);
+        service = new ConfiguracionService(umbrales, operativaRepo, historial, catalogo);
     }
 
     private static List<UmbralMetrica> umbralesDeFabrica() {
@@ -64,9 +59,13 @@ class ConfiguracionServiceCatalogoTest {
                 sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1], sp.crit()[0], sp.crit()[1], false)).toList();
     }
 
-    private static Configuracion cfg(List<RustificacionEtapa> etapas) {
-        return new Configuracion(umbralesDeFabrica(),
-                new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null, null), etapas);
+    private static Configuracion cfg() {
+        return cfg(null, null);
+    }
+
+    private static Configuracion cfg(String mediasombraDesde, String mediasombraHasta) {
+        return new Configuracion(umbralesDeFabrica(), new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null,
+                null, mediasombraDesde, mediasombraHasta));
     }
 
     // ------------------------------------------------------------------ 5.1
@@ -90,25 +89,43 @@ class ConfiguracionServiceCatalogoTest {
 
     @Test
     void updateConfiguracion_sinLosCamposMudadosGuarda() {
-        service.updateConfiguracion(cfg(List.of()), "Ana");
+        service.updateConfiguracion(cfg(), "Ana");
 
         verify(operativaRepo).save(any(ConfiguracionOperativaEntity.class));
     }
 
-    // ------------------------------------------------------------------ 5.2
+    // ------------------------------------------------------------------ horario por defecto de la mediasombra
 
     @Test
-    void rustificacion_rechazaUnaEtapaPorEncimaDeCien() {
-        assertThatThrownBy(() -> service.updateConfiguracion(cfg(List.of(new RustificacionEtapa(1, 1, 10, 101))), "Ana"))
+    void horarioMediasombra_rechazaElCierreAntesDeLaApertura() {
+        assertThatThrownBy(() -> service.updateConfiguracion(cfg("17:00", "08:00"), "Ana"))
                 .isInstanceOf(InvalidConfigurationException.class)
-                .hasMessageContaining("100");
+                .hasMessageContaining("posterior");
         verify(operativaRepo, never()).save(any());
     }
 
     @Test
-    void rustificacion_aceptaHastaCien() {
-        service.updateConfiguracion(cfg(List.of(new RustificacionEtapa(1, 1, 10, 100))), "Ana");
+    void horarioMediasombra_rechazaUnaHoraMalEscrita() {
+        assertThatThrownBy(() -> service.updateConfiguracion(cfg("8", "17:00"), "Ana"))
+                .isInstanceOf(InvalidConfigurationException.class)
+                .hasMessageContaining("HH:mm");
+    }
 
-        verify(operativaRepo).save(any(ConfiguracionOperativaEntity.class));
+    @Test
+    void horarioMediasombra_seGuardaYSeLee() {
+        service.updateConfiguracion(cfg("09:30", "16:00"), "Ana");
+
+        org.mockito.ArgumentCaptor<ConfiguracionOperativaEntity> guardada =
+                org.mockito.ArgumentCaptor.forClass(ConfiguracionOperativaEntity.class);
+        verify(operativaRepo).save(guardada.capture());
+        assertThat(guardada.getValue().getMediasombraAbiertaDesde()).isEqualTo("09:30");
+        assertThat(guardada.getValue().getMediasombraAbiertaHasta()).isEqualTo("16:00");
+    }
+
+    @Test
+    void horarioMediasombra_sinGuardarRigeElDeFabrica() {
+        assertThat(service.getConfiguracion().operativa().mediasombraAbiertaDesde()).isEqualTo("08:00");
+        assertThat(service.getConfiguracion().operativa().mediasombraAbiertaHasta()).isEqualTo("17:00");
+        assertThat(service.horarioMediasombraPorDefecto().texto()).isEqualTo("08:00–17:00");
     }
 }

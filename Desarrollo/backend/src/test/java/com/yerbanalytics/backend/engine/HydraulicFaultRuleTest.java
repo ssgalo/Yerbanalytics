@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("HydraulicFaultRule (S-05)")
 class HydraulicFaultRuleTest {
 
-    private static final HardwareFaults SIN_CAUDAL = new HardwareFaults("SIN_CAUDAL", null);
+    private static final HardwareFaults SIN_CAUDAL = new HardwareFaults("SIN_CAUDAL");
 
     private final HydraulicFaultRule rule = new HydraulicFaultRule();
 
@@ -67,13 +67,6 @@ class HydraulicFaultRuleTest {
     }
 
     @Test
-    @DisplayName("una falla de la malla no toca el riego del sector")
-    void laMallaNoAfectaAlRiego() {
-        assertThat(rule.evaluate(ctx(new HardwareFaults(null, "MEDIASOMBRA_FIN_DE_CARRERA")), ev(rule)))
-                .extracting(RuleAction::type).containsExactly(ActionType.NOOP_INFO);
-    }
-
-    @Test
     @DisplayName("no emite alertas: la alerta sale una sola vez, cuando el nodo informa la falla")
     void sinAlertas() {
         assertThat(rule.evaluate(ctx(SIN_CAUDAL), ev(rule))).extracting(RuleAction::type).doesNotContain(ActionType.ALERTA);
@@ -82,7 +75,7 @@ class HydraulicFaultRuleTest {
     @Test
     @DisplayName("un tipo de falla desconocido igual saca al sector (se muestra tal cual)")
     void tipoDesconocido() {
-        List<RuleAction> acciones = rule.evaluate(ctx(new HardwareFaults("FALLA_RARA", null)), ev(rule));
+        List<RuleAction> acciones = rule.evaluate(ctx(new HardwareFaults("FALLA_RARA")), ev(rule));
 
         assertThat(acciones).extracting(RuleAction::type).containsExactly(ActionType.ABORT_RIEGO, ActionType.ABORT_INSUMO);
         assertThat(acciones.get(0).motivo()).contains("FALLA_RARA");

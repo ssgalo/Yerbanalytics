@@ -1,7 +1,7 @@
 /* Alta y recambio de dispositivos con validación en cliente (HU-18 CA-02/03 · HU-21 CA-05) */
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
-import { NODO_TESTIGO, TIPO_OPTIONS, ZONA_IDS } from '@/data/mock/hardware';
+import { NODO_TESTIGO, TIPO_OPTIONS, ZONA_IDS, esTipoDeZona } from '@/data/mock/hardware';
 import type { Dispositivo, NuevoDispositivo } from '@/types/domain';
 import styles from '../Hardware.module.css';
 
@@ -22,7 +22,9 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
   const [sectorId, setSectorId] = useState(device?.sectorId ?? '');
   const [error, setError] = useState<string | null>(null);
 
-  const esNodo = (esRecambio ? device?.tipo : tipo) === NODO_TESTIGO;
+  // El nodo testigo y la mediasombra son de la macro-zona; los demás actuadores, de un sector.
+  const deZona = esTipoDeZona(esRecambio ? device?.tipo : tipo);
+  const equipoDeZona = tipo === NODO_TESTIGO ? 'del nodo testigo' : 'de la mediasombra';
 
   /** Validación en cliente, espejo del backend (HU-18 CA-02). */
   function validar(): string | null {
@@ -30,8 +32,8 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
       return esRecambio ? 'Ingresá el serial/MAC de la pieza nueva.' : 'El serial/MAC es obligatorio.';
     }
     if (esRecambio) return null;
-    if (esNodo) {
-      if (!zonaId.trim()) return 'Elegí la macro-zona del nodo testigo.';
+    if (deZona) {
+      if (!zonaId.trim()) return `Elegí la macro-zona ${equipoDeZona}.`;
     } else if (!sectorId.trim()) {
       return 'Ingresá el sector del actuador (ej. MZ-1-003).';
     }
@@ -55,8 +57,8 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
       : {
           serial: serial.trim(),
           tipo,
-          zonaId: esNodo ? zonaId.trim() : null,
-          sectorId: esNodo ? null : sectorId.trim(),
+          zonaId: deZona ? zonaId.trim() : null,
+          sectorId: deZona ? null : sectorId.trim(),
         };
     try {
       await onSubmit(payload);
@@ -110,7 +112,7 @@ export function AltaHardwareForm({ mode, device, busy, onSubmit, onCancel }: Alt
               </select>
             </div>
 
-            {esNodo ? (
+            {deZona ? (
               <div className={styles.group}>
                 <label className={styles.label}>Macro-zona</label>
                 <select

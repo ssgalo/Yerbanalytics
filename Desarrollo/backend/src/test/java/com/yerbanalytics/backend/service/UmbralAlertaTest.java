@@ -14,7 +14,6 @@ import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.exception.InvalidConfigurationException;
 import com.yerbanalytics.backend.model.UmbralMetricaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
-import com.yerbanalytics.backend.repository.RustificacionEtapaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,15 +43,13 @@ class UmbralAlertaTest {
     void setUp() {
         umbrales = mock(UmbralMetricaRepository.class);
         ConfiguracionOperativaRepository operativaRepo = mock(ConfiguracionOperativaRepository.class);
-        RustificacionEtapaRepository rustificacionRepo = mock(RustificacionEtapaRepository.class);
         CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
         when(umbrales.findAll()).thenReturn(List.of());
         when(umbrales.findById(any())).thenReturn(Optional.empty());
         when(operativaRepo.findById(1)).thenReturn(Optional.empty());
         when(operativaRepo.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(rustificacionRepo.findAllByOrderByOrdenAsc()).thenReturn(List.of());
         when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
-        service = new ConfiguracionService(umbrales, operativaRepo, rustificacionRepo,
+        service = new ConfiguracionService(umbrales, operativaRepo,
                 mock(HistorialService.class), catalogo);
     }
 
@@ -67,7 +64,7 @@ class UmbralAlertaTest {
                 .map(sp -> "humAmb".equals(sp.key()) ? humAmb : new UmbralMetrica(sp.key(), sp.label(), sp.unit(),
                         sp.dec(), sp.ideal()[0], sp.ideal()[1], sp.warn()[0], sp.warn()[1], sp.crit()[0], sp.crit()[1], false))
                 .toList();
-        return new Configuracion(lista, new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null, null), List.of());
+        return new Configuracion(lista, new ConfiguracionOperativa(15, 2, 5.0, 240, "x", 1L, null, null, null));
     }
 
     @Test

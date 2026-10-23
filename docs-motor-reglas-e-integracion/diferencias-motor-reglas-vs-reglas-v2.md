@@ -33,7 +33,7 @@
 
 > **Actualización parcial del 23/10/2026** (`add-reglas-clorosis-estres-solar`):
 > - **F-C1, F-C2, F-S1 y F-S3 pasan de Ausente/Distinta a Implementada** (tablas de abajo). Son reglas **de sector** que actúan una vez por diagnóstico: `ChlorosisNonNutritionalRule` / `ChlorosisNutritionalRule` (`chlorosis/`) y `SolarStressRule` / `SolarStressUnexplainedRule` (`solarstress/`), sobre la compuerta común `engine/DiagnosisGate`. **F-S2 sigue Ausente**: necesita un dueño de la malla por horario, que `add-mediasombra-v2` (cancelado) iba a crear.
-> - F-C2 pide la dosis del catálogo (10 ml), no los 100 mL de la v2. «Durante la rustificación» se resuelve con el plan **global** (`hardening/GlobalPlanHardeningPhase`) hasta que exista el plan por macro-zona. La luz sigue siendo el % de un LDR.
+> - F-C2 pide la dosis del catálogo (10 ml), no los 100 mL de la v2. «Durante la rustificación» se resuelve con el plan **de la macro-zona** (`hardening/ZonePlanHardeningPhase`: rige una etapa hoy). La luz sigue siendo el % de un LDR.
 > - Con F-C2 y las bióticas ya están todas las reglas que aplican insumos por diagnóstico: `SupplyRule` y `DailyDoseLimitRule` (retiradas) pueden borrarse.
 > - Los conteos de cobertura y las citas `archivo:línea` del resto del documento no se recalcularon.
 

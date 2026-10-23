@@ -37,6 +37,22 @@ test('the shade net is marked for the whole zone when any of its sectors has it 
   assert.equal(shadeMarked(devices, 'MZ-2', sectors), false);
 });
 
+test('the shade net belongs to the zone: registered with it, like the witness node', () => {
+  const sectors = [sector('MZ-1-001'), sector('MZ-2-001', 'MZ-2')];
+  const zoneShade: HardwareDevice = {
+    id: 'DEV-011',
+    serial: 'MS-1',
+    tipo: 'mediasombra',
+    zonaId: 'MZ-1',
+    sectorId: null,
+    falla: 'MEDIASOMBRA_FIN_DE_CARRERA',
+  };
+
+  assert.equal(shadeMarked([zoneShade], 'MZ-1', sectors), true);
+  assert.equal(shadeMarked([zoneShade], 'MZ-2', sectors), false);
+  assert.equal(shadeMarked([{ ...zoneShade, falla: null }], 'MZ-1', sectors), false);
+});
+
 test('waitUntil returns as soon as the check passes, without waiting more', async () => {
   const waits: number[] = [];
   let calls = 0;

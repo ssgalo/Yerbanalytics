@@ -7,7 +7,7 @@ import type { EtapaRustificacion, NuevoPlanRustificacion, PlanRustificacion } fr
 import { addDays, daysBetween, horarioError, isIsoDate, todayIso, windowMinutes } from './horario';
 
 /** Horario por defecto de la mediasombra (sin plan), de fábrica. */
-export const HORARIO_MEDIASOMBRA_DEFAULT = { desde: '08:00', hasta: '18:00' } as const;
+export const HORARIO_MEDIASOMBRA_DEFAULT = { desde: '08:00', hasta: '17:00' } as const;
 
 /** Tope de días de una etapa: un plan de rustificación dura semanas, no meses. */
 export const MAX_DIAS_ETAPA = 60;
@@ -61,10 +61,11 @@ export interface ProgresoPlan {
   /** Día del plan (1-based); 0 si todavía no empezó. */
   dia: number;
   totalDias: number;
-  /** Etapa de hoy, o null si no empezó o ya terminó. */
+  /** Etapa que rige hoy, o null si no empezó. Pasada la última, la última (se sostiene hasta eliminar el plan). */
   etapa: EtapaRustificacion | null;
   /** Días que faltan para empezar (> 0 sólo si está programado). */
   faltan: number;
+  /** Ya pasaron todas las etapas: rige la última, sostenida, hasta que alguien elimine el plan. */
   terminado: boolean;
 }
 
@@ -73,7 +74,8 @@ export function progreso(plan: Pick<PlanRustificacion, 'fechaInicio' | 'etapas'>
   const total = totalDias(plan.etapas);
   const transcurridos = daysBetween(plan.fechaInicio, hoy);
   if (transcurridos < 0) return { dia: 0, totalDias: total, etapa: null, faltan: -transcurridos, terminado: false };
-  if (transcurridos >= total) return { dia: total, totalDias: total, etapa: null, faltan: 0, terminado: true };
+  const ultima = plan.etapas[plan.etapas.length - 1] ?? null;
+  if (transcurridos >= total) return { dia: total, totalDias: total, etapa: ultima, faltan: 0, terminado: true };
   let acumulado = 0;
   for (const e of plan.etapas) {
     acumulado += e.dias;
@@ -81,7 +83,7 @@ export function progreso(plan: Pick<PlanRustificacion, 'fechaInicio' | 'etapas'>
       return { dia: transcurridos + 1, totalDias: total, etapa: e, faltan: 0, terminado: false };
     }
   }
-  return { dia: total, totalDias: total, etapa: null, faltan: 0, terminado: true };
+  return { dia: total, totalDias: total, etapa: ultima, faltan: 0, terminado: true };
 }
 
 /** Un plan rige (programado o en curso): la zona no admite otro. */

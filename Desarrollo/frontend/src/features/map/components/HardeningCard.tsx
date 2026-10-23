@@ -1,7 +1,7 @@
 /* ============================================================
    Rustificación de la macro-zona: el plan vigente (si hay) o el horario por defecto de la
-   mediasombra, y desde acá se inicia o se cancela un plan. Un plan es de UNA macro-zona: las
-   mediasombras son por sector, pero la rustificación se decide por zona.
+   mediasombra, y desde acá se inicia o se elimina un plan. Un plan es de UNA macro-zona, como
+   su mediasombra (hay una por zona).
    ============================================================ */
 import { useState } from 'react';
 import type { Zona } from '@/types/domain';
@@ -21,7 +21,7 @@ import panel from './Panel.module.css';
 export function HardeningCard({ zona, className }: { zona: Zona; className?: string }) {
   const { plan, loading, error, busy, reload, start, cancel } = useHardeningPlan(zona.id);
   const { config } = useConfig();
-  // Iniciar o cancelar un plan cambia cómo opera la mediasombra: lo hace quien edita la configuración.
+  // Iniciar o eliminar un plan cambia cómo opera la mediasombra: lo hace quien edita la configuración.
   const canManage = useAuth().puede('configuracion.editar');
   const [editing, setEditing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -88,7 +88,11 @@ export function HardeningCard({ zona, className }: { zona: Zona; className?: str
       <div className={panel.head}>
         <h2 className={panel.title}>Rustificación</h2>
         <span className={panel.meta}>
-          {editing ? `Nuevo plan para ${zona.name}` : 'Exposición progresiva al sol antes del trasplante'}
+          {editing
+            ? `Nuevo plan para ${zona.name}`
+            : zona.mediasombra
+              ? `Mediasombra ${zona.mediasombra} (última orden)`
+              : 'Exposición progresiva al sol antes del trasplante'}
         </span>
       </div>
       {body}

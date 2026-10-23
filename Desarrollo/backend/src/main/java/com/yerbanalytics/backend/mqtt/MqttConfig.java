@@ -100,7 +100,7 @@ public class MqttConfig {
 
     // -------------------------------------------------------------------------
     // Inbound de los acks: resultado de cada comando de riego, insumo o mediasombra
-    // (nursery/zone/{zona}/sector/{sector}/ack)
+    // (nursery/zone/{zona}/sector/{sector}/ack; la mediasombra, de la zona: nursery/zone/{zona}/ack)
     // -------------------------------------------------------------------------
 
     /**
@@ -115,7 +115,8 @@ public class MqttConfig {
     @Bean
     public MqttPahoMessageDrivenChannelAdapter ackInboundAdapter(MqttPahoClientFactory factory) {
         MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(clientId + "-ack", factory, ContratoNodo.TOPIC_ACK_SUSCRIPCION);
+                new MqttPahoMessageDrivenChannelAdapter(clientId + "-ack", factory,
+                        ContratoNodo.TOPIC_ACK_SUSCRIPCION, ContratoNodo.TOPIC_ACK_ZONA_SUSCRIPCION);
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);

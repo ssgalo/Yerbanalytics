@@ -40,7 +40,7 @@ class ReglasArquitecturaTest {
     }
 
     @Test
-    void ningunaReglaLeeUnValueSalvoElDatoDelLoteDeShadingRule() throws Exception {
+    void ningunaReglaLeeUnValue() throws Exception {
         List<String> encontrados = new ArrayList<>();
         for (Class<?> c : reglas()) {
             for (Field f : c.getDeclaredFields()) {
@@ -56,7 +56,8 @@ class ReglasArquitecturaTest {
                 }
             }
         }
-        assertThat(encontrados).containsExactly("ShadingRule(String)");
+        // La fecha de siembra de ShadingRule se fue con la rustificación global: ahora no queda ninguna excepción.
+        assertThat(encontrados).isEmpty();
     }
 
     @Test
@@ -90,8 +91,9 @@ class ReglasArquitecturaTest {
                 .isLessThan(prioridades.get("DeficitCriticoRule"))
                 .isLessThan(prioridades.get("RiegoPorDeficitRule"))
                 .isLessThan(prioridades.get("SupplyRule"));
-        // La malla no se mueve sin antes saber que está averiada.
-        assertThat(prioridades.get("ShadeFaultRule")).isLessThan(prioridades.get("ShadingRule"));
+        // La malla (reglas de zona) no se mueve sin antes saber que está averiada.
+        assertThat(new com.yerbanalytics.backend.mediasombra.ShadeFaultRule().priority())
+                .isLessThan(new com.yerbanalytics.backend.mediasombra.ShadingRule().priority());
     }
 
     @Test

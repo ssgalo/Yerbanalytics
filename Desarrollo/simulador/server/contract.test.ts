@@ -49,6 +49,11 @@ test('the rail topics and vocabulary mirror contrato.h', async () => {
 test('command and ack topics mirror contrato.h', async () => {
   const c = await import('./contract.ts');
   assert.equal(c.ackTopic('MZ-1', 'MZ-1-002'), 'nursery/zone/MZ-1/sector/MZ-1-002/ack');
+  // La mediasombra es de la macro-zona: su ack va por el tópico de zona (sin sector).
+  assert.equal(c.ackTopic('MZ-1', ''), 'nursery/zone/MZ-1/ack');
+  assert.equal(c.zoneAckTopic('MZ-3'), 'nursery/zone/MZ-3/ack');
+  assert.equal(c.isZoneShadeCommand({ commandId: 'x', actuador: 'shade', accion: 'SET', parametros: { targetPct: 0 } }), true);
+  assert.equal(c.isZoneShadeCommand({ commandId: 'x', accion: 'LEER_AHORA', parametros: {} }), false);
   assert.deepEqual(c.parseCommandTopic('nursery/zone/MZ-1/sector/MZ-1-002/command'), {
     zonaId: 'MZ-1',
     sectorId: 'MZ-1-002',
