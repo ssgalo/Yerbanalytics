@@ -1,22 +1,71 @@
 import { describe, expect, it } from 'vitest';
 import {
-  agruparPorConsumidor,
-  agruparPorRama,
-  filtrarParametros,
-  filtrarReglas,
+  agruparPorObjetivo,
+  CONSUMIDORES,
+  nombreConsumidor,
+  NOMBRE_OBJETIVO,
+  ORDEN_OBJETIVOS,
+  SIN_FILTROS,
   indicePorClave,
-  textoResumen,
-  resumenRegla,
 } from './catalogoView';
 import { catalogoDeFabrica, conValor } from './__fixtures__/catalogos';
+import type { ReglaCatalogo } from '@/types/domain';
 
-describe('agruparPorRama', () => {
-  it('agrupa por rama en el orden del motor y cada rama por prioridad', () => {
-    const grupos = agruparPorRama(catalogoDeFabrica().reglas);
+const grupo = (
+  objetivo: string,
+  c = catalogoDeFabrica(),
+  f = SIN_FILTROS,
+  editadas = new Set<string>(),
+) => agruparPorObjetivo(c, f, editadas).find((g) => g.objetivo === objetivo);
 
-    expect(grupos.map((g) => g.rama)).toEqual(['GLOBAL', 'RIEGO', 'INSUMO', 'MEDIASOMBRA', 'SEGUIMIENTO']);
-    // El orden en que corre el motor: R-04 → ciclo → R-02 → R-05 → R-06 → R-03 → R-01.
-    expect(grupos[1].reglas.map((r) => r.id)).toEqual([
+describe('agruparPorObjetivo', () => {
+  it('agrupa en el orden fijado y no dibuja un grupo sin piezas (Sanidad)', () => {
+    const grupos = agruparPorObjetivo(catalogoDeFabrica());
+
+    expect(grupos.map((g) => g.objetivo)).toEqual([
+      'IRRIGATION',
+      'NUTRITION',
+      'SHADE',
+      'FOLLOW_UP',
+      'PROTECTION',
+    ]);
+    expect(grupos.map((g) => g.titulo)).toEqual([
+      'Riego',
+      'Nutrición',
+      'Mediasombra',
+      'Seguimiento',
+      'Protecciones',
+    ]);
+    expect(ORDEN_OBJETIVOS).toEqual([
+      'IRRIGATION',
+      'NUTRITION',
+      'SANITY',
+      'SHADE',
+      'FOLLOW_UP',
+      'PROTECTION',
+    ]);
+    expect(NOMBRE_OBJETIVO.SANITY).toBe('Sanidad');
+  });
+
+  it('un grupo de Sanidad aparece cuando hay una pieza con ese objetivo', () => {
+    const c = catalogoDeFabrica();
+    const f: ReglaCatalogo = {
+      ...c.reglas[0],
+      id: 'FungalDamageRule',
+      objetivo: 'SANITY',
+      efecto: 'ACTS',
+      proteccion: null,
+    };
+    const grupos = agruparPorObjetivo({ ...c, reglas: [...c.reglas, f] });
+
+    expect(grupos.map((g) => g.objetivo)).toContain('SANITY');
+    expect(grupos.map((g) => g.objetivo).indexOf('SANITY')).toBe(2);
+  });
+
+  it('dentro de cada grupo, por prioridad; R-04 (protege) está en Riego y no en Protecciones', () => {
+    const riego = grupo('IRRIGATION')!;
+
+    expect(riego.reglas.map((r) => r.id)).toEqual([
       'SustratoSaturadoRule',
       'CicloLecturaRiegoRule',
       'DeficitCriticoRule',
@@ -25,229 +74,121 @@ describe('agruparPorRama', () => {
       'PosponerPorLluviaRule',
       'RiegoPorDeficitRule',
     ]);
+    expect(riego.reglas[0].efecto).toBe('PROTECTS');
+    expect(grupo('PROTECTION')!.reglas.map((r) => r.id)).not.toContain('SustratoSaturadoRule');
+    expect(grupo('PROTECTION')!.reglas.map((r) => r.id)).toEqual(
+      expect.arrayContaining([
+        'ManualLockRule',
+        'EscalamientoNodo',
+        'ReadingValidationGuard',
+        'HardwareFaultService',
+      ]),
+    );
   });
 
-  it('omite las ramas sin reglas y escala a decenas de reglas', () => {
-    const reglas = Array.from({ length: 40 }, (_, i) => ({
-      ...catalogoDeFabrica().reglas[0],
-      id: `R${i}`,
-      label: `Regla ${i}`,
-      rama: 'RIEGO' as const,
-      prioridad: 40 - i,
-      parametros: [],
-    }));
-
-    const grupos = agruparPorRama(reglas);
-
-    expect(grupos).toHaveLength(1);
-    expect(grupos[0].reglas[0].id).toBe('R39');
-    expect(grupos[0].reglas).toHaveLength(40);
-  });
-});
-
-describe('resumen por regla', () => {
-  it('cuenta parámetros y modificados', () => {
-    const c = conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40');
-    const riego = c.reglas.find((r) => r.id === 'RiegoPorDeficitRule')!;
-
-    expect(resumenRegla(riego, indicePorClave(c))).toEqual({ total: 6, modificados: 1 });
-  });
-
-  it('el texto sigue el formato "N parámetros · M modificados"', () => {
-    expect(textoResumen({ total: 3, modificados: 1 })).toBe('3 parámetros · 1 modificado');
-    expect(textoResumen({ total: 3, modificados: 0 })).toBe('3 parámetros · 0 modificados');
-    expect(textoResumen({ total: 1, modificados: 0 })).toBe('1 parámetro · 0 modificados');
-    expect(textoResumen({ total: 2, modificados: 2 })).toBe('2 parámetros · 2 modificados');
-  });
-
-  it('una regla sin parámetros lo dice', () => {
-    expect(textoResumen({ total: 0, modificados: 0 })).toBe('Sin parámetros configurables');
-  });
-});
-
-describe('filtrarReglas', () => {
-  const sinFiltros = { busqueda: '', rama: 'TODAS' as const, soloModificados: false };
-
-  it('sin filtros devuelve todas', () => {
+  it('cuenta las apagadas de cada grupo', () => {
     const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, sinFiltros)).toHaveLength(18);
+    c.reglas.find((r) => r.id === 'RiegoPorDeficitRule')!.activa = false;
+
+    expect(grupo('IRRIGATION', c)!.apagadas).toBe(1);
+    // Las retiradas de fábrica también cuentan como apagadas.
+    expect(grupo('NUTRITION', c)!.apagadas).toBe(2);
   });
 
-  it('busca por nombre de regla o de alguno de sus parámetros, sin importar tildes ni mayúsculas', () => {
+  it('un parámetro compartido se edita una vez: en el primer grupo, en el orden, donde tiene un consumidor', () => {
     const c = catalogoDeFabrica();
 
-    // "lluvia": R-03 por su nombre y sus parámetros; R-02 también la nombra en el umbral crítico que comparte.
-    expect(filtrarReglas(c, { ...sinFiltros, busqueda: 'lluvia' }).map((r) => r.id)).toContain('PosponerPorLluviaRule');
-    // Sin tildes ni mayúsculas: "SATURACION" encuentra "Saturación".
-    expect(filtrarReglas(c, { ...sinFiltros, busqueda: 'SATURACION' }).map((r) => r.id)).toEqual(['SustratoSaturadoRule']);
-    // Una regla se encuentra por el nombre de uno de sus parámetros ("Ventana horaria…" es de R-05).
-    expect(filtrarReglas(c, { ...sinFiltros, busqueda: 'ventana horaria' }).map((r) => r.id)).toContain('FueraDeVentanaRiegoRule');
-  });
-
-  it('busca también por la clave del parámetro', () => {
-    const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, { ...sinFiltros, busqueda: 'uv-umbral' }).map((r) => r.id)).toEqual(['ShadingRule']);
-  });
-
-  it('filtra por rama', () => {
-    const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, { ...sinFiltros, rama: 'INSUMO' }).map((r) => r.id)).toEqual([
-      'DailyDoseLimitRule',
-      'SupplyRule',
-      'LowEcRule',
-      'NutritionPlanRule',
-    ]);
-  });
-
-  it('"sólo modificados" deja las reglas con algún parámetro editado', () => {
-    const c = conValor(catalogoDeFabrica(), 'insumo.max-dosis-24h', '2');
-
-    expect(filtrarReglas(c, { ...sinFiltros, soloModificados: true }).map((r) => r.id)).toEqual([
-      'DailyDoseLimitRule',
-    ]);
-  });
-
-  it('una regla sin parámetros no aparece al buscar un parámetro, pero sí por su nombre', () => {
-    const c = catalogoDeFabrica();
-    expect(filtrarReglas(c, { ...sinFiltros, busqueda: 'seguimiento' }).map((r) => r.id)).toEqual(['FollowUpRule']);
-  });
-});
-
-describe('filtrarParametros (vista por parámetro)', () => {
-  const sinFiltros = { busqueda: '', rama: 'TODAS' as const, soloModificados: false };
-
-  it('lista cada parámetro una sola vez, aunque lo usen varias reglas', () => {
-    const c = catalogoDeFabrica();
-
-    const lista = filtrarParametros(c, sinFiltros);
-
-    const claves = lista.map((p) => p.clave);
-    expect(new Set(claves).size).toBe(claves.length);
-    // El umbral de riego lo usan cuatro reglas (y la alerta de falla hidráulica) y aparece una sola vez, en el orden en que corre el motor.
-    expect(lista.find((p) => p.clave === 'riego.umbral-humedad')!.usadoPor).toEqual([
-      'FueraDeVentanaRiegoRule',
-      'HardwareFaultService',
-      'PausaTrasAplicacionRule',
-      'PosponerPorLluviaRule',
-      'RiegoPorDeficitRule',
-    ]);
-  });
-
-  it('el consumidor que no es una regla (el despacho) cuenta como de la rama de riego', () => {
-    const c = catalogoDeFabrica();
-
-    const enRiego = filtrarParametros(c, { ...sinFiltros, rama: 'RIEGO' }).map((p) => p.clave);
-    const enInsumo = filtrarParametros(c, { ...sinFiltros, rama: 'INSUMO' }).map((p) => p.clave);
-
-    expect(enRiego).toContain('riego.sectores-simultaneos');
-    expect(enInsumo).not.toContain('riego.sectores-simultaneos');
-    // Los que el despacho lee: el suyo y los que revalida antes de abrir cada válvula (con los mismos parámetros que las reglas).
-    expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'ejecución del riego' }).map((p) => p.clave).sort()).toEqual([
-      'riego.exceptuado-bloqueo',
-      'riego.lluvia-mm',
-      'riego.lluvia-probabilidad',
-      'riego.lluvia-ventana',
-      'riego.pausa-tras-aplicacion',
-      'riego.saturacion-bloqueo',
-      'riego.sectores-simultaneos',
-      'riego.ventana-normal',
+    // Lo usan R-01, R-03, R-05, R-06 (Riego) y la alerta de falla hidráulica (Protecciones): vive en Riego.
+    expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).toContain(
+      'riego.umbral-humedad',
+    );
+    expect(grupo('PROTECTION', c)!.compartidos.map((p) => p.clave)).not.toContain(
+      'riego.umbral-humedad',
+    );
+    // Lo lee una protección y el despacho: gana Riego, que va antes.
+    expect(grupo('IRRIGATION', c)!.compartidos.map((p) => p.clave)).toContain(
       'seguridad.antiguedad-max-lectura',
-    ]);
-  });
-
-  it('el filtro por rama deja los parámetros que usa alguna regla de esa rama', () => {
-    const c = catalogoDeFabrica();
-    const claves = filtrarParametros(c, { ...sinFiltros, rama: 'MEDIASOMBRA' }).map((p) => p.clave);
-    expect(claves).toHaveLength(1);
-    expect(claves.every((k) => k.startsWith('mediasombra.'))).toBe(true);
-  });
-
-  it('busca por nombre del parámetro o de una regla que lo usa', () => {
-    const c = catalogoDeFabrica();
-    expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'confianza' }).map((p) => p.clave)).toEqual([
+    );
+    // Nutrición: la regla de insumo y el servicio de aplicación.
+    expect(grupo('NUTRITION', c)!.compartidos.map((p) => p.clave)).toContain(
       'diagnostico.confianza-minima',
-    ]);
-    expect(filtrarParametros(c, { ...sinFiltros, busqueda: 'SupplyRule' }).map((p) => p.clave)).toEqual([
-      'diagnostico.confianza-minima',
-    ]);
-  });
-});
-
-describe('agruparPorConsumidor', () => {
-  it('agrupa los parámetros que lee algo que no es una regla, cada uno bajo su consumidor', () => {
-    const grupos = agruparPorConsumidor(catalogoDeFabrica());
-
-    expect(grupos).toHaveLength(8);
-    // Salen en el orden del catálogo: los de seguridad (S-03) primero.
-    expect(grupos[0]).toMatchObject({ id: 'ReadingValidationGuard', titulo: 'Lectura inválida' });
-    expect(grupos[0].parametros.map((p) => p.clave)).toEqual([
-      'seguridad.rango-hum-min',
-      'seguridad.rango-hum-max',
-      'seguridad.rango-temp-min',
-      'seguridad.rango-temp-max',
-      'seguridad.rango-ph-min',
-      'seguridad.rango-ph-max',
-      'seguridad.rango-ce-min',
-      'seguridad.rango-ce-max',
-      'seguridad.rango-luz-min',
-      'seguridad.rango-luz-max',
-      'seguridad.relecturas-invalidas',
-    ]);
-    expect(grupos[1]).toMatchObject({ id: 'DespachoRiego', titulo: 'Ejecución del riego' });
-    expect(grupos[1].parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
-    expect(grupos[2]).toMatchObject({ id: 'ApplicationService', titulo: 'Aplicación de insumos' });
-    expect(grupos[2].parametros.map((p) => p.clave)).toEqual([
-      'insumo.dosis-fertilizante',
-      'insumo.dosis-fitosanitario',
-      'insumo.lluvia-impide-horas',
-      'insumo.reingreso-horas',
-      'insumo.pendiente-vence-dias',
-      'diagnostico.vigencia-horas',
-    ]);
-    expect(grupos[3]).toMatchObject({ id: 'ApplicationPreconditions', titulo: 'Cuándo se puede aplicar un insumo' });
-    expect(grupos[3].parametros.map((p) => p.clave)).toEqual([
-      'insumo.intervalo-fertilizante',
-      'insumo.intervalo-fitosanitario',
-      'insumo.ventana-manana',
-      'insumo.ventana-tarde',
-      'insumo.temp-max-aplicar',
-      'insumo.humedad-min-aplicar',
-      'insumo.lluvia-impide-mm',
-    ]);
-    expect(grupos[4]).toMatchObject({ id: 'TankService', titulo: 'Tanques de insumo' });
-    expect(grupos[4].parametros.map((p) => p.clave)).toEqual(['insumo.stock-aviso']);
-    expect(grupos[5]).toMatchObject({ id: 'ReadingPurge', titulo: 'Historial de lecturas' });
-    expect(grupos[5].parametros.map((p) => p.clave)).toEqual(['readings.retention-days']);
-    expect(grupos[6]).toMatchObject({ id: 'PulsoSensado', titulo: 'Lectura de los nodos' });
-    expect(grupos[6].parametros.map((p) => p.clave)).toEqual([
-      'sensado.espera-respuesta',
-      'sensado.reintentos',
-      'sensado.espera-reintento',
-    ]);
-    expect(grupos[7]).toMatchObject({ id: 'EscalamientoNodo', titulo: 'Nodo sin respuesta' });
-    expect(grupos[7].parametros.map((p) => p.clave)).toEqual(['sensado.reintento-fuera-servicio']);
-  });
-
-  it('los que el despacho revalida pero ya son de una regla se editan bajo la regla: no se repiten en el grupo', () => {
-    const c = catalogoDeFabrica();
-    const ventana = c.parametros.find((p) => p.clave === 'riego.ventana-normal')!;
-
-    expect(ventana.usadoPor).toContain('DespachoRiego');
-    const despacho = agruparPorConsumidor(c).find((g) => g.id === 'DespachoRiego')!;
-    expect(despacho.parametros.map((p) => p.clave)).not.toContain('riego.ventana-normal');
-  });
-
-  it('un parámetro que usan sólo reglas no genera grupo', () => {
-    const c = catalogoDeFabrica();
-    c.parametros = c.parametros.filter(
-      (p) =>
-        p.clave !== 'riego.sectores-simultaneos' &&
-        p.clave !== 'readings.retention-days' &&
-        !p.clave.startsWith('sensado.') &&
-        !p.usadoPor.includes('ReadingValidationGuard') &&
-        !p.usadoPor.some((u) => ['ApplicationService', 'ApplicationPreconditions', 'TankService'].includes(u)),
     );
 
-    expect(agruparPorConsumidor(c)).toEqual([]);
+    const todos = agruparPorObjetivo(c).flatMap((g) => g.compartidos.map((p) => p.clave));
+    expect(new Set(todos).size).toBe(todos.length);
+    expect(todos.sort()).toEqual(
+      c.parametros
+        .filter((p) => p.usadoPor.length > 1)
+        .map((p) => p.clave)
+        .sort(),
+    );
+  });
+
+  it('los consumidores sin interruptor se rotulan "Ejecución" y sólo traen lo que ninguna pieza usa', () => {
+    const c = catalogoDeFabrica();
+
+    const despacho = grupo('IRRIGATION', c)!.consumidores.find((x) => x.id === 'DespachoRiego')!;
+    expect(despacho.parametros.map((p) => p.clave)).toEqual(['riego.sectores-simultaneos']);
+    const hist = grupo('FOLLOW_UP', c)!.consumidores.find((x) => x.id === 'HistorialService')!;
+    expect(hist.parametros.map((p) => p.clave).sort()).toEqual([
+      'seguimiento.delta-min',
+      'seguimiento.latencia-min',
+    ]);
+    expect(nombreConsumidor('HistorialService')).toMatch(/^Ejecución/);
+    expect(nombreConsumidor('DespachoRiego')).toMatch(/^Ejecución/);
+  });
+
+  it('CONSUMIDORES no incluye las piezas que ahora vienen como reglas y cada uno declara su objetivo', () => {
+    for (const id of [
+      'EscalamientoNodo',
+      'ReadingValidationGuard',
+      'HardwareFaultService',
+      'ApplicationPreconditions',
+    ]) {
+      expect(CONSUMIDORES[id]).toBeUndefined();
+    }
+    for (const c of Object.values(CONSUMIDORES)) expect(ORDEN_OBJETIVOS).toContain(c.objetivo);
+  });
+
+  it('filtra por Apagadas, Protecciones y Con cambios', () => {
+    const c = catalogoDeFabrica();
+    c.reglas.find((r) => r.id === 'SustratoSaturadoRule')!.activa = false;
+
+    const apagadas = agruparPorObjetivo(c, { ...SIN_FILTROS, soloApagadas: true });
+    expect(apagadas.flatMap((g) => g.reglas.map((r) => r.id)).sort()).toEqual([
+      'DailyDoseLimitRule',
+      'SupplyRule',
+      'SustratoSaturadoRule',
+    ]);
+    expect(apagadas.flatMap((g) => g.compartidos)).toEqual([]);
+
+    const protecciones = agruparPorObjetivo(c, { ...SIN_FILTROS, soloProtecciones: true });
+    expect(protecciones.flatMap((g) => g.reglas).every((r) => r.efecto === 'PROTECTS')).toBe(true);
+    expect(protecciones.flatMap((g) => g.reglas.map((r) => r.id))).toContain(
+      'SustratoSaturadoRule',
+    );
+
+    const cambios = agruparPorObjetivo(
+      c,
+      { ...SIN_FILTROS, soloConCambios: true },
+      new Set(['riego.humedad-objetivo']),
+    );
+    expect(cambios.flatMap((g) => g.reglas.map((r) => r.id))).toEqual(['RiegoPorDeficitRule']);
+    expect(cambios).toHaveLength(1);
+  });
+
+  it('busca por nombre, código o parámetro, sin tildes ni mayúsculas', () => {
+    const c = catalogoDeFabrica();
+    const ids = (busqueda: string) =>
+      agruparPorObjetivo(c, { ...SIN_FILTROS, busqueda }).flatMap((g) => g.reglas.map((r) => r.id));
+
+    expect(ids('SATURACION')).toContain('SustratoSaturadoRule');
+    expect(ids('r-04')).toEqual(['SustratoSaturadoRule']);
+    expect(ids('uv-umbral')).toEqual(['ShadingRule']);
+  });
+
+  it('el índice por clave sigue sirviendo para resolver los parámetros de una pieza', () => {
+    const c = conValor(catalogoDeFabrica(), 'riego.umbral-humedad', '40');
+    expect(indicePorClave(c).get('riego.umbral-humedad')!.modificado).toBe(true);
   });
 });

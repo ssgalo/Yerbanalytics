@@ -1,0 +1,198 @@
+/* Pestaña Reglas: grupos por objetivo, tarjetas de pieza y diálogo de apagado. Todo color sale de un token. */
+
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.barra > :first-child {
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.vacio {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.grupo {
+  display: grid;
+  gap: 12px;
+}
+.grupoCabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+.grupoTitulo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-18);
+  font-weight: 700;
+  color: var(--ink);
+}
+.grupoDesc {
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.destacada {
+  box-shadow: var(--focus-ring);
+}
+
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.titulos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.nombre {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-15);
+  font-weight: 700;
+  color: var(--ink);
+}
+.codigo {
+  color: var(--muted);
+  font-weight: 600;
+}
+.chips {
+  display: inline-flex;
+  gap: 6px;
+}
+.interruptor {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.estadoTexto {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.descripcion {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+.parametros {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px 20px;
+}
+.param {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+}
+.ventana {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.auditoria,
+.usadoPor {
+  font-size: var(--t-12);
+  color: var(--muted);
+  font-stretch: var(--w-cond);
+}
+.compartido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: var(--t-13);
+  color: var(--ink-2);
+}
+.compartidoNombre {
+  font-weight: 600;
+}
+.link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--info-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* diálogo de apagado */
+.dialogoTitulo {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-stretch: var(--w-exp);
+  font-size: var(--t-15);
+  font-weight: 700;
+  color: var(--ink);
+}
+.dialogoTexto {
+  margin: 0 0 10px;
+  font-size: var(--t-13);
+  color: var(--ink-2);
+}
+.dialogoCampo {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.dialogoEtiqueta {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.opcional {
+  font-weight: 400;
+  color: var(--muted);
+}
+.textarea {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--line-field);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-15);
+  resize: vertical;
+}
+.textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: var(--field-focus);
+}
+.dialogoAcciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}

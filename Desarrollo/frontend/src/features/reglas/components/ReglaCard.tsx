@@ -1,24 +1,36 @@
-/* Tarjeta de una regla: colapsada muestra resumen y valores vigentes; abierta, sus parámetros. */
+/* Tarjeta de una pieza del motor: nombre y código, efecto, interruptor, aviso si está apagada y sus parámetros en línea. */
+import { useRef } from 'react';
+import { Callout } from '@/components/ui/Callout';
 import { Card } from '@/components/ui/Card';
+import { Chip, type ChipTone } from '@/components/ui/Chip';
+import { Switch } from '@/components/ui/Seleccion';
 import { formatearValor } from '@/lib/parametrosValidation';
-import type { ParametroRegla, ReglaCatalogo } from '@/types/domain';
+import type { EfectoRegla, ParametroRegla, ReglaCatalogo } from '@/types/domain';
 import { valorMostrado, type Borrador } from '../borrador';
-import { resumenRegla, textoResumen } from '../catalogoView';
-import { ParametroRow } from './ParametroRow';
-import styles from './Parametros.module.css';
+import { fechaCorta, idTarjeta, irAlParametro } from './anclas';
+import { ParametroInline } from './ParametroInline';
+import styles from './ReglasTab.module.css';
+
+/** El efecto no usa colores de estado: Actúa = info, Avisa = neutro, Protege = destacado. */
+const EFECTO: Record<EfectoRegla, { texto: string; tono: ChipTone }> = {
+  ACTS: { texto: 'Actúa', tono: 'info' },
+  WARNS: { texto: 'Avisa', tono: 'line' },
+  PROTECTS: { texto: 'Protege', tono: 'dark' },
+};
 
 interface ReglaCardProps {
   regla: ReglaCatalogo;
   indice: Map<string, ParametroRegla>;
-  nombresReglas: Record<string, string>;
   borrador: Borrador;
   erroresCliente: ReadonlyMap<string, string>;
   erroresServidor: ReadonlyMap<string, string>;
-  abierta: boolean;
+  /** Hay un guardado o un cambio de estado en vuelo. */
   disabled?: boolean;
-  /** Sin permiso de edición: no se ofrece "Restablecer fábrica". */
+  /** Sin `reglas.editar`. */
   soloLectura?: boolean;
-  onToggle: () => void;
+  /** Llegó por `?regla=`: se resalta. */
+  destacada?: boolean;
+  onCambiarEstado: (regla: ReglaCatalogo, activa: boolean, anchor: HTMLElement) => void;
   onEditar: (p: ParametroRegla, texto: string) => void;
   onRestablecer: (p: ParametroRegla) => void;
 }
@@ -26,88 +38,109 @@ interface ReglaCardProps {
 export function ReglaCard({
   regla,
   indice,
-  nombresReglas,
   borrador,
   erroresCliente,
   erroresServidor,
-  abierta,
   disabled,
   soloLectura,
-  onToggle,
+  destacada,
+  onCambiarEstado,
   onEditar,
   onRestablecer,
 }: ReglaCardProps) {
+  const interruptor = useRef<HTMLSpanElement>(null);
   const params = regla.parametros.map((c) => indice.get(c)).filter((p): p is ParametroRegla => !!p);
-  const resumen = resumenRegla(regla, indice);
-  const sinParametros = params.length === 0;
-  const hayError = params.some((p) => erroresCliente.has(p.clave) || erroresServidor.has(p.clave));
-  const hayEdicion = params.some((p) => borrador.has(p.clave));
+  const efecto = EFECTO[regla.efecto];
+  const esProteccion = regla.proteccion !== null;
+  const titulo = idTarjeta(regla.id);
 
   return (
-    <Card className={styles.regla}>
-      <button
-        type="button"
-        className={styles.reglaCabecera}
-        aria-expanded={abierta}
-        aria-controls={`regla-${regla.id}`}
-        onClick={onToggle}
-      >
-        <span className={abierta ? `${styles.chevron} ${styles.chevronAbierto}` : styles.chevron} aria-hidden="true">
-          ›
-        </span>
-        <span className={styles.reglaNombre}>
-          <span className={styles.reglaLabel}>{regla.label}</span>
-          <span className={styles.reglaId}>
-            {regla.id} · prioridad {regla.prioridad}
+    <Card className={destacada ? `${styles.card} ${styles.destacada}` : styles.card}>
+      <article id={titulo} aria-labelledby={`${titulo}-nombre`} data-activa={regla.activa}>
+        <header className={styles.cabecera}>
+          <div className={styles.titulos}>
+            <h3 id={`${titulo}-nombre`} className={styles.nombre}>
+              {regla.label}
+              {regla.codigo && <span className={styles.codigo}> · {regla.codigo}</span>}
+            </h3>
+            <span className={styles.chips}>
+              <Chip tone={efecto.tono}>{efecto.texto}</Chip>
+              {!regla.activaPorDefecto && <Chip tone="line">Retirada</Chip>}
+            </span>
+          </div>
+          <span className={styles.interruptor} ref={interruptor}>
+            <span className={styles.estadoTexto}>{regla.activa ? 'Activa' : 'Apagada'}</span>
+            <Switch
+              checked={regla.activa}
+              label={`${regla.activa ? 'Apagar' : 'Prender'} ${regla.label}`}
+              disabled={disabled || soloLectura}
+              onChange={(activa) => {
+                const boton = interruptor.current?.querySelector('button');
+                if (boton) onCambiarEstado(regla, activa, boton);
+              }}
+            />
           </span>
-        </span>
+        </header>
 
-        {/* El valor vigente se ve sin abrir: chips de valor, con la etiqueta como tooltip. */}
-        {!sinParametros && (
-          <span className={styles.valores} data-testid={`valores-${regla.id}`}>
-            {params.map((p) => (
-              <span
-                key={p.clave}
-                className={p.modificado ? `${styles.valorChip} ${styles.valorChipMod}` : styles.valorChip}
-                title={p.etiqueta}
-              >
-                {formatearValor(p, valorMostrado(p, borrador))}
-              </span>
-            ))}
-          </span>
+        {!regla.activa && (
+          <Callout tone={esProteccion ? 'crit' : 'neutral'} icon="lock">
+            {regla.estado ? (
+              <>
+                Apagada por {regla.estado.updatedBy} el {fechaCorta(regla.estado.updatedTs)}.
+                {regla.estado.motivo && <> Motivo: {regla.estado.motivo}.</>}
+              </>
+            ) : (
+              <>Apagada de fábrica: la regla está retirada y no corre hasta que se la prenda.</>
+            )}
+            {esProteccion && (
+              <>
+                {' '}
+                <b>Consecuencia:</b> {regla.proteccion}
+              </>
+            )}
+          </Callout>
+        )}
+        {regla.apagadaPorDemo && (
+          <Callout tone="warn" role="status">
+            Apagada por la demo: el simulador la apagó en modo demo y mientras tanto no corre,
+            aunque acá figure {regla.activa ? 'activa' : 'apagada'}.
+          </Callout>
         )}
 
-        <span className={styles.resumen}>
-          {hayError && <span className={styles.puntoError} title="Hay errores en esta regla" />}
-          {hayEdicion && !hayError && <span className={styles.puntoEditado} title="Cambios sin guardar" />}
-          {textoResumen(resumen)}
-        </span>
-      </button>
-
-      {abierta && (
-        <div className={styles.reglaCuerpo} id={`regla-${regla.id}`}>
-          {sinParametros ? (
-            <p className={styles.sinParametros}>Sin parámetros configurables</p>
-          ) : (
-            params.map((p) => (
-              <ParametroRow
-                key={p.clave}
-                parametro={p}
-                valor={valorMostrado(p, borrador)}
-                editado={borrador.has(p.clave)}
-                errorCliente={erroresCliente.get(p.clave) ?? null}
-                errorServidor={erroresServidor.get(p.clave) ?? null}
-                nombresReglas={nombresReglas}
-                reglaActual={regla.id}
-                disabled={disabled}
-                soloLectura={soloLectura}
-                onChange={(texto) => onEditar(p, texto)}
-                onRestablecer={() => onRestablecer(p)}
-              />
-            ))
-          )}
-        </div>
-      )}
+        {params.length > 0 && (
+          <div className={styles.parametros}>
+            {params.map((p) =>
+              p.usadoPor.length > 1 ? (
+                <div key={p.clave} className={styles.compartido} data-clave={p.clave}>
+                  <span className={styles.compartidoNombre}>{p.etiqueta}</span>
+                  <b>{formatearValor(p, valorMostrado(p, borrador))}</b>
+                  <Chip tone="line">Compartido con {p.usadoPor.length} reglas</Chip>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    onClick={() => irAlParametro(p.clave)}
+                  >
+                    Editar en Compartidos
+                  </button>
+                </div>
+              ) : (
+                <ParametroInline
+                  key={p.clave}
+                  parametro={p}
+                  valor={valorMostrado(p, borrador)}
+                  editado={borrador.has(p.clave)}
+                  errorCliente={erroresCliente.get(p.clave) ?? null}
+                  errorServidor={erroresServidor.get(p.clave) ?? null}
+                  disabled={disabled}
+                  soloLectura={soloLectura}
+                  onChange={(texto) => onEditar(p, texto)}
+                  onRestablecer={() => onRestablecer(p)}
+                />
+              ),
+            )}
+          </div>
+        )}
+      </article>
     </Card>
   );
 }

@@ -1,10 +1,11 @@
 /* ============================================================
    Sección "Motor de reglas": dos vistas sobre el mismo motor.
-   - Parámetros: los umbrales agrupados por regla, con edición.
+   - Reglas: cada pieza con su interruptor y sus umbrales, agrupada por objetivo.
    - Inspector: el DAG del motor coloreado con la última evaluación de un sector.
 
    La pestaña vive en la URL (`?tab=`), así que se puede enlazar: el detalle de sector manda
-   a `?tab=inspector&sector=…` y el Inspector a `?regla=…` para editar un umbral.
+   a `?tab=inspector&sector=…` y el Inspector a `?regla=…` para ir a la tarjeta de la regla.
+   (`?tab=parametros`, el nombre de la pestaña anterior, abre Reglas.)
    ============================================================ */
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -13,29 +14,29 @@ import { usePageTitle } from '@/hooks/PageMeta';
 import { useAuth } from '@/hooks/AuthContext';
 import { useCatalogoReglas } from '@/hooks/useCatalogoReglas';
 import { cambiosDelBorrador, type Borrador } from './borrador';
-import { ParametrosTab } from './ParametrosTab';
+import { ReglasTab } from './ReglasTab';
 import { InspectorTab } from './inspector/InspectorTab';
 import styles from './Reglas.module.css';
 
-type Pestania = 'parametros' | 'inspector';
+type Pestania = 'reglas' | 'inspector';
 
 export function ReglasPage() {
   const [params, setParams] = useSearchParams();
-  const tab: Pestania = params.get('tab') === 'inspector' ? 'inspector' : 'parametros';
-  const { catalogo, loading, error, saving, save } = useCatalogoReglas();
+  const tab: Pestania = params.get('tab') === 'inspector' ? 'inspector' : 'reglas';
+  const { catalogo, loading, error, saving, save, setEstado } = useCatalogoReglas();
   // Sin `reglas.editar` el catálogo se ve en sólo lectura, sin botón para guardar.
   const soloLectura = !useAuth().puede('reglas.editar');
 
-  // El borrador de Parámetros vive acá, no en la pestaña: ésta se desmonta al ir al Inspector.
+  // El borrador de parámetros vive acá, no en la pestaña: ésta se desmonta al ir al Inspector.
   const [borrador, setBorrador] = useState<Borrador>(new Map());
   const pendientes = useMemo(
     () => (catalogo ? cambiosDelBorrador(catalogo, borrador).length : 0),
     [catalogo, borrador],
   );
 
-  usePageTitle('Motor de reglas', 'Umbrales de cada regla y última evaluación por sector');
+  usePageTitle('Motor de reglas', 'Qué reglas corren, sus umbrales y la última evaluación por sector');
 
-  /** "Editar parámetro" desde el Inspector: a Parámetros, con esa regla abierta. */
+  /** "Editar parámetro" desde el Inspector: a Reglas, en la tarjeta de esa regla. */
   const editarRegla = (ruleId: string) => setParams({ regla: ruleId });
 
   const cambiarSector = (id: string) => {
@@ -46,7 +47,7 @@ export function ReglasPage() {
 
   const elegir = (t: Pestania) => {
     const next = new URLSearchParams(params);
-    if (t === 'parametros') next.delete('tab');
+    if (t === 'reglas') next.delete('tab');
     else next.set('tab', t);
     setParams(next, { replace: true });
   };
@@ -57,11 +58,11 @@ export function ReglasPage() {
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'parametros'}
-          className={tab === 'parametros' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-          onClick={() => elegir('parametros')}
+          aria-selected={tab === 'reglas'}
+          className={tab === 'reglas' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+          onClick={() => elegir('reglas')}
         >
-          Parámetros
+          Reglas
           {pendientes > 0 && (
             <span className={styles.tabBadge} title={`${contar(pendientes, 'cambio', 'cambios')} sin guardar`}>
               {pendientes}
@@ -79,24 +80,25 @@ export function ReglasPage() {
         </button>
       </div>
 
-      {tab === 'parametros' && (
+      {tab === 'reglas' && (
         <>
           <p className={styles.intro}>
-            Cada regla del motor decide comparando lo que recibe contra uno o más umbrales. Acá ves cuánto
-            vale cada uno{soloLectura ? '' : ' y podés cambiarlo'}. Un umbral que usan varias reglas es un solo
-            valor: editarlo en una lo cambia en todas.
+            Acá ves qué reglas corren y cuánto vale cada umbral
+            {soloLectura ? '' : '; podés prender o apagar una regla y cambiar sus umbrales'}. Un umbral que usan varias
+            reglas es un solo valor, y se edita una vez en «Compartidos» de su grupo.
           </p>
           {error ? (
             <div className={styles.state} style={{ color: 'var(--crit-ink)' }}>
-              No se pudieron cargar los parámetros: {error.message}
+              No se pudieron cargar las reglas: {error.message}
             </div>
           ) : loading || !catalogo ? (
-            <div className={styles.state}>Cargando parámetros…</div>
+            <div className={styles.state}>Cargando reglas…</div>
           ) : (
-            <ParametrosTab
+            <ReglasTab
               catalogo={catalogo}
               saving={saving}
               onGuardar={save}
+              onCambiarEstado={setEstado}
               borrador={borrador}
               onBorradorChange={setBorrador}
               reglaInicial={params.get('regla')}

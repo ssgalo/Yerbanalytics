@@ -19,6 +19,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** El campo de un parámetro (se espera a que cargue el catálogo). */
+const campo = async (clave: string) => {
+  await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' });
+  return document.getElementById(`param-${clave}`)!;
+};
+
 /** La app completa (sesión + shell + rutas) en memoria, como la monta `App`. */
 const montarEn = (ruta: string) => montarApp(ruta);
 
@@ -31,15 +37,15 @@ describe('Ruta /reglas (7.1)', () => {
     expect(enlace.getAttribute('href')).toBe('/reglas');
   });
 
-  it('monta ReglasPage con las pestañas Parámetros e Inspector', async () => {
+  it('monta ReglasPage con las pestañas Reglas e Inspector', async () => {
     montarEn('/reglas');
 
-    expect(await screen.findByRole('tab', { name: /^Parámetros/ })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: /^Reglas/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Inspector' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /^Parámetros/ }).getAttribute('aria-selected')).toBe('true');
-    // La pestaña Parámetros carga el catálogo del repositorio (mock): las 13 reglas
-    expect(await screen.findByText('Riego por déficit hídrico')).toBeTruthy();
-    expect(screen.getByText('Bloqueo manual')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Reglas/ }).getAttribute('aria-selected')).toBe('true');
+    // La pestaña Reglas carga el catálogo del repositorio (mock), con un interruptor por regla.
+    expect(await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Apagar Bloqueo manual' })).toBeTruthy();
   });
 
   it('el título de la topbar es "Motor de reglas"', async () => {
@@ -62,15 +68,27 @@ describe('Ruta /reglas (7.1)', () => {
     await waitFor(() => expect(ubicacion.actual?.search).toContain('tab=inspector'));
   });
 
-  it('?regla= abre esa regla en Parámetros', async () => {
+  it('?tab=parametros (el nombre de la pestaña anterior) abre Reglas', async () => {
+    montarEn('/reglas?tab=parametros');
+
+    const tab = await screen.findByRole('tab', { name: /^Reglas/ });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' })).toBeTruthy();
+  });
+
+  it('?regla= lleva a la tarjeta de esa regla, resaltada', async () => {
+    const scroll = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scroll;
     montarEn('/reglas?regla=RiegoPorDeficitRule');
 
-    expect(await screen.findByLabelText(/Umbral de riego/)).toBeTruthy();
+    const tarjeta = await screen.findByRole('article', { name: /Riego por déficit hídrico/ });
+    expect(tarjeta.id).toBe('regla-RiegoPorDeficitRule');
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
   });
 
   it('un cambio guardado en la demo se conserva en el repositorio', async () => {
-    montarEn('/reglas?regla=RiegoPorDeficitRule');
-    fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
+    montarEn('/reglas');
+    fireEvent.change(await campo('riego.umbral-humedad'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
 
     await waitFor(async () => {
@@ -83,44 +101,45 @@ describe('Ruta /reglas (7.1)', () => {
 
 describe('Borrador de Parámetros entre pestañas (#1)', () => {
   it('editar, ir al Inspector y volver conserva el borrador', async () => {
-    montarEn('/reglas?regla=RiegoPorDeficitRule');
-    fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
+    montarEn('/reglas');
+    fireEvent.change(await campo('riego.umbral-humedad'), { target: { value: '40' } });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
     await screen.findByLabelText('Macro-zona');
-    fireEvent.click(screen.getByRole('tab', { name: /^Parámetros/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Reglas/ }));
 
-    expect(screen.getByText('1 cambio sin guardar')).toBeTruthy();
-    // La regla vuelve abierta (la URL conserva ?regla=) y el valor editado sigue ahí
-    expect((await screen.findByLabelText(/Umbral de riego/) as HTMLInputElement).value).toBe('40');
+    expect(screen.getByText(/1 cambio sin guardar/)).toBeTruthy();
+    // El valor editado sigue ahí
+    expect(((await campo('riego.umbral-humedad')) as HTMLInputElement).value).toBe('40');
   });
 
   it('el aviso de cambios sin guardar se ve desde la pestaña Inspector', async () => {
-    montarEn('/reglas?regla=RiegoPorDeficitRule');
-    fireEvent.change(await screen.findByLabelText(/Umbral de riego/), { target: { value: '40' } });
+    montarEn('/reglas');
+    fireEvent.change(await campo('riego.umbral-humedad'), { target: { value: '40' } });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
 
     const marca = await screen.findByTitle('1 cambio sin guardar');
     expect(marca.textContent).toBe('1');
-    expect(screen.getByRole('tab', { name: /^Parámetros/ }).contains(marca)).toBe(true);
+    expect(screen.getByRole('tab', { name: /^Reglas/ }).contains(marca)).toBe(true);
   });
 
   it('sin cambios no hay marca en la pestaña', async () => {
     montarEn('/reglas');
-    await screen.findByText('Riego por déficit hídrico');
+    await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' });
     expect(screen.queryByTitle(/sin guardar/)).toBeNull();
   });
 });
 
-describe('Parámetros sin permiso de edición (7.5)', () => {
-  it('el Productor Viverista ve el catálogo en sólo lectura, sin botón para guardar', async () => {
+describe('Reglas sin permiso de edición', () => {
+  it('el Productor Viverista ve las reglas y sus umbrales en sólo lectura, sin cambiarlos', async () => {
     await seguridadDemo('productor');
-    montarEn('/reglas?regla=RiegoPorDeficitRule');
+    montarEn('/reglas');
 
-    const campo = (await screen.findByLabelText(/Umbral de riego/)) as HTMLInputElement;
-    expect(campo.disabled).toBe(true);
+    const umbral = (await campo('riego.umbral-humedad')) as HTMLInputElement;
+    expect(umbral.readOnly).toBe(true);
+    expect((screen.getByRole('switch', { name: 'Apagar Riego por déficit hídrico' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole('button', { name: /Guardar cambios/ })).toBeNull();
-    expect(screen.getByText(/Sólo lectura/)).toBeTruthy();
+    expect(screen.getByText(/hace falta el permiso/)).toBeTruthy();
   });
 });

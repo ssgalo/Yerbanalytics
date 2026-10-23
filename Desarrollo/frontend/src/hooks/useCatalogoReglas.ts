@@ -4,7 +4,7 @@
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import { getRepository } from '@/data';
-import type { CambioParametro, CatalogoReglas } from '@/types/domain';
+import type { CambioEstadoRegla, CambioParametro, CatalogoReglas, ReglaCatalogo } from '@/types/domain';
 
 interface UseCatalogoReglasResult {
   catalogo: CatalogoReglas | null;
@@ -18,6 +18,11 @@ interface UseCatalogoReglasResult {
    * `ParametrosInvalidosError` si el servidor rechazó valores).
    */
   save: (cambios: CambioParametro[]) => Promise<CatalogoReglas>;
+  /**
+   * Prende o apaga una pieza en el momento. Reemplaza sólo esa pieza del catálogo (no toca los parámetros que
+   * se estén editando) y resuelve con ella; rechaza con `EstadoReglaError` si el backend pide motivo o confirmación.
+   */
+  setEstado: (nombre: string, cambio: CambioEstadoRegla) => Promise<ReglaCatalogo>;
 }
 
 export function useCatalogoReglas(): UseCatalogoReglasResult {
@@ -67,5 +72,11 @@ export function useCatalogoReglas(): UseCatalogoReglasResult {
     }
   }, []);
 
-  return { catalogo, loading, error, saving, save, reload };
+  const setEstado = useCallback(async (nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo> => {
+    const pieza = await getRepository().setEstadoRegla(nombre, cambio);
+    setCatalogo((c) => (c ? { ...c, reglas: c.reglas.map((r) => (r.id === pieza.id ? pieza : r)) } : c));
+    return pieza;
+  }, []);
+
+  return { catalogo, loading, error, saving, save, setEstado, reload };
 }

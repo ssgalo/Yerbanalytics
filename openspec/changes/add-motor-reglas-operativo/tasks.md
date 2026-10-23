@@ -60,11 +60,11 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 8.3 GREEN: reemplazos de D-12; tests existentes sin emojis; token `--scrim` en `tokens.css` y `theme.ts`, usado en `ReasoningModal.module.css`.
 
 ## 9. Frontend: pantalla Motor de reglas (D-13)
-- [ ] 9.1 RED: `catalogoView.test`: agrupado por objetivo en el orden fijado, grupos vacíos fuera; compartidos ubicados en el primer grupo con consumidor; `CONSUMIDORES` sin las piezas que ahora son reglas y con `objetivo`.
-- [ ] 9.2 RED: `ReglaCard.test`: nombre + código, chip de efecto, chip Retirada, `Switch` con `aria-checked`, `Callout` de apagada (crit si protección), aviso de demo, parámetro compartido en sólo lectura con enlace.
-- [ ] 9.3 RED: `ReglasTab.test` (reemplaza a `ParametrosTab.test`): `SaveBar` con parámetros; apagar una regla con borrador pendiente no toca el borrador; diálogo de protección con motivo obligatorio; cancelar devuelve el `Switch` y el foco; sólo lectura sin `reglas.editar`; filtros Apagadas / Protecciones / Con cambios.
-- [ ] 9.4 RED: `ReglasPage.test`: pestañas Reglas e Inspector; `?tab=parametros` abre Reglas; `?regla=` lleva a la tarjeta.
-- [ ] 9.5 GREEN: `ReglasTab`, `ReglaCard`, diálogo de confirmación, bloque de compartidos, sobre `src/components/ui/` y tokens; sin prioridades visibles.
+- [x] 9.1 RED: `catalogoView.test`: agrupado por objetivo en el orden fijado, grupos vacíos fuera; compartidos ubicados en el primer grupo con consumidor; `CONSUMIDORES` sin las piezas que ahora son reglas y con `objetivo`.
+- [x] 9.2 RED: `ReglaCard.test`: nombre + código, chip de efecto, chip Retirada, `Switch` con `aria-checked`, `Callout` de apagada (crit si protección), aviso de demo, parámetro compartido en sólo lectura con enlace.
+- [x] 9.3 RED: `ReglasTab.test` (reemplaza a `ParametrosTab.test`): `SaveBar` con parámetros; apagar una regla con borrador pendiente no toca el borrador; diálogo de protección con motivo obligatorio; cancelar devuelve el `Switch` y el foco; sólo lectura sin `reglas.editar`; filtros Apagadas / Protecciones / Con cambios.
+- [x] 9.4 RED: `ReglasPage.test`: pestañas Reglas e Inspector; `?tab=parametros` abre Reglas; `?regla=` lleva a la tarjeta.
+- [x] 9.5 GREEN: `ReglasTab`, `ReglaCard`, diálogo de confirmación, bloque de compartidos, sobre `src/components/ui/` y tokens; sin prioridades visibles.
 
 ## 10. Frontend: historial (D-11)
 - [ ] 10.1 RED: `historyGraphModel.test`: regla apagada hoy y activa entonces se dibuja; regla en `reglasInactivas` no; evento sin `reglasInactivas` excluye `activaPorDefecto: false`; la que decidió siempre aparece.
