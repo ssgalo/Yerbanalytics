@@ -27,10 +27,10 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Configuración agronómica (HU-15): lectura, validación y persistencia de umbrales,
- * límites operativos y horario por defecto de la mediasombra. Es la fuente de verdad en runtime para
- * los umbrales de métricas ({@link #getEffectiveSpecs()}) y los parámetros de
- * seguimiento post-acción que consumen {@code NurseryService} e {@code HistorialService}.
+ * Configuración agronómica (HU-15): lectura, validación y persistencia de las bandas de alerta de las métricas,
+ * el intervalo de sensado, la pasada diaria y el horario por defecto de la mediasombra. Es la fuente de verdad en runtime
+ * para los umbrales de métricas ({@link #getEffectiveSpecs()}) que consume {@code NurseryService}. Los parámetros que
+ * decide el motor (incluido el seguimiento post-acción) viven en el catálogo de reglas.
  */
 @Service
 public class ConfiguracionService {
@@ -109,8 +109,6 @@ public class ConfiguracionService {
 
     private ConfiguracionOperativa buildOperativaDto(ConfiguracionOperativaEntity e) {
         return new ConfiguracionOperativa(
-                e.getInsumoDosisMax24hMl(),
-                e.getSeguimientoLatenciaMin(), e.getSeguimientoDeltaMin(),
                 e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : SensingCadence.DEFAULT_MINUTES,
                 e.getUpdatedBy(), e.getUpdatedTs(),
                 pasadaDiariaActiva(e), pasadaDiariaHora(e),
@@ -147,9 +145,6 @@ public class ConfiguracionService {
         ConfiguracionOperativaEntity oe = operativaRepository.findById(OPERATIVA_ID)
                 .orElseGet(ConfiguracionOperativaEntity::new);
         oe.setId(OPERATIVA_ID);
-        oe.setInsumoDosisMax24hMl(op.insumoDosisMax24hMl());
-        oe.setSeguimientoLatenciaMin(op.seguimientoLatenciaMin());
-        oe.setSeguimientoDeltaMin(op.seguimientoDeltaMin());
         oe.setIntervaloSensadoMinutos(op.intervaloSensadoMinutos());
         if (op.pasadaDiariaActiva() != null) {
             oe.setPasadaDiariaActiva(op.pasadaDiariaActiva());
@@ -232,9 +227,6 @@ public class ConfiguracionService {
         if (op == null) {
             throw new InvalidConfigurationException("Faltan los límites operativos.");
         }
-        requirePositive(op.insumoDosisMax24hMl(), "la dosis máxima de insumo por 24 h");
-        requirePositive(op.seguimientoLatenciaMin(), "la latencia de seguimiento");
-        requirePositive(op.seguimientoDeltaMin(), "el delta mínimo de recuperación");
         // Intervalo del pulso de sensado y del ciclo de lectura del riego. Una base vieja con un valor fuera de
         // rango se sigue leyendo acotado (SensingCadence.intervalMinutes); lo que no se acepta es guardarlo.
         int intervalo = op.intervaloSensadoMinutos();
@@ -264,12 +256,6 @@ public class ConfiguracionService {
         if (!LocalTime.parse(hasta).isAfter(LocalTime.parse(desde))) {
             throw new InvalidConfigurationException("mediasombraAbiertaHasta: la hora de cierre de la mediasombra debe "
                     + "ser posterior a la de apertura.");
-        }
-    }
-
-    private void requirePositive(double value, String nombre) {
-        if (value <= 0) {
-            throw new InvalidConfigurationException("El valor de " + nombre + " debe ser mayor a 0.");
         }
     }
 
@@ -321,21 +307,6 @@ public class ConfiguracionService {
         return loadOperativa();
     }
 
-    /** Latencia de seguimiento en ms (HU-15 CA-07). */
-    public long getLatencyMs() {
-        return loadOperativa().getSeguimientoLatenciaMin() * 60_000L;
-    }
-
-    /** Etiqueta legible de la latencia (p. ej. "2 min"). */
-    public String getLatencyLabel() {
-        return loadOperativa().getSeguimientoLatenciaMin() + " min";
-    }
-
-    /** Delta mínimo de recuperación para catalogar una acción como efectiva. */
-    public double getUmbralRecuperacion() {
-        return loadOperativa().getSeguimientoDeltaMin();
-    }
-
     // ------------------------------------------------------------------
     // Internos
     // ------------------------------------------------------------------
@@ -356,9 +327,6 @@ public class ConfiguracionService {
     private ConfiguracionOperativaEntity defaultOperativa() {
         ConfiguracionOperativaEntity e = new ConfiguracionOperativaEntity();
         e.setId(OPERATIVA_ID);
-        e.setInsumoDosisMax24hMl(15);
-        e.setSeguimientoLatenciaMin(2);
-        e.setSeguimientoDeltaMin(5);
         e.setIntervaloSensadoMinutos(SensingCadence.DEFAULT_MINUTES);
         return e;
     }

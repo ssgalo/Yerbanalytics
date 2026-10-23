@@ -9,6 +9,11 @@ import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
+import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
+import com.yerbanalytics.backend.engine.parametros.ParametrosSeguimiento;
+import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.mqtt.ContratoNodo;
 import com.yerbanalytics.backend.mqtt.NodeErrorType;
@@ -18,7 +23,6 @@ import com.yerbanalytics.backend.repository.SectorRepository;
 import static com.yerbanalytics.backend.constant.NurseryConstants.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,7 +40,7 @@ import java.util.*;
  * nunca borra ni permite editar la cadena de justificación de un evento.
  */
 @Service
-public class HistorialService {
+public class HistorialService implements ConsumidorParametros {
 
     private static final String EMDASH = "—";
 
@@ -49,11 +53,11 @@ public class HistorialService {
 
     private final HistorialRepository historialRepository;
     private final SectorRepository sectorRepository;
-    private final ConfiguracionService configuracionService;
-    /** Fallbacks por properties, usados si la configuración persistida no está disponible. */
-    private final long latencyMs;
-    private final String latencyLabel;
-    private final double umbralRecuperacion;
+    /**
+     * Se inyecta lazy: el catálogo guarda sus cambios en el historial, y el historial lee de él el seguimiento
+     * post-acción ({@code seguimiento.latencia-min} y {@code seguimiento.delta-min}).
+     */
+    private final CatalogoParametrosService parametros;
     /** Reloj del vivero: el mismo que usa el despacho de riego para sellar y comparar los eventos. */
     private final Clock reloj;
     /** Estado efectivo de las piezas: de ahí sale qué estaba apagado al registrar cada decisión del motor. */
@@ -62,32 +66,33 @@ public class HistorialService {
     /** Sin overrides: ninguna pieza figura apagada. */
     public HistorialService(HistorialRepository historialRepository,
                             SectorRepository sectorRepository,
-                            ConfiguracionService configuracionService,
-                            long latencyMs,
-                            String latencyLabel,
-                            double umbralRecuperacion,
+                            CatalogoParametrosService parametros,
                             Clock reloj) {
-        this(historialRepository, sectorRepository, configuracionService, latencyMs, latencyLabel, umbralRecuperacion,
-                reloj, RuleOverrides.NONE);
+        this(historialRepository, sectorRepository, parametros, reloj, RuleOverrides.NONE);
     }
 
     @Autowired
     public HistorialService(HistorialRepository historialRepository,
                             SectorRepository sectorRepository,
-                            @Lazy ConfiguracionService configuracionService,
-                            @Value("${yerbanalytics.historial.latency-ms:120000}") long latencyMs,
-                            @Value("${yerbanalytics.historial.latency-label:2 min}") String latencyLabel,
-                            @Value("${yerbanalytics.historial.umbral-recuperacion:5}") double umbralRecuperacion,
+                            @Lazy CatalogoParametrosService parametros,
                             Clock reloj,
                             RuleOverrides overrides) {
-        this.overrides = overrides;
         this.historialRepository = historialRepository;
         this.sectorRepository = sectorRepository;
-        this.configuracionService = configuracionService;
-        this.latencyMs = latencyMs;
-        this.latencyLabel = latencyLabel;
-        this.umbralRecuperacion = umbralRecuperacion;
+        this.parametros = parametros;
         this.reloj = reloj;
+        this.overrides = overrides;
+    }
+
+    @Override
+    public String name() {
+        return "HistorialService";
+    }
+
+    /** El seguimiento post-acción lee su latencia y su recuperación mínima del catálogo. */
+    @Override
+    public List<DefinicionParametro> parametros() {
+        return List.of(ParametrosSeguimiento.LATENCY_MIN, ParametrosSeguimiento.DELTA_MIN);
     }
 
     // ------------------------------------------------------------------
@@ -239,18 +244,20 @@ public class HistorialService {
     }
 
     private void withSeguimiento(HistorialEventoEntity e, double valorAntes) {
-        // Latencia y delta vienen de la configuración agronómica vigente (HU-15 CA-07),
-        // con los valores de properties como fallback.
-        long effLatency = latencyMs;
-        String effLabel = latencyLabel;
-        double effUmbral = umbralRecuperacion;
+        // Latencia y recuperación mínima vienen del catálogo del motor (HU-15 CA-07). Si no se puede leer (la base),
+        // el evento se registra igual con los valores de fábrica: el historial no puede perder una acción por eso.
+        double latenciaMin;
+        double effUmbral;
         try {
-            effLatency = configuracionService.getLatencyMs();
-            effLabel = configuracionService.getLatencyLabel();
-            effUmbral = configuracionService.getUmbralRecuperacion();
+            ParametrosVigentes vigentes = parametros.vigentes();
+            latenciaMin = vigentes.numero(ParametrosSeguimiento.LATENCY_MIN);
+            effUmbral = vigentes.numero(ParametrosSeguimiento.DELTA_MIN);
         } catch (RuntimeException ignored) {
-            // Sin configuración disponible: se usan los fallbacks por properties.
+            latenciaMin = Double.parseDouble(ParametrosSeguimiento.LATENCY_MIN.fabrica());
+            effUmbral = Double.parseDouble(ParametrosSeguimiento.DELTA_MIN.fabrica());
         }
+        long effLatency = Math.round(latenciaMin * 60_000L);
+        String effLabel = Math.round(latenciaMin) + " min";
 
         e.setMetricKey("humSus");
         e.setValorAntes(valorAntes);
@@ -492,7 +499,8 @@ public class HistorialService {
 
             double antes = e.getValorAntes() != null ? e.getValorAntes() : 0.0;
             double delta = ahora - antes;
-            double umbral = e.getUmbralRecuperacion() != null ? e.getUmbralRecuperacion() : umbralRecuperacion;
+            double umbral = e.getUmbralRecuperacion() != null ? e.getUmbralRecuperacion()
+                    : Double.parseDouble(ParametrosSeguimiento.DELTA_MIN.fabrica());
             boolean efectiva = Math.abs(delta) >= umbral;
 
             e.setEvoAhora(fmt0(ahora));

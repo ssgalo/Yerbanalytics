@@ -28,8 +28,8 @@ class HistorialServiceLimiteTest {
     private final HistorialRepository repo = mock(HistorialRepository.class);
 
     private HistorialService service() {
-        return new HistorialService(repo, mock(SectorRepository.class), mock(ConfiguracionService.class),
-                120000, "2 min", 5, Clock.systemUTC());
+        return new HistorialService(repo, mock(SectorRepository.class), HistorialTestSupport.parametrosDeFabrica(),
+                Clock.systemUTC());
     }
 
     private int topeConsultado(Integer pedido) {

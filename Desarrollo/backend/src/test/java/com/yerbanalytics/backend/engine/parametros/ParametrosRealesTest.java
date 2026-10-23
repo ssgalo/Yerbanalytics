@@ -62,6 +62,8 @@ class ParametrosRealesTest {
             Map.entry("sensado.reintentos", 2.0),
             Map.entry("sensado.espera-reintento", 1.0),
             Map.entry("sensado.reintento-fuera-servicio", 15.0),
+            Map.entry("seguimiento.latencia-min", 2.0),              // add-motor-reglas-operativo D-14 (era seguimiento_latencia_min)
+            Map.entry("seguimiento.delta-min", 5.0),
             Map.entry("diagnostico.confianza-minima", 70.0));        // reglas_v2 §1.3 y §11 (era 85)
 
     /** Las claves nuevas de riego v2 (tabla D8): tipo, unidad, fábrica, mínimo, máximo y decimales. */
@@ -108,6 +110,25 @@ class ParametrosRealesTest {
             assertThat(d.max()).as(e.clave()).isEqualTo(e.max());
             assertThat(d.refSpec()).as(e.clave()).contains("reglas_v2");
         }
+    }
+
+    @Test
+    void losParametrosDeSeguimientoVienenDeLaConfiguracionOperativaYSeEditanEnElMotor() {
+        DefinicionParametro latencia = catalogo.definicion("seguimiento.latencia-min").orElseThrow();
+        assertThat(latencia.familia()).isEqualTo(FamiliaParametro.SEGUIMIENTO);
+        assertThat(latencia.tipo()).isEqualTo(TipoParametro.ENTERO);
+        assertThat(latencia.unidad()).isEqualTo("min");
+        assertThat(latencia.fabrica()).isEqualTo("2");
+        assertThat(latencia.min()).isEqualTo(1.0);
+        assertThat(latencia.max()).isEqualTo(1440.0);
+
+        DefinicionParametro delta = catalogo.definicion("seguimiento.delta-min").orElseThrow();
+        assertThat(delta.familia()).isEqualTo(FamiliaParametro.SEGUIMIENTO);
+        assertThat(delta.tipo()).isEqualTo(TipoParametro.NUMERO);
+        assertThat(delta.fabrica()).isEqualTo("5");
+        assertThat(delta.min()).isEqualTo(0.5);
+        assertThat(delta.max()).isEqualTo(50.0);
+        assertThat(delta.decimales()).isEqualTo(1);
     }
 
     @Test

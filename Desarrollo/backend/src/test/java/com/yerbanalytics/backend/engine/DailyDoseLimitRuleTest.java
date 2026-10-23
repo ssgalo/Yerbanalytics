@@ -127,7 +127,7 @@ class DailyDoseLimitRuleTest {
     void elMotivoCitaElUmbralDelCatalogo() {
         when(historialRepository.countByTipoAndSectorAndPeriod(
                 eq("MZ-1-010"), eq("Insumo"), anyLong())).thenReturn(3L);
-        // defaultConfig() trae insumoDosisMax24hMl = 50: no debe aparecer en el texto.
+        // el texto de la regla sólo menciona el tope del catálogo (insumo.max-dosis-24h), no un valor de la configuración operativa.
         RuleContext ctx = RuleContextTestFactory.basico(sector, zona);
 
         List<RuleAction> acciones = rule.evaluate(ctx, ev(rule, java.util.Map.of(ParametrosInsumo.MAX_DOSIS_24H, "3")));

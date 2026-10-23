@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.model.HistorialEventoEntity;
 import com.yerbanalytics.backend.repository.HistorialRepository;
 import com.yerbanalytics.backend.repository.SectorRepository;
@@ -29,11 +30,11 @@ class HistorialServiceEstadoReglaTest {
     @Mock
     private SectorRepository sectorRepository;
     @Mock
-    private ConfiguracionService configuracionService;
+    private CatalogoParametrosService parametros;
 
     private HistorialEventoEntity registrar(boolean activa, String motivo, String consecuencia) {
         HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                configuracionService, 120000, "2 min", 5, Clock.fixed(AHORA, ZoneOffset.UTC));
+                parametros, Clock.fixed(AHORA, ZoneOffset.UTC));
 
         service.registrarEstadoRegla("Ana López", "SustratoSaturadoRule", "Sustrato saturado", "R-04",
                 activa, motivo, consecuencia);
@@ -83,7 +84,7 @@ class HistorialServiceEstadoReglaTest {
     @DisplayName("una regla sin código no deja paréntesis vacíos")
     void sinCodigo() {
         HistorialService service = new HistorialService(historialRepository, sectorRepository,
-                configuracionService, 120000, "2 min", 5, Clock.fixed(AHORA, ZoneOffset.UTC));
+                parametros, Clock.fixed(AHORA, ZoneOffset.UTC));
 
         service.registrarEstadoRegla("Ana", "SupplyRule", "Dosificación de insumo", "", false, null, null);
 

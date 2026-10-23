@@ -42,7 +42,8 @@ public class CatalogoParametros {
                 ParametrosMediasombra.values(),
                 ParametrosDiagnostico.values(),
                 ReadingParameters.values(),
-                SensingParameters.values()}) {
+                SensingParameters.values(),
+                ParametrosSeguimiento.values()}) {
             todas.addAll(List.of(familia));
         }
         return todas;

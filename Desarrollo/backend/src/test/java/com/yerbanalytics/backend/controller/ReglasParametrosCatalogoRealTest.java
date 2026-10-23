@@ -94,6 +94,14 @@ class ReglasParametrosCatalogoRealTest {
     }
 
     @Test
+    void elSeguimientoPostAccionLoDeclaraQuienLoLee_HistorialService() throws Exception {
+        JsonNode json = catalogoJson();
+
+        assertThat(usadoPor(json, "seguimiento.latencia-min")).containsExactly("HistorialService");
+        assertThat(usadoPor(json, "seguimiento.delta-min")).containsExactly("HistorialService");
+    }
+
+    @Test
     void lasClavesDeLasReglasViejasNoEstanEnElCatalogo() throws Exception {
         List<String> claves = new ArrayList<>();
         catalogoJson().get("parametros").forEach(p -> claves.add(p.get("clave").asText()));

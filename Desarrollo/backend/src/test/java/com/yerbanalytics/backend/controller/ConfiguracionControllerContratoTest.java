@@ -41,7 +41,7 @@ class ConfiguracionControllerContratoTest {
     private ConfiguracionService service;
 
     private static Configuracion cfg() {
-        return new Configuracion(List.of(), new ConfiguracionOperativa(15, 2, 5.0, 240, "Ana", 1L, false, "11:00", 14580));
+        return new Configuracion(List.of(), new ConfiguracionOperativa(240, "Ana", 1L, false, "11:00", 14580));
     }
 
     @Test
@@ -51,7 +51,10 @@ class ConfiguracionControllerContratoTest {
         mockMvc.perform(get("/api/configuracion"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.operativa.riegoVolMaxDiarioMl").doesNotExist())
-                .andExpect(jsonPath("$.operativa.insumoDosisMax24hMl").value(15.0))
+                // Se mudaron al catálogo del motor (seguimiento.*) o se borraron (insumoDosisMax24hMl): ver add-motor-reglas-operativo.
+                .andExpect(jsonPath("$.operativa.insumoDosisMax24hMl").doesNotExist())
+                .andExpect(jsonPath("$.operativa.seguimientoLatenciaMin").doesNotExist())
+                .andExpect(jsonPath("$.operativa.seguimientoDeltaMin").doesNotExist())
                 .andExpect(jsonPath("$.operativa.riegoTiempoMaxSeg").doesNotExist())
                 .andExpect(jsonPath("$.operativa.mediasombraAperturaMaxPct").doesNotExist());
     }

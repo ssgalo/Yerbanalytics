@@ -48,9 +48,6 @@ public final class RuleContextTestFactory {
     public static ConfiguracionOperativaEntity defaultConfig() {
         return new ConfiguracionOperativaEntity(
                 1,
-                50.0,   // insumoDosisMax24hMl
-                5,      // seguimientoLatenciaMin
-                5.0,    // seguimientoDeltaMin
                 240,    // intervaloSensadoMinutos
                 null,   // pasadaDiariaActiva (null se lee como false)
                 null,   // pasadaDiariaHora (null se lee como "11:00")

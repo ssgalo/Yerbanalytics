@@ -44,11 +44,8 @@ class HistorialServiceRelojTest {
     void setUp() {
         historialRepository = mock(HistorialRepository.class);
         sectorRepository = mock(SectorRepository.class);
-        ConfiguracionService config = mock(ConfiguracionService.class);
-        when(config.getLatencyMs()).thenReturn(120_000L);
-        when(config.getLatencyLabel()).thenReturn("2 min");
-        when(config.getUmbralRecuperacion()).thenReturn(5.0);
-        service = new HistorialService(historialRepository, sectorRepository, config, 1, "x", 1, RELOJ);
+        service = new HistorialService(historialRepository, sectorRepository,
+                HistorialTestSupport.parametrosDeFabrica(), RELOJ);
         sector = RuleContextTestFactory.sectorBasico("MZ-2-003");
         sector.setZona(RuleContextTestFactory.zonaBasica("MZ-2"));
         sector.getZona().setName("Macro-zona 2");

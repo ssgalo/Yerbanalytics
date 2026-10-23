@@ -31,6 +31,8 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 3.4 RED: `HistorialServiceTest`: `registrarEstadoRegla` deja un evento `Configuración` con regla, usuario, motivo y, si es protección, la consecuencia.
 - [x] 3.5 GREEN: `PUT /api/rules/{name}/estado` (controller + servicio), `ReglaCatalogoDto` ampliada, `CatalogoParametrosService.catalogo()` desde el registro, `MapaPermisos`, descripción de `Permiso.REGLAS_EDITAR`.
 
+> Notas de implementación (bloques 0–6): (a) `PUT /api/rules/{name}/estado` sin `activa` responde `400 ACTIVA_REQUERIDA`; (b) `MOTIVO_DEMASIADO_LARGO` vale para toda regla que traiga motivo, no sólo las protecciones; (c) `RuleOverride.enabled` pasó a `Boolean` (nulo = demo nunca tocó el interruptor) y `DemoRuleDto` suma `operationalActive` y `effectiveEnabled`; (d) `data.sql` inserta la fila operativa con `WHERE NOT EXISTS` (el `ON CONFLICT` no evita el chequeo `NOT NULL` de las columnas viejas); (e) `CatalogoParametrosService` recibe `ReglasCatalogo` con `@Lazy` (varios `DemoControllable` dependen de él); (f) `ApplicationPreconditions` declara el código como lista `P-D1, P-D2, P-D3, P-D4, P-D5`.
+
 ## 4. Backend: despacho de riego (D-10)
 - [x] 4.1 RED: `DespachoRiegoTest`: con `ManualLockRule`, `PosponerPorLluviaRule` o `SustratoSaturadoRule` apagadas, el despacho no descarta por bloqueo, lluvia o saturación; prendidas, descarta como hoy.
 - [x] 4.2 GREEN: `DespachoRiego` consulta el estado efectivo antes de esos tres descartes.
@@ -41,11 +43,11 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 5.3 GREEN: columna `historial_evento.reglas_inactivas`, `ActionRecord` del backend, `RuleNodeDto.activaPorDefecto`.
 
 ## 6. Backend: Umbrales al motor (D-14)
-- [ ] 6.1 RED: `ParametrosRealesTest` con `seguimiento.latencia-min` y `seguimiento.delta-min` (familia `SEGUIMIENTO`, rangos, fábrica 2 y 5); `CatalogoParametros` exige que `HistorialService` los declare.
-- [ ] 6.2 RED: `HistorialServiceConfiguracionTest`: la latencia y el delta salen del catálogo (override ⇒ se usa el override).
-- [ ] 6.3 RED: `ConfiguracionServiceTest` / controller: el DTO de configuración ya no trae `insumoDosisMax24hMl`, `seguimientoLatenciaMin` ni `seguimientoDeltaMin`; un PUT viejo con esos campos no falla (se ignoran).
-- [ ] 6.4 GREEN: `ParametrosSeguimiento`, `HistorialService implements ConsumidorParametros`; se borran los campos de `ConfiguracionOperativa`, `ConfiguracionOperativaEntity`, `ConfiguracionService` (getters, validación, fábrica), `data.sql` y las propiedades `yerbanalytics.historial.latency-*`.
-- [ ] 6.5 `migracion-umbrales-al-motor.sql` (idempotente, encabezado al estilo de `migracion-catalogo-parametros.sql`): copia los valores editados y en rango a `parametro_regla`, `RAISE NOTICE` si no; `DROP COLUMN IF EXISTS` de las tres columnas. Probarla dos veces seguidas en una base de desarrollo.
+- [x] 6.1 RED: `ParametrosRealesTest` con `seguimiento.latencia-min` y `seguimiento.delta-min` (familia `SEGUIMIENTO`, rangos, fábrica 2 y 5); `CatalogoParametros` exige que `HistorialService` los declare.
+- [x] 6.2 RED: `HistorialServiceConfiguracionTest`: la latencia y el delta salen del catálogo (override ⇒ se usa el override).
+- [x] 6.3 RED: `ConfiguracionServiceTest` / controller: el DTO de configuración ya no trae `insumoDosisMax24hMl`, `seguimientoLatenciaMin` ni `seguimientoDeltaMin`; un PUT viejo con esos campos no falla (se ignoran).
+- [x] 6.4 GREEN: `ParametrosSeguimiento`, `HistorialService implements ConsumidorParametros`; se borran los campos de `ConfiguracionOperativa`, `ConfiguracionOperativaEntity`, `ConfiguracionService` (getters, validación, fábrica), `data.sql` y las propiedades `yerbanalytics.historial.latency-*`.
+- [x] 6.5 `migracion-umbrales-al-motor.sql` (idempotente, encabezado al estilo de `migracion-catalogo-parametros.sql`): copia los valores editados y en rango a `parametro_regla`, `RAISE NOTICE` si no; `DROP COLUMN IF EXISTS` de las tres columnas. Probarla dos veces seguidas en una base de desarrollo.
 
 ## 7. Frontend: datos y tipos
 - [ ] 7.1 RED: tests del repositorio HTTP y mock: `setEstadoRegla(name, { activa, motivo, confirmaProteccion })`; error tipado con `MOTIVO_REQUERIDO` / `CONFIRMACION_REQUERIDA`.

@@ -9,5 +9,6 @@ public enum FamiliaParametro {
     MEDIASOMBRA,
     DIAGNOSTICO,
     READINGS,
-    SENSADO
+    SENSADO,
+    SEGUIMIENTO
 }

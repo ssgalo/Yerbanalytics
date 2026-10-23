@@ -10,9 +10,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Límites operativos que no son umbrales de reglas y parámetros de seguimiento post-acción (HU-15).
- * La apertura máxima de la mediasombra y el tiempo máx. de riego se mudaron al catálogo de reglas.
- * Fila única ({@code id = 1}); la calibración del vivero es global.
+ * Lo operativo que no es un umbral de regla: intervalo del pulso de sensado, pasada diaria del riel y horario por
+ * defecto de la mediasombra (HU-15). Los umbrales que deciden viven en el catálogo de reglas, incluido el seguimiento
+ * post-acción. Fila única ({@code id = 1}); la calibración del vivero es global.
  */
 @Entity
 @Table(name = "configuracion_operativa")
@@ -24,17 +24,6 @@ public class ConfiguracionOperativaEntity {
 
     @Id
     private Integer id;
-
-    // --- Insumos / bomba peristáltica (HU-15 CA-05) ---
-    @Column(name = "insumo_dosis_max_24h_ml", nullable = false)
-    private double insumoDosisMax24hMl;
-
-    // --- Seguimiento post-acción (HU-15 CA-07) ---
-    @Column(name = "seguimiento_latencia_min", nullable = false)
-    private int seguimientoLatenciaMin;
-
-    @Column(name = "seguimiento_delta_min", nullable = false)
-    private double seguimientoDeltaMin;
 
     // --- Tiempos y Frecuencias ---
     /** Intervalo del pulso de sensado y evaluación (60–360 min, franjas ancladas a las 02:00). */

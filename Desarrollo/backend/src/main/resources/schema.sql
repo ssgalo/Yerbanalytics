@@ -43,9 +43,6 @@ CREATE TABLE IF NOT EXISTS dispositivo (
 
 CREATE TABLE IF NOT EXISTS configuracion_operativa (
     id INTEGER PRIMARY KEY,
-    insumo_dosis_max_24h_ml DOUBLE PRECISION NOT NULL,
-    seguimiento_latencia_min INTEGER NOT NULL,
-    seguimiento_delta_min DOUBLE PRECISION NOT NULL,
     updated_by VARCHAR(255),
     updated_ts BIGINT
 );
