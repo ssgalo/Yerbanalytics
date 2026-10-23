@@ -32,8 +32,8 @@ Suites: `cd Desarrollo/backend && ./mvnw test`; `cd Desarrollo/frontend && npm t
 - [x] 3.5 GREEN: `PUT /api/rules/{name}/estado` (controller + servicio), `ReglaCatalogoDto` ampliada, `CatalogoParametrosService.catalogo()` desde el registro, `MapaPermisos`, descripción de `Permiso.REGLAS_EDITAR`.
 
 ## 4. Backend: despacho de riego (D-10)
-- [ ] 4.1 RED: `DespachoRiegoTest`: con `ManualLockRule`, `PosponerPorLluviaRule` o `SustratoSaturadoRule` apagadas, el despacho no descarta por bloqueo, lluvia o saturación; prendidas, descarta como hoy.
-- [ ] 4.2 GREEN: `DespachoRiego` consulta el estado efectivo antes de esos tres descartes.
+- [x] 4.1 RED: `DespachoRiegoTest`: con `ManualLockRule`, `PosponerPorLluviaRule` o `SustratoSaturadoRule` apagadas, el despacho no descarta por bloqueo, lluvia o saturación; prendidas, descarta como hoy.
+- [x] 4.2 GREEN: `DespachoRiego` consulta el estado efectivo antes de esos tres descartes.
 
 ## 5. Backend: historial fiel a la ejecución (D-11)
 - [ ] 5.1 RED: `HistorialServiceTest`: un evento del motor guarda `reglasInactivas` con las piezas apagadas en ese momento; el DTO lo expone como lista.

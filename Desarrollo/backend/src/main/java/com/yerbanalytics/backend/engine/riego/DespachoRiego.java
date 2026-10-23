@@ -13,6 +13,9 @@ import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.engine.parametros.VentanaHoraria;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
+import com.yerbanalytics.backend.engine.rules.ManualLockRule;
+import com.yerbanalytics.backend.engine.rules.PosponerPorLluviaRule;
+import com.yerbanalytics.backend.engine.rules.SustratoSaturadoRule;
 import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.rules.FueraDeVentanaRiegoRule;
@@ -475,8 +478,11 @@ public class DespachoRiego implements ConsumidorParametros {
         long abiertos = enCurso.values().stream().filter(c -> c.zonaId().equals(zonaId)).count();
         long libres = cupo - abiertos;
 
+        // Apagar una regla apaga también su revalidación: con S-01 apagada (o su guarda salteada en demo) un bloqueo manual
+        // no descarta el riego. Lo que el bloqueo hace al activarse (cerrar válvulas, cancelar lo encolado) no cambia.
+        boolean ignoraBloqueo = overrides.skipsGuard(ManualLockRule.NAME, ManualLockRule.BYPASS_LOCK);
         for (SolicitudRiego s : pendientes) {
-            if (zonaBloqueada || sectoresBloqueados.contains(s.sectorId())) {
+            if (!ignoraBloqueo && (zonaBloqueada || sectoresBloqueados.contains(s.sectorId()))) {
                 log.info("Sector {}: riego descartado, hay un bloqueo manual activo.", s.sectorId());
                 cola.retirarSiCoincide(s);
                 continue;
@@ -509,7 +515,7 @@ public class DespachoRiego implements ConsumidorParametros {
             }
             // Los bloqueos se leyeron al empezar el tick: un operario pudo bloquear después. Se mira de nuevo,
             // justo antes de abrir ESTE sector.
-            if (hayBloqueoAhora(zonaId, s.sectorId())) {
+            if (!ignoraBloqueo && hayBloqueoAhora(zonaId, s.sectorId())) {
                 log.info("Sector {}: riego descartado, hay un bloqueo manual activo.", s.sectorId());
                 cola.retirarSiCoincide(s);
                 continue;
@@ -587,7 +593,9 @@ public class DespachoRiego implements ConsumidorParametros {
         int horas = (int) numero(ParametrosRiego.LLUVIA_VENTANA);
         WeatherForecast.LluviaPrevista lluvia = PrecondicionesRiego.lluviaPrevista(pronostico,
                 ahora.atZone(ZonaHorariaVivero.ZONA).toLocalDateTime(), horas);
-        if (PrecondicionesRiego.lluviaPospone(lluvia, numero(ParametrosRiego.LLUVIA_PROBABILIDAD),
+        // R-03 apagada: la lluvia prevista no descarta el riego.
+        if (overrides.isEnabled(PosponerPorLluviaRule.NAME)
+                && PrecondicionesRiego.lluviaPospone(lluvia, numero(ParametrosRiego.LLUVIA_PROBABILIDAD),
                 numero(ParametrosRiego.LLUVIA_MM))) {
             return MOTIVO_LLUVIA;                      // R-03 (sin pronóstico: no pospone)
         }
@@ -710,7 +718,8 @@ public class DespachoRiego implements ConsumidorParametros {
         if (humedad == null || humedad.isNaN()) {
             return new Estado("sin lectura de humedad de sustrato", false);
         }
-        if (humedad >= numero(ParametrosRiego.SATURACION_BLOQUEO)) {
+        // R-04 apagada: el sustrato saturado no retira la ronda.
+        if (overrides.isEnabled(SustratoSaturadoRule.NAME) && humedad >= numero(ParametrosRiego.SATURACION_BLOQUEO)) {
             return new Estado("el sustrato ya está en o sobre el umbral de saturación", true);   // R-04: cancela
         }
         return Estado.LISTA;

@@ -38,7 +38,7 @@ import java.util.List;
 public class SustratoSaturadoRule implements Rule {
 
     private static final int PRIORITY = 4;
-    private static final String NAME = "SustratoSaturadoRule";
+    public static final String NAME = "SustratoSaturadoRule";
     static final String TEXTO_ALERTA = "Sustrato saturado, riesgo de asfixia radicular y hongos";
 
     @Override

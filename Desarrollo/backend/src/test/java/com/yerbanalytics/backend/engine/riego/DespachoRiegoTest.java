@@ -3,6 +3,11 @@ package com.yerbanalytics.backend.engine.riego;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.RiegoCtx;
+import com.yerbanalytics.backend.engine.overrides.RuleOverride;
+import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
+import com.yerbanalytics.backend.engine.rules.ManualLockRule;
+import com.yerbanalytics.backend.engine.rules.PosponerPorLluviaRule;
+import com.yerbanalytics.backend.engine.rules.SustratoSaturadoRule;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
 import com.yerbanalytics.backend.service.ConfiguracionService;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
@@ -1379,5 +1384,101 @@ class DespachoRiegoTest {
         despacho.onActuatorStopped(new ActuatorStopped("MZ-2", id("MZ-2", 1), "valve", "cmd-0", "cancelado"));
 
         assertThat(despacho.estadoValvula(id("MZ-2", 1))).isEqualTo("Cerrada");
+    }
+
+    // ------------------------------------------------------------------ add-motor-reglas-operativo (D-10)
+
+    /** Apaga las reglas dadas en el estado efectivo, como lo haría el vivero desde Motor de reglas. */
+    private void apagar(String... reglas) {
+        TestRuleOverrides overrides = new TestRuleOverrides();
+        for (String regla : reglas) {
+            overrides.put(regla, new RuleOverride(false, Map.of(), Set.of()));
+        }
+        despacho.setOverrides(overrides);
+    }
+
+    @Test
+    void conElBloqueoManualApagado_unSectorBloqueadoSeRiega_S01() {
+        pedirZona("MZ-2", 3, 600);
+        when(bloqueos.findByActiveTrue()).thenReturn(List.of(bloqueoSector("MZ-2-002")));
+        when(bloqueos.findBySectorIdAndActiveTrue("MZ-2-002")).thenReturn(List.of(bloqueoSector("MZ-2-002")));
+        apagar(ManualLockRule.NAME);
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-002", "MZ-2-003");
+    }
+
+    @Test
+    void conElBloqueoManualApagado_unaZonaBloqueadaSeRiega_S01() {
+        pedirZona("MZ-2", 2, 600);
+        when(bloqueos.findByActiveTrue()).thenReturn(List.of(bloqueoZona("MZ-2")));
+        when(bloqueos.findByZonaIdAndActiveTrue("MZ-2")).thenReturn(List.of(bloqueoZona("MZ-2")));
+        apagar(ManualLockRule.NAME);
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-002");
+    }
+
+    @Test
+    void conElBloqueoManualPrendido_sigueDescartando_S01() {
+        pedirZona("MZ-2", 3, 600);
+        when(bloqueos.findByActiveTrue()).thenReturn(List.of(bloqueoSector("MZ-2-002")));
+        despacho.setOverrides(new TestRuleOverrides());
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-003");
+        assertThat(cola.contiene("MZ-2-002")).isFalse();
+    }
+
+    @Test
+    void conPosponerPorLluviaApagada_laLluviaPrevistaNoDescartaElRiego_R03() {
+        pedir("MZ-2", 1, 600);
+        lluviaFuerte();
+        apagar(PosponerPorLluviaRule.NAME);
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001");
+    }
+
+    @Test
+    void conPosponerPorLluviaPrendida_laLluviaPrevistaDescarta_R03() {
+        pedir("MZ-2", 1, 600);
+        lluviaFuerte();
+        despacho.setOverrides(new TestRuleOverrides());
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.contiene("MZ-2-001")).isFalse();
+    }
+
+    @Test
+    void conSustratoSaturadoApagada_laSaturacionNoRetiraLaRonda_R04() {
+        pedir("MZ-2", 1, 600);
+        pedirCritico("MZ-2", 2, 720);
+        zonaRepository.findById("MZ-2");
+        zonas.get("MZ-2").setHumSusRaw(75.0);                        // riego.saturacion-bloqueo = 75
+        apagar(SustratoSaturadoRule.NAME);
+
+        despacho.tick();
+
+        assertThat(sectoresPublicados()).containsExactly("MZ-2-001", "MZ-2-002");
+    }
+
+    @Test
+    void conSustratoSaturadoPrendida_laSaturacionRetiraLaRonda_R04() {
+        pedir("MZ-2", 1, 600);
+        zonaRepository.findById("MZ-2");
+        zonas.get("MZ-2").setHumSusRaw(75.0);
+        despacho.setOverrides(new TestRuleOverrides());
+
+        despacho.tick();
+
+        verify(publisher, never()).publicar(any(), any(), any(), any(), any());
+        assertThat(cola.zonas()).isEmpty();
     }
 }
