@@ -1,6 +1,6 @@
 # Change: add-reglas-biotico
 
-> Rama: `feat/reglas-v2-biotico`. Cubre **F-F1**, **F-F2**, **F-P1**, **F-04** (foco) y **F-06** (tope de aplicaciones)
+> Rama: `feat/reglas-v2-reglas-biotico`. Cubre **F-F1**, **F-F2**, **F-P1**, **F-04** (foco) y **F-06** (tope de aplicaciones)
 > de `reglas_v2` §8.5. Índice: `reglas-v2-overview/README.md`.
 > **Depende de:** `add-control-demo-reglas`, `add-historial-lecturas`, `add-metrica-dpv`, `add-dosificacion-base`.
 

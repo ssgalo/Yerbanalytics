@@ -25,6 +25,12 @@
 > - N-01 es **Parcial** porque pide la dosis del catálogo (10 ml de fábrica, tope del firmware 50 ml) y no los 100 mL de la v2, y porque deja fuera de la tanda al sector con bloqueo manual, sin bomba o con falla hidráulica. El intervalo del plan es por zona (`zona.nutrition_plan_interval_days`, 3–30 días, fábrica 7; `PUT /api/zonas/{zona}/plan-nutricion`).
 > - Los conteos de cobertura y las citas `archivo:línea` del resto del documento no se recalcularon.
 
+> **Actualización parcial del 23/10/2026** (`add-reglas-biotico`):
+> - **F-F1 y F-P1 pasan a Parcial; F-F2, F-04 y F-06 a Implementada** (tablas de abajo). F-F1/F-P1 son reglas **de sector** que actúan una vez por diagnóstico (`biotic/FungalDamageRule`, `FoliarPestRule`, sobre el esqueleto `BioticDiagnosisBase`); F-F2 y F-04 son reglas **de macro-zona** (`FungalConditionRule`, `OutbreakRule`); F-06 es una precondición más de la aplicación (`ApplicationPreconditions`, con la revisión en `POST /api/sectores/{id}/revision-fitosanitario`).
+> - Son **Parcial** porque piden la dosis del catálogo (10 ml de fábrica, tope del firmware 50 ml) y no los 100 mL de la v2. Dos supuestos a validar con el vivero: el *Daño biótico* genérico no dispara nada (D-1) y los lindantes de F-04 salen de la disposición visual de la grilla (D-6).
+> - El diagnóstico se da por usado cuando la aplicación se ejecuta, no cuando se pide (D-4): una aplicación diferida ya no lo pierde.
+> - Los conteos de cobertura y las citas `archivo:línea` del resto del documento no se recalcularon.
+
 Abreviaturas de ruta: `engine/` = `…/backend/engine/`; `rules/` = `…/backend/engine/rules/`; `riego/` = `…/backend/engine/riego/`; `param/` = `…/backend/engine/parametros/`; `traza/` = `…/backend/engine/traza/`; `service/` = `…/backend/service/`; `res/` = `Desarrollo/backend/src/main/resources/`.
 
 ---
@@ -141,15 +147,15 @@ Estados: **Implementada** (mismo comportamiento), **Parcial** (coincide con dife
 | N-02 | CE baja | Implementada | `LowEcRule` (`nutrition/`, de macro-zona) | Media de las últimas 6 lecturas de pulso (`ReadingHistory`) < 0,5 dS/m y sin fertilizar en 5 días (plan o correctiva): adelanta N-01 y deja el `INFO` del doc; una alerta por evento |
 | F-C1 | Clorosis no nutricional | Ausente | — | No se evalúan causas (humedad, CE, pH) ni se bloquea fertilizante |
 | F-C2 | Clorosis nutricional | Distinta | `SupplyRule` | Sin distinción por clase: cualquier sector `critical` con confianza ≥ 85 % dosifica |
-| F-F1 | Daño fúngico | Distinta | `SupplyRule` | Idem F-C2; sin severidad/ambiente/3 capturas |
-| F-F2 | Condición predisponente | Ausente | — | No hay DPV ni alerta sin diagnóstico |
-| F-P1 | Plaga foliar | Distinta | `SupplyRule` | Idem F-C2; sin clima de ácaros ni 3 capturas |
+| F-F1 | Daño fúngico | Parcial | `FungalDamageRule` (`biotic/`, de sector) | Diagnóstico vigente (P-D1) y severidad Media/Alta, o sustrato > 80 % / DPV < 0,3 en 2 lecturas de pulso de las últimas 24 h, o 3 capturas diarias seguidas; `WARNING` (`CRITICAL` si Alta). Dosis del catálogo (10 ml), no 100 mL |
+| F-F2 | Condición predisponente | Implementada | `FungalConditionRule` (`biotic/`, de macro-zona) | DPV < 0,3 en 2 lecturas seguidas, 18–28 °C y sustrato ≥ 75 %: `WARNING` sin aplicar nada y sin diagnóstico; una alerta por evento |
+| F-P1 | Plaga foliar | Parcial | `FoliarPestRule` (`biotic/`, de sector) | Idem F-F1 para *Plaga foliar* y *Ácaro*, con DPV ≥ 2 kPa en las últimas 72 h; `INFO` si no actúa. Dosis del catálogo |
 | F-S1 | Estrés solar (sector) | Ausente | — | No hay riego de reposición ligado al diagnóstico |
 | F-S2 | Estrés solar extendido (MZ) | Ausente | — | No hay cierre de malla por 3 días por % de sectores |
 | F-S3 | Estrés solar sin radiación | Ausente | — | Sin alerta de "síntoma no explicado por radiación" |
-| F-04 | Foco | Ausente | — | No hay tratamiento de sectores lindantes |
+| F-04 | Foco | Implementada | `OutbreakRule` (`biotic/`, de macro-zona) | ≥ 3 sectores de la zona con el mismo daño biótico vigente en 72 h ⇒ fitosanitario para los lindantes (grilla `sectoresPorFila`, supuesto a validar) y `CRITICAL`; sin P-D1 para los lindantes. No repite sobre un lindante ya tratado o en cola |
 | F-05 | Sano tras tratamiento | Ausente | — | El seguimiento se cierra por delta de humedad, no por diagnóstico Sano |
-| F-06 | Tope de aplicaciones | Ausente | — | El único tope es 1 dosis/24 h; no hay 3 en 30 días |
+| F-06 | Tope de aplicaciones | Implementada | `ApplicationPreconditions` + `FungicideCap` + `FungicideReviewService` | 3 fitosanitarios en 30 días ⇒ la cuarta se rechaza («F-06 … tope») con `WARNING`, hasta que alguien registre la revisión (`POST /api/sectores/{id}/revision-fitosanitario`) |
 | P-D1 | Diagnóstico vigente | Implementada | `ValidDiagnosis` (vía `ApplicationService`) | Último diagnóstico del sector, ≤ 48 h (`diagnostico.vigencia-horas`), confianza ≥ 70 %, no «No concluyente». «Última captura» se lee como «último diagnóstico». Sin regla productiva que la pida |
 | P-D2 | Intervalo mínimo | Implementada | `ApplicationPreconditions` | Intervalo 5 d (fertilizante) / 7 d (fitosanitario) y una aplicación por día; con ambos el mismo día va el fitosanitario y el fertilizante espera al día siguiente |
 | P-D3 | Ventana y temperatura | Implementada | `ApplicationPreconditions` | Ventanas 07–10 y 17–19 (`insumo.ventana-manana` / `insumo.ventana-tarde`) y ≤ 30 °C (lectura de la zona o, si falta, pronóstico) |
@@ -323,13 +329,9 @@ La sección F del documento está marcada **Sin revisar**; todas las diferencias
 - **Falta por regla:**
   - F-C1: sin chequeo de asfixia/salinidad/pH ni WARNING con causa.
   - F-C2: la severidad "moderada o alta" en rustificación no se evalúa.
-  - F-F1: sin condiciones de severidad, ambiente húmedo (humedad > 80 %, DPV) ni 3 capturas seguidas.
-  - F-F2: no hay DPV. No se calcula ni se guarda (búsqueda de `dpv|vapor` en `src/main/java`: sin resultados).
-  - F-P1: sin clima de ácaros ni conteo de capturas.
+  - F-F1, F-F2, F-P1, F-04 y F-06: **implementadas** en `add-reglas-biotico` (ver la actualización del 23/10/2026 y la tabla de arriba).
   - F-S1/F-S2/F-S3: no hay riego de reposición, ni cierre de MZ por 3 días, ni alerta de síntoma no explicado. El motor no consulta historial de lecturas (ver punto 7).
-  - F-04: no hay vecindad ni anillo de 8 sectores.
   - F-05: ver E.
-  - F-06: no hay conteo de fitosanitarios por 30 días; sólo `DailyDoseLimitRule` (1 dosis/24 h).
 - **Alertas y trazabilidad.** El Registro de Inacción dejó de escribir una fila por regla, sector y evaluación: sólo escribe cuando cambia la decisión del sector (ver 2). Las alertas de riego sí son una por zona y ciclo. Para las reglas de insumo no hay alertas.
 
 ### 4.6 Precondiciones de dosificación (P-D) y ejecución (§8.2)

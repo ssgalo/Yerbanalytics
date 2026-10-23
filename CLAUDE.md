@@ -101,8 +101,9 @@ hardware real.
   (`WARNING`, `WARNING`, `CRITICAL`) y la MZ pasa a **estado seguro** (riego cerrado, bombas detenidas,
   mediasombra cerrada); con el nodo caído se le vuelve a pedir lectura cada 15 min. Los plazos y reintentos de la
   lectura son parámetros `sensado.*` del catálogo. También se pide a mano (`POST /api/pulsos`, con o sin motor).
-- **Diagnóstico nuevo**: las reglas que usan el diagnóstico de IA (hoy la de insumo) actúan una vez
-  por diagnóstico; queda marcado como usado en el sector. La telemetría no toca el diagnóstico.
+- **Diagnóstico nuevo**: las reglas que usan el diagnóstico de IA (hoy las bióticas F-F1/F-P1 y la de insumo, retirada) actúan una vez
+  por diagnóstico; queda marcado como usado en el sector. Si la regla pide una aplicación, el diagnóstico se da por usado **cuando la
+  aplicación se ejecuta** (o se rechaza), no cuando se pide: una aplicación diferida no lo pierde. La telemetría no toca el diagnóstico.
 - **Aplicación (de insumo)**: orden de fertilizante o fitosanitario a un sector (`supply/ApplicationService`). Toda aplicación pasa por
   ahí: la regla decide **qué** insumo y el servicio verifica las precondiciones P-D1…P-D5, publica `pump ON {ml}` y descuenta el tanque.
   Lo que no es el momento queda **pendiente** y se reintenta en la próxima ventana apta (07–10 / 17–19 de fábrica).
@@ -112,6 +113,12 @@ hardware real.
 - **Plan de nutrición**: fertilizante foliar en **todos los sectores de la macro-zona cada N días** (3–30, fábrica 7; lo fija el agrónomo en el
   detalle de la zona), sin mirar lo que se mide (N-01), y adelantado si la CE media baja de 0,5 dS/m sin fertilizar en 5 días (N-02). El motor
   lo pide en una **tanda** (un pedido por sector) y el intervalo corre desde que se aplicó el último sector (`nutrition/`).
+- **Reglas bióticas** (`biotic/`): fitosanitario ante un diagnóstico de *Daño fúngico* (F-F1) o de *Plaga foliar/Ácaro* (F-P1) vigente cuando la
+  severidad es Media/Alta, el ambiente lo favorece (DPV, sustrato) o el diagnóstico se repite en 3 capturas diarias seguidas; aviso de condiciones
+  favorables al hongo sin diagnóstico (F-F2); **foco** (F-04): ≥ 3 sectores de la zona con el mismo daño biótico en 72 h ⇒ se trata también a
+  sus **lindantes** (grilla `sectoresPorFila`, supuesto a validar con el vivero). El *Daño biótico* genérico no dispara nada (D-1).
+- **Tope de fitosanitarios** (F-06): un sector con 3 fitosanitarios en 30 días no recibe otro hasta que alguien **registra la revisión**
+  (`POST /api/sectores/{id}/revision-fitosanitario`); es una precondición más de la aplicación (`ApplicationPreconditions`).
 - **Rustificación**: endurecimiento progresivo del plantín antes del trasplante. Plan **por
   macro-zona** (desde su detalle): etapas de N días con una ventana horaria en que la mediasombra
   está abierta (sólo abre o cierra del todo). Sin plan, rige el horario por defecto de Umbrales.
@@ -309,6 +316,8 @@ cd Desarrollo/backend
   días). El plan se lee de `GET /api/nursery` → `zonas[].nutritionPlan`. Ver "Plan de nutrición" en el README del backend.
 - `GET /api/tanques`, `POST /api/tanques/{zona}/{insumo}/recarga {liters, capacityLiters?}` → tanques de insumo por macro-zona y
   registro de sus cargas (permisos `insumos.ver` / `insumos.gestionar`). Ver "Aplicación de insumos" en el README del backend.
+- `POST /api/sectores/{sectorId}/revision-fitosanitario {detail}` → revisión de un sector que alcanzó el tope de fitosanitarios (F-06): levanta el
+  bloqueo (permiso `insumos.gestionar`; el detalle es obligatorio). Ver "Reglas bióticas" en el README del backend.
 - `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{id}` → bloqueo manual de la actuación autónoma por sector o
   macro-zona (S-01): al activar cierra válvulas y bombas y cancela el riego encolado; reanudar no repone nada.
   Un bloqueo es de un sector o de una zona, nunca de los dos. Ver "Bloqueo manual" en el README del backend.
@@ -362,8 +371,12 @@ cd Desarrollo/backend
   `ApplicationPreconditions` (P-D1…P-D5, `DemoControllable`), el stock del tanque, registra y descuenta. El backend manda **mililitros** (el
   firmware convierte a tiempo y corta solo; tope 50 ml por comando = `ContratoNodo.BOMBA_ML_MAX`) y hay una bomba por sector: el comando
   no lleva el insumo. **`SupplyRule` y `DailyDoseLimitRule` están retiradas** (arrancan apagadas, `yerbanalytics.reglas.retiradas`) hasta que
-  entren las reglas por diagnóstico F-*, que son las que las reemplazan: hoy sólo el plan de nutrición (N-01) pide aplicaciones, y no decide con
-  el diagnóstico. Detalle en el README del backend.
+  entren las reglas por diagnóstico F-C*/F-S* (clorosis y estrés solar), que son las que faltan para reemplazarlas: hoy piden aplicaciones el plan
+  de nutrición (N-01, no decide con el diagnóstico) y las reglas bióticas (F-F1, F-P1, F-04; las dos primeras sí). Detalle en el README del backend.
+- **Las reglas bióticas por sector comparten un esqueleto** (`biotic/BioticDiagnosisBase`, template method): F-F1 y F-P1 deciden igual (diagnóstico
+  del tipo y vigente, y alguna de tres razones) y sólo difieren en qué ambiente favorece al problema. Cada regla concreta declara **su**
+  `parametros()` con un `List.of(...)` literal (el test anti-drift del frontend lo lee del código fuente). El foco no cuenta nada por su cuenta:
+  usa `GridNeighbors` y `FungicideLog`, y cada lindante lleva su orden (`DetalleOutbreakTreatment`) al `ZoneActionExecutor`.
 - **El riego se decide en las reglas y se ejecuta en un despacho por tandas** (cola, 10 válvulas por
   zona, revalidación antes de abrir). Qué cubre cada regla frente a `reglas_v2` y el riesgo de
   operar sin E-01/S-06: README del backend y
@@ -380,10 +393,11 @@ cd Desarrollo/backend
   `YERBANALYTICS_USUARIOS_INICIALES` (`usuario:ROL:clave,…`). Se crean si no existen y nunca se pisan.
   Sus claves de desarrollo coinciden con los `env.example` del simulador y de la inferencia.
 - **Las reglas que deciden sobre una macro-zona entera son `ZoneRule`** (`engine/zone/`), no `Rule`: el plan de nutrición (N-01, N-02) es de la zona
-  y la CE que lo adelanta también (hay un nodo testigo por zona). `ZoneRuleEngine` las corre **una vez por zona**, en `updateTelemetry` después de los
-  sectores y sólo con el motor encendido (pulso con motor); decide la regla y ejecuta `ZoneActionExecutor`/`NutritionPlanService`, igual que el
+  y la CE que lo adelanta también (hay un nodo testigo por zona); también la condición predisponente al hongo (F-F2) y el foco (F-04). `ZoneRuleEngine`
+  las corre **una vez por zona**, en `updateTelemetry` después de los sectores y sólo con el motor encendido (pulso con motor), en orden de prioridad
+  (sanidad antes que rutina); decide la regla y ejecuta `ZoneActionExecutor`/`NutritionPlanService`/`ApplicationService`, igual que el
   reparto del riego. Son `DemoControllable` y declaran sus umbrales en el catálogo como cualquier regla, y su traza se suma a la del sector en el
-  Inspector. Antes de escribir una regla nueva, decidir si es de sector (`Rule`) o de zona (`ZoneRule`). Detalle en el README del backend ("Plan de nutrición").
+  Inspector. Antes de escribir una regla nueva, decidir si es de sector (`Rule`) o de zona (`ZoneRule`). Detalle en el README del backend ("Plan de nutrición" y "Reglas bióticas").
 - **Patrón para agregar una nueva regla agronómica**:
   - Toda pieza que decide una acción (regla por sector, por macro-zona o servicio) es un **`DemoControllable`** (`engine/overrides/`; `Rule` ya lo extiende): así aparece en `GET /api/demo/rules`, se apaga y declara sus `cooldownKeys()`/`bypassKeys()`. Las reglas nuevas también necesitan su escenario en el simulador (`Desarrollo/simulador/src/scenarios/`; ver su README).
   - Toda regla nueva debe seguir estrictamente el patrón de las existentes: implementar `Rule`, anotarse como `@Component`, definir `priority()` ascendente, `name()`, `label()` legible para el usuario, `branch()` (GLOBAL, RIEGO, INSUMO, MEDIASOMBRA, SEGUIMIENTO) y declarar sus umbrales en `parametros()`.

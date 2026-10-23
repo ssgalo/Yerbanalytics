@@ -1054,6 +1054,59 @@ Fertilizante foliar **en todos los sectores de la macro-zona cada N días**, sin
   vence ya) y `LowEcRule` (cooldown `no-fertilized`; bypass `samples`: la última lectura de CE cuenta como la media). Las dos se apagan.
   Escenarios `NUTRITION_PLAN` y `LOW_EC` en el simulador.
 
+## Reglas bióticas (`add-reglas-biotico` · reglas_v2 §8.5)
+
+Cinco decisiones sobre hongos y plagas, todas con fitosanitario y todas por el `ApplicationService` (nunca publican la bomba). Dos son **de
+sector** (corren en la cadena del `RuleOrchestrator`, rama `INSUMO`, sólo con un **diagnóstico nuevo**) y dos **de macro-zona** (las corre el
+`ZoneRuleEngine`, antes que el plan de nutrición: sanidad antes que rutina). El tope es una precondición más de la aplicación.
+
+| Regla | Prioridad | Qué decide |
+|---|---|---|
+| `FungalDamageRule` (F-F1) | 15 · sector | Diagnóstico *Daño fúngico* vigente (P-D1) **y** (severidad Media/Alta **o** sustrato > `biotico.humedad-hongo` (80 %) **o** DPV < `biotico.dpv-saturado` (0,3 kPa) en las **2 últimas lecturas de pulso, de las últimas 24 h** **o** el mismo diagnóstico en `biotico.capturas-seguidas` (3) capturas de días seguidos): pide fitosanitario y deja un `WARNING` «Alta probabilidad de hongo» (`CRITICAL` con severidad Alta). Si no, espera a las próximas capturas |
+| `FoliarPestRule` (F-P1) | 16 · sector | Lo mismo para *Plaga foliar* y *Ácaro* (que es una plaga foliar), con DPV ≥ `biotico.dpv-calor-seco` (2 kPa) en alguna lectura de las últimas `biotico.horas-dpv-acaros` (72) horas como razón ambiental. Si no se cumple ninguna deja un `INFO` y espera |
+| `FungalConditionRule` (F-F2) | 17 · zona | DPV < `biotico.dpv-saturado` en 2 lecturas de pulso seguidas, temperatura entre `biotico.temp-predisponente-min` y `-max` (18–28 °C) y sustrato ≥ `biotico.humedad-predisponente` (75 %): `WARNING` «Condiciones favorables a enfermedades fúngicas». **No aplica nada** y no mira el diagnóstico |
+| `OutbreakRule` (F-04) | 18 · zona | `biotico.sectores-foco` (3) o más sectores de la zona con el mismo tipo de daño biótico vigente dentro de `biotico.horas-foco` (72 h): pide fitosanitario para los **lindantes** de cada afectado (aunque estén sanos) y deja un `CRITICAL` «Foco de [diagnóstico] en MZ-N» |
+| Tope (F-06) | precondición | Un sector que ya recibió `insumo.tope-fitosanitario` (3) fitosanitarios en `insumo.tope-fitosanitario-dias` (30) días **no recibe otro** hasta que alguien registre la revisión: `ApplicationPreconditions` rechaza (motivo «F-06 … tope») y deja un `WARNING` por sector, una vez |
+
+- **Qué decide la regla y qué el servicio.** La regla decide *si* corresponde tratar; *cuándo* se aplica lo resuelve el `ApplicationService` con
+  P-D1…P-D5 (ventana, temperatura, lluvia, humedad, intervalo de 7 días y una por día). Lo diferido queda en `pending_application` y se reintenta.
+  La dosis es la del catálogo (`insumo.dosis-fitosanitario`, 10 ml de fábrica, máx. 50): la v2 dice 100 ml, el firmware acepta 50 por comando.
+- **Mapa de estados (D-1).** *Daño fúngico* → F-F1; *Plaga foliar* y *Ácaro* → F-P1 (y cuentan juntos en el foco); el *Daño biótico* genérico
+  **no es de ninguno** (no se sabe qué condición lo justifica): sólo queda en el Registro de Inacción. Es la decisión por defecto del diseño,
+  **a validar con el vivero**. Severidad: Baja = leve, Media = moderada, Alta = alta (`biotic/Severity`).
+- **Capturas seguidas (D-3).** `biotic/ConsecutiveCaptures`: de cada día vale la última captura, y la racha corre hacia atrás desde la más nueva
+  sin saltear ningún día (una pasada que faltó la corta). Cuentan sólo las del tipo de daño y con la confianza mínima del catálogo.
+- **Un diagnóstico, una aplicación (D-4).** Una regla que pide una aplicación por el diagnóstico **no lo gasta**: lo gasta el `ApplicationService`
+  cuando la aplicación se ejecuta (o se rechaza, porque no se reintenta). La fila diferida guarda `diagnosis_ts` (columna nueva de
+  `pending_application`, sin migración manual) y al ejecutarse se marca ESE diagnóstico, no el que tenga entonces el sector: uno más nuevo sigue
+  siendo nuevo. Mientras espera, la regla se reevalúa en cada pulso y vuelve a pedir lo mismo (la fila es única por sector e insumo).
+  `ResultadoEvaluacion.usoDiagnostico` es `false` si alguna regla pidió una aplicación por el diagnóstico.
+- **El foco (D-6).** Cuenta, por tipo de daño, los sectores **de la zona** con diagnóstico vigente (concluyente y con la confianza mínima) **dentro
+  de la ventana del foco**, que puede ser más larga que la vigencia de P-D1 (48 h). Los lindantes son los hasta 8 de la grilla de la zona
+  calculada con `sectoresPorFila` de la topología (`biotic/GridNeighbors`, `biotic/SectorGrid`); los del borde sólo tienen los que existen, y los
+  de otra macro-zona no se tratan. **Supuesto a validar con el vivero:** esa disposición es visual, no un mapa de adyacencia física. Un foco, un
+  tratamiento: no se le pide a un lindante que ya recibió fitosanitario dentro de la ventana ni al que ya lo tiene en cola, y si no queda ninguno
+  por tratar no se repiten ni las órdenes ni la alerta. Un lindante bloqueado (S-01), sin bomba (S-04) o con falla hidráulica (S-05) queda fuera
+  de la tanda pero el foco se avisa igual.
+- **Una alerta por evento (F-F2).** La regla no guarda estado: avisa cuando la condición se cumple con las últimas lecturas y **no** se cumplía
+  con las mismas lecturas corridas una hacia atrás, es decir, cuando el evento empieza.
+- **Revisión del sector (F-06).** `POST /api/sectores/{sectorId}/revision-fitosanitario {"detail": "..."}` (permiso `insumos.gestionar`,
+  que ya tienen el Ingeniero, el Operario y el Servicio; sin migración) registra quién revisó y qué constató (evento «Revisión» en el historial
+  del sector) y fija `sector.fungicide_review_ts`: desde ahí el conteo del tope vuelve a cero. El detalle es obligatorio (`400`); un sector
+  inexistente da `404`. Es el único camino que levanta el bloqueo. El tope cuenta las aplicaciones de la tabla `application`, sea cual sea la
+  regla que las pidió.
+- **Parámetros** (editables en Motor de reglas → Parámetros): familia `BIOTICO` (`biotico.dpv-saturado`, `dpv-calor-seco`, `humedad-hongo`,
+  `temp-predisponente-min`/`-max`, `humedad-predisponente`, `capturas-seguidas`, `horas-dpv-acaros`, `sectores-foco`, `horas-foco`) e `INSUMO`
+  (`insumo.tope-fitosanitario`, `insumo.tope-fitosanitario-dias`). Los rangos de las temperaturas predisponentes y de las ventanas los propone el
+  equipo: la v2 fija el valor de fábrica pero no cuánto se puede mover.
+- **Control desde el simulador** (`/api/demo/rules`): `FungalDamageRule` y `FoliarPestRule` (bypass `persistence`: el diagnóstico cuenta como
+  visto en las capturas seguidas), `FungalConditionRule` (bypass `readings`: basta una lectura de DPV bajo el umbral), `OutbreakRule` (cooldown
+  `window`, en minutos: la ventana del foco) y `ApplicationPreconditions` (bypass `cap`: el tope de fitosanitarios no se aplica). Las cuatro reglas
+  se apagan. Escenarios `FUNGAL_DAMAGE`, `FOLIAR_PEST`, `FUNGAL_CONDITION`, `OUTBREAK` y `FUNGICIDE_CAP` en el simulador.
+- **Efecto a conocer.** `SupplyRule` y `DailyDoseLimitRule` siguen retiradas: estas reglas **no las reemplazan** (las F-C*/F-S* de
+  `add-reglas-clorosis-estres-solar` son las que faltan para borrarlas). Con el motor encendido, un sector con daño fúngico o plaga que no tiene
+  el tanque de fitosanitario registrado rechaza la aplicación (y gasta el diagnóstico): cargá los tanques antes de la primera pasada.
+
 ## Historial de lecturas
 
 Casi todas las reglas de nutrición y de hongos/plagas/estrés de `reglas_v2` miran el **pasado** de las lecturas
