@@ -70,3 +70,6 @@ GEMINI.md
 # (no en la base). Son datos de cada instalación, no del repo.
 # ─────────────────────────────────────────────────────────────
 Desarrollo/backend/capturas/
+
+# Logs y PIDs de start-all.sh
+logs/
