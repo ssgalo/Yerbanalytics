@@ -169,10 +169,18 @@ warn "Esperando 3 segundos para que la base de datos se inicialice..."
 sleep 3
 
 # Lanza un servicio en su propio grupo de procesos (setsid) para que stop-all.sh lo mate entero.
+# El PID lo escribe el propio proceso ya dentro de su sesion nueva y despues se reemplaza por el
+# comando (exec): asi el archivo guarda el lider del grupo, y no queda ningun proceso intermedio
+# con la salida de este script abierta (que dejaria colgado a quien lo llama).
 start_service() { # nombre directorio comando...
   local name="$1" dir="$2"
   shift 2
-  (cd "$dir" && setsid "$@" >"$LOG_DIR/$name.log" 2>&1 </dev/null & echo $! >"$PID_DIR/$name.pid")
+  (
+    cd "$dir" || exit 1
+    # shellcheck disable=SC2016 # $$ y $@ se expanden en el bash hijo, a proposito
+    setsid bash -c 'echo $$ >"$0"; exec "$@"' "$PID_DIR/$name.pid" "$@" \
+      >"$LOG_DIR/$name.log" 2>&1 </dev/null &
+  )
 }
 
 # --- 2. Backend -------------------------------------------------------------
