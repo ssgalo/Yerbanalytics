@@ -33,8 +33,8 @@ export function OperationalThresholds() {
         </button>
       </div>
       <p className="sectionHint">
-        Parámetros actuales del catálogo de reglas del backend. La automatización los usa para
-        calcular la telemetría idónea.
+        Parámetros actuales del catálogo de reglas del backend, una fila por copia: cada regla tiene la suya. La
+        automatización usa la copia de la regla que ejercita cada escenario para calcular la telemetría idónea.
       </p>
 
       {error && <p className="errorMsg">{error}</p>}
@@ -47,6 +47,7 @@ export function OperationalThresholds() {
         <table className="thresholdsTable">
           <thead>
             <tr>
+              <th>Regla</th>
               <th>Parámetro</th>
               <th>Valor actual</th>
               <th>Fábrica</th>
@@ -55,7 +56,10 @@ export function OperationalThresholds() {
           </thead>
           <tbody>
             {parametros.map((p) => (
-              <tr key={p.clave} className={p.valor !== p.fabrica ? 'thresholdModified' : ''}>
+              <tr key={`${p.regla}|${p.clave}`} className={p.valor !== p.fabrica ? 'thresholdModified' : ''}>
+                <td className="mono" style={{ fontSize: 12 }}>
+                  {p.regla}
+                </td>
                 <td>
                   <span className="mono" style={{ fontSize: 12 }}>
                     {p.clave}

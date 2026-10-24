@@ -292,7 +292,13 @@ export interface Secuencia {
    Rule parameters catalog
    ---------------------------------------------------------------- */
 
+/**
+ * One copy of a rule parameter (`GET /api/rules/parametros`): since rediseno-motor-reglas every backend piece has its own
+ * copy of each parameter it reads, so the same `clave` can come several times with different values.
+ */
 export interface ParametroRegla {
+  /** Backend piece that owns this copy (`RiegoPorDeficitRule`, `DespachoRiego`…). */
+  regla: string;
   clave: string;
   etiqueta: string;
   valor: string;
