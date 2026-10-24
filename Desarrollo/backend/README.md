@@ -404,6 +404,15 @@ Ningún dato existente se migra (no había usuarios). Las tablas nuevas las crea
 **Riesgo conocido:** no hay bloqueo por intentos fallidos (para no abrir un vector de denegación
 contra el Administrador). BCrypt costo 10 vuelve lenta la fuerza bruta.
 
+## Tests y broker MQTT
+
+Los tests **nunca** usan el broker MQTT real: es el mismo al que está conectado el ESP32 físico, y una
+corrida completa llegó a publicar comandos de válvula y bomba que movieron actuadores reales
+(2026-10-23). `src/test/resources/config/application.properties` apaga la conexión
+(`yerbanalytics.mqtt.enabled=false`: los adaptadores de entrada no arrancan y el de salida descarta el
+mensaje) y apunta el host a una dirección inexistente. En producción el interruptor queda encendido por
+defecto. `BrokerRealProtegidoTest` falla si alguien vuelve a apuntar el contexto de test a `localhost:1883`.
+
 ## Arquitectura
 
 El proyecto sigue el patrón multicapa clásico de Spring Boot:

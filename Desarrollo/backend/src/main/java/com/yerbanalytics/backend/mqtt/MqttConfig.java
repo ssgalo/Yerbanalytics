@@ -28,6 +28,14 @@ public class MqttConfig {
     @Value("${yerbanalytics.mqtt.telemetry-topic}")
     private String telemetryTopic;
 
+    /**
+     * Interruptor de toda la conexión al broker. Por defecto (producción) está encendido; los tests lo
+     * apagan para no conectarse jamás al broker real, que es el del ESP32 físico: ni suscripciones ni
+     * publicaciones.
+     */
+    @Value("${yerbanalytics.mqtt.enabled:true}")
+    private boolean enabled;
+
     @Bean
     public MqttConnectOptions mqttConnectOptions() {
         MqttConnectOptions options = new MqttConnectOptions();
@@ -55,6 +63,7 @@ public class MqttConfig {
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);
+        adapter.setAutoStartup(enabled);
         adapter.setOutputChannel(mqttInputChannel());
         return adapter;
     }
@@ -87,6 +96,7 @@ public class MqttConfig {
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);
+        adapter.setAutoStartup(enabled);
         adapter.setOutputChannel(mqttRielChannel());
         return adapter;
     }
@@ -120,6 +130,7 @@ public class MqttConfig {
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);
+        adapter.setAutoStartup(enabled);
         adapter.setOutputChannel(mqttAckChannel());
         return adapter;
     }
@@ -152,6 +163,7 @@ public class MqttConfig {
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);
+        adapter.setAutoStartup(enabled);
         adapter.setOutputChannel(mqttErrorChannel());
         return adapter;
     }
@@ -181,6 +193,7 @@ public class MqttConfig {
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new org.springframework.integration.mqtt.support.DefaultPahoMessageConverter());
         adapter.setQos(1);
+        adapter.setAutoStartup(enabled);
         adapter.setOutputChannel(mqttLecturaChannel());
         return adapter;
     }
@@ -221,6 +234,10 @@ public class MqttConfig {
      */
     @Bean
     public MessageHandler mqttOutboundHandler(MqttPahoClientFactory factory) {
+        if (!enabled) {
+            // Sin broker: el comando se descarta en lugar de salir a la red.
+            return message -> { };
+        }
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler(clientId + "-outbound", factory);
         handler.setAsync(true);
