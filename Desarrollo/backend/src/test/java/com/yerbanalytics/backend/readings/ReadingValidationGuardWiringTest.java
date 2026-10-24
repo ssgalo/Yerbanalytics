@@ -4,7 +4,7 @@ import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
-import com.yerbanalytics.backend.engine.parametros.ParametroReglaRepository;
+import com.yerbanalytics.backend.engine.parametros.ReglaParametroRepository;
 import com.yerbanalytics.backend.mqtt.ComandoZonaPublisher;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
 import com.yerbanalytics.backend.repository.UmbralMetricaRepository;
@@ -38,7 +38,7 @@ class ReadingValidationGuardWiringTest {
             ctx.registerBean(ComandoZonaPublisher.class, () -> mock(ComandoZonaPublisher.class));
             ctx.registerBean(HistorialService.class, () -> mock(HistorialService.class));
             ctx.registerBean(InvalidReadingEscalation.class, () -> mock(InvalidReadingEscalation.class));
-            ctx.registerBean(ParametroReglaRepository.class, () -> mock(ParametroReglaRepository.class));
+            ctx.registerBean(ReglaParametroRepository.class, () -> mock(ReglaParametroRepository.class));
             ctx.registerBean(ConfiguracionOperativaRepository.class, () -> mock(ConfiguracionOperativaRepository.class));
             ctx.registerBean(UmbralMetricaRepository.class, () -> mock(UmbralMetricaRepository.class));
             ctx.registerBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
@@ -48,8 +48,8 @@ class ReadingValidationGuardWiringTest {
             ctx.refresh();
 
             CatalogoParametros catalogo = ctx.getBean(CatalogoParametros.class);
-            assertThat(catalogo.usadoPor("seguridad.rango-hum-max")).containsExactly(ReadingValidationGuard.NAME);
-            assertThat(catalogo.usadoPor("seguridad.relecturas-invalidas")).containsExactly(ReadingValidationGuard.NAME);
+            assertThat(catalogo.declarantes("seguridad.rango-hum-max")).containsExactly(ReadingValidationGuard.NAME);
+            assertThat(catalogo.declarantes("seguridad.relecturas-invalidas")).containsExactly(ReadingValidationGuard.NAME);
             assertThat(ctx.getBeansOfType(ConsumidorParametros.class)).containsKey("readingValidationGuard");
         }
     }

@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.nutrition;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.dto.NutritionPlan;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.DetalleNutritionPlan.Change;
@@ -68,7 +69,7 @@ class NutritionPlanServiceTest {
         zones = mock(ZonaRepository.class);
         history = mock(HistorialService.class);
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
-        when(catalog.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalog.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         service = new NutritionPlanService(applicationService, applications, pending, zones, history, catalog);
 
         zone = zone("MZ-2");

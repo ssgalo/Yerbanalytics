@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.readings;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -69,7 +70,7 @@ class ReadingValidationGuardTest {
         when(publisher.leerAhora(anyString())).thenReturn(new ComandoZonaPublisher.Resultado(true, "cmd", null));
         escalation = mock(InvalidReadingEscalation.class);
         catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         ConfiguracionService configuracion = mock(ConfiguracionService.class);
         when(configuracion.getConfiguracionOperativa()).thenReturn(RuleContextTestFactory.defaultConfig());
         when(configuracion.getEffectiveSpecs()).thenReturn(List.of(
@@ -203,7 +204,7 @@ class ReadingValidationGuardTest {
     @Test
     @DisplayName("la cantidad de relecturas sale del catálogo: con 1 se descarta a la segunda lectura inválida")
     void relecturasDelCatalogo() {
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosSeguridad.RELECTURAS_INVALIDAS, "1")));
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.con(Map.of(ParametrosSeguridad.RELECTURAS_INVALIDAS, "1"))));
 
         ReadingCheck primera = guard.check(zona, lectura("temp", 99.0));
         ReadingCheck segunda = guard.check(zona, lectura("temp", 99.0));

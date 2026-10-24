@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.supply;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
@@ -175,7 +176,7 @@ class ApplicationServiceTest {
 
         overrides = new TestRuleOverrides();
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
-        when(catalog.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
+        when(catalog.vigentes()).thenReturn(ParametrosPorPieza.uniforme(new CatalogoParametros(List.of()).fabricas()));
 
         FungicideCap cap = new FungicideCap(new FungicideLog(applications, pending), history, clock);
         effectivenessBlocks = mock(com.yerbanalytics.backend.effectiveness.EffectivenessBlockService.class);

@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.constant.NurseryConstants;
 import com.yerbanalytics.backend.engine.ActionExecutor;
@@ -153,7 +154,7 @@ class RiegoIntegracionTest {
 
         // --- catálogo, reglas, orquestador, executor y despacho reales ---
         CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         List<Rule> reglas = new ArrayList<>(List.of(new ManualLockRule(mock(ManualLockRepository.class)),
                 new StaleSensorRule(), new CicloLecturaRiegoRule(), new SustratoSaturadoRule(),
                 new DeficitCriticoRule(), new FueraDeVentanaRiegoRule(), new PausaTrasAplicacionRule(),

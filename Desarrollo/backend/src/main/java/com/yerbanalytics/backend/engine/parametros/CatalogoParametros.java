@@ -16,12 +16,14 @@ import java.util.regex.Pattern;
 
 /**
  * Catálogo único de parámetros de reglas: junta las definiciones de todas las familias y las
- * reglas que las usan. Es inmutable y <b>falla al construirse</b> (la aplicación no arranca) si:
+ * piezas que las usan (cada una con su copia del valor, ver {@link ParametrosPorPieza}). Es inmutable y <b>falla al construirse</b> (la aplicación no arranca) si:
  * <ul>
  *   <li>hay claves duplicadas, mal formadas o sin el prefijo de su familia;</li>
  *   <li>un valor de fábrica no cumple su propio tipo o rango, o un rango tiene mínimo mayor que máximo;</li>
  *   <li>los valores de fábrica violan una restricción cruzada;</li>
- *   <li>una restricción cruzada o una regla refiere a una clave que no existe.</li>
+ *   <li>una restricción cruzada o una regla refiere a una clave que no existe;</li>
+ *   <li>dos piezas tienen el mismo nombre, o una lee de otra pieza ({@link ConsumidorParametros#parametrosDe()}) una
+ *       clave que esa pieza no declara.</li>
  * </ul>
  * No conoce los valores vigentes: eso es {@link CatalogoParametrosService}.
  */
@@ -58,7 +60,11 @@ public class CatalogoParametros {
     private final List<Rule> reglas;
     private final List<ZoneRule> reglasDeZona;
     private final Map<String, ValorParametro> fabricas;
-    private final Map<String, List<String>> usadoPor;
+    /** Clave → piezas que la declaran como propia (tienen copia), por prioridad. */
+    private final Map<String, List<String>> declarantes;
+    /** Todo lo que lee parámetros, en el orden de la pantalla: reglas por prioridad, de zona y el resto. */
+    private final List<ConsumidorParametros> consumidores;
+    private final Map<String, ConsumidorParametros> consumidorPorNombre;
 
     /**
      * Constructor de Spring: definiciones reales y todo lo que lee parámetros (las reglas registradas
@@ -163,7 +169,7 @@ public class CatalogoParametros {
             }
         }
 
-        // Por prioridad (estable): así reglas() y usadoPor() salen en el orden en que corre el motor.
+        // Por prioridad (estable): así reglas() y declarantes() salen en el orden en que corre el motor.
         // Los consumidores que no son reglas (el despacho de riego) van después, en el orden dado.
         List<Rule> ordenadas = consumidores.stream().filter(Rule.class::isInstance).map(Rule.class::cast)
                 .sorted(Comparator.comparingInt(Rule::priority)).toList();
@@ -173,13 +179,41 @@ public class CatalogoParametros {
         lectores.addAll(deZona);
         consumidores.stream().filter(c -> !(c instanceof Rule) && !(c instanceof ZoneRule)).forEach(lectores::add);
         Map<String, List<String>> usos = new LinkedHashMap<>();
+        Map<String, ConsumidorParametros> porNombre = new LinkedHashMap<>();
         for (ConsumidorParametros lector : lectores) {
+            if (porNombre.putIfAbsent(lector.name(), lector) != null) {
+                throw new IllegalStateException("Hay dos consumidores de parámetros con el nombre '" + lector.name()
+                        + "': el nombre es el dueño de la copia y tiene que ser único.");
+            }
             for (DefinicionParametro p : lector.parametros()) {
                 if (!mapa.containsKey(p.clave())) {
                     throw new IllegalStateException("'" + lector.name()
                             + "' declara un parámetro inexistente en el catálogo: '" + p.clave() + "'.");
                 }
                 usos.computeIfAbsent(p.clave(), k -> new ArrayList<>()).add(lector.name());
+            }
+        }
+        // D-2: quien lee la copia de otra pieza tiene que nombrar a una que exista y la declare como propia.
+        for (ConsumidorParametros lector : lectores) {
+            for (Map.Entry<DefinicionParametro, String> prestada : lector.parametrosDe().entrySet()) {
+                DefinicionParametro p = prestada.getKey();
+                ConsumidorParametros duena = porNombre.get(prestada.getValue());
+                if (!mapa.containsKey(p.clave())) {
+                    throw new IllegalStateException("'" + lector.name()
+                            + "' lee de otra pieza un parámetro inexistente en el catálogo: '" + p.clave() + "'.");
+                }
+                if (duena == null) {
+                    throw new IllegalStateException("'" + lector.name() + "' lee '" + p.clave() + "' de la pieza '"
+                            + prestada.getValue() + "', que no existe.");
+                }
+                if (!duena.parametros().contains(p)) {
+                    throw new IllegalStateException("'" + lector.name() + "' lee '" + p.clave() + "' de '"
+                            + duena.name() + "', que no lo declara como propio.");
+                }
+                if (lector.parametros().contains(p)) {
+                    throw new IllegalStateException("'" + lector.name() + "' declara '" + p.clave()
+                            + "' como propio y también como de '" + duena.name() + "': tiene que ser uno de los dos.");
+                }
             }
         }
 
@@ -189,7 +223,9 @@ public class CatalogoParametros {
         this.reglas = ordenadas;
         this.reglasDeZona = deZona;
         this.fabricas = Map.copyOf(fab);
-        this.usadoPor = Map.copyOf(usos);
+        this.declarantes = Map.copyOf(usos);
+        this.consumidores = List.copyOf(lectores);
+        this.consumidorPorNombre = java.util.Collections.unmodifiableMap(porNombre);
     }
 
     public List<DefinicionParametro> definiciones() {
@@ -218,9 +254,26 @@ public class CatalogoParametros {
         return ParametrosVigentes.de(fabricas);
     }
 
-    /** Nombres de quienes declaran el parámetro: primero las reglas por prioridad, después los demás. Vacía si nadie. */
-    public List<String> usadoPor(String clave) {
-        return usadoPor.getOrDefault(clave, List.of());
+    /**
+     * Nombres de las piezas que declaran el parámetro como propio (tienen copia): primero las reglas por prioridad,
+     * después los demás. Vacía si nadie.
+     */
+    public List<String> declarantes(String clave) {
+        return declarantes.getOrDefault(clave, List.of());
+    }
+
+    /** Todo lo que lee parámetros: reglas por prioridad, reglas de zona por prioridad y después el resto. */
+    public List<ConsumidorParametros> consumidores() {
+        return consumidores;
+    }
+
+    public Optional<ConsumidorParametros> consumidor(String nombre) {
+        return Optional.ofNullable(nombre == null ? null : consumidorPorNombre.get(nombre));
+    }
+
+    /** {@code true} si la pieza tiene copia propia del parámetro. */
+    public boolean declara(String consumidor, String clave) {
+        return declarantes(clave).contains(consumidor);
     }
 
     /** Restricciones cruzadas que el conjunto de valores dado NO cumple. */

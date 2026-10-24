@@ -42,13 +42,13 @@ class ConsumidorParametrosTest {
     }
 
     @Test
-    void unConsumidorQueNoEsReglaApareceEnUsadoPorYNoEnReglas() {
+    void unConsumidorQueNoEsReglaTieneSusCopiasYNoEstaEnReglas() {
         ConsumidorParametros despacho = consumidor("DespachoRiego", SIMULTANEOS);
 
         CatalogoParametros cat = new CatalogoParametros(
                 CatalogoParametros.definicionesReales(), CatalogoParametros.restriccionesReales(), List.of(despacho));
 
-        assertThat(cat.usadoPor("riego.sectores-simultaneos")).containsExactly("DespachoRiego");
+        assertThat(cat.declarantes("riego.sectores-simultaneos")).containsExactly("DespachoRiego");
         assertThat(cat.reglas()).isEmpty();
     }
 
@@ -62,7 +62,7 @@ class ConsumidorParametrosTest {
                 CatalogoParametros.definicionesReales(), CatalogoParametros.restriccionesReales(),
                 List.of(despacho, tarde, temprano));
 
-        assertThat(cat.usadoPor("riego.sectores-simultaneos")).containsExactly("Temprano", "Tarde", "DespachoRiego");
+        assertThat(cat.declarantes("riego.sectores-simultaneos")).containsExactly("Temprano", "Tarde", "DespachoRiego");
         assertThat(cat.reglas()).containsExactly(temprano, tarde);
     }
 

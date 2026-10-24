@@ -4,10 +4,12 @@ import java.util.List;
 
 /**
  * Pieza conmutable del motor en el catálogo (una regla por sector, una de macro-zona o un servicio que decide):
- * referencia a sus parámetros por clave, que están una sola vez en {@link CatalogoReglasDto#parametros()}.
+ * referencia a sus parámetros propios por clave; sus copias están en {@link CatalogoReglasDto#parametros()} con
+ * {@code regla} = {@code id}.
  *
  * @param id               nombre técnico de la pieza (el mismo que el id de su nodo en {@code /api/rules/schema})
- * @param label            nombre legible, sin emojis y sin código
+ * @param label            nombre vigente: el propio que le dio el vivero o, si no tiene, el de fábrica; sin emojis ni código
+ * @param etiquetaFabrica  nombre de fábrica (el que declara la pieza); {@code label} vuelve a éste al restablecer
  * @param codigo           código de {@code reglas_v2} ({@code "R-01"}); vacío si no tiene
  * @param rama             {@code GLOBAL | RIEGO | INSUMO | MEDIASOMBRA | SEGUIMIENTO}
  * @param objetivo         grupo de la pantalla: {@code IRRIGATION | NUTRITION | SANITY | SHADE | FOLLOW_UP | PROTECTION}
@@ -16,10 +18,12 @@ import java.util.List;
  * @param activaPorDefecto {@code false} si figura en {@code yerbanalytics.reglas.retiradas}: así arranca sin fila
  * @param proteccion       texto de lo que pasa al apagarla si es una protección; {@code null} si no lo es
  * @param estado           último cambio del interruptor; {@code null} si nunca se cambió
+ * @param eliminada        {@code true} si se sacó de la vista (está apagada y no se puede prender hasta restaurarla)
  */
 public record ReglaCatalogoDto(
         String id,
         String label,
+        String etiquetaFabrica,
         String codigo,
         String rama,
         String objetivo,
@@ -29,5 +33,6 @@ public record ReglaCatalogoDto(
         boolean activa,
         boolean activaPorDefecto,
         String proteccion,
-        UltimoCambioReglaDto estado
+        UltimoCambioReglaDto estado,
+        boolean eliminada
 ) {}

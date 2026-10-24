@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.effectiveness;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleContextTestFactory;
 import com.yerbanalytics.backend.engine.Severity;
@@ -44,7 +45,7 @@ class EffectivenessServiceTest {
         history = mock(HistorialRepository.class);
         neighbors = mock(SectorNeighbors.class);
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
-        when(catalog.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalog.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         service = new EffectivenessService(catalog, overrides, history, neighbors);
     }
 

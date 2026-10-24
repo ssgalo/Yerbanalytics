@@ -35,6 +35,15 @@ La configuración principal se encuentra en `src/main/resources/application.prop
 El esquema lo genera Hibernate (`ddl-auto=update`) y se siembra con
 `src/main/resources/data.sql` (600 sectores, 6 macro-zonas, umbrales de fábrica).
 
+### Migración manual pendiente · parámetros por regla
+
+Desde `rediseno-motor-reglas` el valor de un parámetro es de cada pieza (`regla_parametro`, PK `consumidor` + `clave`),
+no de la clave (`parametro_regla`). La tabla vieja ya no se lee: sin migrar, todas las copias quedan en fábrica y el
+arranque registra un `WARN` (`LegacyParametersWarning`) mientras `parametro_regla` tenga filas. Correr
+`src/main/resources/migracion-parametros-por-regla.sql` **después de arrancar el backend nuevo una vez**: copia cada
+override a todas las piezas que leen esa clave como propia (nadie pierde un valor editado) y borra `parametro_regla`.
+Idempotente; la lista (clave, pieza) está escrita en el script, generada desde el catálogo al momento del cambio.
+
 ### Migración manual pendiente · diagnóstico por detecciones
 
 El alta de diagnósticos pasó a llevar nivel de confianza y detecciones (ver
@@ -325,7 +334,7 @@ ninguna rama para ellos: son usuarios como cualquier otro.
 | `GET` / `PUT /api/configuracion` | `configuracion.ver` / `configuracion.editar` |
 | `GET /api/diagnosticos/**` / `POST /api/diagnosticos` | `diagnosticos.ver` / `diagnosticos.registrar` |
 | `GET /api/historial` | `historial.ver` |
-| `GET /api/rules/**` / `PUT /api/rules/parametros` | `reglas.ver` / `reglas.editar` |
+| `GET /api/rules/**` / `PUT /api/rules/parametros`, `PUT /api/rules/*/estado`, `PUT /api/rules/*/etiqueta`, `DELETE /api/rules/*`, `POST /api/rules/*/restaurar` | `reglas.ver` / `reglas.editar` |
 | `GET` / `POST`,`PUT /api/hardware/**` | `hardware.ver` / `hardware.gestionar` |
 | `POST /api/hardware/{id}/reparacion` | `hardware.reparar` |
 | `GET` / `POST`,`PUT /api/topologia/**` | `topologia.ver` / `topologia.gestionar` |
@@ -415,23 +424,50 @@ El proyecto sigue el patrón multicapa clásico de Spring Boot:
 
 Los umbrales que comparan las reglas (antigüedad de la lectura, umbrales y volúmenes de riego,
 lluvia, saturación, ventana horaria, UV, confianza mínima del diagnóstico, dosis en 24 h, aperturas de
-mediasombra…) viven en **un catálogo único** (`engine/parametros/`, 21 parámetros), **no** en
+mediasombra…) viven en **un catálogo único** (`engine/parametros/`), **no** en
 `application.properties` ni en `configuracion_operativa`. Definiciones y valores de fábrica están en
-código; en la base (`parametro_regla`) sólo hay los overrides. Cada regla declara los parámetros que
-usa (`Rule.parametros()`) y sólo puede leer esos. Sumar un umbral nuevo es agregarlo al catálogo, no
-una constante en la regla.
+código, una por clave. Cada regla declara los parámetros que usa (`Rule.parametros()`) y sólo puede leer
+esos. Sumar un umbral nuevo es agregarlo al catálogo, no una constante en la regla.
+
+**Cada pieza tiene su copia** (`rediseno-motor-reglas`, D-1): el valor vigente es de `(pieza, clave)` — el override de
+esa copia en `regla_parametro` o, si no hay, fábrica; no hay herencia entre piezas. Editar `riego.umbral-humedad` de
+R-01 no mueve el de R-03, R-05 ni R-06. `CatalogoParametrosService.vigentes()` devuelve un `ParametrosPorPieza`
+(snapshot inmutable de todas las vistas); cada pieza lee la suya con `de(pieza)`: el orquestador se la pasa a
+`Evaluacion`, los servicios la leen por `DeclaredParameters` o `vigentes().de(this)`. El umbral efectivo de
+`seguridad.antiguedad-max-lectura` se superpone en cada vista con los `sensado.*` de `PulsoSensado`, su dueño. La huella
+de la traza es la del snapshot entero.
+
+**Quien revalida lee la copia de quien decidió** (D-2): un ejecutor declara en `ConsumidorParametros.parametrosDe()` las
+claves que lee de otra pieza, y su vista ya trae el valor de la dueña. No son copia propia: se editan en la regla. El
+catálogo valida al arrancar que la dueña exista y declare la clave.
+
+| Ejecutor | Clave | Lee la copia de |
+|---|---|---|
+| `DespachoRiego` | `riego.lluvia-*` | `PosponerPorLluviaRule` (R-03) |
+| `DespachoRiego` | `riego.saturacion-bloqueo` | `SustratoSaturadoRule` (R-04) |
+| `DespachoRiego` | `riego.ventana-normal` | `FueraDeVentanaRiegoRule` (R-05) |
+| `DespachoRiego` | `riego.pausa-tras-aplicacion` | `PausaTrasAplicacionRule` (R-06) |
+| `DespachoRiego` | `riego.exceptuado-bloqueo` | `DeficitCriticoRule` (R-02) |
+| `DespachoRiego` | `seguridad.antiguedad-max-lectura` | `StaleSensorRule` (S-02) |
+| `NutritionPlanService` | `nutricion.intervalo-plan` | `NutritionPlanRule` (N-01) |
+
+**Restricciones cruzadas por copia** (D-4): se evalúan en cada pieza que declara todas sus claves; si ninguna las declara
+todas pero cada clave tiene una sola dueña (estrés solar: luz baja en F-S3, luz alta en F-S1), con el valor de cada
+dueña; si no, no se evalúan (el crítico de R-02 frente al umbral de R-01 se perdió a propósito: son copias que el
+agrónomo eligió separar).
 
 Fuera del catálogo quedan, a propósito, el horario por defecto de la mediasombra (configuración operativa),
 el intervalo de despacho de riego, los parámetros del cliente de pronóstico (`yerbanalytics.weather.*`)
 y el intervalo del pulso de sensado y evaluación (configuración operativa).
 
-- `GET /api/rules/parametros`: catálogo normalizado (`reglas` y `parametros`, cada parámetro una
-  vez con su `usadoPor`).
-- `PUT /api/rules/parametros`: edición en lote, todo o nada (`{"cambios":[{"clave","valor"}]}`;
-  `valor: null` restablece la fábrica). Valida tipo, rango y restricciones cruzadas (crítico < umbral
-  de riego < humedad objetivo; bloqueo ≤ alerta de saturación; el volumen máximo debe caber en los
-  1200 s de la válvula); si algo falla responde `400 {"errores":[{"clave","mensaje"}]}` y no persiste
-  nada. El historial lo firma el usuario de la sesión.
+- `GET /api/rules/parametros`: `reglas` (las piezas conmutables, con `label` vigente, `etiquetaFabrica` y `eliminada`)
+  y `parametros`, **una entrada por copia** con su `regla` (la pieza dueña; también los ejecutores sin interruptor, como
+  `DespachoRiego`, `ApplicationService`, `TankService`, `ReadingPurge`, `PulsoSensado`). Ya no hay `usadoPor`.
+- `PUT /api/rules/parametros`: edición en lote, todo o nada (`{"cambios":[{"regla","clave","valor"}]}`;
+  `valor: null` restablece la fábrica de esa copia). Valida que la pieza tenga la clave como propia, tipo, rango y
+  restricciones cruzadas (crítico < umbral de riego < humedad objetivo; bloqueo ≤ alerta de saturación; el volumen
+  máximo debe caber en los 1200 s de la válvula); si algo falla responde `400 {"errores":[{"regla","clave","mensaje"}]}`
+  y no persiste nada. El historial lo firma el usuario de la sesión y nombra cada copia.
 - `GET /api/rules/evaluaciones/{sectorId}?origen=TELEMETRIA`: última traza de evaluación
   del sector (qué recibió cada regla contra qué umbral). Vive en memoria: `204` si todavía no se
   evaluó desde el arranque, `404` si el sector no existe. Una regla de diagnóstico sin diagnóstico
@@ -459,6 +495,15 @@ Prender o apagar una regla es una **decisión del vivero**, no un control de dem
   ese estado (sólo lectura, lo que corre); `PUT /api/demo/rules/{name}` con `enabled` responde `400` («El encendido se cambia
   en Motor de reglas.»). El catálogo (`GET /api/rules/parametros`) no trae `apagadaPorDemo`. El simulador no tiene
   `reglas.editar`: no escribe el estado operativo.
+- **Nombre propio y eliminación** (`rediseno-motor-reglas` D-5, columnas `etiqueta` y `eliminada` de `regla_estado`),
+  los tres con `reglas.editar` y con evento en el historial:
+  - `PUT /api/rules/{name}/etiqueta {etiqueta}`: 1–80 caracteres tras recortar (si no, `400 ETIQUETA_DEMASIADO_LARGA`);
+    vacío o `null` restablece el de fábrica. No toca el interruptor: una fila creada sólo por el nombre queda con
+    `updated_ts` nulo y rige la siembra.
+  - `DELETE /api/rules/{name}`: apaga y marca eliminada; `409 PROTECCION_NO_ELIMINABLE` si es una protección.
+  - `POST /api/rules/{name}/restaurar`: quita la marca y la deja **apagada**.
+  - Una eliminada no corre (`OperationalRuleStates.isActive` es `false`) y prenderla da `409 REGLA_ELIMINADA`. Las piezas
+    sin interruptor (ejecutores que no son `DemoControllable`) dan `404`.
 
 > **Migración manual pendiente · umbrales al motor.** `resources/migracion-umbrales-al-motor.sql`: el seguimiento
 > post-acción (`seguimiento_latencia_min`, `seguimiento_delta_min`) pasa al catálogo y se borra

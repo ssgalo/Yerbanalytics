@@ -2,7 +2,7 @@ package com.yerbanalytics.backend.engine;
 
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
-import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.traza.AccionTrazada;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -91,7 +91,7 @@ public class RuleOrchestrator {
         List<RuleAction> accumulated = new ArrayList<>();
         List<TrazaRegla> trazas = new ArrayList<>(rules.size());
         String sectorId = ctx.sector().getId();
-        ParametrosVigentes vigentes = parametros.vigentes();
+        ParametrosPorPieza vigentes = parametros.vigentes();
 
         // Nombre de la regla que cortó cada nivel; null = no cortado.
         String abortAll = null;
@@ -137,7 +137,7 @@ public class RuleOrchestrator {
                 continue;
             }
 
-            Evaluacion ev = new Evaluacion(rule, vigentes);
+            Evaluacion ev = new Evaluacion(rule, vigentes.de(rule));
             List<RuleAction> actions;
             try {
                 actions = rule.evaluate(ctx, ev);
@@ -194,7 +194,7 @@ public class RuleOrchestrator {
     }
 
     private static TrazaEvaluacion armarTraza(RuleContext ctx, OrigenEvaluacion origen,
-                                              ParametrosVigentes vigentes, List<TrazaRegla> trazas) {
+                                              ParametrosPorPieza vigentes, List<TrazaRegla> trazas) {
         return new TrazaEvaluacion(
                 ctx.sector().getId(),
                 ctx.zona() != null ? ctx.zona().getId() : null,
@@ -205,7 +205,7 @@ public class RuleOrchestrator {
     }
 
     /** Traza de una evaluación cortada por una excepción: la regla en ERROR y el resto sin alcanzar. */
-    private void guardarTrazaParcial(RuleContext ctx, OrigenEvaluacion origen, ParametrosVigentes vigentes,
+    private void guardarTrazaParcial(RuleContext ctx, OrigenEvaluacion origen, ParametrosPorPieza vigentes,
                                      List<TrazaRegla> hechas, Rule fallida, Evaluacion ev, RuntimeException e) {
         List<TrazaRegla> trazas = new ArrayList<>(hechas);
         trazas.add(new TrazaRegla(fallida.name(), fallida.branch(), fallida.priority(), EstadoRegla.ERROR,

@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionExecutor;
@@ -64,7 +65,7 @@ class RelojInyectadoTest {
         zonaRepository = mock(ZonaRepository.class);
         sectorRepository = mock(SectorRepository.class);
         parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         store = new TrazaEvaluacionStore();
         Rule regla = new Rule() {
             @Override public int priority() { return 10; }

@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
@@ -55,7 +56,7 @@ class EscalamientoNodoReintentoTest {
         parameters = mock(CatalogoParametrosService.class);
         overrides = new TestRuleOverrides();
         clock = new RelojDePrueba(T);
-        when(parameters.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(new CatalogoParametros(List.of()).fabricas()));
         when(publisher.leerAhora(anyString())).thenReturn(new Resultado(true, "c", null));
         mz2 = new ZonaEntity();
         mz2.setId("MZ-2");
@@ -75,7 +76,7 @@ class EscalamientoNodoReintentoTest {
     private void offlineRetryEvery(double minutes) {
         Map<String, ValorParametro> values = new HashMap<>(new CatalogoParametros(List.of()).fabricas().valores());
         values.put(SensingParameters.OFFLINE_RETRY.clave(), new ValorParametro.Numero(minutes));
-        when(parameters.vigentes()).thenReturn(ParametrosVigentes.de(values));
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ParametrosVigentes.de(values)));
     }
 
     @Test

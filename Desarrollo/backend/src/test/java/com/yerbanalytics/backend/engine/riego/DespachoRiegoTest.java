@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.engine.riego;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
+import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
 import com.yerbanalytics.backend.engine.ComandoActuadorPublisher;
 import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.RiegoCtx;
@@ -131,7 +133,7 @@ class DespachoRiegoTest {
         bloqueos = mock(ManualLockRepository.class);
         when(bloqueos.findByActiveTrue()).thenReturn(List.of());
         parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         clima = mock(WeatherService.class);                      // por defecto, sin pronóstico (O-01)
         configuracion = mock(ConfiguracionService.class);
         when(configuracion.getConfiguracionOperativa()).thenReturn(RuleContextTestFactory.defaultConfig());   // ciclo de 240 min
@@ -177,7 +179,7 @@ class DespachoRiegoTest {
     }
 
     private void usarSimultaneos(int n) {
-        when(parametros.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosRiego.SECTORES_SIMULTANEOS, String.valueOf(n))));
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.con(Map.of(ParametrosRiego.SECTORES_SIMULTANEOS, String.valueOf(n)))));
     }
 
     // ------------------------------------------------------------------ 8.3
@@ -601,14 +603,36 @@ class DespachoRiegoTest {
     // ------------------------------------------------------------------ catálogo y concurrencia
 
     @Test
-    void declaraSuParametroParaQueElCatalogoLoMuestreEnUsadoPor() {
+    void suCopiaPropiaEsElSimultaneo_yLoQueRevalidaLoLeeDeLaReglaQueDecidio() {
         assertThat(despacho.name()).isEqualTo("DespachoRiego");
-        assertThat(despacho.parametros()).containsExactlyInAnyOrder(ParametrosRiego.SECTORES_SIMULTANEOS,
-                // los que revalida antes de abrir cada válvula
-                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, ParametrosRiego.SATURACION_BLOQUEO,
-                ParametrosRiego.VENTANA_NORMAL, ParametrosRiego.PAUSA_TRAS_APLICACION,
-                ParametrosRiego.LLUVIA_PROBABILIDAD, ParametrosRiego.LLUVIA_MM, ParametrosRiego.LLUVIA_VENTANA,
-                ParametrosRiego.EXCEPTUADO_BLOQUEO);
+        assertThat(despacho.parametros()).containsExactly(ParametrosRiego.SECTORES_SIMULTANEOS);
+        // rediseno-motor-reglas D-2: lo que revalida antes de abrir cada válvula es de la regla que lo decidió.
+        assertThat(despacho.parametrosDe()).containsExactlyInAnyOrderEntriesOf(java.util.Map.of(
+                ParametrosRiego.LLUVIA_PROBABILIDAD, "PosponerPorLluviaRule",
+                ParametrosRiego.LLUVIA_MM, "PosponerPorLluviaRule",
+                ParametrosRiego.LLUVIA_VENTANA, "PosponerPorLluviaRule",
+                ParametrosRiego.SATURACION_BLOQUEO, "SustratoSaturadoRule",
+                ParametrosRiego.VENTANA_NORMAL, "FueraDeVentanaRiegoRule",
+                ParametrosRiego.PAUSA_TRAS_APLICACION, "PausaTrasAplicacionRule",
+                ParametrosRiego.EXCEPTUADO_BLOQUEO, "DeficitCriticoRule",
+                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, "StaleSensorRule"));
+    }
+
+    @Test
+    void revalidaLaLluviaConLaCopiaDeR03() {
+        // La vista del despacho trae la probabilidad de R-03 (la resuelve el catálogo, ver CatalogoParametrosService).
+        java.util.Map<String, com.yerbanalytics.backend.engine.parametros.ValorParametro> deR03 =
+                new java.util.HashMap<>(ReglaTestSupport.fabrica().valores());
+        deR03.put(ParametrosRiego.LLUVIA_PROBABILIDAD.clave(),
+                new com.yerbanalytics.backend.engine.parametros.ValorParametro.Numero(60));
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.of(
+                java.util.Map.of("DespachoRiego", ParametrosVigentes.de(deR03)), ReglaTestSupport.fabrica()));
+
+        assertThat(despacho.numero(ParametrosRiego.LLUVIA_PROBABILIDAD)).isEqualTo(60.0);
+        assertThat(despacho.numero(ParametrosRiego.SECTORES_SIMULTANEOS))
+                .isEqualTo(Double.parseDouble(ParametrosRiego.SECTORES_SIMULTANEOS.fabrica()));
+        assertThatThrownBy(() -> despacho.numero(ParametrosRiego.UMBRAL_HUMEDAD))
+                .isInstanceOf(com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException.class);
     }
 
     @Test
@@ -1060,7 +1084,7 @@ class DespachoRiegoTest {
 
     @Test
     void laPausaDeR06UsaElParametroDelCatalogo() {
-        when(parametros.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "2")));
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.con(Map.of(ParametrosRiego.PAUSA_TRAS_APLICACION, "2"))));
         pedir("MZ-2", 1, 600);
         historia(fila("MZ-2-001", "Insumo", null, T0.minusSeconds(3 * 3600)));    // hace 3 h, pausa de 2 h
 

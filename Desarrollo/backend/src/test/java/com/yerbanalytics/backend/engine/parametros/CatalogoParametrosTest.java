@@ -106,7 +106,7 @@ class CatalogoParametrosTest {
         assertThat(cat.definicion("riego.umbral")).contains(UMBRAL);
         assertThat(cat.definicion("nada")).isEmpty();
         assertThat(cat.fabricas().numero("riego.umbral")).isEqualTo(45.0);
-        assertThat(cat.usadoPor("riego.umbral")).containsExactly("A", "B");
+        assertThat(cat.declarantes("riego.umbral")).containsExactly("A", "B");
         assertThat(cat.reglas()).containsExactly(a, b, c);
     }
 

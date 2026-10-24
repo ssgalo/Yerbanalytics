@@ -44,6 +44,9 @@ import java.util.UUID;
 @Service
 public class PulsoSensadoService implements ConsumidorParametros {
 
+    /** Nombre técnico: dueño de las copias de los plazos {@code sensado.*} (rediseno-motor-reglas D-1). */
+    public static final String NAME = "PulsoSensado";
+
     private static final Logger log = LoggerFactory.getLogger(PulsoSensadoService.class);
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -104,7 +107,7 @@ public class PulsoSensadoService implements ConsumidorParametros {
 
     @Override
     public String name() {
-        return "PulsoSensado";
+        return NAME;
     }
 
     @Override
@@ -215,7 +218,7 @@ public class PulsoSensadoService implements ConsumidorParametros {
             }
             pulsoId = enCurso.pulso.id();
             long ahora = reloj.millis();
-            ParametrosVigentes vigentes = parametros.vigentes();   // una sola vez: todas las zonas ven los mismos plazos
+            ParametrosVigentes vigentes = parametros.vigentes().de(this);   // una sola vez: todas las zonas ven los mismos plazos
             long primerPlazoMs = (long) (vigentes.numero(SensingParameters.RESPONSE_WAIT) * 1000L);
             long plazoReintentoMs = (long) (vigentes.numero(SensingParameters.RETRY_WAIT) * 60_000L);
             intentos = 1 + (int) vigentes.numero(SensingParameters.RETRIES);

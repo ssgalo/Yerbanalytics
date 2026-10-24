@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
@@ -39,7 +40,7 @@ class RiegoOrquestacionTest {
     @BeforeEach
     void setUp() {
         CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         List<Rule> reglas = new java.util.ArrayList<>(List.of(
                 new ManualLockRule(mock(ManualLockRepository.class)), new StaleSensorRule(),
                 new CicloLecturaRiegoRule(), new SustratoSaturadoRule(), new DeficitCriticoRule(),

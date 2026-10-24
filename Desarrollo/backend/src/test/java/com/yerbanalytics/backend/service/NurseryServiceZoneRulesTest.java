@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.constant.NurseryConstants;
@@ -91,7 +92,7 @@ class NurseryServiceZoneRulesTest {
 
     private NurseryService serviceWith(PulsoSensadoService pulses) {
         CatalogoParametrosService parameters = mock(CatalogoParametrosService.class);
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         ConfiguracionService configuration = mock(ConfiguracionService.class);
         when(configuration.getConfiguracionOperativa()).thenReturn(RuleContextTestFactory.defaultConfig());
         when(configuration.getEffectiveSpecs()).thenReturn(NurseryConstants.SPECS);

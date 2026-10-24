@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.constant.NurseryConstants;
 import com.yerbanalytics.backend.dto.Configuracion;
@@ -50,7 +51,7 @@ class ConfiguracionServiceCatalogoTest {
         when(umbrales.findAll()).thenReturn(List.of());
         when(operativaRepo.findById(1)).thenReturn(Optional.empty());
         when(operativaRepo.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         service = new ConfiguracionService(umbrales, operativaRepo, historial, catalogo);
     }
 

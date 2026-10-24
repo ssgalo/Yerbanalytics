@@ -41,14 +41,14 @@ class ReglasParametrosControllerTest {
     private CatalogoParametrosService service;
 
     private static ReglaCatalogoDto regla(String id, String label, int prioridad) {
-        return new ReglaCatalogoDto(id, label, "R-01", "RIEGO", "IRRIGATION", "ACTS", prioridad,
-                List.of("riego.umbral-humedad"), true, true, null, null);
+        return new ReglaCatalogoDto(id, label, label, "R-01", "RIEGO", "IRRIGATION", "ACTS", prioridad,
+                List.of("riego.umbral-humedad"), true, true, null, null, false);
     }
 
     private static CatalogoReglasDto catalogo(String valorUmbral) {
-        ParametroDto umbral = new ParametroDto("riego.umbral-humedad", "Umbral de riego", "desc", "RIEGO",
-                "NUMERO", "%", valorUmbral, "42", 35.0, 60.0, 0, "reglas_v2 §5 R-01",
-                !valorUmbral.equals("42"), List.of("IrrigationRule", "WeatherOverrideRule"), null, null);
+        ParametroDto umbral = new ParametroDto("IrrigationRule", "riego.umbral-humedad", "Umbral de riego", "desc",
+                "RIEGO", "NUMERO", "%", valorUmbral, "42", 35.0, 60.0, 0, "reglas_v2 §5 R-01",
+                !valorUmbral.equals("42"), null, null);
         return new CatalogoReglasDto(
                 List.of(regla("IrrigationRule", "Riego", 10),
                         regla("WeatherOverrideRule", "Lluvia", 5)),
@@ -63,7 +63,8 @@ class ReglasParametrosControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.parametros.length()").value(1))
                 .andExpect(jsonPath("$.parametros[0].clave").value("riego.umbral-humedad"))
-                .andExpect(jsonPath("$.parametros[0].usadoPor.length()").value(2))
+                .andExpect(jsonPath("$.parametros[0].regla").value("IrrigationRule"))
+                .andExpect(jsonPath("$.parametros[0].usadoPor").doesNotExist())
                 .andExpect(jsonPath("$.parametros[0].valor").value("42"))
                 .andExpect(jsonPath("$.parametros[0].fabrica").value("42"))
                 .andExpect(jsonPath("$.parametros[0].modificado").value(false))
@@ -79,27 +80,28 @@ class ReglasParametrosControllerTest {
         mockMvc.perform(put("/api/rules/parametros")
                         .header("X-Usuario", "Ana")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cambios\":[{\"clave\":\"riego.umbral-humedad\",\"valor\":\"40\"},"
-                                + "{\"clave\":\"riego.tiempo-max-apertura\",\"valor\":null}]}"))
+                        .content("{\"cambios\":[{\"regla\":\"IrrigationRule\",\"clave\":\"riego.umbral-humedad\",\"valor\":\"40\"},"
+                                + "{\"regla\":\"WeatherOverrideRule\",\"clave\":\"riego.tiempo-max-apertura\",\"valor\":null}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.parametros[0].valor").value("40"))
                 .andExpect(jsonPath("$.parametros[0].modificado").value(true));
 
         verify(service).guardar(List.of(
-                new CambioParametro("riego.umbral-humedad", "40"),
-                new CambioParametro("riego.tiempo-max-apertura", null)), "Ana");
+                new CambioParametro("IrrigationRule", "riego.umbral-humedad", "40"),
+                new CambioParametro("WeatherOverrideRule", "riego.tiempo-max-apertura", null)), "Ana");
     }
 
     @Test
     void put_invalidoDevuelve400ConErroresPorClave() throws Exception {
         when(service.guardar(any(), any())).thenThrow(new ParametrosInvalidosException(List.of(
-                new ErrorParametro("riego.umbral-humedad", "Debe estar entre 35 y 60 %."))));
+                new ErrorParametro("IrrigationRule", "riego.umbral-humedad", "Debe estar entre 35 y 60 %."))));
 
         mockMvc.perform(put("/api/rules/parametros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cambios\":[{\"clave\":\"riego.umbral-humedad\",\"valor\":\"70\"}]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errores.length()").value(1))
+                .andExpect(jsonPath("$.errores[0].regla").value("IrrigationRule"))
                 .andExpect(jsonPath("$.errores[0].clave").value("riego.umbral-humedad"))
                 .andExpect(jsonPath("$.errores[0].mensaje").value("Debe estar entre 35 y 60 %."));
     }

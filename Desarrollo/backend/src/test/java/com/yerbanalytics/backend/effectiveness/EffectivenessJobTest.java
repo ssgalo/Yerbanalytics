@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.effectiveness;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.DetalleAlerta;
 import com.yerbanalytics.backend.engine.NivelAlerta;
@@ -75,7 +76,7 @@ class EffectivenessJobTest {
         neighbors = mock(SectorNeighbors.class);
         historial = mock(HistorialService.class);
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
-        when(catalog.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalog.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         EffectivenessService service = new EffectivenessService(catalog, overrides, history, neighbors);
         job = new EffectivenessJob(service, history, sectors, zones, hardware, publisher, verification, neighbors, historial,
                 clock);

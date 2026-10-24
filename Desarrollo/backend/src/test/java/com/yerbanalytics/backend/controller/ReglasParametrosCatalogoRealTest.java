@@ -68,32 +68,36 @@ class ReglasParametrosCatalogoRealTest {
     void devuelveLosParametrosRealesConSuFabrica() throws Exception {
         mockMvc.perform(get("/api/rules/parametros"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.parametros[?(@.clave=='riego.umbral-humedad')].fabrica").value("45"));
+                .andExpect(jsonPath("$.parametros[?(@.clave=='riego.umbral-humedad' && @.regla=='RiegoPorDeficitRule')].fabrica").value("45"));
     }
 
     @Test
-    void elUmbralDeRiegoLoCompartenLasCuatroReglasQueLoUsanYElSimultaneoLoUsaElDespacho() throws Exception {
+    void cadaReglaTieneSuCopia_yLoQueElDespachoRevalidaSeEditaSoloEnLaReglaQueDecide() throws Exception {
         JsonNode json = catalogoJson();
 
-        List<String> umbral = usadoPor(json, "riego.umbral-humedad");
-        // La alerta de la falla hidráulica (S-05) lee el mismo umbral para saber si pide el riego manual.
-        assertThat(umbral).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "PausaTrasAplicacionRule",
-                "PosponerPorLluviaRule", "RiegoPorDeficitRule", "HardwareFaultService");
-        assertThat(usadoPor(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
-        assertThat(usadoPor(json, "riego.lluvia-probabilidad")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.lluvia-mm")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.lluvia-ventana")).containsExactlyInAnyOrder("PosponerPorLluviaRule", "DespachoRiego");
-        // F-S1 (la reposición por estrés solar) respeta la misma pausa tras una aplicación.
-        assertThat(usadoPor(json, "riego.pausa-tras-aplicacion"))
-                .containsExactlyInAnyOrder("PausaTrasAplicacionRule", "SolarStressRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.exceptuado-bloqueo")).containsExactlyInAnyOrder("DeficitCriticoRule", "DespachoRiego");
-        // Lo que el despacho revalida antes de abrir cada válvula, junto a las reglas que ya lo decidieron.
-        assertThat(usadoPor(json, "seguridad.antiguedad-max-lectura")).contains("StaleSensorRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.saturacion-bloqueo")).containsExactlyInAnyOrder("SustratoSaturadoRule", "DespachoRiego");
-        assertThat(usadoPor(json, "riego.ventana-normal"))
-                .containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "SolarStressRule", "DespachoRiego");
+        // rediseno-motor-reglas D-1: cada pieza que lee el umbral de riego tiene su copia (la alerta de la falla
+        // hidráulica, S-05, también lo lee para saber si pide el riego manual).
+        assertThat(copias(json, "riego.umbral-humedad")).containsExactlyInAnyOrder("FueraDeVentanaRiegoRule",
+                "PausaTrasAplicacionRule", "PosponerPorLluviaRule", "RiegoPorDeficitRule", "HardwareFaultService");
+        assertThat(copias(json, "riego.sectores-simultaneos")).containsExactly("DespachoRiego");
+        // D-2: el despacho revalida con la copia de la regla que decidió; no tiene copia propia de esas claves.
+        assertThat(copias(json, "riego.lluvia-probabilidad")).containsExactly("PosponerPorLluviaRule");
+        assertThat(copias(json, "riego.lluvia-mm")).containsExactly("PosponerPorLluviaRule");
+        assertThat(copias(json, "riego.lluvia-ventana")).containsExactly("PosponerPorLluviaRule");
+        // F-S1 (la reposición por estrés solar) tiene su propia pausa tras una aplicación.
+        assertThat(copias(json, "riego.pausa-tras-aplicacion"))
+                .containsExactlyInAnyOrder("PausaTrasAplicacionRule", "SolarStressRule");
+        assertThat(copias(json, "riego.exceptuado-bloqueo")).containsExactly("DeficitCriticoRule");
+        assertThat(copias(json, "seguridad.antiguedad-max-lectura")).contains("StaleSensorRule")
+                .doesNotContain("DespachoRiego");
+        assertThat(copias(json, "riego.saturacion-bloqueo")).containsExactly("SustratoSaturadoRule");
+        assertThat(copias(json, "riego.ventana-normal"))
+                .containsExactlyInAnyOrder("FueraDeVentanaRiegoRule", "SolarStressRule");
+        // El intervalo del plan de nutrición se edita en N-01; el servicio del plan lo lee de ahí.
+        assertThat(copias(json, "nutricion.intervalo-plan")).containsExactly("NutritionPlanRule");
         // La regla de ciclo lee el umbral crítico para dejar pasar a R-02.
-        assertThat(usadoPor(json, "riego.umbral-critico")).contains("CicloLecturaRiegoRule");
+        assertThat(copias(json, "riego.umbral-critico")).contains("CicloLecturaRiegoRule");
+        json.get("parametros").forEach(p -> assertThat(p.has("usadoPor")).isFalse());
     }
 
     @Test
@@ -154,24 +158,29 @@ class ReglasParametrosCatalogoRealTest {
         assertThat(nodos).doesNotContainKeys("IrrigationRule", "WeatherOverrideRule", "DailyVolumeLimitRule");
     }
 
-    private static List<String> usadoPor(JsonNode json, String clave) {
+    /** Las piezas que tienen copia de la clave. */
+    private static List<String> copias(JsonNode json, String clave) {
         List<String> out = new ArrayList<>();
         json.get("parametros").forEach(p -> {
             if (p.get("clave").asText().equals(clave)) {
-                p.get("usadoPor").forEach(x -> out.add(x.asText()));
+                out.add(p.get("regla").asText());
             }
         });
         return out;
     }
 
     @Test
-    void invariantesEstructurales_clavesUnicas_reglasExistentesYUsadoPorCoherente() throws Exception {
+    void invariantesEstructurales_unaEntradaPorCopia_reglasExistentesYCopiasCoherentes() throws Exception {
         JsonNode json = catalogoJson();
 
-        List<String> claves = new ArrayList<>();
-        json.get("parametros").forEach(p -> claves.add(p.get("clave").asText()));
-        assertThat(claves).isNotEmpty().doesNotHaveDuplicates()
-                .containsExactlyInAnyOrderElementsOf(catalogo.definiciones().stream().map(DefinicionParametro::clave).toList());
+        // Una entrada por (pieza, clave): exactamente lo que cada consumidor declara como propio.
+        List<String> enJsonCopias = new ArrayList<>();
+        json.get("parametros").forEach(p -> enJsonCopias.add(p.get("regla").asText() + "|" + p.get("clave").asText()));
+        List<String> declaradas = new ArrayList<>();
+        consumidores.forEach(c -> c.parametros().forEach(d -> declaradas.add(c.name() + "|" + d.clave())));
+        assertThat(enJsonCopias).isNotEmpty().doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(declaradas);
+        List<String> clavesDelCatalogo = catalogo.definiciones().stream().map(DefinicionParametro::clave).toList();
+        json.get("parametros").forEach(p -> assertThat(clavesDelCatalogo).contains(p.get("clave").asText()));
 
         // Toda pieza conmutable figura, una vez, con exactamente los parámetros que declara (ninguno si no lee).
         Map<String, List<String>> declarado = new LinkedHashMap<>();
@@ -184,22 +193,20 @@ class ReglasParametrosCatalogoRealTest {
             List<String> ps = new ArrayList<>();
             r.get("parametros").forEach(x -> ps.add(x.asText()));
             enJson.put(r.get("id").asText(), ps);
+            assertThat(r.get("etiquetaFabrica").asText()).isNotBlank();
+            assertThat(r.has("eliminada")).isTrue();
         });
         assertThat(enJson).containsOnlyKeys(declarado.keySet().toArray(String[]::new));
         declarado.forEach((regla, ps) -> assertThat(enJson.get(regla)).as(regla).containsExactlyElementsOf(ps));
 
-        // Todo usadoPor nombra consumidores (reglas o no) que existen y que de verdad declaran ese parámetro.
-        Map<String, List<String>> declaradoPorConsumidores = new LinkedHashMap<>();
-        consumidores.forEach(c -> declaradoPorConsumidores.put(c.name(),
-                c.parametros().stream().map(DefinicionParametro::clave).toList()));
-        json.get("parametros").forEach(p -> {
-            String clave = p.get("clave").asText();
-            List<String> usadoPor = new ArrayList<>();
-            p.get("usadoPor").forEach(x -> usadoPor.add(x.asText()));
-            assertThat(usadoPor).as(clave).doesNotHaveDuplicates()
-                    .containsExactlyInAnyOrderElementsOf(declaradoPorConsumidores.entrySet().stream()
-                            .filter(e -> e.getValue().contains(clave)).map(Map.Entry::getKey).toList());
-        });
+        // Lo que una pieza lee de otra (D-2) nombra a una dueña que lo declara como propio.
+        Map<String, ConsumidorParametros> porNombre = new LinkedHashMap<>();
+        consumidores.forEach(c -> porNombre.put(c.name(), c));
+        consumidores.forEach(c -> c.parametrosDe().forEach((def, duena) -> {
+            assertThat(porNombre).as(c.name() + " lee " + def.clave()).containsKey(duena);
+            assertThat(porNombre.get(duena).parametros()).contains(def);
+            assertThat(c.parametros()).doesNotContain(def);
+        }));
     }
 
     private JsonNode regla(JsonNode json, String id) {

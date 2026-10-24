@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine.zone;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.ActionType;
 import com.yerbanalytics.backend.engine.HardwareCoverage;
 import com.yerbanalytics.backend.engine.MallaZona;
@@ -81,7 +82,7 @@ class ZoneRuleEngineTest {
 
     private CatalogoParametrosService parameters() {
         CatalogoParametrosService parameters = mock(CatalogoParametrosService.class);
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         return parameters;
     }
 

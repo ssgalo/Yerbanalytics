@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
@@ -60,7 +61,7 @@ class NurseryServiceTimestampTest {
         hardwareService = mock(HardwareService.class);
         actionExecutor = mock(ActionExecutor.class);
         CatalogoParametrosService parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         Rule regla = new Rule() {
             @Override public int priority() { return 10; }
             @Override public String name() { return "ReglaFalsa"; }

@@ -5,7 +5,7 @@ import com.yerbanalytics.backend.engine.overrides.DemoControllableRegistry;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
-import com.yerbanalytics.backend.engine.parametros.ParametroReglaRepository;
+import com.yerbanalytics.backend.engine.parametros.ReglaParametroRepository;
 import com.yerbanalytics.backend.engine.rules.HydraulicFaultRule;
 import com.yerbanalytics.backend.mediasombra.ShadeFaultRule;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
@@ -42,7 +42,7 @@ class HardwareFaultServiceWiringTest {
             ctx.registerBean(DispositivoRepository.class, () -> mock(DispositivoRepository.class));
             ctx.registerBean(SectorRepository.class, () -> mock(SectorRepository.class));
             ctx.registerBean(ZonaRepository.class, () -> mock(ZonaRepository.class));
-            ctx.registerBean(ParametroReglaRepository.class, () -> mock(ParametroReglaRepository.class));
+            ctx.registerBean(ReglaParametroRepository.class, () -> mock(ReglaParametroRepository.class));
             ctx.registerBean(ConfiguracionOperativaRepository.class, () -> mock(ConfiguracionOperativaRepository.class));
             ctx.registerBean(UmbralMetricaRepository.class, () -> mock(UmbralMetricaRepository.class));
             ctx.registerBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
@@ -53,7 +53,7 @@ class HardwareFaultServiceWiringTest {
             ctx.refresh();
 
             CatalogoParametros catalogo = ctx.getBean(CatalogoParametros.class);
-            assertThat(catalogo.usadoPor("riego.umbral-humedad")).contains(HardwareFaultService.NAME);
+            assertThat(catalogo.declarantes("riego.umbral-humedad")).contains(HardwareFaultService.NAME);
             assertThat(ctx.getBean(DemoControllableRegistry.class).all()).extracting(DemoControllable::name)
                     .contains("HardwareFaultService", "HydraulicFaultRule", "ShadeFaultRule");
         }

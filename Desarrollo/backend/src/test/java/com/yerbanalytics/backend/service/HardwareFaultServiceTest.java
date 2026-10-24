@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.RuleBranch;
@@ -72,7 +73,7 @@ class HardwareFaultServiceTest {
         zonas = mock(ZonaRepository.class);
         historial = mock(HistorialService.class);
         CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
 
         zona = new ZonaEntity();
         zona.setId("MZ-1");
@@ -174,7 +175,7 @@ class HardwareFaultServiceTest {
         void elUmbralEsElDelCatalogo() {
             zona.setHumSusRaw(44.0);
             CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
-            when(catalogo.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ParametrosRiego.UMBRAL_HUMEDAD, "40")));
+            when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.con(Map.of(ParametrosRiego.UMBRAL_HUMEDAD, "40"))));
             HardwareFaultService conOtroUmbral = new HardwareFaultService(dispositivos, sectores, zonas, historial,
                     catalogo, overrides, Clock.fixed(AHORA, ZoneOffset.UTC));
 

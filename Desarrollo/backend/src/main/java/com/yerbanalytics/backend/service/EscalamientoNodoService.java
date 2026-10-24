@@ -208,7 +208,7 @@ public class EscalamientoNodoService implements ConsumidorParametros, DemoContro
     /** El override del simulador reemplaza al parámetro del catálogo; 0 elimina la espera. */
     private double retryIntervalMinutes() {
         return overrides.cooldownMinutes(NAME, COOLDOWN_RETRY_OFFLINE)
-                .orElseGet(() -> parametros.vigentes().numero(SensingParameters.OFFLINE_RETRY));
+                .orElseGet(() -> parametros.vigentes().de(this).numero(SensingParameters.OFFLINE_RETRY));
     }
 
     private void requestReading(String zonaId) {

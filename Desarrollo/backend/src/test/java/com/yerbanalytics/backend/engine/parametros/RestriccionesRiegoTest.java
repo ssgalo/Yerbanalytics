@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 class RestriccionesRiegoTest {
 
     @Mock
-    private ParametroReglaRepository repository;
+    private ReglaParametroRepository repository;
     @Mock
     private HistorialService historialService;
     @Mock
@@ -34,14 +34,27 @@ class RestriccionesRiegoTest {
 
     @BeforeEach
     void setUp() {
-        catalogo = new CatalogoParametros(List.of());
+        // Una pieza que declara todas las claves de las restricciones de riego: ahí se evalúan (D-4).
+        ConsumidorParametros riego = new ConsumidorParametros() {
+            @Override public String name() { return PIEZA; }
+            @Override public List<DefinicionParametro> parametros() {
+                return List.of(ParametrosRiego.UMBRAL_CRITICO, ParametrosRiego.UMBRAL_HUMEDAD,
+                        ParametrosRiego.HUMEDAD_OBJETIVO, ParametrosRiego.SATURACION_BLOQUEO,
+                        ParametrosRiego.SATURACION_ALERTA, ParametrosRiego.VOLUMEN_MAX_EVENTO,
+                        ParametrosRiego.CAUDAL_EMISOR);
+            }
+        };
+        catalogo = new CatalogoParametros(CatalogoParametros.definicionesReales(),
+                CatalogoParametros.restriccionesReales(), List.of(riego));
         service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
                 org.mockito.Mockito.mock(com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository.class),
                 org.mockito.Mockito.mock(ReglasCatalogo.class));
     }
 
+    private static final String PIEZA = "Riego";
+
     private static CambioParametro cambio(String clave, String valor) {
-        return new CambioParametro(clave, valor);
+        return new CambioParametro(PIEZA, clave, valor);
     }
 
     private void rechaza(String mensaje, CambioParametro... cambios) {

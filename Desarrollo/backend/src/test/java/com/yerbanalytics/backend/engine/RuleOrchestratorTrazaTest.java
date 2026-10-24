@@ -4,6 +4,7 @@ import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
 import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException;
 import com.yerbanalytics.backend.engine.parametros.ValorParametro;
@@ -77,9 +78,9 @@ class RuleOrchestratorTrazaTest {
     @BeforeEach
     void setUp() {
         parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(ParametrosVigentes.de(Map.of(
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ParametrosVigentes.de(Map.of(
                 ParametrosRiego.UMBRAL_HUMEDAD.clave(), new ValorParametro.Numero(42),
-                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(), new ValorParametro.Numero(30))));
+                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(), new ValorParametro.Numero(30)))));
         ctx = RuleContextTestFactory.basico(
                 RuleContextTestFactory.sectorBasico("MZ-2-006"), RuleContextTestFactory.zonaBasica("MZ-2"));
     }

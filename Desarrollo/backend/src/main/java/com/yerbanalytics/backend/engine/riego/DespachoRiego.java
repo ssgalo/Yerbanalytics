@@ -7,10 +7,12 @@ import com.yerbanalytics.backend.engine.DetalleRiego;
 import com.yerbanalytics.backend.engine.NivelAlerta;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ConsumidorParametros;
+import com.yerbanalytics.backend.engine.parametros.DeclaredParameters;
 import com.yerbanalytics.backend.engine.parametros.DefinicionParametro;
 import com.yerbanalytics.backend.engine.parametros.ParametroNoDeclaradoException;
 import com.yerbanalytics.backend.engine.parametros.ParametrosRiego;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
+import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
 import com.yerbanalytics.backend.engine.parametros.VentanaHoraria;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.rules.ManualLockRule;
@@ -20,6 +22,7 @@ import com.yerbanalytics.backend.engine.rules.CicloLecturaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.DeficitCriticoRule;
 import com.yerbanalytics.backend.engine.rules.FueraDeVentanaRiegoRule;
 import com.yerbanalytics.backend.engine.rules.PausaTrasAplicacionRule;
+import com.yerbanalytics.backend.engine.rules.StaleSensorRule;
 import com.yerbanalytics.backend.solarstress.SolarStressRule;
 import com.yerbanalytics.backend.engine.weather.WeatherForecast;
 import com.yerbanalytics.backend.engine.weather.WeatherService;
@@ -50,6 +53,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -206,28 +210,43 @@ public class DespachoRiego implements ConsumidorParametros {
 
     @Override
     public List<DefinicionParametro> parametros() {
-        return List.of(ParametrosRiego.SECTORES_SIMULTANEOS,
-                // La revalidación al despachar: los mismos parámetros que las reglas que ya decidieron.
-                ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, ParametrosRiego.SATURACION_BLOQUEO,
-                ParametrosRiego.VENTANA_NORMAL, ParametrosRiego.PAUSA_TRAS_APLICACION,
-                ParametrosRiego.LLUVIA_PROBABILIDAD, ParametrosRiego.LLUVIA_MM, ParametrosRiego.LLUVIA_VENTANA,
-                ParametrosRiego.EXCEPTUADO_BLOQUEO);
+        return List.of(ParametrosRiego.SECTORES_SIMULTANEOS);
+    }
+
+    /**
+     * La revalidación al despachar lee la copia de la regla que decidió (rediseno-motor-reglas D-2): el despacho no
+     * puede discrepar con ella. Estas claves se editan en la regla, no acá.
+     */
+    @Override
+    public Map<DefinicionParametro, String> parametrosDe() {
+        Map<DefinicionParametro, String> de = new LinkedHashMap<>();
+        de.put(ParametrosRiego.LLUVIA_PROBABILIDAD, PosponerPorLluviaRule.NAME);
+        de.put(ParametrosRiego.LLUVIA_MM, PosponerPorLluviaRule.NAME);
+        de.put(ParametrosRiego.LLUVIA_VENTANA, PosponerPorLluviaRule.NAME);
+        de.put(ParametrosRiego.SATURACION_BLOQUEO, SustratoSaturadoRule.NAME);
+        de.put(ParametrosRiego.VENTANA_NORMAL, FueraDeVentanaRiegoRule.NAME);
+        de.put(ParametrosRiego.PAUSA_TRAS_APLICACION, PausaTrasAplicacionRule.NAME);
+        de.put(ParametrosRiego.EXCEPTUADO_BLOQUEO, DeficitCriticoRule.NAME);
+        de.put(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA, StaleSensorRule.NAME);
+        return Collections.unmodifiableMap(de);
     }
 
     /** Lee un parámetro del catálogo, y sólo uno de los que declara: misma garantía que {@code Evaluacion}. */
     double numero(DefinicionParametro p) {
-        if (!parametros().contains(p)) {
-            throw new ParametroNoDeclaradoException(NAME, p.clave());
-        }
-        return parametros.vigentes().numero(p);
+        return declarado(p).numero(p);
     }
 
     /** Ventana horaria vigente de un parámetro del catálogo, y sólo de los que declara. */
     VentanaHoraria ventana(DefinicionParametro p) {
-        if (!parametros().contains(p)) {
+        return declarado(p).ventana(p);
+    }
+
+    /** La vista del despacho, donde las claves de otra pieza ya traen el valor de la copia de esa pieza. */
+    private ParametrosVigentes declarado(DefinicionParametro p) {
+        if (!DeclaredParameters.declares(this, p)) {
             throw new ParametroNoDeclaradoException(NAME, p.clave());
         }
-        return parametros.vigentes().ventana(p);
+        return parametros.vigentes().de(this);
     }
 
     /** Epoch ms del último riego despachado al sector desde que arrancó el proceso, o {@code null}. */

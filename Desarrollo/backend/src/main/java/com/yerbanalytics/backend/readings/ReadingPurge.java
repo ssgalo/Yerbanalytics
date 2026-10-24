@@ -66,7 +66,7 @@ public class ReadingPurge implements ConsumidorParametros {
 
     /** Borra lo anterior a la retención vigente y devuelve cuántas lecturas eran. */
     public int purge() {
-        long days = (long) parameters.vigentes().numero(ReadingParameters.RETENTION_DAYS);
+        long days = (long) parameters.vigentes().de(this).numero(ReadingParameters.RETENTION_DAYS);
         long cutoff = clock.instant().minus(Duration.ofDays(days)).toEpochMilli();
         return repository.deleteByTsLessThan(cutoff);
     }

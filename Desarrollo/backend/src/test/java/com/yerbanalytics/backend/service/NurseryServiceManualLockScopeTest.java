@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionExecutor;
@@ -69,7 +70,7 @@ class NurseryServiceManualLockScopeTest {
         locks = mock(ManualLockRepository.class);
         DespachoRiego dispatch = mock(DespachoRiego.class);
         CatalogoParametrosService parameters = mock(CatalogoParametrosService.class);
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         Rule noop = new Rule() {
             @Override public int priority() { return 10; }
             @Override public String name() { return "ReglaFalsa"; }

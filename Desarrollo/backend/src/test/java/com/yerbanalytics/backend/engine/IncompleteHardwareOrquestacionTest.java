@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.overrides.RuleOverride;
 import com.yerbanalytics.backend.engine.overrides.TestRuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
@@ -61,7 +62,7 @@ class IncompleteHardwareOrquestacionTest {
     @BeforeEach
     void setUp() {
         CatalogoParametrosService catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         List<Rule> reglas = new ArrayList<>(List.of(
                 new ManualLockRule(mock(ManualLockRepository.class)), new IncompleteHardwareRule(), new StaleSensorRule(),
                 new CicloLecturaRiegoRule(), new SustratoSaturadoRule(), new DeficitCriticoRule(),

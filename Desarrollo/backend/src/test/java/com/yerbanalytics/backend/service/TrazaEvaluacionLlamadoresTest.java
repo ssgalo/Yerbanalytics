@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.engine.ActionExecutor;
 import com.yerbanalytics.backend.engine.ActionType;
@@ -72,7 +73,7 @@ class TrazaEvaluacionLlamadoresTest {
         manualLockRepository = mock(ManualLockRepository.class);
 
         parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(com.yerbanalytics.backend.engine.ReglaTestSupport.fabrica());
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(com.yerbanalytics.backend.engine.ReglaTestSupport.fabrica()));
         Rule regla = new Rule() {
             @Override public int priority() { return 10; }
             @Override public String name() { return "ReglaFalsa"; }

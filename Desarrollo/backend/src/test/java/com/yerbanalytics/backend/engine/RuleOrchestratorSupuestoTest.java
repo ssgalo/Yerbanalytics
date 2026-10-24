@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.engine;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.rules.PosponerPorLluviaRule;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -46,7 +47,7 @@ class RuleOrchestratorSupuestoTest {
     @BeforeEach
     void setUp() {
         catalogo = mock(CatalogoParametrosService.class);
-        when(catalogo.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(catalogo.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
     }
 
     private TrazaRegla trazaDe(Rule regla, WeatherForecast forecast) {

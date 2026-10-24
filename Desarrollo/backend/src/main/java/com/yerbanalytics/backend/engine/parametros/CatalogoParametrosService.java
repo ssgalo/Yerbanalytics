@@ -5,6 +5,7 @@ import com.yerbanalytics.backend.dto.ParametroDto;
 import com.yerbanalytics.backend.dto.ReglaCatalogoDto;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
 import com.yerbanalytics.backend.repository.ConfiguracionOperativaRepository;
+import com.yerbanalytics.backend.sensing.PulsoSensadoService;
 import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.service.HistorialService;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +29,13 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Valores vigentes de los parámetros de reglas, y su edición validada.
+ * Valores vigentes de los parámetros de reglas, por pieza, y su edición validada.
  *
- * <p>Valor vigente = override persistido o, si no hay, fábrica. El conjunto se cachea en un
- * {@code volatile} (igual que {@code ConfiguracionService}) y se invalida al guardar: el camino
- * caliente del motor paga un acceso a un campo y cero consultas. El orquestador toma
- * {@link #vigentes()} UNA vez por evaluación de sector, así todas las reglas del ciclo ven los
- * mismos valores aunque alguien guarde a mitad de un barrido.
+ * <p>Cada pieza que lee parámetros tiene su copia (rediseno-motor-reglas D-1): valor vigente de {@code (pieza, clave)} =
+ * override persistido de esa copia o, si no hay, fábrica. No hay herencia entre piezas. El conjunto se cachea en un
+ * {@code volatile} (igual que {@code ConfiguracionService}) y se invalida al guardar: el camino caliente del motor paga
+ * un acceso a un campo y cero consultas. El orquestador toma {@link #vigentes()} UNA vez por evaluación de sector, así
+ * todas las reglas del ciclo ven los mismos valores aunque alguien guarde a mitad de un barrido.
  */
 @Service
 public class CatalogoParametrosService {
@@ -43,18 +45,24 @@ public class CatalogoParametrosService {
     /** Mismo default que {@code ConfiguracionService} cuando el cliente no manda {@code X-Usuario}. */
     private static final String USUARIO_POR_DEFECTO = "Ingeniero Agrónomo";
 
+    /** Una copia: la pieza dueña y la clave. */
+    private record Copia(String regla, String clave) {}
+
     /** Auditoría de un override persistido. */
     private record OverridePersistido(String valor, String updatedBy, Long updatedTs) {}
 
-    /** Lo que se cachea: valores resueltos más la auditoría de los overrides. */
-    private record Estado(ParametrosVigentes vigentes, ParametrosVigentes efectivos,
-                          Map<String, OverridePersistido> overrides, Set<String> corruptas) {}
+    /**
+     * Lo que se cachea: los valores propios de cada pieza (crudos, lo que se edita), el snapshot efectivo que leen las
+     * piezas y la auditoría de los overrides.
+     */
+    private record Estado(Map<String, ParametrosVigentes> crudos, ParametrosPorPieza efectivos,
+                          Map<Copia, OverridePersistido> overrides, Set<Copia> corruptas) {}
 
     /** Operating-config row that holds the sensing pulse interval. */
     private static final int OPERATIVA_ID = 1;
 
     private final CatalogoParametros catalogo;
-    private final ParametroReglaRepository repository;
+    private final ReglaParametroRepository repository;
     private final HistorialService historialService;
     private final TransactionTemplate transaccion;
     private final ConfiguracionOperativaRepository operativaRepository;
@@ -78,7 +86,7 @@ public class CatalogoParametrosService {
     private final AtomicLong generacion = new AtomicLong();
 
     public CatalogoParametrosService(CatalogoParametros catalogo,
-                                     ParametroReglaRepository repository,
+                                     ReglaParametroRepository repository,
                                      HistorialService historialService,
                                      PlatformTransactionManager transactionManager,
                                      ConfiguracionOperativaRepository operativaRepository,
@@ -98,14 +106,15 @@ public class CatalogoParametrosService {
     // ------------------------------------------------------------------
 
     /**
-     * Valores vigentes; el mismo objeto hasta que alguien guarde. This is the EFFECTIVE snapshot the
-     * engine consumes: {@code seguridad.antiguedad-max-lectura} is {@code max(floor, pulse interval + response window)}.
+     * Valores vigentes de todas las piezas; el mismo objeto hasta que alguien guarde. Es el snapshot EFECTIVO que consume
+     * el motor: en cada vista, {@code seguridad.antiguedad-max-lectura} es {@code max(piso, intervalo del pulso + ventana
+     * de respuesta)}, y las claves que una pieza lee de otra (D-2) ya traen el valor de la dueña.
      */
-    public ParametrosVigentes vigentes() {
+    public ParametrosPorPieza vigentes() {
         return estado().efectivos();
     }
 
-    /** Catálogo normalizado para la API: reglas por prioridad y cada parámetro una sola vez. */
+    /** Catálogo para la API: las piezas por prioridad y una entrada por copia {@code (pieza, clave)}. */
     public CatalogoReglasDto catalogo() {
         Estado e = estado();
 
@@ -113,13 +122,16 @@ public class CatalogoParametrosService {
         List<ReglaCatalogoDto> reglas = reglasCatalogo.reglas();
 
         List<ParametroDto> parametros = new ArrayList<>();
-        for (DefinicionParametro d : catalogo.definiciones()) {
-            OverridePersistido o = e.overrides().get(d.clave());
-            parametros.add(new ParametroDto(
-                    d.clave(), d.etiqueta(), d.descripcion(), d.familia().name(), d.tipo().name(), d.unidad(),
-                    e.vigentes().valor(d.clave()).canonico(), d.fabrica(), d.min(), d.max(), d.decimales(),
-                    d.refSpec(), o != null, catalogo.usadoPor(d.clave()),
-                    o != null ? o.updatedBy() : null, o != null ? o.updatedTs() : null));
+        for (ConsumidorParametros pieza : catalogo.consumidores()) {
+            ParametrosVigentes propios = e.crudos().getOrDefault(pieza.name(), catalogo.fabricas());
+            for (DefinicionParametro d : pieza.parametros()) {
+                OverridePersistido o = e.overrides().get(new Copia(pieza.name(), d.clave()));
+                parametros.add(new ParametroDto(
+                        pieza.name(), d.clave(), d.etiqueta(), d.descripcion(), d.familia().name(), d.tipo().name(),
+                        d.unidad(), propios.valor(d.clave()).canonico(), d.fabrica(), d.min(), d.max(), d.decimales(),
+                        d.refSpec(), o != null,
+                        o != null ? o.updatedBy() : null, o != null ? o.updatedTs() : null));
+            }
         }
         return new CatalogoReglasDto(reglas, parametros);
     }
@@ -149,47 +161,75 @@ public class CatalogoParametrosService {
     }
 
     private Estado cargar() {
-        Map<String, ValorParametro> valores = new HashMap<>(catalogo.fabricas().valores());
-        Map<String, OverridePersistido> overrides = new LinkedHashMap<>();
-        Set<String> corruptas = new java.util.HashSet<>();
-        for (ParametroReglaEntity fila : repository.findAll()) {
+        Map<String, ValorParametro> fabrica = catalogo.fabricas().valores();
+        Map<String, Map<String, ValorParametro>> propios = new LinkedHashMap<>();
+        for (ConsumidorParametros pieza : catalogo.consumidores()) {
+            propios.put(pieza.name(), new HashMap<>(fabrica));
+        }
+        Map<Copia, OverridePersistido> overrides = new LinkedHashMap<>();
+        Set<Copia> corruptas = new HashSet<>();
+        for (ReglaParametroEntity fila : repository.findAll()) {
+            Copia copia = new Copia(fila.getConsumidor(), fila.getClave());
             Optional<DefinicionParametro> def = catalogo.definicion(fila.getClave());
             if (def.isEmpty()) {
-                log.warn("OverridePersistido de un parámetro que ya no existe en el catálogo ('{}'): se ignora.", fila.getClave());
+                log.warn("Override de un parámetro que ya no existe en el catálogo ('{}' de '{}'): se ignora.",
+                        fila.getClave(), fila.getConsumidor());
+                continue;
+            }
+            if (!catalogo.declara(fila.getConsumidor(), fila.getClave())) {
+                log.warn("Override de '{}' para '{}', que no lo declara (o ya no existe): se ignora.",
+                        fila.getClave(), fila.getConsumidor());
                 continue;
             }
             try {
-                valores.put(fila.getClave(), def.get().tipo().parsear(fila.getValor(), def.get()));
-                overrides.put(fila.getClave(), new OverridePersistido(fila.getValor(), fila.getUpdatedBy(), fila.getUpdatedTs()));
+                propios.get(fila.getConsumidor()).put(fila.getClave(), def.get().tipo().parsear(fila.getValor(), def.get()));
+                overrides.put(copia, new OverridePersistido(fila.getValor(), fila.getUpdatedBy(), fila.getUpdatedTs()));
             } catch (ValorParametroInvalidoException ex) {
                 // Un valor corrupto en la base no puede tirar el motor: se cae a fábrica.
-                corruptas.add(fila.getClave());
-                log.warn("OverridePersistido inválido de '{}' ('{}'): {} Se usa el valor de fábrica.",
-                        fila.getClave(), fila.getValor(), ex.getMessage());
+                corruptas.add(copia);
+                log.warn("Override inválido de '{}' en '{}' ('{}'): {} Se usa el valor de fábrica.",
+                        fila.getClave(), fila.getConsumidor(), fila.getValor(), ex.getMessage());
             }
         }
-        ParametrosVigentes crudos = ParametrosVigentes.de(valores);
-        return new Estado(crudos, conUmbralEfectivo(crudos), Map.copyOf(overrides), Set.copyOf(corruptas));
+        Map<String, ParametrosVigentes> crudos = new LinkedHashMap<>();
+        propios.forEach((pieza, valores) -> crudos.put(pieza, ParametrosVigentes.de(valores)));
+        return new Estado(Map.copyOf(crudos), efectivos(crudos), Map.copyOf(overrides), Set.copyOf(corruptas));
     }
 
     /**
-     * Overlays the effective stale threshold on the raw values: the stored value is only the floor,
-     * the real threshold also depends on the pulse interval and its response window (see {@link SensingCadence}),
-     * which comes from the {@code sensado.*} parameters in force.
+     * Arma la vista de cada pieza: sus valores propios, las claves que lee de otra pieza con el valor de la dueña (D-2)
+     * y, encima, el umbral efectivo de antigüedad.
      */
-    private ParametrosVigentes conUmbralEfectivo(ParametrosVigentes crudos) {
-        Integer raw = operativaRepository.findById(OPERATIVA_ID)
-                .map(ConfiguracionOperativaEntity::getIntervaloSensadoMinutos).orElse(null);
-        double piso = crudos.numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA);
+    private ParametrosPorPieza efectivos(Map<String, ParametrosVigentes> crudos) {
+        int intervalo = SensingCadence.intervalMinutes(operativaRepository.findById(OPERATIVA_ID)
+                .map(ConfiguracionOperativaEntity::getIntervaloSensadoMinutos).orElse(null));
+        // La ventana de respuesta sale de los plazos del pulso de sensado, su dueño (D-1).
+        ParametrosVigentes pulso = crudos.getOrDefault(PulsoSensadoService.NAME, catalogo.fabricas());
         double ventana = SensingCadence.responseWindowSeconds(
-                crudos.numero(SensingParameters.RESPONSE_WAIT),
-                (int) crudos.numero(SensingParameters.RETRIES),
-                crudos.numero(SensingParameters.RETRY_WAIT));
-        Map<String, ValorParametro> efectivos = new HashMap<>(crudos.valores());
-        efectivos.put(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave(),
-                new ValorParametro.Numero(SensingCadence.staleThresholdSeconds(
-                        piso, SensingCadence.intervalMinutes(raw), ventana)));
-        return ParametrosVigentes.de(efectivos);
+                pulso.numero(SensingParameters.RESPONSE_WAIT),
+                (int) pulso.numero(SensingParameters.RETRIES),
+                pulso.numero(SensingParameters.RETRY_WAIT));
+
+        Map<String, ParametrosVigentes> vistas = new LinkedHashMap<>();
+        for (ConsumidorParametros pieza : catalogo.consumidores()) {
+            Map<String, ValorParametro> vista = new HashMap<>(crudos.get(pieza.name()).valores());
+            pieza.parametrosDe().forEach((def, duena) ->
+                    vista.put(def.clave(), crudos.get(duena).valor(def.clave())));
+            vistas.put(pieza.name(), conUmbralEfectivo(vista, intervalo, ventana));
+        }
+        ParametrosVigentes base = conUmbralEfectivo(new HashMap<>(catalogo.fabricas().valores()), intervalo, ventana);
+        return ParametrosPorPieza.of(vistas, base);
+    }
+
+    /**
+     * Overlays the effective stale threshold on a view: the stored value is only the floor, the real threshold also
+     * depends on the pulse interval and its response window (see {@link SensingCadence}).
+     */
+    private static ParametrosVigentes conUmbralEfectivo(Map<String, ValorParametro> vista, int intervalo, double ventana) {
+        String clave = ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA.clave();
+        double piso = ((ValorParametro.Numero) vista.get(clave)).valor();
+        vista.put(clave, new ValorParametro.Numero(SensingCadence.staleThresholdSeconds(piso, intervalo, ventana)));
+        return ParametrosVigentes.de(vista);
     }
 
     /** Descarta el cache: la próxima lectura vuelve a la base. */
@@ -203,9 +243,9 @@ public class CatalogoParametrosService {
     // ------------------------------------------------------------------
 
     /**
-     * Aplica un lote de cambios, todo o nada. {@code valor = null} (o igual a fábrica) borra el
-     * override. Valida tipo, rango, existencia de la clave y restricciones cruzadas sobre el
-     * conjunto resultante.
+     * Aplica un lote de cambios, todo o nada. Cada cambio nombra la copia {@code (regla, clave)}; {@code valor = null}
+     * (o igual a fábrica) borra el override. Valida que la pieza declare la clave, tipo, rango y restricciones cruzadas
+     * sobre el conjunto resultante (D-4).
      *
      * <p><b>No invocar desde una transacción externa:</b> corre en una transacción propia
      * ({@code REQUIRES_NEW}) para que el lock se suelte después del commit; desde una externa
@@ -234,47 +274,52 @@ public class CatalogoParametrosService {
         // Se parte de la base, no del cache: el guardado decide sobre el estado persistido.
         Estado actual = cargar();
         List<ErrorParametro> errores = new ArrayList<>();
-        Map<String, ValorParametro> resultante = new HashMap<>(actual.vigentes().valores());
-        // clave → valor canónico nuevo, o null para restablecer. Sólo los que validaron.
-        Map<String, String> aplicar = new LinkedHashMap<>();
+        // Pieza → valores propios después del lote. Sólo se copian las piezas que el lote toca.
+        Map<String, Map<String, ValorParametro>> resultante = new HashMap<>();
+        // Copia → valor canónico nuevo, o null para restablecer. Sólo los que validaron.
+        Map<Copia, String> aplicar = new LinkedHashMap<>();
 
         for (CambioParametro c : cambios) {
             if (c == null) {
-                errores.add(new ErrorParametro(null, "Hay un cambio vacío en el lote."));
+                errores.add(new ErrorParametro(null, null, "Hay un cambio vacío en el lote."));
                 continue;
             }
             Optional<DefinicionParametro> def = c.clave() == null ? Optional.empty() : catalogo.definicion(c.clave());
             if (def.isEmpty()) {
-                errores.add(new ErrorParametro(c.clave(), "El parámetro no existe en el catálogo."));
+                errores.add(new ErrorParametro(c.regla(), c.clave(), "El parámetro no existe en el catálogo."));
                 continue;
             }
-            if (aplicar.containsKey(c.clave())) {
-                errores.add(new ErrorParametro(c.clave(), "El parámetro viene repetido en el lote."));
+            if (catalogo.consumidor(c.regla()).isEmpty()) {
+                errores.add(new ErrorParametro(c.regla(), c.clave(), "La regla no existe o no lee parámetros."));
+                continue;
+            }
+            if (!catalogo.declara(c.regla(), c.clave())) {
+                errores.add(new ErrorParametro(c.regla(), c.clave(), "La regla no tiene este parámetro."));
+                continue;
+            }
+            Copia copia = new Copia(c.regla(), c.clave());
+            if (aplicar.containsKey(copia)) {
+                errores.add(new ErrorParametro(c.regla(), c.clave(), "El parámetro viene repetido en el lote."));
                 continue;
             }
             DefinicionParametro d = def.get();
+            Map<String, ValorParametro> propios = resultante.computeIfAbsent(c.regla(),
+                    r -> new HashMap<>(actual.crudos().get(r).valores()));
             if (c.valor() == null) {
-                resultante.put(d.clave(), catalogo.fabricas().valor(d.clave()));
-                aplicar.put(d.clave(), null);
+                propios.put(d.clave(), catalogo.fabricas().valor(d.clave()));
+                aplicar.put(copia, null);
                 continue;
             }
             try {
                 ValorParametro v = d.tipo().parsear(c.valor(), d);
-                resultante.put(d.clave(), v);
-                aplicar.put(d.clave(), v.canonico());
+                propios.put(d.clave(), v);
+                aplicar.put(copia, v.canonico());
             } catch (ValorParametroInvalidoException e) {
-                errores.add(new ErrorParametro(d.clave(), e.getMessage()));
+                errores.add(new ErrorParametro(c.regla(), d.clave(), e.getMessage()));
             }
         }
 
-        // Restricciones cruzadas: sólo las que involucran algo que este lote toca.
-        ParametrosVigentes conjunto = ParametrosVigentes.de(resultante);
-        for (RestriccionCruzada r : catalogo.violaciones(conjunto)) {
-            List<String> tocadas = r.claves().stream().filter(aplicar::containsKey).toList();
-            for (String clave : tocadas) {
-                errores.add(new ErrorParametro(clave, r.mensaje()));
-            }
-        }
+        errores.addAll(violacionesCruzadas(actual, resultante, aplicar.keySet()));
 
         if (!errores.isEmpty()) {
             throw new ParametrosInvalidosException(errores);
@@ -283,22 +328,22 @@ public class CatalogoParametrosService {
         String autor = usuario != null && !usuario.isBlank() ? usuario : USUARIO_POR_DEFECTO;
         long ahora = System.currentTimeMillis();
         List<String> cambiadas = new ArrayList<>();
-        for (Map.Entry<String, String> a : aplicar.entrySet()) {
-            String clave = a.getKey();
-            String fabrica = catalogo.fabricas().valor(clave).canonico();
+        for (Map.Entry<Copia, String> a : aplicar.entrySet()) {
+            Copia copia = a.getKey();
+            String fabrica = catalogo.fabricas().valor(copia.clave()).canonico();
             // Un valor igual a fábrica es restablecer: "modificado" significa "hay override".
             String nuevo = a.getValue() == null || a.getValue().equals(fabrica) ? null : a.getValue();
-            OverridePersistido previo = actual.overrides().get(clave);
+            OverridePersistido previo = actual.overrides().get(copia);
 
             if (nuevo == null) {
                 // Una fila corrupta también se borra: es la única forma de restablecerla.
-                if (previo != null || actual.corruptas().contains(clave)) {
-                    repository.deleteById(clave);
-                    cambiadas.add(clave);
+                if (previo != null || actual.corruptas().contains(copia)) {
+                    repository.deleteById(new ReglaParametroId(copia.regla(), copia.clave()));
+                    cambiadas.add(descripcion(copia));
                 }
             } else if (previo == null || !previo.valor().equals(nuevo)) {
-                repository.save(new ParametroReglaEntity(clave, nuevo, autor, ahora));
-                cambiadas.add(clave);
+                repository.save(new ReglaParametroEntity(copia.regla(), copia.clave(), nuevo, autor, ahora));
+                cambiadas.add(descripcion(copia));
             }
         }
 
@@ -310,6 +355,60 @@ public class CatalogoParametrosService {
         historialService.registrarConfiguracion(autor,
                 "Parámetros de reglas modificados: " + String.join(", ", cambiadas) + ".");
         return catalogo();
+    }
+
+    /** {@code clave (pieza)}, para el historial: el cambio es de una copia. */
+    private static String descripcion(Copia copia) {
+        return copia.clave() + " (" + copia.regla() + ")";
+    }
+
+    /**
+     * Restricciones cruzadas sobre el resultado del lote (D-4), informadas sobre las copias que el lote toca:
+     * <ul>
+     *   <li>se evalúan en cada pieza que declara <b>todas</b> las claves de la restricción, con sus valores;</li>
+     *   <li>si ninguna las declara todas pero cada clave tiene una sola pieza que la declara, se evalúan con el valor de
+     *       cada dueña;</li>
+     *   <li>si no, no se evalúan: son copias de piezas distintas que el agrónomo eligió separar.</li>
+     * </ul>
+     */
+    private List<ErrorParametro> violacionesCruzadas(Estado actual, Map<String, Map<String, ValorParametro>> resultante,
+                                                     Set<Copia> tocadas) {
+        List<ErrorParametro> errores = new ArrayList<>();
+        for (RestriccionCruzada r : catalogo.restricciones()) {
+            List<String> completas = catalogo.consumidores().stream().map(ConsumidorParametros::name)
+                    .filter(p -> r.claves().stream().allMatch(k -> catalogo.declara(p, k))).toList();
+            if (!completas.isEmpty()) {
+                for (String pieza : completas) {
+                    List<Copia> deLaPieza = r.claves().stream().map(k -> new Copia(pieza, k)).filter(tocadas::contains)
+                            .toList();
+                    if (!deLaPieza.isEmpty() && !r.cumple(ParametrosVigentes.de(propios(actual, resultante, pieza)))) {
+                        deLaPieza.forEach(c -> errores.add(new ErrorParametro(c.regla(), c.clave(), r.mensaje())));
+                    }
+                }
+                continue;
+            }
+            boolean unaDuenaPorClave = r.claves().stream().allMatch(k -> catalogo.declarantes(k).size() == 1);
+            if (!unaDuenaPorClave) {
+                continue;
+            }
+            List<Copia> copias = r.claves().stream().map(k -> new Copia(catalogo.declarantes(k).get(0), k)).toList();
+            List<Copia> deLasDuenas = copias.stream().filter(tocadas::contains).toList();
+            if (deLasDuenas.isEmpty()) {
+                continue;
+            }
+            Map<String, ValorParametro> combinados = new HashMap<>(catalogo.fabricas().valores());
+            copias.forEach(c -> combinados.put(c.clave(), propios(actual, resultante, c.regla()).get(c.clave())));
+            if (!r.cumple(ParametrosVigentes.de(combinados))) {
+                deLasDuenas.forEach(c -> errores.add(new ErrorParametro(c.regla(), c.clave(), r.mensaje())));
+            }
+        }
+        return errores;
+    }
+
+    private static Map<String, ValorParametro> propios(Estado actual, Map<String, Map<String, ValorParametro>> resultante,
+                                                       String pieza) {
+        Map<String, ValorParametro> cambiados = resultante.get(pieza);
+        return cambiados != null ? cambiados : actual.crudos().get(pieza).valores();
     }
 
     /**

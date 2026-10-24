@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.sensing;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
 import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
@@ -59,7 +60,7 @@ class PulsoSensadoServiceTest {
         publisher = mock(ComandoZonaPublisher.class);
         escalamiento = mock(EscalamientoNodoService.class);
         parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(new CatalogoParametros(List.of()).fabricas()));
         reloj = new RelojDePrueba(T);
         when(zonas.findAllIds()).thenReturn(List.of("MZ-1", "MZ-2", "MZ-3"));
         when(publisher.leerAhora(anyString())).thenReturn(new Resultado(true, "c", null));
@@ -70,7 +71,7 @@ class PulsoSensadoServiceTest {
     private void conSensado(Map<SensingParameters, Double> cambios) {
         Map<String, ValorParametro> valores = new HashMap<>(new CatalogoParametros(List.of()).fabricas().valores());
         cambios.forEach((p, v) -> valores.put(p.clave(), new ValorParametro.Numero(v)));
-        when(parametros.vigentes()).thenReturn(ParametrosVigentes.de(valores));
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ParametrosVigentes.de(valores)));
     }
 
     private long ms(int segundosDesdeT) {
