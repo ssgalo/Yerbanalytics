@@ -71,18 +71,30 @@ export interface EntradaMotor {
 class Ev {
   readonly comparaciones: Comparacion[] = [];
 
-  constructor(private readonly catalogo: CatalogoReglas) {}
+  constructor(
+    private readonly catalogo: CatalogoReglas,
+    /** Pieza que se evalúa: lee su copia de cada parámetro. */
+    private readonly regla: string,
+  ) {}
+
+  /** La copia de la regla evaluada; si no la declara, la primera de la clave (como un valor de fábrica más). */
+  private copia(clave: string) {
+    return (
+      this.catalogo.parametros.find((x) => x.regla === this.regla && x.clave === clave) ??
+      this.catalogo.parametros.find((x) => x.clave === clave)
+    );
+  }
 
   /** Valor vigente de un parámetro numérico. */
   numero(clave: string): number {
-    const p = this.catalogo.parametros.find((x) => x.clave === clave);
+    const p = this.copia(clave);
     if (!p) throw new Error(`Parámetro ${clave} no está en el catálogo`);
     return Number(p.valor);
   }
 
   /** Compara contra un parámetro del catálogo y registra la comparación. */
   comparar(etiqueta: string, recibido: number | null, op: OperadorComparacion, clave: string): boolean {
-    const p = this.catalogo.parametros.find((x) => x.clave === clave);
+    const p = this.copia(clave);
     const umbral = this.numero(clave);
     const cumple = recibido !== null && aplicar(recibido, op, umbral);
     this.comparaciones.push({
@@ -100,14 +112,14 @@ class Ev {
 
   /** Valor vigente de un parámetro de ventana horaria ("06:00-18:00"). */
   ventana(clave: string): string {
-    const p = this.catalogo.parametros.find((x) => x.clave === clave);
+    const p = this.copia(clave);
     if (!p) throw new Error(`Parámetro ${clave} no está en el catálogo`);
     return p.valor;
   }
 
   /** Registra "hora ∈ ventana" (operador `EN`): recibido "HH:mm", umbral la ventana vigente. */
   compararVentana(etiqueta: string, minuto: number | null, clave: string): boolean {
-    const p = this.catalogo.parametros.find((x) => x.clave === clave);
+    const p = this.copia(clave);
     const texto = this.ventana(clave);
     const cumple = minuto !== null && dentroDeVentana(minuto, parseVentana(texto));
     this.comparaciones.push({
@@ -479,8 +491,10 @@ const REGLAS_DE_ZONA = new Set(['FungalConditionRule', 'OutbreakRule', 'LowEcRul
 /** Huella estable de los valores vigentes (FNV-1a), como el `parametrosHash` del backend. */
 function huella(catalogo: CatalogoReglas): string {
   let h = 0x811c9dc5;
-  for (const p of [...catalogo.parametros].sort((a, b) => a.clave.localeCompare(b.clave))) {
-    for (const ch of `${p.clave}=${p.valor};`) {
+  const orden = (a: { regla: string; clave: string }, b: { regla: string; clave: string }) =>
+    a.regla.localeCompare(b.regla) || a.clave.localeCompare(b.clave);
+  for (const p of [...catalogo.parametros].sort(orden)) {
+    for (const ch of `${p.regla}.${p.clave}=${p.valor};`) {
       h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
     }
   }
@@ -531,7 +545,7 @@ export function evaluarMotor(catalogo: CatalogoReglas, entrada: EntradaMotor): T
       continue;
     }
 
-    const ev = new Ev(catalogo);
+    const ev = new Ev(catalogo, regla.id);
     const acciones = (EVALUADORES[regla.id] ?? (() => []))(ev, entrada);
     reglas.push({
       ruleId: regla.id,

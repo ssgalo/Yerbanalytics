@@ -1,5 +1,5 @@
 /* ============================================================
-   Pestaña Inspector: el DAG del motor pintado con la última evaluación de un sector.
+   Inspector del motor (`/reglas/inspector`): el DAG del motor pintado con la última evaluación de un sector.
 
    Sirve para probar y entender el motor: qué recibió cada regla, contra qué umbral, y por qué
    una regla disparó o no. La traza es en vivo (vive en memoria en el backend), no auditoría.
@@ -16,7 +16,7 @@ import styles from './Inspector.module.css';
 interface InspectorTabProps {
   /** Sector que llega por `?sector=` (desde el detalle de sector). */
   sectorInicial: string | null;
-  /** Ir a Parámetros con esa regla abierta. */
+  /** Ir a Motor de reglas con la fila de esa regla desplegada. */
   onEditarRegla: (ruleId: string) => void;
   /** Se eligió otro sector: la página lo refleja en la URL. */
   onSectorChange?: (sectorId: string) => void;

@@ -8,6 +8,7 @@ const BASE = 'http://localhost:8000/api';
 const regla: ReglaCatalogo = {
   id: 'SustratoSaturadoRule',
   label: 'Sustrato saturado',
+  etiquetaFabrica: 'Sustrato saturado',
   codigo: 'R-04',
   rama: 'RIEGO',
   objetivo: 'IRRIGATION',
@@ -18,6 +19,7 @@ const regla: ReglaCatalogo = {
   activaPorDefecto: true,
   proteccion: 'Se riega con el sustrato saturado.',
   estado: { motivo: 'sonda en recalibración', updatedBy: 'Ana', updatedTs: 1759514400000 },
+  eliminada: false,
 };
 
 function stubFetch(status: number, body?: unknown) {
@@ -101,6 +103,45 @@ describe('HttpRepository · estado de las reglas', () => {
     stubFetch(403);
     await expect(new HttpRepository(BASE).setEstadoRegla('Foo', { activa: true })).rejects.toThrow(
       /permiso/,
+    );
+  });
+});
+
+describe('HttpRepository · nombre, eliminar y restaurar', () => {
+  const llamada = (fn: ReturnType<typeof stubFetch>) => fn.mock.calls[0] as unknown as [string, RequestInit];
+
+  it('renombrarRegla hace PUT /rules/{name}/etiqueta con { etiqueta } (null restablece)', async () => {
+    const fn = stubFetch(200, { ...regla, label: 'Sustrato encharcado' });
+
+    const res = await new HttpRepository(BASE).renombrarRegla('SustratoSaturadoRule', 'Sustrato encharcado');
+
+    const [url, init] = llamada(fn);
+    expect(url).toBe(`${BASE}/rules/SustratoSaturadoRule/etiqueta`);
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body as string)).toEqual({ etiqueta: 'Sustrato encharcado' });
+    expect(res.label).toBe('Sustrato encharcado');
+
+    const fn2 = stubFetch(200, regla);
+    await new HttpRepository(BASE).renombrarRegla('SustratoSaturadoRule', null);
+    expect(JSON.parse(llamada(fn2)[1].body as string)).toEqual({ etiqueta: null });
+  });
+
+  it('eliminarRegla hace DELETE /rules/{name} y restaurarRegla POST /rules/{name}/restaurar', async () => {
+    const fn = stubFetch(200, { ...regla, eliminada: true });
+    expect((await new HttpRepository(BASE).eliminarRegla('PosponerPorLluviaRule')).eliminada).toBe(true);
+    expect(llamada(fn)[0]).toBe(`${BASE}/rules/PosponerPorLluviaRule`);
+    expect(llamada(fn)[1].method).toBe('DELETE');
+
+    const fn2 = stubFetch(200, regla);
+    await new HttpRepository(BASE).restaurarRegla('PosponerPorLluviaRule');
+    expect(llamada(fn2)[0]).toBe(`${BASE}/rules/PosponerPorLluviaRule/restaurar`);
+    expect(llamada(fn2)[1].method).toBe('POST');
+  });
+
+  it('un 409 (eliminar una protección) falla con el mensaje del backend', async () => {
+    stubFetch(409, { error: 'PROTECCION', mensaje: 'Una protección no se elimina.' });
+    await expect(new HttpRepository(BASE).eliminarRegla('SustratoSaturadoRule')).rejects.toThrow(
+      'Una protección no se elimina.',
     );
   });
 });

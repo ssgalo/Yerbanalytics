@@ -19,127 +19,83 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** El campo de un parámetro (se espera a que cargue el catálogo). */
-const campo = async (clave: string) => {
-  await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' });
-  return document.getElementById(`param-${clave}`)!;
-};
+const R01 = 'RiegoPorDeficitRule';
+const UMBRAL = 'riego.umbral-humedad';
+const campo = () => document.getElementById(`param-${R01}-${UMBRAL}`) as HTMLInputElement;
+const cargada = () => screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' }, { timeout: 5000 });
 
-/** La app completa (sesión + shell + rutas) en memoria, como la monta `App`. */
-const montarEn = (ruta: string) => montarApp(ruta);
-
-describe('Ruta /reglas (7.1)', () => {
-  it('el Sidebar enlaza a "Motor de reglas" dentro del grupo Configuración', async () => {
-    montarEn('/');
+describe('Ruta /reglas', () => {
+  it('el Sidebar enlaza a "Motor de reglas" y a "Inspector del motor" dentro de Configuración', async () => {
+    montarApp('/');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }));
-    const enlace = await screen.findByRole('link', { name: 'Motor de reglas' });
-    expect(enlace.getAttribute('href')).toBe('/reglas');
+    expect((await screen.findByRole('link', { name: 'Motor de reglas' })).getAttribute('href')).toBe('/reglas');
+    expect(screen.getByRole('link', { name: 'Inspector del motor' }).getAttribute('href')).toBe('/reglas/inspector');
   });
 
-  it('monta ReglasPage con las pestañas Reglas e Inspector', async () => {
-    montarEn('/reglas');
+  it('muestra las reglas, sin selector de pestañas', async () => {
+    montarApp('/reglas');
 
-    expect(await screen.findByRole('tab', { name: /^Reglas/ })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Inspector' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /^Reglas/ }).getAttribute('aria-selected')).toBe('true');
-    // La pestaña Reglas carga el catálogo del repositorio (mock), con un interruptor por regla.
-    expect(await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' })).toBeTruthy();
+    expect(await cargada()).toBeTruthy();
     expect(screen.getByRole('switch', { name: 'Apagar Bloqueo manual' })).toBeTruthy();
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Motor de reglas' })).toBeTruthy();
   });
 
-  it('el título de la topbar es "Motor de reglas"', async () => {
-    montarEn('/reglas');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Motor de reglas' }, { timeout: 5000 })).toBeTruthy();
+  it('?regla= despliega la fila de esa regla', async () => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    montarApp(`/reglas?regla=${R01}`);
+
+    await cargada();
+    await waitFor(() => expect(campo()).toBeTruthy());
   });
 
-  it('?tab=inspector abre el Inspector y ?sector llega al selector', async () => {
-    montarEn('/reglas?tab=inspector&sector=MZ-1-001');
-
-    const tab = await screen.findByRole('tab', { name: 'Inspector' });
-    expect(tab.getAttribute('aria-selected')).toBe('true');
-  });
-
-  it('cambiar de pestaña actualiza la URL', async () => {
-    const ubicacion = montarEn('/reglas');
-
-    fireEvent.click(await screen.findByRole('tab', { name: 'Inspector' }));
-
-    await waitFor(() => expect(ubicacion.actual?.search).toContain('tab=inspector'));
-  });
-
-  it('?tab=parametros (el nombre de la pestaña anterior) abre Reglas', async () => {
-    montarEn('/reglas?tab=parametros');
-
-    const tab = await screen.findByRole('tab', { name: /^Reglas/ });
-    expect(tab.getAttribute('aria-selected')).toBe('true');
-    expect(await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' })).toBeTruthy();
-  });
-
-  it('?regla= lleva a la tarjeta de esa regla, resaltada', async () => {
-    const scroll = vi.fn();
-    window.HTMLElement.prototype.scrollIntoView = scroll;
-    montarEn('/reglas?regla=RiegoPorDeficitRule');
-
-    const tarjeta = await screen.findByRole('article', { name: /Riego por déficit hídrico/ });
-    expect(tarjeta.id).toBe('regla-RiegoPorDeficitRule');
-    await waitFor(() => expect(scroll).toHaveBeenCalled());
-  });
-
-  it('un cambio guardado en la demo se conserva en el repositorio', async () => {
-    montarEn('/reglas');
-    fireEvent.change(await campo('riego.umbral-humedad'), { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+  it('un cambio guardado en la demo se conserva en el repositorio, sólo en la copia de esa regla', async () => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    montarApp(`/reglas?regla=${R01}`);
+    await cargada();
+    await waitFor(() => expect(campo()).toBeTruthy());
+    fireEvent.change(campo(), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
 
     await waitFor(async () => {
       const c = await getRepository().getCatalogoReglas();
-      expect(c.parametros.find((p) => p.clave === 'riego.umbral-humedad')!.valor).toBe('40');
+      expect(c.parametros.find((p) => p.regla === R01 && p.clave === UMBRAL)!.valor).toBe('40');
+      expect(c.parametros.find((p) => p.regla === 'PosponerPorLluviaRule' && p.clave === UMBRAL)!.valor).toBe('45');
     });
-    await getRepository().saveParametros([{ clave: 'riego.umbral-humedad', valor: null }]);
+    await getRepository().saveParametros([{ regla: R01, clave: UMBRAL, valor: null }]);
   });
 });
 
-describe('Borrador de Parámetros entre pestañas (#1)', () => {
-  it('editar, ir al Inspector y volver conserva el borrador', async () => {
-    montarEn('/reglas');
-    fireEvent.change(await campo('riego.umbral-humedad'), { target: { value: '40' } });
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
-    await screen.findByLabelText('Macro-zona');
-    fireEvent.click(screen.getByRole('tab', { name: /^Reglas/ }));
-
-    expect(screen.getByText(/1 cambio sin guardar/)).toBeTruthy();
-    // El valor editado sigue ahí
-    expect(((await campo('riego.umbral-humedad')) as HTMLInputElement).value).toBe('40');
+describe('Ruta /reglas/inspector', () => {
+  it('monta el Inspector con su título', async () => {
+    montarApp('/reglas/inspector');
+    expect(await screen.findByLabelText('Macro-zona', {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Inspector del motor' })).toBeTruthy();
   });
 
-  it('el aviso de cambios sin guardar se ve desde la pestaña Inspector', async () => {
-    montarEn('/reglas');
-    fireEvent.change(await campo('riego.umbral-humedad'), { target: { value: '40' } });
+  it('el enlace viejo ?tab=inspector&sector= redirige conservando el sector', async () => {
+    const ubicacion = montarApp('/reglas?tab=inspector&sector=MZ-1-001');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Inspector' }));
-
-    const marca = await screen.findByTitle('1 cambio sin guardar');
-    expect(marca.textContent).toBe('1');
-    expect(screen.getByRole('tab', { name: /^Reglas/ }).contains(marca)).toBe(true);
-  });
-
-  it('sin cambios no hay marca en la pestaña', async () => {
-    montarEn('/reglas');
-    await screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' });
-    expect(screen.queryByTitle(/sin guardar/)).toBeNull();
+    await waitFor(() => expect(ubicacion.actual?.pathname).toBe('/reglas/inspector'));
+    expect(ubicacion.actual?.search).toBe('?sector=MZ-1-001');
+    expect(await screen.findByLabelText('Macro-zona', {}, { timeout: 5000 })).toBeTruthy();
   });
 });
 
 describe('Reglas sin permiso de edición', () => {
-  it('el Productor Viverista ve las reglas y sus umbrales en sólo lectura, sin cambiarlos', async () => {
+  it('el Productor Viverista ve las reglas y sus valores en sólo lectura', async () => {
     await seguridadDemo('productor');
-    montarEn('/reglas');
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    montarApp(`/reglas?regla=${R01}`);
 
-    const umbral = (await campo('riego.umbral-humedad')) as HTMLInputElement;
-    expect(umbral.readOnly).toBe(true);
-    expect((screen.getByRole('switch', { name: 'Apagar Riego por déficit hídrico' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.queryByRole('button', { name: /Guardar cambios/ })).toBeNull();
+    await cargada();
+    await waitFor(() => expect(campo()).toBeTruthy());
+    expect(campo().readOnly).toBe(true);
+    expect((screen.getByRole('switch', { name: 'Apagar Riego por déficit hídrico' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull();
     expect(screen.getByText(/hace falta el permiso/)).toBeTruthy();
   });
 });

@@ -273,6 +273,8 @@ export function SistemaDisenoPage() {
               <div className={styles.flex}>
                 <Switch checked={encendido} onChange={setEncendido} label="Mostrar Demo Expo" />
                 <span className={styles.meta}>Interruptor</span>
+                <Switch checked="mixed" onChange={() => undefined} label="Todas las reglas del grupo" />
+                <span className={styles.meta}>Grupo a medio camino</span>
               </div>
             </div>
           </div>

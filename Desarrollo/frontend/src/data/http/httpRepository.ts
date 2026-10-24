@@ -385,7 +385,7 @@ export class HttpRepository implements DataRepository {
       body: JSON.stringify({ cambios }),
     });
     if (!res.ok) {
-      // Un 400 de validación trae { errores: [{ clave, mensaje }] }; uno por JSON inválido
+      // Un 400 de validación trae { errores: [{ regla, clave, mensaje }] }; uno por JSON inválido
       // puede venir sin `errores` (o sin cuerpo), así que se tolera cualquiera de las formas.
       const body = (await res.json().catch(() => null)) as {
         errores?: ErrorParametro[];
@@ -419,6 +419,40 @@ export class HttpRepository implements DataRepository {
         throw new EstadoReglaError(body.error, body.mensaje ?? body.error, body.consecuencia ?? null);
       }
       throw new Error(body?.error ?? `Error ${res.status} al cambiar el estado de la regla ${nombre}`);
+    }
+    return (await res.json()) as ReglaCatalogo;
+  }
+
+  async renombrarRegla(nombre: string, etiqueta: string | null): Promise<ReglaCatalogo> {
+    return this.accionRegla(nombre, 'etiqueta', 'PUT', 'renombrar', { etiqueta });
+  }
+
+  async eliminarRegla(nombre: string): Promise<ReglaCatalogo> {
+    return this.accionRegla(nombre, '', 'DELETE', 'eliminar');
+  }
+
+  async restaurarRegla(nombre: string): Promise<ReglaCatalogo> {
+    return this.accionRegla(nombre, 'restaurar', 'POST', 'restaurar');
+  }
+
+  /** `/rules/{name}[/sub]`: nombre, eliminar y restaurar. Un rechazo (400, 409) trae `{ error | mensaje }`. */
+  private async accionRegla(
+    nombre: string,
+    sub: string,
+    method: 'PUT' | 'POST' | 'DELETE',
+    verbo: string,
+    body?: unknown,
+  ): Promise<ReglaCatalogo> {
+    const url = `${this.baseUrl}/rules/${encodeURIComponent(nombre)}${sub ? `/${sub}` : ''}`;
+    const res = await apiFetch(url, {
+      method,
+      ...(body !== undefined
+        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        : {}),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: string; mensaje?: string } | null;
+      throw new Error(err?.mensaje ?? err?.error ?? `Error ${res.status} al ${verbo} la regla ${nombre}`);
     }
     return (await res.json()) as ReglaCatalogo;
   }

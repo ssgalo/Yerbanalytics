@@ -49,7 +49,9 @@ export function FilterChips({ label, children }: { label: string; children: Reac
 }
 
 interface SwitchProps {
-  checked: boolean;
+  /** `'mixed'`: el interruptor de un grupo con elementos prendidos y apagados (se muestra a medio camino). */
+  checked: boolean | 'mixed';
+  /** Recibe el estado pedido: `false` si estaba prendido; `true` si estaba apagado o a medio camino. */
   onChange: (checked: boolean) => void;
   /** Nombre accesible, si no hay una etiqueta asociada con `aria-labelledby`. */
   label?: string;
@@ -58,7 +60,7 @@ interface SwitchProps {
   id?: string;
 }
 
-/** Interruptor encendido/apagado de efecto inmediato. */
+/** Interruptor encendido/apagado de efecto inmediato; `mixed` para el de un grupo. */
 export function Switch({ checked, onChange, label, labelledBy, disabled, id }: SwitchProps) {
   return (
     <button
@@ -70,7 +72,7 @@ export function Switch({ checked, onChange, label, labelledBy, disabled, id }: S
       aria-label={label}
       aria-labelledby={labelledBy}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={() => onChange(checked !== true)}
     />
   );
 }

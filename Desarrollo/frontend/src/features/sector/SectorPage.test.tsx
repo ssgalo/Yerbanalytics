@@ -20,7 +20,7 @@ describe('SectorPage · enlace al motor (8.6)', () => {
 
     const enlace = await screen.findByRole('link', { name: /Ver última evaluación del motor/ });
 
-    expect(enlace.getAttribute('href')).toBe('/reglas?tab=inspector&sector=MZ-2-006');
+    expect(enlace.getAttribute('href')).toBe('/reglas/inspector?sector=MZ-2-006');
   });
 });
 

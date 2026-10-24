@@ -140,8 +140,8 @@ describe('HttpRepository · motor de reglas', () => {
     const catalogo = { reglas: [], parametros: [] };
     const llamadas = stubFetch({ status: 200, body: catalogo });
     const cambios = [
-      { clave: 'riego.umbral-humedad', valor: '40' },
-      { clave: 'riego.lluvia-probabilidad', valor: null },
+      { regla: 'RiegoPorDeficitRule', clave: 'riego.umbral-humedad', valor: '40' },
+      { regla: 'PosponerPorLluviaRule', clave: 'riego.lluvia-probabilidad', valor: null },
     ];
 
     expect(await new HttpRepository(BASE).saveParametros(cambios)).toEqual(catalogo);
@@ -152,11 +152,13 @@ describe('HttpRepository · motor de reglas', () => {
   });
 
   it('saveParametros convierte un 400 con errores en ParametrosInvalidosError', async () => {
-    const errores = [{ clave: 'riego.umbral-humedad', mensaje: 'Debe estar entre 35 y 60 %.' }];
+    const errores = [
+      { regla: 'RiegoPorDeficitRule', clave: 'riego.umbral-humedad', mensaje: 'Debe estar entre 35 y 60 %.' },
+    ];
     stubFetch({ status: 400, body: { errores } });
 
     const promesa = new HttpRepository(BASE).saveParametros([
-      { clave: 'riego.umbral-humedad', valor: '99' },
+      { regla: 'RiegoPorDeficitRule', clave: 'riego.umbral-humedad', valor: '99' },
     ]);
 
     await expect(promesa).rejects.toBeInstanceOf(ParametrosInvalidosError);

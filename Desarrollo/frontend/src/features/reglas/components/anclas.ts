@@ -1,15 +1,11 @@
-/* Ids de las tarjetas y de los campos, y el salto de un parámetro compartido al lugar donde se edita. */
+/* Ids de las filas y de los campos (los usan `?regla=` y los tests), y la fecha corta del último cambio. */
+import type { ParametroRegla } from '@/types/domain';
 
-export const idTarjeta = (id: string) => `regla-${id}`;
+/** id de la fila de una pieza: `?regla=` la despliega y lleva hasta ella. */
+export const idFila = (id: string) => `regla-${id}`;
 
-export const idParametro = (clave: string) => `param-${clave}`;
-
-/** Lleva a un parámetro (el compartido se edita en el bloque de su grupo). */
-export function irAlParametro(clave: string) {
-  const el = document.getElementById(idParametro(clave));
-  el?.scrollIntoView?.({ block: 'center' });
-  el?.focus();
-}
+/** id del campo de una copia: único por `(regla, clave)`, así dos piezas con la misma clave no chocan. */
+export const idCampo = (p: Pick<ParametroRegla, 'regla' | 'clave'>) => `param-${p.regla}-${p.clave}`;
 
 /** "22/10 14:05". */
 export function fechaCorta(ts: number): string {

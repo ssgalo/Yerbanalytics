@@ -23,6 +23,12 @@ interface UseCatalogoReglasResult {
    * se estén editando) y resuelve con ella; rechaza con `EstadoReglaError` si el backend pide motivo o confirmación.
    */
   setEstado: (nombre: string, cambio: CambioEstadoRegla) => Promise<ReglaCatalogo>;
+  /** Nombre propio de una pieza (`null` o vacío vuelve al de fábrica). Reemplaza sólo esa pieza. */
+  renombrar: (nombre: string, etiqueta: string | null) => Promise<ReglaCatalogo>;
+  /** Apaga una pieza y la saca de la vista. Reemplaza sólo esa pieza. */
+  eliminar: (nombre: string) => Promise<ReglaCatalogo>;
+  /** Devuelve una pieza eliminada, apagada. Reemplaza sólo esa pieza. */
+  restaurar: (nombre: string) => Promise<ReglaCatalogo>;
 }
 
 export function useCatalogoReglas(): UseCatalogoReglasResult {
@@ -72,11 +78,30 @@ export function useCatalogoReglas(): UseCatalogoReglasResult {
     }
   }, []);
 
-  const setEstado = useCallback(async (nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo> => {
-    const pieza = await getRepository().setEstadoRegla(nombre, cambio);
+  /** Aplica el resultado de una acción sobre una pieza, sin tocar los parámetros que se estén editando. */
+  const reemplazar = useCallback((pieza: ReglaCatalogo): ReglaCatalogo => {
     setCatalogo((c) => (c ? { ...c, reglas: c.reglas.map((r) => (r.id === pieza.id ? pieza : r)) } : c));
     return pieza;
   }, []);
 
-  return { catalogo, loading, error, saving, save, setEstado, reload };
+  const setEstado = useCallback(
+    async (nombre: string, cambio: CambioEstadoRegla) =>
+      reemplazar(await getRepository().setEstadoRegla(nombre, cambio)),
+    [reemplazar],
+  );
+  const renombrar = useCallback(
+    async (nombre: string, etiqueta: string | null) =>
+      reemplazar(await getRepository().renombrarRegla(nombre, etiqueta)),
+    [reemplazar],
+  );
+  const eliminar = useCallback(
+    async (nombre: string) => reemplazar(await getRepository().eliminarRegla(nombre)),
+    [reemplazar],
+  );
+  const restaurar = useCallback(
+    async (nombre: string) => reemplazar(await getRepository().restaurarRegla(nombre)),
+    [reemplazar],
+  );
+
+  return { catalogo, loading, error, saving, save, setEstado, renombrar, eliminar, restaurar, reload };
 }

@@ -7,7 +7,10 @@ import type { CatalogoReglas } from '@/types/domain';
 
 const nuevo = () => new MockRepository(20260613);
 const UMBRAL = 'riego.umbral-humedad';
-const param = (c: CatalogoReglas, clave: string) => c.parametros.find((p) => p.clave === clave)!;
+const R01 = 'RiegoPorDeficitRule';
+const R03 = 'PosponerPorLluviaRule';
+const param = (c: CatalogoReglas, clave: string, regla = R01) =>
+  c.parametros.find((p) => p.regla === regla && p.clave === clave)!;
 
 describe('MockRepository · catálogo de reglas', () => {
   it('arma el catálogo desde el fixture', async () => {
@@ -21,34 +24,33 @@ describe('MockRepository · catálogo de reglas', () => {
     expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('45');
   });
 
-  it('saveParametros persiste en memoria y marca el parámetro como modificado', async () => {
+  it('saveParametros persiste la copia de la regla y la marca modificada, sin tocar la de otra regla', async () => {
     const repo = nuevo();
 
-    const guardado = await repo.saveParametros([{ clave: UMBRAL, valor: '40' }]);
+    const guardado = await repo.saveParametros([{ regla: R01, clave: UMBRAL, valor: '40' }]);
 
     expect(param(guardado, UMBRAL)).toMatchObject({ valor: '40', fabrica: '45', modificado: true });
     expect(param(guardado, UMBRAL).updatedBy).toBeTruthy();
     expect(param(guardado, UMBRAL).updatedTs).toEqual(expect.any(Number));
     expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('40');
+    expect(param(await repo.getCatalogoReglas(), UMBRAL, R03)).toMatchObject({ valor: '45', modificado: false });
   });
 
   it('valor null restablece la fábrica', async () => {
     const repo = nuevo();
-    await repo.saveParametros([{ clave: UMBRAL, valor: '40' }]);
+    await repo.saveParametros([{ regla: R01, clave: UMBRAL, valor: '40' }]);
 
-    const c = await repo.saveParametros([{ clave: UMBRAL, valor: null }]);
+    const c = await repo.saveParametros([{ regla: R01, clave: UMBRAL, valor: null }]);
 
     expect(param(c, UMBRAL)).toMatchObject({ valor: '45', modificado: false, updatedBy: null });
   });
 
-  it('valida con la misma función que la UI y rechaza con ParametrosInvalidosError', async () => {
-    const repo = nuevo();
-
-    const promesa = repo.saveParametros([{ clave: UMBRAL, valor: '99' }]);
+  it('valida con la misma función que la UI y rechaza con ParametrosInvalidosError, nombrando la copia', async () => {
+    const promesa = nuevo().saveParametros([{ regla: R01, clave: UMBRAL, valor: '99' }]);
 
     await expect(promesa).rejects.toBeInstanceOf(ParametrosInvalidosError);
     await expect(promesa).rejects.toMatchObject({
-      errores: [{ clave: UMBRAL, mensaje: 'Debe estar entre 35 y 60 %.' }],
+      errores: [{ regla: R01, clave: UMBRAL, mensaje: 'Debe estar entre 35 y 60 %.' }],
     });
   });
 
@@ -57,18 +59,50 @@ describe('MockRepository · catálogo de reglas', () => {
 
     await expect(
       repo.saveParametros([
-        { clave: UMBRAL, valor: '40' },
-        { clave: 'riego.lluvia-probabilidad', valor: '5' },
+        { regla: R01, clave: UMBRAL, valor: '40' },
+        { regla: R03, clave: 'riego.lluvia-probabilidad', valor: '5' },
       ]),
     ).rejects.toBeInstanceOf(ParametrosInvalidosError);
 
     expect(param(await repo.getCatalogoReglas(), UMBRAL).valor).toBe('45');
   });
 
-  it('rechaza una clave que no existe en el catálogo', async () => {
-    await expect(nuevo().saveParametros([{ clave: 'no.existe', valor: '1' }])).rejects.toMatchObject({
+  it('rechaza una copia que no existe (clave desconocida o que la regla no lee)', async () => {
+    await expect(nuevo().saveParametros([{ regla: R01, clave: 'no.existe', valor: '1' }])).rejects.toMatchObject({
       errores: [{ clave: 'no.existe' }],
     });
+    await expect(
+      nuevo().saveParametros([{ regla: 'ManualLockRule', clave: UMBRAL, valor: '40' }]),
+    ).rejects.toBeInstanceOf(ParametrosInvalidosError);
+  });
+});
+
+describe('MockRepository · nombre, eliminar y restaurar', () => {
+  const regla = (c: CatalogoReglas, id: string) => c.reglas.find((r) => r.id === id)!;
+
+  it('renombrar cambia el nombre vigente y conserva el de fábrica; vacío lo restablece', async () => {
+    const repo = nuevo();
+
+    const r = await repo.renombrarRegla(R03, '  Lluvia a la vista ');
+
+    expect(r).toMatchObject({ label: 'Lluvia a la vista', etiquetaFabrica: 'Posponer por lluvia' });
+    expect((await repo.renombrarRegla(R03, '')).label).toBe('Posponer por lluvia');
+    expect((await repo.renombrarRegla(R03, 'x'.repeat(81)).catch((e: Error) => e)) instanceof Error).toBe(true);
+  });
+
+  it('eliminar la apaga y la marca; restaurar la devuelve apagada', async () => {
+    const repo = nuevo();
+
+    expect(await repo.eliminarRegla(R03)).toMatchObject({ eliminada: true, activa: false });
+    await expect(repo.setEstadoRegla(R03, { activa: true })).rejects.toThrow(/409/);
+
+    const restaurada = await repo.restaurarRegla(R03);
+    expect(restaurada).toMatchObject({ eliminada: false, activa: false });
+    expect(regla(await repo.getCatalogoReglas(), R03).eliminada).toBe(false);
+  });
+
+  it('una protección no se elimina', async () => {
+    await expect(nuevo().eliminarRegla('SustratoSaturadoRule')).rejects.toThrow(/409/);
   });
 });
 
@@ -302,7 +336,7 @@ describe('MockRepository · traza de evaluación', () => {
 
   it('refleja un umbral editado', async () => {
     const repo = nuevo();
-    await repo.saveParametros([{ clave: UMBRAL, valor: '60' }]);
+    await repo.saveParametros([{ regla: R01, clave: UMBRAL, valor: '60' }]);
     const { zonas } = await repo.getNursery();
 
     for (const z of zonas) {

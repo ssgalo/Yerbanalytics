@@ -34,6 +34,8 @@ export const VISTAS = {
   // y es una vista de Configuración: hacen falta los dos. Editarlo, `configuracion.editar`.
   criterioDiagnostico: { ruta: '/criterio-diagnostico', permisos: ['configuracion.ver', 'diagnosticos.ver'] },
   reglas: { ruta: '/reglas', permisos: ['reglas.ver', 'vivero.ver'] },
+  // El Inspector es parte del motor (comparte el primer segmento): mismos permisos que Motor de reglas.
+  inspector: { ruta: '/reglas/inspector', permisos: ['reglas.ver', 'vivero.ver'] },
   hardware: { ruta: '/hardware', permisos: ['hardware.ver'] },
   topologia: { ruta: '/topologia', permisos: ['topologia.ver'] },
   usuarios: { ruta: '/usuarios', permisos: ['usuarios.gestionar'] },

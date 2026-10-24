@@ -126,7 +126,7 @@ describe('InspectorTab · detalle de un nodo (8.5)', () => {
     expect(within(panel).getByText('riego.umbral-humedad')).toBeTruthy();
   });
 
-  it('"Editar parámetro" lleva a Parámetros con esa regla abierta', async () => {
+  it('"Editar parámetro" avisa qué regla desplegar en Motor de reglas', async () => {
     const { onEditarRegla } = montar({ sectorInicial: 'MZ-1-001' });
     await waitFor(() => expect(nodo('RiegoPorDeficitRule')).toBeTruthy());
     fireEvent.click(nodo('RiegoPorDeficitRule'));

@@ -112,7 +112,7 @@ export interface DataRepository {
   iniciarPlanRustificacion(zonaId: string, plan: NuevoPlanRustificacion): Promise<PlanRustificacion>;
   /** Cancela el plan vigente. Rechaza con `PlanRustificacionError` si no hay ninguno. */
   cancelarPlanRustificacion(zonaId: string): Promise<PlanRustificacion>;
-  /** Catálogo de umbrales del motor de reglas, agrupado por regla (cada parámetro una vez). */
+  /** Catálogo del motor de reglas: las piezas y una copia de parámetro por `(regla, clave)`. */
   getCatalogoReglas(): Promise<CatalogoReglas>;
   /**
    * Aplica cambios al catálogo, todo o nada, y devuelve el catálogo actualizado. `valor: null`
@@ -124,6 +124,12 @@ export interface DataRepository {
    * actualizada. Rechaza con `EstadoReglaError` si falta el motivo o la confirmación de una protección.
    */
   setEstadoRegla(nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo>;
+  /** Le pone un nombre propio a una pieza; `null` o vacío vuelve al de fábrica. Devuelve la pieza actualizada. */
+  renombrarRegla(nombre: string, etiqueta: string | null): Promise<ReglaCatalogo>;
+  /** Apaga una pieza y la saca de la vista (una protección no se elimina: rechaza). Devuelve la pieza actualizada. */
+  eliminarRegla(nombre: string): Promise<ReglaCatalogo>;
+  /** Devuelve a la vista una pieza eliminada, apagada. Devuelve la pieza actualizada. */
+  restaurarRegla(nombre: string): Promise<ReglaCatalogo>;
   /** Esquema base del DAG del motor (topología estática, con los parámetros de cada regla). */
   getRuleSchema(): Promise<DagSchema>;
   /**
