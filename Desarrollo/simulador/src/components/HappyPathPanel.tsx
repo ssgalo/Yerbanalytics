@@ -31,6 +31,8 @@ interface Props {
   sensors: SimulatedSensor[];
   /** Hay una pasada del riel en curso: el happy path espera. */
   pasadaEnCurso: boolean;
+  /** Cambia cada vez que se elige otra fuente de telemetría en la misma página: el panel relee su modo. */
+  sourceVersion?: number;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -56,7 +58,7 @@ function loadSource(): DiagnosisSource {
   }
 }
 
-export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
+export function HappyPathPanel({ sectors, sensors, pasadaEnCurso, sourceVersion = 0 }: Props) {
   const [mode, setMode] = useState<HappyPathMode | null>(null);
   const [modeError, setModeError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -89,7 +91,7 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
 
   useEffect(() => {
     void loadMode();
-  }, [loadMode]);
+  }, [loadMode, sourceVersion]);
 
   const target = mode ? pickTarget(sectors, sensors, mode) : null;
   const noTarget = mode !== null && target === null;

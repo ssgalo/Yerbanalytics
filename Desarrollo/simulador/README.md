@@ -63,8 +63,9 @@ simulador (punto ámbar, con el motivo).
   un modo "sin pronóstico") y arma las condiciones para que una regla dispare en el siguiente pulso
   (*Automatización*). Ver "Cómo agregar el escenario de una regla".
 - **Fuente de telemetría** — con el backend en modo demo, **toda** la telemetría del simulador sale por
-  `nursery/demo/zone/{id}/telemetry` (tópico aparte del ESP32, sin carrera) y un interruptor en *Telemetría*
-  ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend. Los comandos a los
+  `nursery/demo/zone/{id}/telemetry` (tópico aparte del ESP32, sin carrera) y un interruptor al principio de la pestaña
+  *Demo Expo* ("Telemetría que usa el backend: ESP32 real / Simulador") elige cuál lee el backend; al cambiarlo, el
+  happy path de la misma pestaña relee su modo. Los comandos a los
   actuadores siguen en los tópicos del ESP32. Sin modo demo publica en el tópico regular, como siempre.
 - **Happy path de la demo** (pestaña *Demo Expo*, junto a la pasada del riel y las secuencias) — un botón que evalúa
   riego, insumo y mediasombra en **un solo pulso con motor**, con las tres reglas como están, sobre el primer sector de la primera macro-zona. Con la fuente en **Simulador** saltea la ventana horaria y el límite diario de aplicación y asegura stock en los tanques de la zona (ver «Aplicación de insumos»); **no enciende la dosificación** (`SupplyRule`, que el backend arranca retirada): si está apagada en el vivero avisa «Prendé «Dosificación de insumo» en Motor de reglas…» y saltea sólo ese tramo; con la fuente en **ESP32 real** no toca ninguna regla y sólo avisa lo mismo. No espera que una acción termine: el nodo (el ESP32 o el simulador) serializa las cargas y el motor puede ordenarlas juntas. La tarjeta muestra, por regla, lo que dijo la traza y el avance de la acción leído del estado de los actuadores: válvula `En cola` → «en cola», `Regando` → «en curso», `Cerrada` → «hecho»; bomba `En cola` / `Dosificando` / `En espera`. La mediasombra no tiene estado derivado del nodo: queda «ordenada». Con la fuente

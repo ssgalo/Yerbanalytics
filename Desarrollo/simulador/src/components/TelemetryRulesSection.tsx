@@ -3,7 +3,6 @@
 import type { SimulatedSensor, SimulatorStatus, TelemetryInput } from '../types';
 import { ReadNowButton } from './ReadNowButton';
 import { RuleToggles } from './RuleToggles';
-import { TelemetrySourceSwitch } from './TelemetrySourceSwitch';
 import { SensorCard } from './SensorCard';
 import { Section } from './Section';
 import { WeatherSimulation } from './WeatherSimulation';
@@ -51,7 +50,6 @@ export function TelemetryRulesSection({ sensors, demoEnabled }: Props) {
 
       {demoEnabled ? (
         <>
-          <TelemetrySourceSwitch />
           <ReadNowButton demoEnabled={demoEnabled} />
           <WeatherSimulation />
           <RuleToggles />
