@@ -208,9 +208,9 @@ npm run dev          # http://localhost:5173
   colapsa a íconos (botón de la Topbar, borde de la sidebar o Ctrl/⌘ + B; estado en
   `hooks/SidebarContext`, recordado por navegador).
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
-  diagnostics, reglas, historial, demo-expo, placeholder. **Motor de reglas** (`/reglas`) es la vista del motor: pestaña
-  *Reglas* (cada regla con su interruptor operativo y sus parámetros, por objetivo) e *Inspector* (el grafo de reglas con la última
-  evaluación de un sector). **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
+  diagnostics, reglas, historial, demo-expo, placeholder. **Motor de reglas** (`/reglas`) muestra las reglas por objetivo,
+  una fila por regla (interruptor, menú ⋮ para renombrar o eliminar, y sus parámetros al desplegarla) y un interruptor por grupo; el
+  **Inspector del motor** (`/reglas/inspector`, entrada propia en Configuración) es el grafo de reglas con la última evaluación de un sector. **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
   se ve u oculta con un interruptor en Configuración → Preferencias.
 - **Routing**: react-router (`src/router.tsx`).
 
@@ -279,7 +279,7 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 `resources/data.sql` (600 sectores, 6 zonas).
 
 > **Migraciones manuales pendientes.** `ddl-auto=update` agrega columnas pero no migra datos
-> ni borra lo obsoleto, así que hay diecisiete scripts para correr a mano (ninguno se aplica solo; `migracion-captura-imagenes.sql` es DDL de
+> ni borra lo obsoleto, así que hay dieciocho scripts para correr a mano (ninguno se aplica solo; `migracion-captura-imagenes.sql` es DDL de
 > referencia y no hace falta):
 > - `resources/migracion-manual.sql` — el sensado se mudó de `sector` a `zona`.
 > - `resources/migracion-catalogo-parametros.sql` — dos columnas de `configuracion_operativa` pasan
@@ -315,6 +315,9 @@ App **Spring Boot 3.2.4** (Java 17) funcional. Stack: JPA + PostgreSQL, ingesta 
 > - `resources/migracion-umbrales-al-motor.sql` — el seguimiento post-acción pasa al catálogo del motor y se borra
 >   `insumo_dosis_max_24h_ml`. **Correr con el backend nuevo ya arrancado una vez** (crea `parametro_regla` y `regla_estado`);
 >   sin ella no se puede crear una fila operativa nueva (columnas viejas `NOT NULL`).
+> - `resources/migracion-parametros-por-regla.sql` — los parámetros pasan a ser de cada regla: copia cada override de
+>   `parametro_regla` a todas las piezas que leen esa clave (tabla `regla_parametro`) y borra la vieja. Sin ella todas las
+>   copias quedan en fábrica (el arranque deja un `WARN`).
 >
 > Detalle en el README del backend.
 
@@ -330,6 +333,8 @@ cd Desarrollo/backend
 - `GET/PUT /api/rules/parametros`, `GET /api/rules/evaluaciones/{sectorId}`, `GET /api/rules/schema`
   → catálogo de umbrales del motor, traza de la última evaluación y grafo de reglas (ver más abajo).
   `PUT /api/rules/{name}/estado` → interruptor operativo de una regla (`reglas.editar`; apagar una protección pide motivo y confirmación).
+  `PUT /api/rules/{name}/etiqueta`, `DELETE /api/rules/{name}`, `POST /api/rules/{name}/restaurar` → nombre propio y eliminación
+  (apaga y oculta; una protección no se elimina; restaurar la deja apagada). Ver `openspec/changes/rediseno-motor-reglas/`.
 - `POST /api/pasadas`, `GET /api/pasadas/actual`, `POST /api/pasadas/actual/cancelar` → pasada del
   riel (también diaria, a hora configurable: `pasadaDiariaActiva`/`pasadaDiariaHora` en la
   configuración); `GET/PUT /api/configuracion/demo-expo` → interruptor de la pestaña. Ver README del backend.
@@ -382,6 +387,10 @@ cd Desarrollo/backend
 - **Los umbrales de las reglas viven en un único catálogo de parámetros** (`engine/parametros/`),
   editable por `/api/rules/parametros`. Una regla no lleva constantes ni `@Value` para umbrales:
   los declara en `parametros()` y los lee por ahí. `umbral_metrica` sólo define estado y color.
+  **Cada pieza tiene su copia de cada parámetro** (`regla_parametro`, clave `(pieza, clave)`): editar el umbral de una regla no
+  cambia el de otra. La excepción es quien revalida una decisión ajena (el despacho de riego, el servicio del plan de nutrición):
+  declara esas claves en `parametrosDe()` y lee la copia de la regla que decidió. Restricciones cruzadas: sólo dentro de la vista
+  de una pieza (design D-4 de `rediseno-motor-reglas`).
 - **La ingesta valida antes de escribir y el motor sabe qué hardware hay.** `ReadingValidationGuard` (S-03) descarta por
   métrica lo que cae fuera del rango físico del catálogo, con relecturas inmediatas, y `IncompleteHardwareRule` (S-04,
   prioridad 1) aborta la rama a la que le falta un actuador mapeado (`HardwareCoverage`, armada una vez por zona). Efecto a
