@@ -27,7 +27,7 @@
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
-import { registerDiagnosisWithCapture } from '../captureFlow';
+import { registerDiagnosisOnLatestCapture } from '../captureFlow';
 import type { DemoRule, ManualLock, ParametroRegla, SectorRef, SimulatedSensor } from '../types';
 import { buildThresholds, calculateConditions } from '../ruleConditions';
 import { shadeMarked, valveMarked, waitUntil } from '../faultFlow';
@@ -200,6 +200,10 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
     setExecLog([]);
     setExecError(null);
     const log: string[] = [];
+    const pushLog = (line: string) => {
+      log.push(line);
+      setExecLog([...log]);
+    };
 
     try {
       // Step 1: zero cooldowns if needed.
@@ -333,11 +337,14 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
       // Step 4: register the prior diagnosis. It must exist before the pulse: that is the only
       // moment the engine decides, and the rule acts once per new diagnosis.
       if (conditions.diagnostico && diagnosisSector) {
-        const created = await registerDiagnosisWithCapture({
-          ...conditions.diagnostico,
-          sectorId: diagnosisSector.id,
-          zonaId: diagnosisSector.zonaId,
-        });
+        const created = await registerDiagnosisOnLatestCapture(
+          {
+            ...conditions.diagnostico,
+            sectorId: diagnosisSector.id,
+            zonaId: diagnosisSector.zonaId,
+          },
+          pushLog,
+        );
         log.push(
           `✓ Diagnóstico IA ${created.id} registrado en ${diagnosisSector.id} (${conditions.diagnostico.estado}, conf. ${conditions.diagnostico.conf}%)`,
         );
@@ -354,11 +361,14 @@ export function RuleAutomationSection({ sensors, sectors, demoEnabled }: Props) 
           );
         }
         for (const affectedSector of affected) {
-          const created = await registerDiagnosisWithCapture({
-            ...conditions.outbreak.diagnosis,
-            sectorId: affectedSector.id,
-            zonaId: affectedSector.zonaId,
-          });
+          const created = await registerDiagnosisOnLatestCapture(
+            {
+              ...conditions.outbreak.diagnosis,
+              sectorId: affectedSector.id,
+              zonaId: affectedSector.zonaId,
+            },
+            pushLog,
+          );
           log.push(
             `✓ Diagnóstico IA ${created.id} registrado en ${affectedSector.id} (${conditions.outbreak.diagnosis.estado}, conf. ${conditions.outbreak.diagnosis.conf}%)`,
           );

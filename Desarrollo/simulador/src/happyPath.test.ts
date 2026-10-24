@@ -476,3 +476,49 @@ test('simulator: SupplyRule apagada en el vivero no se prende desde la demo: avi
   assert.ok(out.warnings.some((w) => w.includes(message)));
   assert.ok(logs.some((l) => l.includes(message)));
 });
+
+/* ---- diagnosis source: latest camera diagnosis ---- */
+
+const supplyOn = async () => [windowRule([]), rule_('SupplyRule', true, []), rule_('ApplicationPreconditions', true, [])];
+
+test('simulator + LATEST_CAMERA: no diagnosis registered, the sector diagnosis is read and logged', async () => {
+  const lines: string[] = [];
+  const { deps, calls } = fakeDeps({
+    getRules: supplyOn,
+    getSectorDiagnosis: async () => ({ estado: 'Clorosis', conf: 80.8, confidence: 'Alta', id: 'CAP-000055' }),
+    log: (l) => void lines.push(l),
+  });
+  await runHappyPath('SIMULATOR', target, thresholds, deps, { ...opts, diagnosisSource: 'LATEST_CAMERA' });
+  assert.ok(!calls.includes('diagnosis'), 'nothing is registered');
+  assert.ok(calls.includes('pulse1') && calls.includes('weather'), 'reading, weather and pulse stay simulated');
+  assert.ok(lines.includes('✓ Usa el diagnóstico de la cámara: Clorosis (confianza Alta, 80,8 %) · CAP-000055'), lines.join('\n'));
+  assert.ok(lines.some((l) => /una sola vez por pulso/.test(l)));
+  assert.ok(!lines.some((l) => /el insumo no va a actuar/i.test(l)));
+});
+
+test('LATEST_CAMERA without a camera diagnosis: warns and still runs riego and shade', async () => {
+  const lines: string[] = [];
+  const { deps, calls } = fakeDeps({ getRules: supplyOn, getSectorDiagnosis: async () => null, log: (l) => void lines.push(l) });
+  const out = await runHappyPath('SIMULATOR', target, thresholds, deps, { ...opts, diagnosisSource: 'LATEST_CAMERA' });
+  assert.ok(!calls.includes('diagnosis'));
+  assert.ok(calls.includes('pulse1'));
+  assert.ok(lines.includes('✗ No hay diagnóstico de la cámara para S-101: hacé una pasada del riel antes'));
+  assert.equal(out.warnings.length, 1);
+});
+
+test('LATEST_CAMERA with a healthy diagnosis says the supply leg will not act', async () => {
+  const lines: string[] = [];
+  const { deps } = fakeDeps({
+    getRules: supplyOn,
+    getSectorDiagnosis: async () => ({ estado: 'Sano', conf: 80.8, confidence: 'Alta', id: 'CAP-000055' }),
+    log: (l) => void lines.push(l),
+  });
+  await runHappyPath('SIMULATOR', target, thresholds, deps, { ...opts, diagnosisSource: 'LATEST_CAMERA' });
+  assert.ok(lines.some((l) => l.startsWith('⚠ El insumo no va a actuar') && /Sano/.test(l)), lines.join('\n'));
+});
+
+test('default source (SIMULATED) keeps registering the simulated diagnosis', async () => {
+  const { deps, calls } = fakeDeps({ getRules: supplyOn });
+  await runHappyPath('SIMULATOR', target, thresholds, deps, opts);
+  assert.ok(calls.includes('diagnosis'));
+});

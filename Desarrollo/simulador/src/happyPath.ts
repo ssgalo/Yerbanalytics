@@ -23,6 +23,13 @@ import type { DiagnosisRequest } from './captureFlow';
 
 export type HappyPathMode = 'SIMULATOR' | 'REAL_NODE';
 
+/**
+ * De dónde sale el diagnóstico en modo SIMULATOR: `SIMULATED` registra uno inventado (con orden de captura y foto
+ * sintética del propio dispositivo del simulador); `LATEST_CAMERA` no registra nada y usa el último diagnóstico real
+ * del sector (cámara + servicio de inferencia), útil con un teléfono vinculado que se queda con las órdenes.
+ */
+export type DiagnosisSource = 'SIMULATED' | 'LATEST_CAMERA';
+
 /** R-05 (ventana horaria de riego): en modo simulador se saltea para que la demo ande a cualquier hora. */
 export const WINDOW_RULE = 'FueraDeVentanaRiegoRule';
 export const WINDOW_BYPASS_KEY = 'window';
@@ -197,6 +204,38 @@ export function diagnosisPrecheck(
   return { ok: true, reason: `diagnóstico ${diagnosis.estado} (${diagnosis.conf} %)` };
 }
 
+/** «80,8 %»: una cifra decimal y coma, como se lee en el dashboard. */
+function formatPercent(value: number): string {
+  return `${value.toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
+}
+
+/**
+ * Usa el último diagnóstico real del sector en lugar de registrar uno simulado: no crea orden ni foto. Sin diagnóstico
+ * avisa pero no corta (riego y mediasombra no dependen de él); con uno que no dispara la dosificación, lo dice.
+ */
+async function useCameraDiagnosis(
+  sectorId: string,
+  minConfidence: number,
+  deps: HappyPathDeps,
+  warnings: string[],
+): Promise<void> {
+  const diagnosis = await deps.getSectorDiagnosis(sectorId);
+  if (!diagnosis) {
+    warnings.push(`No hay diagnóstico de la cámara para ${sectorId}: hacé una pasada del riel antes.`);
+    deps.log(`✗ No hay diagnóstico de la cámara para ${sectorId}: hacé una pasada del riel antes`);
+    return;
+  }
+  const level = diagnosis.confidence ? `confianza ${diagnosis.confidence}` : 'sin nivel de confianza';
+  const score = diagnosis.conf == null ? '' : `, ${formatPercent(diagnosis.conf)}`;
+  const id = diagnosis.id ? ` · ${diagnosis.id}` : '';
+  deps.log(`✓ Usa el diagnóstico de la cámara: ${diagnosis.estado} (${level}${score})${id}`);
+  deps.log('ℹ Un diagnóstico se usa una sola vez por pulso del motor («diagnóstico nuevo»): si un pulso anterior ya lo consumió, el insumo se omite.');
+  const check = diagnosisPrecheck(diagnosis, minConfidence);
+  if (!check.ok) {
+    deps.log(`⚠ El insumo no va a actuar: ${check.reason}. La cámara no vio nada para tratar.`);
+  }
+}
+
 /* ---------------- avance de cada acción ---------------- */
 
 /**
@@ -268,6 +307,14 @@ export async function readProgress(
 
 /* ---------------- orquestación ---------------- */
 
+/** Diagnóstico vigente de un sector; `confidence` e `id` pueden faltar en un diagnóstico anterior a los niveles. */
+export interface SectorDiagnosis {
+  estado: string;
+  conf: number | null;
+  confidence?: string | null;
+  id?: string | null;
+}
+
 export interface HappyPathDeps {
   zeroCooldowns(): Promise<unknown>;
   getRules(): Promise<DemoRule[]>;
@@ -283,7 +330,7 @@ export interface HappyPathDeps {
   getPinned(zonaId: string): Promise<Record<string, number>>;
   pinReadings(zonaId: string, metrics: Record<string, number>): Promise<unknown>;
   registerDiagnosis(request: DiagnosisRequest): Promise<{ id: string }>;
-  getSectorDiagnosis(sectorId: string): Promise<{ estado: string; conf: number | null } | null>;
+  getSectorDiagnosis(sectorId: string): Promise<SectorDiagnosis | null>;
   triggerPulse(): Promise<void>;
   getTrace(sectorId: string): Promise<EvaluationTrace | null>;
   sleep(ms: number): Promise<void>;
@@ -293,6 +340,8 @@ export interface HappyPathDeps {
 export interface HappyPathOptions {
   tracePollMs?: number;
   maxTracePolls?: number;
+  /** Sólo modo SIMULATOR; por defecto `SIMULATED`. */
+  diagnosisSource?: DiagnosisSource;
 }
 
 export interface HappyPathOutcome {
@@ -393,7 +442,9 @@ export async function runHappyPath(
 
       // El diagnóstico nace justo antes del pulso: así es «nuevo» para SupplyRule y ningún pulso anterior lo consumió.
       const diagnosis = conditions.diagnostico;
-      if (diagnosis) {
+      if (options.diagnosisSource === 'LATEST_CAMERA') {
+        await useCameraDiagnosis(target.sectorId, thresholds.confianzaMinima, deps, warnings);
+      } else if (diagnosis) {
         const created = await deps.registerDiagnosis({ ...diagnosis, sectorId: target.sectorId, zonaId: target.zonaId });
         deps.log(`✓ Diagnóstico IA ${created.id} en ${target.sectorId}: ${diagnosis.estado}, conf. ${diagnosis.conf} %`);
       }

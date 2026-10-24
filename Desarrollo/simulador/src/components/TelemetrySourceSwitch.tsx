@@ -10,7 +10,12 @@ import type { TelemetrySource } from '../api';
  * the selected one and keeps sending the commands to the ESP32's topics, so the real actuators move.
  * Only shown when the backend is in demo mode (the parent decides); lost when the backend restarts.
  */
-export function TelemetrySourceSwitch() {
+interface Props {
+  /** Avisa el cambio de fuente ya guardado, para que quien depende del modo (el happy path) lo relea. */
+  onChange?: (source: TelemetrySource) => void;
+}
+
+export function TelemetrySourceSwitch({ onChange }: Props = {}) {
   const [source, setSource] = useState<TelemetrySource | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +32,9 @@ export function TelemetrySourceSwitch() {
     setSaving(true);
     setError(null);
     try {
-      setSource(await api.setTelemetrySource(next));
+      const saved = await api.setTelemetrySource(next);
+      setSource(saved);
+      onChange?.(saved);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

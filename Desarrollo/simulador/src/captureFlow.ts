@@ -16,11 +16,13 @@ import {
   createDiagnosis,
   emitCaptureOrder,
   enrollDevice,
+  findLatestCaptureId,
   generatePairingCode,
   getCaptureOrder,
   getDeviceToken,
   uploadImage,
 } from './api';
+import { registerOnLatestCapture } from './latestCapture';
 import type { NewDiagnosis, RegisteredDiagnosis } from './types';
 
 const DEFAULT_RAIL_POSITION = 1200;
@@ -85,4 +87,20 @@ export async function registerDiagnosisWithCapture(
   await uploadImage(order.ordenId, await syntheticPhoto(), token);
   const capturaId = await waitForCapture(order.ordenId);
   return createDiagnosis({ ...request, capturaId });
+}
+
+/**
+ * Diagnóstico simulado del happy path: se cuelga de la última foto del sector (no compite con el celular por una orden
+ * nueva). Sólo si el sector no tiene fotos pide una captura.
+ */
+export function registerDiagnosisOnLatestCapture(
+  request: DiagnosisRequest,
+  log: (line: string) => void,
+): Promise<RegisteredDiagnosis> {
+  return registerOnLatestCapture(request, {
+    findLatestCaptureId,
+    createDiagnosis,
+    registerWithNewCapture: registerDiagnosisWithCapture,
+    log,
+  }) as Promise<RegisteredDiagnosis>;
 }

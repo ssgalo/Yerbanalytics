@@ -8,7 +8,7 @@
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
-import { registerDiagnosisWithCapture } from '../captureFlow';
+import { registerDiagnosisOnLatestCapture } from '../captureFlow';
 import { ensureTankStock } from '../tankStock';
 import {
   hintFor,
@@ -19,6 +19,7 @@ import {
   readProgress,
   runHappyPath,
   type ActionProgress,
+  type DiagnosisSource,
   type HappyPathMode,
   type HappyPathOutcome,
   type HappyTarget,
@@ -30,6 +31,8 @@ interface Props {
   sensors: SimulatedSensor[];
   /** Hay una pasada del riel en curso: el happy path espera. */
   pasadaEnCurso: boolean;
+  /** Cambia cada vez que se elige otra fuente de telemetría en la misma página: el panel relee su modo. */
+  sourceVersion?: number;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -44,7 +47,18 @@ const LABELS: Record<ActionKey, string> = { riego: 'Riego', insumo: 'Dosificaci�
 const PROGRESS_POLL_MS = 2_000;
 const PROGRESS_GIVE_UP_MS = 10 * 60_000;
 
-export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
+const SOURCE_KEY = 'happyPath.diagnosisSource';
+
+/** La elección se recuerda por navegador; sin localStorage (o con un valor ajeno) rige el simulado. */
+function loadSource(): DiagnosisSource {
+  try {
+    return window.localStorage.getItem(SOURCE_KEY) === 'LATEST_CAMERA' ? 'LATEST_CAMERA' : 'SIMULATED';
+  } catch {
+    return 'SIMULATED';
+  }
+}
+
+export function HappyPathPanel({ sectors, sensors, pasadaEnCurso, sourceVersion = 0 }: Props) {
   const [mode, setMode] = useState<HappyPathMode | null>(null);
   const [modeError, setModeError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -54,6 +68,16 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
   const [progress, setProgress] = useState<ActionProgress | null>(null);
   const [progressTarget, setProgressTarget] = useState<HappyTarget | null>(null);
   const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
+  const [diagnosisSource, setDiagnosisSource] = useState<DiagnosisSource>(loadSource);
+
+  const chooseSource = (next: DiagnosisSource) => {
+    setDiagnosisSource(next);
+    try {
+      window.localStorage.setItem(SOURCE_KEY, next);
+    } catch {
+      /* sin almacenamiento: la elección vale sólo para esta sesión */
+    }
+  };
 
   const loadMode = useCallback(async () => {
     try {
@@ -67,7 +91,7 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
 
   useEffect(() => {
     void loadMode();
-  }, [loadMode]);
+  }, [loadMode, sourceVersion]);
 
   const target = mode ? pickTarget(sectors, sensors, mode) : null;
   const noTarget = mode !== null && target === null;
@@ -113,13 +137,13 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
           setEmission: api.setAutoEmission,
           getPinned: async (zonaId) => (await api.getPinnedReadings())[zonaId] ?? {},
           pinReadings: api.pinReadings,
-          registerDiagnosis: registerDiagnosisWithCapture,
+          registerDiagnosis: (request) => registerDiagnosisOnLatestCapture(request, push),
           getSectorDiagnosis: api.getSectorDiagnosis,
           triggerPulse: () => api.triggerSensingPulse(true),
           getTrace: api.getEvaluationTrace,
           sleep,
           log: push,
-        });
+        }, { diagnosisSource });
       setOutcome(result);
       // El avance de cada acción se sigue del snapshot (efecto de abajo): la corrida no espera que termine ninguna.
       setProgress(initialProgress(result.readout));
@@ -174,6 +198,36 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
             ? 'No hay un sensor simulado en una zona con sectores: creá uno en Configuración.'
             : 'La topología no tiene sectores.'}
         </p>
+      )}
+      {mode === 'SIMULATOR' && (
+        <div style={{ margin: '8px 0', fontSize: 13 }}>
+          <span>Diagnóstico de IA:</span>
+          <div className="actions" role="group" aria-label="Diagnóstico de IA">
+            <button
+              type="button"
+              className={diagnosisSource === 'LATEST_CAMERA' ? 'primary' : 'btnSecondary'}
+              aria-pressed={diagnosisSource === 'LATEST_CAMERA'}
+              disabled={running}
+              onClick={() => chooseSource('LATEST_CAMERA')}
+            >
+              Última foto de IA
+            </button>
+            <button
+              type="button"
+              className={diagnosisSource === 'SIMULATED' ? 'primary' : 'btnSecondary'}
+              aria-pressed={diagnosisSource === 'SIMULATED'}
+              disabled={running}
+              onClick={() => chooseSource('SIMULATED')}
+            >
+              Diagnóstico simulado
+            </button>
+          </div>
+          <span className="muted" style={{ fontSize: 12.5 }}>
+            {diagnosisSource === 'LATEST_CAMERA'
+              ? 'Usa el diagnóstico real de la última foto del sector (hacé una pasada del riel antes). No registra nada.'
+              : 'El simulador registra un diagnóstico inventado para que el insumo actúe, colgado de la última foto del sector (no pide una orden, así que no compite con el celular). Sólo si el sector no tiene fotos pide una captura nueva, y ahí necesita la cámara del simulador libre.'}
+          </span>
+        </div>
       )}
       <div className="actions">
         <button type="button" className="primary" disabled={disabled} onClick={() => void run()}>
