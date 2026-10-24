@@ -44,6 +44,7 @@ import type {
   TipoSecuencia,
 } from './types';
 import type { HardwareDevice } from './hardwareCoverage';
+import type { SectorDiagnosis } from './happyPath';
 
 /** Proxy prefix. The UI never learns the backend's real address. */
 const BACKEND = '/backend';
@@ -552,12 +553,17 @@ export async function getZoneActuators(zonaId: string): Promise<{ sectorId: stri
     .map((x) => ({ sectorId: x.id, valve: x.actuadores?.valve ?? '', pump: x.actuadores?.pump ?? '' }));
 }
 
-/** Diagnóstico de IA vigente de un sector, tal como lo expone el snapshot del vivero. */
-export async function getSectorDiagnosis(sectorId: string): Promise<{ estado: string; conf: number | null } | null> {
-  const data = await json<{ sectors?: { id: string; diagnosis?: { estado: string; conf: number | null } }[] }>(
-    await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
-    'consultar el diagnóstico del sector',
-  );
+/** Diagnóstico de IA vigente de un sector, tal como lo expone el snapshot del vivero (+ el id de su última tarjeta). */
+export async function getSectorDiagnosis(sectorId: string): Promise<SectorDiagnosis | null> {
+  const data = await json<{
+    sectors?: { id: string; diagnosis?: { estado: string; conf: number | null; confidence?: string | null } }[];
+    diagnoses?: { id: string; sectorId: string; creadoEn?: number | null; imagenUrl?: string | null }[];
+  }>(await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`), 'consultar el diagnóstico del sector');
   const diagnosis = data.sectors?.find((s) => s.id === sectorId)?.diagnosis;
-  return diagnosis ? { estado: diagnosis.estado, conf: diagnosis.conf } : null;
+  if (!diagnosis) return null;
+  // La tarjeta más reciente con foto es la de la captura que originó el diagnóstico vigente.
+  const card = (data.diagnoses ?? [])
+    .filter((d) => d.sectorId === sectorId && d.imagenUrl)
+    .sort((a, b) => (b.creadoEn ?? 0) - (a.creadoEn ?? 0))[0];
+  return { estado: diagnosis.estado, conf: diagnosis.conf, confidence: diagnosis.confidence ?? null, id: card?.id ?? null };
 }

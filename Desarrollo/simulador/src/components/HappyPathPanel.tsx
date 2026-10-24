@@ -19,6 +19,7 @@ import {
   readProgress,
   runHappyPath,
   type ActionProgress,
+  type DiagnosisSource,
   type HappyPathMode,
   type HappyPathOutcome,
   type HappyTarget,
@@ -44,6 +45,17 @@ const LABELS: Record<ActionKey, string> = { riego: 'Riego', insumo: 'Dosificaci�
 const PROGRESS_POLL_MS = 2_000;
 const PROGRESS_GIVE_UP_MS = 10 * 60_000;
 
+const SOURCE_KEY = 'happyPath.diagnosisSource';
+
+/** La elección se recuerda por navegador; sin localStorage (o con un valor ajeno) rige el simulado. */
+function loadSource(): DiagnosisSource {
+  try {
+    return window.localStorage.getItem(SOURCE_KEY) === 'LATEST_CAMERA' ? 'LATEST_CAMERA' : 'SIMULATED';
+  } catch {
+    return 'SIMULATED';
+  }
+}
+
 export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
   const [mode, setMode] = useState<HappyPathMode | null>(null);
   const [modeError, setModeError] = useState<string | null>(null);
@@ -54,6 +66,16 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
   const [progress, setProgress] = useState<ActionProgress | null>(null);
   const [progressTarget, setProgressTarget] = useState<HappyTarget | null>(null);
   const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
+  const [diagnosisSource, setDiagnosisSource] = useState<DiagnosisSource>(loadSource);
+
+  const chooseSource = (next: DiagnosisSource) => {
+    setDiagnosisSource(next);
+    try {
+      window.localStorage.setItem(SOURCE_KEY, next);
+    } catch {
+      /* sin almacenamiento: la elección vale sólo para esta sesión */
+    }
+  };
 
   const loadMode = useCallback(async () => {
     try {
@@ -119,7 +141,7 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
           getTrace: api.getEvaluationTrace,
           sleep,
           log: push,
-        });
+        }, { diagnosisSource });
       setOutcome(result);
       // El avance de cada acción se sigue del snapshot (efecto de abajo): la corrida no espera que termine ninguna.
       setProgress(initialProgress(result.readout));
@@ -174,6 +196,24 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
             ? 'No hay un sensor simulado en una zona con sectores: creá uno en Configuración.'
             : 'La topología no tiene sectores.'}
         </p>
+      )}
+      {mode === 'SIMULATOR' && (
+        <label style={{ display: 'block', margin: '8px 0', fontSize: 13 }}>
+          Diagnóstico:{' '}
+          <select
+            value={diagnosisSource}
+            disabled={running}
+            onChange={(e) => chooseSource(e.target.value as DiagnosisSource)}
+          >
+            <option value="SIMULATED">simulado</option>
+            <option value="LATEST_CAMERA">último de la cámara</option>
+          </select>
+          {diagnosisSource === 'LATEST_CAMERA' && (
+            <span className="muted" style={{ marginLeft: 8, fontSize: 12.5 }}>
+              No registra nada: usa el diagnóstico real del sector (hacé una pasada del riel antes).
+            </span>
+          )}
+        </label>
       )}
       <div className="actions">
         <button type="button" className="primary" disabled={disabled} onClick={() => void run()}>

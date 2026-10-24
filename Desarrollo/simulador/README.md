@@ -72,7 +72,12 @@ simulador (punto ámbar, con el motivo).
   IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
   el diagnóstico de una pasada del riel previa, y avisa si no hay uno utilizable. Al final lee la traza del Inspector y
-  muestra, por regla, si actuó y por qué. Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING + APPLICATION_PRECONDITIONS.
+  muestra, por regla, si actuó y por qué. En modo **Simulador** el selector «Diagnóstico: simulado / último de la
+  cámara» (se recuerda por navegador) permite no inventar el diagnóstico: con «último de la cámara» no crea orden ni
+  foto —útil con un teléfono real vinculado, que se queda con las órdenes y rechaza la subida sintética—, lee el
+  diagnóstico vigente del sector (el de la última pasada del riel), lo muestra y avisa si el insumo no va a actuar porque
+  no hay nada para tratar; sin diagnóstico avisa y sigue con riego y mediasombra. Un diagnóstico se usa una vez por pulso.
+  Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING + APPLICATION_PRECONDITIONS.
 - **Abrir / cerrar mediasombra** (pestaña *Demo Expo*, tarjeta de *Secuencias*) — dos botones de un clic y una sola
   acción: *Abrir* enrolla (`targetPct` 100) y *Cerrar* despliega (`targetPct` 0). Pasan por la API de secuencias del
   backend (`MEDIASOMBRA_ABRIR` / `MEDIASOMBRA_CERRAR`), no por un publish directo, así el seguimiento de comandos y el
