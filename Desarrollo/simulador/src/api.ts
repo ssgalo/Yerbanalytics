@@ -44,6 +44,9 @@ import type {
   TipoSecuencia,
 } from './types';
 import type { HardwareDevice } from './hardwareCoverage';
+import type { SectorDiagnosis } from './happyPath';
+import { captureIdOf } from './captureId';
+import { pickLatestCaptureId, type CardRef, type OrderRef } from './latestCapture';
 
 /** Proxy prefix. The UI never learns the backend's real address. */
 const BACKEND = '/backend';
@@ -552,12 +555,43 @@ export async function getZoneActuators(zonaId: string): Promise<{ sectorId: stri
     .map((x) => ({ sectorId: x.id, valve: x.actuadores?.valve ?? '', pump: x.actuadores?.pump ?? '' }));
 }
 
-/** Diagnóstico de IA vigente de un sector, tal como lo expone el snapshot del vivero. */
-export async function getSectorDiagnosis(sectorId: string): Promise<{ estado: string; conf: number | null } | null> {
-  const data = await json<{ sectors?: { id: string; diagnosis?: { estado: string; conf: number | null } }[] }>(
-    await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
-    'consultar el diagnóstico del sector',
-  );
+/** Diagnóstico de IA vigente de un sector, tal como lo expone el snapshot del vivero (+ el id de su última tarjeta). */
+export async function getSectorDiagnosis(sectorId: string): Promise<SectorDiagnosis | null> {
+  const data = await json<{
+    sectors?: { id: string; diagnosis?: { estado: string; conf: number | null; confidence?: string | null } }[];
+    diagnoses?: {
+      id: string;
+      sectorId: string;
+      creadoEn?: number | null;
+      capturaId?: string | null;
+      imagenUrl?: string | null;
+    }[];
+  }>(await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`), 'consultar el diagnóstico del sector');
   const diagnosis = data.sectors?.find((s) => s.id === sectorId)?.diagnosis;
-  return diagnosis ? { estado: diagnosis.estado, conf: diagnosis.conf } : null;
+  if (!diagnosis) return null;
+  // La tarjeta más reciente con foto es la de la captura que originó el diagnóstico vigente.
+  const card = (data.diagnoses ?? [])
+    .filter((d) => d.sectorId === sectorId && d.imagenUrl)
+    .sort((a, b) => (b.creadoEn ?? 0) - (a.creadoEn ?? 0))[0];
+  return {
+    estado: diagnosis.estado,
+    conf: diagnosis.conf,
+    confidence: diagnosis.confidence ?? null,
+    id: captureIdOf(card),
+  };
+}
+
+/** Última captura archivada de un sector: sus órdenes recientes y, si no alcanzan, las fotos de sus diagnósticos. */
+export async function findLatestCaptureId(sectorId: string): Promise<string | null> {
+  const orders = await json<OrderRef[]>(
+    await fetch(`${BACKEND}/api/capturas/ordenes?t=${Date.now()}`),
+    'consultar las órdenes de captura',
+  );
+  const fromOrders = pickLatestCaptureId(orders, [], sectorId);
+  if (fromOrders) return fromOrders;
+  const data = await json<{ diagnoses?: CardRef[] }>(
+    await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
+    'consultar las fotos del sector',
+  );
+  return pickLatestCaptureId([], data.diagnoses ?? [], sectorId);
 }

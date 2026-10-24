@@ -23,6 +23,10 @@ public class DemoTelemetryMqttConfig {
     @Value("${yerbanalytics.mqtt.client-id}")
     private String clientId;
 
+    /** Mismo interruptor que {@code MqttConfig}: apagado, ningún adaptador arranca (tests). */
+    @Value("${yerbanalytics.mqtt.enabled:true}")
+    private boolean enabled;
+
     @Bean
     public MqttPahoMessageDrivenChannelAdapter demoInboundAdapter(
             MqttPahoClientFactory factory, @Qualifier("mqttInputChannel") MessageChannel mqttInputChannel) {
@@ -42,6 +46,7 @@ public class DemoTelemetryMqttConfig {
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(1);
+        adapter.setAutoStartup(enabled);
         adapter.setOutputChannel(output);
         return adapter;
     }
