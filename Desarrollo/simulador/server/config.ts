@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseNodeAcks } from './nodeAcks.ts';
 
 /** Simulator project root (one level above `server/`). */
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -49,6 +50,9 @@ function int(key: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+const nodeAcks = parseNodeAcks(process.env.SIM_NODE_ACKS);
+if (nodeAcks.warning) console.warn(`[simulator] ${nodeAcks.warning}`);
+
 export const config = {
   port: int('SIMULATOR_PORT', 5180),
   /** Nursery backend. No trailing slash, so routes can be concatenated safely. */
@@ -65,6 +69,11 @@ export const config = {
    * MAX_CARGAS_SIMULTANEAS in the firmware's config.h (add-cola-actuadores-nodo). 1 = what the prototype's power
    * supply can take.
    */
+  /**
+   * Whether the simulated node answers actuator commands with acks. Turn it off when a real ESP32 serves the same
+   * zone: both would answer and the backend keeps the first final ack.
+   */
+  nodeAcks: nodeAcks.enabled,
   nodeMaxLoads: int('SIM_NODE_MAX_LOADS', 1),
   mqttUrl: str('MQTT_URL', 'mqtt://localhost:1883'),
   mqttClientId: str('MQTT_CLIENT_ID', 'yerbanalytics-simulator'),
