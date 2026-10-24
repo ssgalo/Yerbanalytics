@@ -34,6 +34,7 @@ import { demoMode } from './demo-mode.ts';
 import { answerReadNow } from './emission.ts';
 import { SimulatedNodes } from './nodeQueue.ts';
 import { listSensors } from './store.ts';
+import { shouldAnswerAsNode } from './nodeAcks.ts';
 
 /** Wildcard topic for all sector command messages. Mirrors contrato.h :: contratoTopicComando. */
 const COMMAND_TOPIC_WILDCARD = 'nursery/zone/+/sector/+/command';
@@ -79,6 +80,12 @@ export function connect(): void {
     connectTimeout: 5000,
     clean: true,
   });
+
+  console.log(
+    config.nodeAcks
+      ? '[simulator] nodo simulado: ACK de actuadores encendidos (SIM_NODE_ACKS=on) — el simulador contesta los comandos de sus zonas'
+      : '[simulator] nodo simulado: ACK de actuadores apagados (SIM_NODE_ACKS=off) — los comandos los contesta el hardware real',
+  );
 
   client.on('connect', () => {
     lastError = null;
@@ -163,7 +170,7 @@ function handleZoneCommand(topic: string, message: Buffer): void {
         (payload.parametros ? ' params=' + JSON.stringify(payload.parametros) : '') +
         ` commandId=${payload.commandId ?? '?'}`,
     );
-    if (listSensors().some((s) => s.zonaId === target.zonaId)) {
+    if (answersAsNode(target.zonaId)) {
       simulatedNodes.receive(target.zonaId, '', payload);
     }
     return;
@@ -176,6 +183,14 @@ function handleZoneCommand(topic: string, message: Buffer): void {
   void answerReadNow(target.zonaId);
 }
 
+/** Whether the simulated node answers this zone's actuator commands (SIM_NODE_ACKS on and a simulated sensor there). */
+function answersAsNode(zonaId: string): boolean {
+  return shouldAnswerAsNode({
+    acksEnabled: config.nodeAcks,
+    zoneHasSimulatedSensor: listSensors().some((s) => s.zonaId === zonaId),
+  });
+}
+
 /**
  * Hands the command to the simulated node of its macro-zone, which queues loads like the firmware does and emits
  * the intermediate and final acks (add-cola-actuadores-nodo). Only for macro-zones with a simulated sensor: a
@@ -183,7 +198,7 @@ function handleZoneCommand(topic: string, message: Buffer): void {
  */
 function scheduleAck(topic: string, command: ActuatorCommand): void {
   const target = parseCommandTopic(topic);
-  if (!target || !listSensors().some((s) => s.zonaId === target.zonaId)) return;
+  if (!target || !answersAsNode(target.zonaId)) return;
   simulatedNodes.receive(target.zonaId, target.sectorId, command);
 }
 

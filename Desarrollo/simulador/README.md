@@ -114,6 +114,13 @@ comandos de otras zonas son de un nodo real y sólo se loguean. Las reglas de ca
 (`nursery/zone/{zona}/command`, con `"actuador":"shade"`, el mismo tópico del `LEER_AHORA`) y el simulador contesta el ack
 por `nursery/zone/{zona}/ack`. Abrir y cerrar la malla desde *Demo Expo* (secuencias) funciona igual que antes.
 
+**Nodo simulado con hardware real (`SIM_NODE_ACKS`).** Por defecto (`on`) el simulador contesta con ACK los comandos de
+actuadores de las zonas que simula. Si un ESP32 real atiende la misma zona (Demo Expo con hardware), ponelo en `off`: si no
+contestan los dos y el backend toma el primer ACK final por `commandId`, de modo que un `SUCCESS` simulado puede cerrar un
+paso de secuencia o una dosis con el actuador real todavía en movimiento, y un `ERROR` real posterior se descarta. Con `off`
+no se publica ningún ACK ni se encola ninguna carga (sectores ni `shade SET`); la telemetría y `LEER_AHORA` no cambian. El
+arranque loguea qué valor rige.
+
 **Cola de cargas del nodo.** El simulador se comporta como el firmware (`actuacion/cola_cargas`): corre a lo sumo
 `SIM_NODE_MAX_LOADS` cargas a la vez (riego de un sector, insumo de un sector, movimiento de la mediasombra; por
 defecto **1**, lo que aguanta la fuente del prototipo) y encola el resto en orden de llegada. Con la cola mandan los
