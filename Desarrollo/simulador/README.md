@@ -72,8 +72,8 @@ simulador (punto ámbar, con el motivo).
   IA nuevo (por el flujo de captura) y UV por encima del umbral; pone los cooldowns en 0 y saltea la ventana horaria
   R-05. Con la fuente en **ESP32 real** no inyecta nada (sólo quita un clima simulado): usa el sensor, el pronóstico y
   el diagnóstico de una pasada del riel previa, y avisa si no hay uno utilizable. Al final lee la traza del Inspector y
-  muestra, por regla, si actuó y por qué. En modo **Simulador** el selector «Diagnóstico: simulado / último de la
-  cámara» (se recuerda por navegador) permite no inventar el diagnóstico: con «último de la cámara» no crea orden ni
+  muestra, por regla, si actuó y por qué. En modo **Simulador** el toggle «Diagnóstico de IA: Última foto de IA /
+  Diagnóstico simulado» (se recuerda por navegador) permite no inventar el diagnóstico: con «Última foto de IA» no crea orden ni
   foto —útil con un teléfono real vinculado, que se queda con las órdenes y rechaza la subida sintética—, lee el
   diagnóstico vigente del sector (el de la última pasada del riel), lo muestra y avisa si el insumo no va a actuar porque
   no hay nada para tratar; sin diagnóstico avisa y sigue con riego y mediasombra. Un diagnóstico se usa una vez por pulso.

@@ -198,22 +198,34 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso }: Props) {
         </p>
       )}
       {mode === 'SIMULATOR' && (
-        <label style={{ display: 'block', margin: '8px 0', fontSize: 13 }}>
-          Diagnóstico:{' '}
-          <select
-            value={diagnosisSource}
-            disabled={running}
-            onChange={(e) => chooseSource(e.target.value as DiagnosisSource)}
-          >
-            <option value="SIMULATED">simulado</option>
-            <option value="LATEST_CAMERA">último de la cámara</option>
-          </select>
-          {diagnosisSource === 'LATEST_CAMERA' && (
-            <span className="muted" style={{ marginLeft: 8, fontSize: 12.5 }}>
-              No registra nada: usa el diagnóstico real del sector (hacé una pasada del riel antes).
-            </span>
-          )}
-        </label>
+        <div style={{ margin: '8px 0', fontSize: 13 }}>
+          <span>Diagnóstico de IA:</span>
+          <div className="actions" role="group" aria-label="Diagnóstico de IA">
+            <button
+              type="button"
+              className={diagnosisSource === 'LATEST_CAMERA' ? 'primary' : 'btnSecondary'}
+              aria-pressed={diagnosisSource === 'LATEST_CAMERA'}
+              disabled={running}
+              onClick={() => chooseSource('LATEST_CAMERA')}
+            >
+              Última foto de IA
+            </button>
+            <button
+              type="button"
+              className={diagnosisSource === 'SIMULATED' ? 'primary' : 'btnSecondary'}
+              aria-pressed={diagnosisSource === 'SIMULATED'}
+              disabled={running}
+              onClick={() => chooseSource('SIMULATED')}
+            >
+              Diagnóstico simulado
+            </button>
+          </div>
+          <span className="muted" style={{ fontSize: 12.5 }}>
+            {diagnosisSource === 'LATEST_CAMERA'
+              ? 'Usa el diagnóstico real de la última foto del sector (hacé una pasada del riel antes). No registra nada.'
+              : 'El simulador registra un diagnóstico inventado para que el insumo actúe. Necesita la cámara del simulador: con el celular conectado, la orden la toma el celular.'}
+          </span>
+        </div>
       )}
       <div className="actions">
         <button type="button" className="primary" disabled={disabled} onClick={() => void run()}>
