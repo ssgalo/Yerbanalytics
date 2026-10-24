@@ -46,6 +46,7 @@ import type {
 import type { HardwareDevice } from './hardwareCoverage';
 import type { SectorDiagnosis } from './happyPath';
 import { captureIdOf } from './captureId';
+import { pickLatestCaptureId, type CardRef, type OrderRef } from './latestCapture';
 
 /** Proxy prefix. The UI never learns the backend's real address. */
 const BACKEND = '/backend';
@@ -578,4 +579,19 @@ export async function getSectorDiagnosis(sectorId: string): Promise<SectorDiagno
     confidence: diagnosis.confidence ?? null,
     id: captureIdOf(card),
   };
+}
+
+/** Última captura archivada de un sector: sus órdenes recientes y, si no alcanzan, las fotos de sus diagnósticos. */
+export async function findLatestCaptureId(sectorId: string): Promise<string | null> {
+  const orders = await json<OrderRef[]>(
+    await fetch(`${BACKEND}/api/capturas/ordenes?t=${Date.now()}`),
+    'consultar las órdenes de captura',
+  );
+  const fromOrders = pickLatestCaptureId(orders, [], sectorId);
+  if (fromOrders) return fromOrders;
+  const data = await json<{ diagnoses?: CardRef[] }>(
+    await fetch(`${BACKEND}/api/nursery?t=${Date.now()}`),
+    'consultar las fotos del sector',
+  );
+  return pickLatestCaptureId([], data.diagnoses ?? [], sectorId);
 }

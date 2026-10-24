@@ -8,7 +8,7 @@
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
-import { registerDiagnosisWithCapture } from '../captureFlow';
+import { registerDiagnosisOnLatestCapture } from '../captureFlow';
 import { ensureTankStock } from '../tankStock';
 import {
   hintFor,
@@ -137,7 +137,7 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso, sourceVersion 
           setEmission: api.setAutoEmission,
           getPinned: async (zonaId) => (await api.getPinnedReadings())[zonaId] ?? {},
           pinReadings: api.pinReadings,
-          registerDiagnosis: registerDiagnosisWithCapture,
+          registerDiagnosis: (request) => registerDiagnosisOnLatestCapture(request, push),
           getSectorDiagnosis: api.getSectorDiagnosis,
           triggerPulse: () => api.triggerSensingPulse(true),
           getTrace: api.getEvaluationTrace,
@@ -225,7 +225,7 @@ export function HappyPathPanel({ sectors, sensors, pasadaEnCurso, sourceVersion 
           <span className="muted" style={{ fontSize: 12.5 }}>
             {diagnosisSource === 'LATEST_CAMERA'
               ? 'Usa el diagnóstico real de la última foto del sector (hacé una pasada del riel antes). No registra nada.'
-              : 'El simulador registra un diagnóstico inventado para que el insumo actúe. Necesita la cámara del simulador: con el celular conectado, la orden la toma el celular.'}
+              : 'El simulador registra un diagnóstico inventado para que el insumo actúe, colgado de la última foto del sector (no pide una orden, así que no compite con el celular). Sólo si el sector no tiene fotos pide una captura nueva, y ahí necesita la cámara del simulador libre.'}
           </span>
         </div>
       )}
