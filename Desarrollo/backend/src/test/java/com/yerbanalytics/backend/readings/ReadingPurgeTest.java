@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.readings;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ReglaTestSupport;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametros;
@@ -38,7 +39,7 @@ class ReadingPurgeTest {
     void setUp() {
         repository = mock(ZoneReadingRepository.class);
         parameters = mock(CatalogoParametrosService.class);
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         purge = new ReadingPurge(repository, parameters, new RelojDePrueba(NOW));
     }
 
@@ -74,7 +75,7 @@ class ReadingPurgeTest {
     void usedBy() {
         var catalog = new CatalogoParametros(List.of(purge));
 
-        assertThat(catalog.usadoPor("readings.retention-days")).containsExactly("ReadingPurge");
+        assertThat(catalog.declarantes("readings.retention-days")).containsExactly("ReadingPurge");
     }
 
     // --------------------------------------------------------- la purga
@@ -100,7 +101,7 @@ class ReadingPurgeTest {
     @Test
     @DisplayName("usa la retención editada en el catálogo")
     void usesTheCurrentRetention() {
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.con(Map.of(ReadingParameters.RETENTION_DAYS, "30")));
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.con(Map.of(ReadingParameters.RETENTION_DAYS, "30"))));
 
         purge.purge();
 

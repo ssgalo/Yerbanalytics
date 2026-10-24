@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -54,7 +53,7 @@ import static org.mockito.Mockito.lenient;
 class CatalogoParametrosServiceTest {
 
     @Mock
-    private ParametroReglaRepository repository;
+    private ReglaParametroRepository repository;
     @Mock
     private HistorialService historialService;
     @Mock
@@ -62,8 +61,29 @@ class CatalogoParametrosServiceTest {
     @Mock
     private ConfiguracionOperativaRepository operativaRepository;
 
-    /** Estado de la "tabla" parametro_regla que simulan los stubs del repositorio. */
-    private final Map<String, ParametroReglaEntity> tabla = new ConcurrentHashMap<>();
+    /**
+     * Estado de la "tabla" regla_parametro que simulan los stubs del repositorio. Las copias de la pieza principal
+     * ({@link #PIEZA}) van por clave sola, para leer los asserts; las de las demás, por {@code pieza/clave}.
+     */
+    private final Map<String, ReglaParametroEntity> tabla = new ConcurrentHashMap<>();
+
+    /** La pieza principal de los tests: la que tiene copia de casi todo. */
+    private static final String PIEZA = "IrrigationRule";
+    /** La otra regla que lee el umbral de riego (con su propia copia). */
+    private static final String OTRA = "WeatherOverrideRule";
+
+    private static String k(String regla, String clave) {
+        return PIEZA.equals(regla) ? clave : regla + "/" + clave;
+    }
+
+    private static ReglaParametroId id(String clave) {
+        return new ReglaParametroId(PIEZA, clave);
+    }
+
+    /** La vista de la pieza principal en el snapshot vigente. */
+    private ParametrosVigentes vista() {
+        return service.vigentes().de(PIEZA);
+    }
 
     /** Fábrica del umbral de riego: 42 hasta la conmutación del bloque 10, 45 después. */
     private static final String F_UMBRAL = ParametrosRiego.UMBRAL_HUMEDAD.fabrica();
@@ -85,58 +105,88 @@ class CatalogoParametrosServiceTest {
 
     @BeforeEach
     void setUp() {
-        List<Rule> reglas = List.of(regla("IrrigationRule", 10, RuleBranch.RIEGO,
-                        ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.LITROS_POR_PUNTO),
-                regla("WeatherOverrideRule", 5, RuleBranch.RIEGO, ParametrosRiego.UMBRAL_HUMEDAD),
+        List<Rule> reglas = List.of(regla(PIEZA, 10, RuleBranch.RIEGO,
+                        ParametrosRiego.UMBRAL_HUMEDAD, ParametrosRiego.LITROS_POR_PUNTO, ParametrosRiego.UMBRAL_CRITICO,
+                        ParametrosRiego.HUMEDAD_OBJETIVO, ParametrosRiego.VENTANA_NORMAL,
+                        ParametrosDiagnostico.CONFIANZA_MINIMA, ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA),
+                regla(OTRA, 5, RuleBranch.RIEGO, ParametrosRiego.UMBRAL_HUMEDAD),
                 regla("ManualLockRule", 1, RuleBranch.GLOBAL));
+        List<ConsumidorParametros> consumidores = new ArrayList<>(reglas);
+        consumidores.add(consumidor(com.yerbanalytics.backend.sensing.PulsoSensadoService.NAME, Map.of(),
+                SensingParameters.RESPONSE_WAIT, SensingParameters.RETRIES, SensingParameters.RETRY_WAIT));
+        // Un ejecutor que revalida con la copia de la otra regla (D-2).
+        consumidores.add(consumidor("Despacho", Map.of(ParametrosRiego.UMBRAL_HUMEDAD, OTRA),
+                ParametrosRiego.SECTORES_SIMULTANEOS));
         catalogo = new CatalogoParametros(
                 CatalogoParametros.definicionesReales(),
                 CatalogoParametros.restriccionesReales(),
-                reglas);
+                consumidores);
         RuleStateRepository estados = org.mockito.Mockito.mock(RuleStateRepository.class);
         ReglasCatalogo piezas = new ReglasCatalogo(new DemoControllableRegistry(new ArrayList<>(reglas)),
                 new OperationalRuleStates(estados, List.of()));
 
         lenient().when(repository.findAll()).thenAnswer(i -> new ArrayList<>(tabla.values()));
-        lenient().when(repository.save(any(ParametroReglaEntity.class))).thenAnswer(i -> {
-            ParametroReglaEntity e = i.getArgument(0);
-            tabla.put(e.getClave(), e);
+        lenient().when(repository.save(any(ReglaParametroEntity.class))).thenAnswer(i -> {
+            ReglaParametroEntity e = i.getArgument(0);
+            tabla.put(k(e.getConsumidor(), e.getClave()), e);
             return e;
         });
-        lenient().doAnswer(i -> tabla.remove(i.<String>getArgument(0))).when(repository).deleteById(anyString());
+        lenient().doAnswer(i -> {
+            ReglaParametroId id = i.getArgument(0);
+            return tabla.remove(k(id.getConsumidor(), id.getClave()));
+        }).when(repository).deleteById(any(ReglaParametroId.class));
 
         service = new CatalogoParametrosService(catalogo, repository, historialService, transactionManager,
                 operativaRepository, piezas);
     }
 
+    private static ConsumidorParametros consumidor(String nombre, Map<DefinicionParametro, String> de,
+                                                   DefinicionParametro... params) {
+        return new ConsumidorParametros() {
+            @Override public String name() { return nombre; }
+            @Override public List<DefinicionParametro> parametros() { return List.of(params); }
+            @Override public Map<DefinicionParametro, String> parametrosDe() { return de; }
+        };
+    }
+
+    /** Override de la pieza principal, salvo los plazos de sensado, que son del pulso. */
     private void override(String clave, String valor) {
-        tabla.put(clave, new ParametroReglaEntity(clave, valor, "Ana", 1L));
+        override(clave.startsWith("sensado.") ? com.yerbanalytics.backend.sensing.PulsoSensadoService.NAME : PIEZA,
+                clave, valor);
+    }
+
+    private void override(String regla, String clave, String valor) {
+        tabla.put(k(regla, clave), new ReglaParametroEntity(regla, clave, valor, "Ana", 1L));
     }
 
     private static CambioParametro cambio(String clave, String valor) {
-        return new CambioParametro(clave, valor);
+        return new CambioParametro(PIEZA, clave, valor);
+    }
+
+    private static CambioParametro cambio(String regla, String clave, String valor) {
+        return new CambioParametro(regla, clave, valor);
     }
 
     // ------------------------------------------------------------------ 2.2
 
     @Test
     void vigentes_sinOverridesDevuelveFabrica() {
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
-        assertThat(service.vigentes().ventana("riego.ventana-normal").canonico()).isEqualTo("06:00-18:00");
+        assertThat(vista().numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
+        assertThat(vista().ventana("riego.ventana-normal").canonico()).isEqualTo("06:00-18:00");
     }
 
     @Test
     void vigentes_conOverrideDevuelveElOverrideYElRestoFabrica() {
         override("riego.umbral-humedad", "50");
 
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(50.0);
-        assertThat(service.vigentes().numero("riego.humedad-objetivo")).isEqualTo(65.0);
+        assertThat(vista().numero("riego.umbral-humedad")).isEqualTo(50.0);
+        assertThat(vista().numero("riego.humedad-objetivo")).isEqualTo(65.0);
     }
 
     @Test
     void vigentes_devuelveElMismoObjetoEnDosLlamadasSeguidas_yLeeLaBaseUnaSolaVez() {
-        ParametrosVigentes a = service.vigentes();
-        ParametrosVigentes b = service.vigentes();
+        ParametrosVigentes a = vista();
+        ParametrosVigentes b = vista();
 
         assertThat(b).isSameAs(a);
         verify(repository, org.mockito.Mockito.times(1)).findAll();
@@ -148,7 +198,7 @@ class CatalogoParametrosServiceTest {
         override("riego.umbral-humedad", "no-es-un-numero");
         override("riego.humedad-objetivo", "70");
 
-        ParametrosVigentes v = service.vigentes();
+        ParametrosVigentes v = vista();
 
         assertThat(v.numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
         assertThat(v.numero("riego.humedad-objetivo")).isEqualTo(70.0);
@@ -160,11 +210,11 @@ class CatalogoParametrosServiceTest {
     void guardar_aplicaElCambioAudita_yDevuelveElCatalogoActualizado() {
         CatalogoReglasDto out = service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
 
-        ParametroReglaEntity e = tabla.get("riego.umbral-humedad");
+        ReglaParametroEntity e = tabla.get("riego.umbral-humedad");
         assertThat(e.getValor()).isEqualTo("50");
         assertThat(e.getUpdatedBy()).isEqualTo("Ana");
         assertThat(e.getUpdatedTs()).isNotNull().isPositive();
-        ParametroDto p = out.parametros().stream().filter(x -> x.clave().equals("riego.umbral-humedad")).findFirst().orElseThrow();
+        ParametroDto p = copia(out, PIEZA, "riego.umbral-humedad");
         assertThat(p.valor()).isEqualTo("50");
         assertThat(p.modificado()).isTrue();
         assertThat(p.updatedBy()).isEqualTo("Ana");
@@ -184,7 +234,7 @@ class CatalogoParametrosServiceTest {
     void vigentes_unaConfianzaMinimaEditadaPorElAgronomoNoSePisaConLaFabricaNueva() {
         override("diagnostico.confianza-minima", "80");
 
-        assertThat(service.vigentes().numero("diagnostico.confianza-minima")).isEqualTo(80.0);
+        assertThat(vista().numero("diagnostico.confianza-minima")).isEqualTo(80.0);
     }
 
     @Test
@@ -208,7 +258,7 @@ class CatalogoParametrosServiceTest {
 
         assertThat(tabla).containsOnlyKeys("riego.humedad-objetivo");
         verify(repository, never()).save(any());
-        verify(repository, never()).deleteById(anyString());
+        verify(repository, never()).deleteById(any(ReglaParametroId.class));
         verifyNoInteractions(historialService);
     }
 
@@ -216,7 +266,7 @@ class CatalogoParametrosServiceTest {
     void guardar_restriccionCruzadaSeEvaluaSobreElConjuntoResultante() {
         // Subir el objetivo junto con el umbral es válido aunque el umbral solo superaría al objetivo vigente (65).
         service.guardar(List.of(cambio("riego.umbral-humedad", "60"), cambio("riego.humedad-objetivo", "75")), "Ana");
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(60.0);
+        assertThat(vista().numero("riego.umbral-humedad")).isEqualTo(60.0);
 
         // Pero el umbral solo, por encima del objetivo, no.
         tabla.clear();
@@ -247,13 +297,13 @@ class CatalogoParametrosServiceTest {
     @Test
     void guardar_valorNullBorraElOverride() {
         override("riego.umbral-humedad", "50");
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(50.0);
+        assertThat(vista().numero("riego.umbral-humedad")).isEqualTo(50.0);
 
         service.guardar(List.of(cambio("riego.umbral-humedad", null)), "Ana");
 
         assertThat(tabla).doesNotContainKey("riego.umbral-humedad");
-        verify(repository).deleteById("riego.umbral-humedad");
-        assertThat(service.vigentes().numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
+        verify(repository).deleteById(id("riego.umbral-humedad"));
+        assertThat(vista().numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
     }
 
     @Test
@@ -267,10 +317,10 @@ class CatalogoParametrosServiceTest {
 
     @Test
     void guardar_invalidaElCache() {
-        ParametrosVigentes antes = service.vigentes();
+        ParametrosVigentes antes = vista();
 
         service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
-        ParametrosVigentes despues = service.vigentes();
+        ParametrosVigentes despues = vista();
 
         assertThat(antes.numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
         assertThat(despues).isNotSameAs(antes);
@@ -298,13 +348,13 @@ class CatalogoParametrosServiceTest {
         service.guardar(List.of(cambio("riego.umbral-humedad", null), cambio("riego.humedad-objetivo", "65")), "Ana");
 
         verify(repository, never()).save(any());
-        verify(repository, never()).deleteById(anyString());
+        verify(repository, never()).deleteById(any(ReglaParametroId.class));
         verifyNoInteractions(historialService);
     }
 
     @Test
     void guardar_loteVacioONuloDevuelveElCatalogoSinTocarNada() {
-        int total = catalogo.definiciones().size();
+        int total = catalogo.consumidores().stream().mapToInt(c -> c.parametros().size()).sum();
         assertThat(service.guardar(List.of(), "Ana").parametros()).hasSize(total);
         assertThat(service.guardar(null, "Ana").parametros()).hasSize(total);
         verifyNoInteractions(historialService);
@@ -313,14 +363,14 @@ class CatalogoParametrosServiceTest {
     // ------------------------------------------------------------------ catálogo (DTO)
 
     @Test
-    void catalogo_listaCadaParametroUnaVezConSuUsadoPor_yLasReglasPorPrioridad() {
+    void catalogo_listaUnaEntradaPorCopia_yLasReglasPorPrioridad() {
         override("riego.umbral-humedad", "50");
 
         CatalogoReglasDto dto = service.catalogo();
 
-        assertThat(dto.parametros()).extracting(ParametroDto::clave).doesNotHaveDuplicates().hasSize(catalogo.definiciones().size());
-        ParametroDto umbral = dto.parametros().stream().filter(p -> p.clave().equals("riego.umbral-humedad")).findFirst().orElseThrow();
-        assertThat(umbral.usadoPor()).containsExactly("WeatherOverrideRule", "IrrigationRule");
+        assertThat(dto.parametros()).extracting(p -> p.regla() + "/" + p.clave()).doesNotHaveDuplicates()
+                .hasSize(catalogo.consumidores().stream().mapToInt(c -> c.parametros().size()).sum());
+        ParametroDto umbral = copia(dto, PIEZA, "riego.umbral-humedad");
         assertThat(umbral.fabrica()).isEqualTo(F_UMBRAL);
         assertThat(umbral.valor()).isEqualTo("50");
         assertThat(umbral.familia()).isEqualTo("RIEGO");
@@ -329,16 +379,112 @@ class CatalogoParametrosServiceTest {
         assertThat(umbral.max()).isEqualTo(60.0);
         assertThat(umbral.modificado()).isTrue();
 
-        ParametroDto sinUso = dto.parametros().stream().filter(p -> p.clave().equals("riego.lluvia-mm")).findFirst().orElseThrow();
-        assertThat(sinUso.usadoPor()).isEmpty();
-        assertThat(sinUso.modificado()).isFalse();
-        assertThat(sinUso.updatedBy()).isNull();
+        // La copia de la otra regla sigue en fábrica: no hay herencia.
+        ParametroDto otra = copia(dto, OTRA, "riego.umbral-humedad");
+        assertThat(otra.valor()).isEqualTo(F_UMBRAL);
+        assertThat(otra.modificado()).isFalse();
+        assertThat(otra.updatedBy()).isNull();
 
-        assertThat(dto.reglas()).extracting("id").containsExactly("ManualLockRule", "WeatherOverrideRule", "IrrigationRule");
+        // Un parámetro que nadie declara no tiene copias; lo que se lee de otra pieza (D-2) tampoco es copia propia.
+        assertThat(dto.parametros()).noneMatch(p -> p.clave().equals("riego.lluvia-mm"));
+        assertThat(dto.parametros()).filteredOn(p -> p.regla().equals("Despacho")).extracting(ParametroDto::clave)
+                .containsExactly("riego.sectores-simultaneos");
+
+        assertThat(dto.reglas()).extracting("id").containsExactly("ManualLockRule", OTRA, PIEZA);
         assertThat(dto.reglas().get(1).parametros()).containsExactly("riego.umbral-humedad");
         assertThat(dto.reglas().get(0).parametros()).isEmpty();
         assertThat(dto.reglas().get(2).rama()).isEqualTo("RIEGO");
         assertThat(dto.reglas().get(2).prioridad()).isEqualTo(10);
+    }
+
+    private static ParametroDto copia(CatalogoReglasDto dto, String regla, String clave) {
+        return dto.parametros().stream().filter(p -> p.regla().equals(regla) && p.clave().equals(clave))
+                .findFirst().orElseThrow();
+    }
+
+    // ------------------------------------------------------------------ copias por pieza (rediseno-motor-reglas)
+
+    @Test
+    void guardar_editarLaCopiaDeUnaReglaNoCambiaLaDeOtra() {
+        service.guardar(List.of(cambio(PIEZA, "riego.umbral-humedad", "50")), "Ana");
+
+        assertThat(service.vigentes().de(PIEZA).numero("riego.umbral-humedad")).isEqualTo(50.0);
+        assertThat(service.vigentes().de(OTRA).numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
+        assertThat(tabla).containsOnlyKeys("riego.umbral-humedad");
+        assertThat(tabla.get("riego.umbral-humedad").getConsumidor()).isEqualTo(PIEZA);
+    }
+
+    @Test
+    void guardar_lasDosCopiasDeUnaClaveSeEditanEnElMismoLote() {
+        service.guardar(List.of(cambio(PIEZA, "riego.umbral-humedad", "50"),
+                cambio(OTRA, "riego.umbral-humedad", "40")), "Ana");
+
+        assertThat(service.vigentes().de(PIEZA).numero("riego.umbral-humedad")).isEqualTo(50.0);
+        assertThat(service.vigentes().de(OTRA).numero("riego.umbral-humedad")).isEqualTo(40.0);
+        ArgumentCaptor<String> detalle = ArgumentCaptor.forClass(String.class);
+        verify(historialService).registrarConfiguracion(org.mockito.ArgumentMatchers.eq("Ana"), detalle.capture());
+        assertThat(detalle.getValue()).contains("riego.umbral-humedad (" + PIEZA + ")")
+                .contains("riego.umbral-humedad (" + OTRA + ")");
+    }
+
+    @Test
+    void guardar_unaClaveQueLaPiezaNoDeclaraSeRechazaYNoGuardaNadaDelLote() {
+        assertThatThrownBy(() -> service.guardar(List.of(cambio(PIEZA, "riego.umbral-humedad", "50"),
+                cambio(OTRA, "riego.litros-por-punto", "0.3")), "Ana"))
+                .isInstanceOfSatisfying(ParametrosInvalidosException.class, ex ->
+                        assertThat(ex.getErrores()).singleElement().satisfies(e -> {
+                            assertThat(e.regla()).isEqualTo(OTRA);
+                            assertThat(e.clave()).isEqualTo("riego.litros-por-punto");
+                        }));
+        assertThat(tabla).isEmpty();
+        verifyNoInteractions(historialService);
+    }
+
+    @Test
+    void guardar_unaPiezaInexistenteOSinReglaSeRechaza() {
+        assertThatThrownBy(() -> service.guardar(List.of(cambio("NoExiste", "riego.umbral-humedad", "50"),
+                cambio(null, "riego.umbral-humedad", "50")), "Ana"))
+                .isInstanceOfSatisfying(ParametrosInvalidosException.class, ex ->
+                        assertThat(ex.getErrores()).extracting(ErrorParametro::regla).containsExactly("NoExiste", null));
+        assertThat(tabla).isEmpty();
+    }
+
+    @Test
+    void guardar_unaClaveQueElEjecutorLeeDeOtraPiezaNoSeEditaEnElEjecutor() {
+        assertThatThrownBy(() -> service.guardar(List.of(cambio("Despacho", "riego.umbral-humedad", "50")), "Ana"))
+                .isInstanceOf(ParametrosInvalidosException.class);
+    }
+
+    @Test
+    void vigentes_elEjecutorLeeLaCopiaDeLaPiezaDuena() {
+        override(OTRA, "riego.umbral-humedad", "40");
+        override(PIEZA, "riego.umbral-humedad", "55");
+
+        assertThat(service.vigentes().de("Despacho").numero("riego.umbral-humedad")).isEqualTo(40.0);
+    }
+
+    @Test
+    void vigentes_unOverrideDeUnaPiezaQueNoDeclaraLaClaveSeIgnora() {
+        override(OTRA, "riego.litros-por-punto", "0.3");
+
+        assertThat(service.vigentes().de(OTRA).numero("riego.litros-por-punto"))
+                .isEqualTo(Double.parseDouble(ParametrosRiego.LITROS_POR_PUNTO.fabrica()));
+    }
+
+    @Test
+    void vigentes_unaPiezaQueElCatalogoNoConoceVeFabrica() {
+        override("riego.umbral-humedad", "50");
+
+        assertThat(service.vigentes().de("Desconocida").numero("riego.umbral-humedad")).isEqualTo(F_UMBRAL_NUM);
+    }
+
+    @Test
+    void vigentes_laHuellaCambiaConElValorDeCualquierCopia() {
+        String antes = service.vigentes().huella();
+        override(OTRA, "riego.umbral-humedad", "40");
+        service.invalidar();
+
+        assertThat(service.vigentes().huella()).isNotEqualTo(antes);
     }
 
     // ------------------------------------------------------------------ revisión del bloque 1
@@ -349,7 +495,7 @@ class CatalogoParametrosServiceTest {
         AtomicInteger llamadas = new AtomicInteger();
         // Primera carga: toma la foto vieja y, antes de devolverla, "otro hilo" guarda y invalida.
         org.mockito.Mockito.when(repository.findAll()).thenAnswer(i -> {
-            List<ParametroReglaEntity> foto = new ArrayList<>(tabla.values());
+            List<ReglaParametroEntity> foto = new ArrayList<>(tabla.values());
             if (llamadas.getAndIncrement() == 0) {
                 override("riego.umbral-humedad", "55");
                 service.invalidar();
@@ -357,8 +503,8 @@ class CatalogoParametrosServiceTest {
             return foto;
         });
 
-        ParametrosVigentes durante = service.vigentes();
-        ParametrosVigentes despues = service.vigentes();
+        ParametrosVigentes durante = vista();
+        ParametrosVigentes despues = vista();
 
         assertThat(durante.numero("riego.umbral-humedad")).isEqualTo(50.0);
         assertThat(despues.numero("riego.umbral-humedad")).isEqualTo(55.0);
@@ -366,7 +512,7 @@ class CatalogoParametrosServiceTest {
 
     @Test
     void guardar_alCerrarLaTransaccionInvalidaLoQueOtroHiloRepoblo() {
-        ParametrosVigentes previo;
+        ParametrosPorPieza previo;
         TransactionSynchronizationManager.initSynchronization();
         try {
             service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
@@ -431,7 +577,7 @@ class CatalogoParametrosServiceTest {
         service.guardar(List.of(cambio("riego.umbral-humedad", null)), "Ana");
 
         assertThat(tabla).doesNotContainKey("riego.umbral-humedad");
-        verify(repository).deleteById("riego.umbral-humedad");
+        verify(repository).deleteById(id("riego.umbral-humedad"));
     }
 
     @Test
@@ -441,7 +587,7 @@ class CatalogoParametrosServiceTest {
         service.guardar(List.of(cambio("riego.umbral-humedad", "50")), "Ana");
 
         assertThat(tabla).containsKeys("riego.clave-que-ya-no-existe", "riego.umbral-humedad");
-        verify(repository, never()).deleteById("riego.clave-que-ya-no-existe");
+        verify(repository, never()).deleteById(id("riego.clave-que-ya-no-existe"));
     }
 
     @Test
@@ -450,7 +596,7 @@ class CatalogoParametrosServiceTest {
         CountDownLatch liberar = new CountDownLatch(1);
         AtomicInteger lecturas = new AtomicInteger();
         org.mockito.Mockito.when(repository.findAll()).thenAnswer(i -> {
-            List<ParametroReglaEntity> foto = new ArrayList<>(tabla.values());
+            List<ReglaParametroEntity> foto = new ArrayList<>(tabla.values());
             if (lecturas.incrementAndGet() == 1) {
                 primeroAdentro.countDown();
                 liberar.await(5, TimeUnit.SECONDS);
@@ -492,7 +638,7 @@ class CatalogoParametrosServiceTest {
     void vigentes_superponeElIntervaloDelPulsoMasLaVentana() {
         pullInterval(120);
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(7380.0);
     }
 
     @Test
@@ -503,19 +649,19 @@ class CatalogoParametrosServiceTest {
         override("sensado.espera-reintento", "2");
 
         // 240 min + 120 s + 3 reintentos × 2 min (120 s cada uno)
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(240 * 60 + 120 + 3 * 120);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(240 * 60 + 120 + 3 * 120);
     }
 
     @Test
     void vigentes_intervaloNuloSeLeeComo240() {
         pullInterval(null);
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(14580.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(14580.0);
     }
 
     @Test
     void vigentes_sinFilaDeConfiguracionSeLeeComo240() {
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(14580.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(14580.0);
     }
 
     @Test
@@ -523,14 +669,14 @@ class CatalogoParametrosServiceTest {
         pullInterval(60);
         override(STALE_KEY, "200");
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(3780.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(3780.0);
     }
 
     @Test
     void vigentes_intervaloGuardadoFueraDeRangoSeAcota() {
         pullInterval(99999);
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(21780.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(21780.0);
     }
 
     @Test
@@ -538,7 +684,7 @@ class CatalogoParametrosServiceTest {
         pullInterval(120);
 
         ParametroDto dto = service.catalogo().parametros().stream()
-                .filter(p -> p.clave().equals(STALE_KEY)).findFirst().orElseThrow();
+                .filter(p -> p.clave().equals(STALE_KEY) && p.regla().equals(PIEZA)).findFirst().orElseThrow();
 
         assertThat(dto.valor()).isEqualTo("90");
         assertThat(dto.modificado()).isFalse();
@@ -547,14 +693,14 @@ class CatalogoParametrosServiceTest {
     @Test
     void invalidarAlTerminar_makesTheNextReadSeeTheNewInterval() {
         pullInterval(60);
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(3780.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(3780.0);
 
         pullInterval(120);
-        assertThat(service.vigentes().numero(STALE_KEY)).as("cached until invalidated").isEqualTo(3780.0);
+        assertThat(vista().numero(STALE_KEY)).as("cached until invalidated").isEqualTo(3780.0);
 
         service.invalidarAlTerminar();
 
-        assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
+        assertThat(vista().numero(STALE_KEY)).isEqualTo(7380.0);
     }
 
     @Test
@@ -570,7 +716,7 @@ class CatalogoParametrosServiceTest {
                 sync.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
             }
 
-            assertThat(service.vigentes().numero(STALE_KEY)).isEqualTo(7380.0);
+            assertThat(vista().numero(STALE_KEY)).isEqualTo(7380.0);
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }

@@ -768,10 +768,13 @@ export type TipoParametro = 'NUMERO' | 'ENTERO' | 'HORA' | 'VENTANA_HORARIA';
 export type RamaRegla = 'GLOBAL' | 'RIEGO' | 'INSUMO' | 'MEDIASOMBRA' | 'SEGUIMIENTO';
 
 /**
- * Un umbral del catálogo. Existe UNA vez aunque lo usen varias reglas (`usadoPor`).
+ * La copia de un umbral que tiene una pieza: el valor es de `(regla, clave)` y editarlo en una pieza no cambia las
+ * demás. La definición (tipo, rango, unidad, fábrica) es la misma en todas las copias de la clave.
  * `valor` y `fabrica` son strings canónicos por tipo ("42", "0.2", "06:00", "06:00-18:00").
  */
 export interface ParametroRegla {
+  /** Pieza dueña de la copia: el id de una regla del catálogo o el de un servicio de ejecución (`DespachoRiego`). */
+  regla: string;
   clave: string;
   etiqueta: string;
   descripcion: string;
@@ -787,8 +790,6 @@ export interface ParametroRegla {
   refSpec: string;
   /** Distinto del valor de fábrica. */
   modificado: boolean;
-  /** Ids de las reglas que lo declaran. Derivado en el servidor. */
-  usadoPor: string[];
   updatedBy: string | null;
   /** Epoch ms de la última edición. */
   updatedTs: number | null;
@@ -810,11 +811,14 @@ export interface UltimoCambioRegla {
 
 /**
  * Una pieza del motor que decide (regla por sector, de macro-zona o servicio) con las claves de los parámetros
- * que declara. `label` viene sin emoji ni código; `codigo` es "" si la pieza no tiene (puede ser una lista).
+ * que declara. `label` es el nombre vigente (el propio si el vivero la renombró), sin emoji ni código; `codigo` es ""
+ * si la pieza no tiene (puede ser una lista).
  */
 export interface ReglaCatalogo {
   id: string;
   label: string;
+  /** Nombre de fábrica: el que vuelve al restablecer el nombre. */
+  etiquetaFabrica: string;
   codigo: string;
   rama: RamaRegla;
   objetivo: ObjetivoRegla;
@@ -829,6 +833,8 @@ export interface ReglaCatalogo {
   proteccion: string | null;
   /** `null` si nunca se cambió el interruptor. */
   estado: UltimoCambioRegla | null;
+  /** Sacada de la vista por el vivero: está apagada y no se puede prender hasta restaurarla. */
+  eliminada: boolean;
 }
 
 /** Cuerpo de `PUT /api/rules/{name}/estado`. Prender nunca pide motivo ni confirmación. */
@@ -839,20 +845,22 @@ export interface CambioEstadoRegla {
   confirmaProteccion?: boolean;
 }
 
-/** Catálogo normalizado: los parámetros van una vez y las reglas los referencian por clave. */
+/** Catálogo: las reglas y una copia de parámetro por `(regla, clave)`; los de una regla son los de `regla === id`. */
 export interface CatalogoReglas {
   reglas: ReglaCatalogo[];
   parametros: ParametroRegla[];
 }
 
-/** Cambio de un parámetro. `valor: null` restablece el valor de fábrica. */
+/** Cambio de la copia de una pieza. `valor: null` restablece el valor de fábrica. */
 export interface CambioParametro {
+  regla: string;
   clave: string;
   valor: string | null;
 }
 
-/** Error de validación del servidor; `clave` es null si no corresponde a un parámetro. */
+/** Error de validación del servidor; `regla` y `clave` son null si no corresponde a una copia. */
 export interface ErrorParametro {
+  regla?: string | null;
   clave: string | null;
   mensaje: string;
 }

@@ -52,7 +52,7 @@ public interface Rule extends ConsumidorParametros, DemoControllable {
 
     /**
      * Parámetros del catálogo que esta regla usa para decidir. El catálogo valida al arrancar
-     * que todos existan, y de acá se arman la vista "por regla" y el campo {@code usadoPor}.
+     * que todos existan; la regla tiene su propia copia de cada uno (editarla no cambia la de otra regla).
      * Por defecto ninguno (reglas sin umbrales).
      */
     @Override

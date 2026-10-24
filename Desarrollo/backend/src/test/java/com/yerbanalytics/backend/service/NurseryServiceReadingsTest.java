@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.engine.ActionExecutor;
@@ -69,7 +70,7 @@ class NurseryServiceReadingsTest {
         pulses = mock(PulsoSensadoService.class);
         when(pulses.recordResponse(anyString(), anyLong())).thenReturn(PulseResponse.NONE);
         CatalogoParametrosService parameters = mock(CatalogoParametrosService.class);
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         RuleOrchestrator orchestrator = new RuleOrchestrator(List.of(), parameters, new TrazaEvaluacionStore());
 
         zone = RuleContextTestFactory.zonaBasica("MZ-1");

@@ -57,9 +57,12 @@ import {
   catalogoVigente,
   soloReglasDeLaCadena,
   exigirActiva,
+  ETIQUETA_MAX,
+  idCopia,
   validarCambioEstado,
   validarCambios,
   type EstadoRegla,
+  type MarcaRegla,
   type OverrideParametro,
 } from './reglasMock';
 import { evaluarMotor } from './trazaReglas';
@@ -106,6 +109,8 @@ export class MockRepository implements DataRepository {
   private readonly parametrosEditados = new Map<string, OverrideParametro>();
   /** Interruptores de las reglas cambiados en la sesión; sin entrada rige el estado de fábrica (las retiradas apagadas). */
   private readonly estadosReglas = new Map<string, EstadoRegla>();
+  /** Nombres propios y eliminadas de la sesión, por pieza. */
+  private readonly marcasReglas = new Map<string, MarcaRegla>();
 
   /** Criterio de diagnóstico guardado en la sesión; arranca con el de fábrica, como el backend. */
   private diagnosisCriteria: DiagnosisCriteria = defaultDiagnosisCriteria();
@@ -464,7 +469,7 @@ export class MockRepository implements DataRepository {
   }
 
   async getCatalogoReglas(): Promise<CatalogoReglas> {
-    return catalogoVigente(this.parametrosEditados, this.estadosReglas);
+    return catalogoVigente(this.parametrosEditados, this.estadosReglas, this.marcasReglas);
   }
 
   async saveParametros(cambios: CambioParametro[]): Promise<CatalogoReglas> {
@@ -475,16 +480,16 @@ export class MockRepository implements DataRepository {
     const ahora = Date.now();
     for (const c of cambios) {
       if (c.valor === null) {
-        this.parametrosEditados.delete(c.clave);
+        this.parametrosEditados.delete(idCopia(c.regla, c.clave));
       } else {
-        this.parametrosEditados.set(c.clave, {
+        this.parametrosEditados.set(idCopia(c.regla, c.clave), {
           valor: c.valor,
           updatedBy: 'Ingeniero Agrónomo',
           updatedTs: ahora,
         });
       }
     }
-    return catalogoVigente(this.parametrosEditados, this.estadosReglas);
+    return catalogoVigente(this.parametrosEditados, this.estadosReglas, this.marcasReglas);
   }
 
   async setEstadoRegla(nombre: string, cambio: CambioEstadoRegla): Promise<ReglaCatalogo> {
@@ -495,6 +500,9 @@ export class MockRepository implements DataRepository {
     // confirmación; recién entonces se validan. Excepción: apagar lo que sólo la siembra tiene apagado (sin fila) es una
     // decisión explícita y se registra.
     exigirActiva(cambio);
+    if (cambio.activa && regla.eliminada) {
+      throw new Error('Error 409: la regla está eliminada; restaurala antes de prenderla.');
+    }
     const apagadaSoloPorLaSiembra = !cambio.activa && !this.estadosReglas.has(nombre);
     if (regla.activa === cambio.activa && !apagadaSoloPorLaSiembra) return regla;
     validarCambioEstado(regla, cambio);
@@ -519,6 +527,44 @@ export class MockRepository implements DataRepository {
       }),
     );
     return (await this.getCatalogoReglas()).reglas.find((r) => r.id === nombre)!;
+  }
+
+  async renombrarRegla(nombre: string, etiqueta: string | null): Promise<ReglaCatalogo> {
+    const regla = await this.reglaDelCatalogo(nombre);
+    const limpia = etiqueta?.trim() ?? '';
+    if (limpia.length > ETIQUETA_MAX) {
+      throw new Error(`El nombre no puede superar los ${ETIQUETA_MAX} caracteres.`);
+    }
+    this.marcasReglas.set(nombre, {
+      eliminada: regla.eliminada,
+      etiqueta: limpia === '' || limpia === regla.etiquetaFabrica ? null : limpia,
+    });
+    return this.reglaDelCatalogo(nombre);
+  }
+
+  async eliminarRegla(nombre: string): Promise<ReglaCatalogo> {
+    const regla = await this.reglaDelCatalogo(nombre);
+    if (regla.proteccion !== null) {
+      throw new Error('Error 409: una protección no se elimina; sólo se puede apagar.');
+    }
+    if (regla.activa) {
+      this.estadosReglas.set(nombre, { activa: false, motivo: null, updatedBy: 'Ingeniero Agrónomo', updatedTs: Date.now() });
+    }
+    this.marcasReglas.set(nombre, { etiqueta: this.marcasReglas.get(nombre)?.etiqueta ?? null, eliminada: true });
+    return this.reglaDelCatalogo(nombre);
+  }
+
+  async restaurarRegla(nombre: string): Promise<ReglaCatalogo> {
+    await this.reglaDelCatalogo(nombre);
+    this.marcasReglas.set(nombre, { etiqueta: this.marcasReglas.get(nombre)?.etiqueta ?? null, eliminada: false });
+    return this.reglaDelCatalogo(nombre);
+  }
+
+  /** La pieza vigente con ese nombre; 404 si no existe. */
+  private async reglaDelCatalogo(nombre: string): Promise<ReglaCatalogo> {
+    const regla = (await this.getCatalogoReglas()).reglas.find((r) => r.id === nombre);
+    if (!regla) throw new Error(`Error 404: la regla ${nombre} no existe`);
+    return regla;
   }
 
   async getRuleSchema(): Promise<DagSchema> {

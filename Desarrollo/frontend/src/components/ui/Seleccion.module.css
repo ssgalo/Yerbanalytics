@@ -94,6 +94,16 @@
 .switch[aria-checked='true']::after {
   transform: translateX(16px);
 }
+/* a medio camino: el interruptor de un grupo con elementos prendidos y apagados */
+.switch[aria-checked='mixed'] {
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+}
+.switch[aria-checked='mixed']::after {
+  transform: translateX(8px);
+  background: var(--brand);
+  box-shadow: none;
+}
 .switch:disabled {
   opacity: 0.45;
   cursor: default;

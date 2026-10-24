@@ -2,8 +2,9 @@
    Catálogo y esquema del motor de reglas para la demo (modo `mock`).
 
    El catálogo de fábrica sale de `catalogoReglas.fixture.json`, escrito fiel a los enums
-   `engine/parametros/Parametros*.java` del backend (un test los compara). Sobre ese fixture
-   el mock aplica los overrides que el usuario guarda durante la sesión.
+   `engine/parametros/Parametros*.java` del backend (un test los compara), con una copia de
+   parámetro por `(regla, clave)`. Sobre ese fixture el mock aplica lo que el usuario guarda
+   durante la sesión: valores por copia, interruptores, nombres propios y eliminadas.
    ============================================================ */
 import fixture from './catalogoReglas.fixture.json';
 import { EstadoReglaError } from '@/data/estadoReglaError';
@@ -20,7 +21,10 @@ import type {
   UltimoCambioRegla,
 } from '@/types/domain';
 
-/** Valor guardado en la sesión para una clave. */
+/** Índice de una copia de parámetro: `regla|clave`. */
+export const idCopia = (regla: string, clave: string): string => `${regla}|${clave}`;
+
+/** Valor guardado en la sesión para una copia `(regla, clave)` (indexado con `idCopia`). */
 export interface OverrideParametro {
   valor: string;
   updatedBy: string;
@@ -35,7 +39,16 @@ export interface EstadoRegla {
   updatedTs: number;
 }
 
+/** Nombre propio y eliminación de una pieza en la sesión (las columnas `etiqueta` y `eliminada` de `regla_estado`). */
+export interface MarcaRegla {
+  etiqueta: string | null;
+  eliminada: boolean;
+}
+
 const FABRICA = fixture as CatalogoReglas;
+
+/** Tope del nombre propio, como el backend. */
+export const ETIQUETA_MAX = 80;
 
 /** Máximo de caracteres del motivo, como el backend. */
 const MOTIVO_MAX = 500;
@@ -96,9 +109,15 @@ export function validarCambioEstado(regla: ReglaCatalogo, cambio: CambioEstadoRe
 export function catalogoVigente(
   overrides: ReadonlyMap<string, OverrideParametro>,
   estados: ReadonlyMap<string, EstadoRegla> = new Map(),
+  marcas: ReadonlyMap<string, MarcaRegla> = new Map(),
 ): CatalogoReglas {
   const catalogo = structuredClone(FABRICA);
   for (const r of catalogo.reglas) {
+    const m = marcas.get(r.id);
+    if (m) {
+      r.label = m.etiqueta ?? r.etiquetaFabrica;
+      r.eliminada = m.eliminada;
+    }
     const e = estados.get(r.id);
     if (!e) continue;
     r.activa = e.activa;
@@ -106,7 +125,7 @@ export function catalogoVigente(
     r.estado = ultimo;
   }
   for (const p of catalogo.parametros) {
-    const o = overrides.get(p.clave);
+    const o = overrides.get(idCopia(p.regla, p.clave));
     if (!o) continue;
     p.valor = o.valor;
     p.modificado = o.valor !== p.fabrica;
@@ -120,12 +139,12 @@ export function catalogoVigente(
 export function validarCambios(cambios: CambioParametro[]): ErrorParametro[] {
   const errores: ErrorParametro[] = [];
   for (const c of cambios) {
-    const def = FABRICA.parametros.find((p) => p.clave === c.clave);
+    const def = FABRICA.parametros.find((p) => p.regla === c.regla && p.clave === c.clave);
     if (!def) {
-      errores.push({ clave: c.clave, mensaje: `El parámetro ${c.clave} no existe.` });
+      errores.push({ regla: c.regla, clave: c.clave, mensaje: `${c.regla} no tiene el parámetro ${c.clave}.` });
     } else if (c.valor !== null) {
       const mensaje = parametroError(def, c.valor);
-      if (mensaje) errores.push({ clave: c.clave, mensaje });
+      if (mensaje) errores.push({ regla: c.regla, clave: c.clave, mensaje });
     }
   }
   return errores;

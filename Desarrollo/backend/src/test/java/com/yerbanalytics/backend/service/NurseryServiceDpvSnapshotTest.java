@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.constant.NurseryConstants;
@@ -47,7 +48,7 @@ class NurseryServiceDpvSnapshotTest {
     void setUp() {
         ZonaRepository zoneRepository = mock(ZonaRepository.class);
         CatalogoParametrosService parameters = mock(CatalogoParametrosService.class);
-        when(parameters.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parameters.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         zone = RuleContextTestFactory.zonaBasica("MZ-1");
         zone.setLastReadingTime(NOW.toEpochMilli() - 60_000L);
         SectorEntity sector = RuleContextTestFactory.sectorBasico("MZ-1-001");

@@ -197,7 +197,7 @@ public class HardwareFaultService implements ConsumidorParametros, DemoControlla
                     + (isBlank(error.value()) ? "" : ", " + error.value() + " L/h") + "). Su electroválvula quedó marcada como "
                     + "averiada: el riego y la dosificación autónomos del sector están suspendidos hasta registrar la reparación.";
             Double humidity = zona.getHumSusRaw();
-            double threshold = parametros.vigentes().numero(ParametrosRiego.UMBRAL_HUMEDAD);
+            double threshold = parametros.vigentes().de(this).numero(ParametrosRiego.UMBRAL_HUMEDAD);
             if (humidity != null && humidity < threshold) {
                 text += " La humedad de sustrato de la macro-zona es " + Math.round(humidity) + " % (umbral de riego "
                         + Math.round(threshold) + " %): hacer el riego manual del sector.";

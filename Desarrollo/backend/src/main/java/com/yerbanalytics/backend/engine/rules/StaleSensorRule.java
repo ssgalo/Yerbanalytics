@@ -49,7 +49,7 @@ import java.util.List;
 public class StaleSensorRule implements Rule {
 
     private static final int PRIORITY = 3;
-    private static final String NAME = "StaleSensorRule";
+    public static final String NAME = "StaleSensorRule";
 
     @Override
     public int priority() {

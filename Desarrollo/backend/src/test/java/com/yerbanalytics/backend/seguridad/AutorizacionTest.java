@@ -43,7 +43,8 @@ class AutorizacionTest extends SeguridadIntegracionBase {
 
         mvc.perform(put("/api/rules/parametros").cookie(ingeniero).contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("cambios",
-                                List.of(Map.of("clave", p.get("clave").asText(), "valor", p.get("valor").asText()))))))
+                                List.of(Map.of("regla", p.get("regla").asText(), "clave", p.get("clave").asText(),
+                                        "valor", p.get("valor").asText()))))))
                 .andExpect(status().isOk());
     }
 

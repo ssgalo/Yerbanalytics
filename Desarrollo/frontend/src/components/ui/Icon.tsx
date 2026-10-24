@@ -47,9 +47,21 @@ export type IconName =
   | 'info'
   | 'gauge'
   | 'toggle'
-  | 'sidebar';
+  | 'sidebar'
+  | 'more'
+  | 'edit'
+  | 'trash';
 
 const PATHS: Record<IconName, JSX.Element> = {
+  more: (
+    <>
+      <circle cx="12" cy="5" r="1.2" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="12" cy="19" r="1.2" fill="currentColor" />
+    </>
+  ),
+  edit: <path d="M15.5 4.5l4 4L8 20H4v-4Z" />,
+  trash: <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" />,
   // Seguridad: personas, candado, llave y salida.
   users: (
     <>

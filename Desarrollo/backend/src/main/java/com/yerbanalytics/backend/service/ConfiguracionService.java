@@ -6,6 +6,7 @@ import com.yerbanalytics.backend.dto.MetricSpec;
 import com.yerbanalytics.backend.dto.UmbralMetrica;
 import com.yerbanalytics.backend.mediasombra.VentanaDiaria;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
+import com.yerbanalytics.backend.engine.rules.StaleSensorRule;
 import com.yerbanalytics.backend.engine.parametros.ParametrosSeguridad;
 import com.yerbanalytics.backend.sensing.SensingCadence;
 import com.yerbanalytics.backend.model.ConfiguracionOperativaEntity;
@@ -112,7 +113,8 @@ public class ConfiguracionService {
                 e.getIntervaloSensadoMinutos() != null ? e.getIntervaloSensadoMinutos() : SensingCadence.DEFAULT_MINUTES,
                 e.getUpdatedBy(), e.getUpdatedTs(),
                 pasadaDiariaActiva(e), pasadaDiariaHora(e),
-                (int) Math.ceil(catalogoParametros.vigentes().numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)),
+                (int) Math.ceil(catalogoParametros.vigentes().de(StaleSensorRule.NAME)
+                        .numero(ParametrosSeguridad.ANTIGUEDAD_MAX_LECTURA)),
                 mediasombraDesde(e), mediasombraHasta(e));
     }
 

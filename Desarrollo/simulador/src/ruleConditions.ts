@@ -40,31 +40,59 @@ export const DEFAULT_THRESHOLDS: Record<string, number> = {
   'seguridad.relecturas-invalidas': 2,
 };
 
+/**
+ * Each parameter has one copy per backend piece (rediseno-motor-reglas): a threshold is read from the copy of the rule
+ * its scenario exercises. `humedadPredisponente` comes from F-F2 because the fungal-condition scenario is the one that
+ * needs it, and so on.
+ */
+const THRESHOLD_SOURCES: Record<Exclude<keyof ThresholdMap, 'confianzaMinima'>, { key: string; rule: string }> = {
+  umbralHumedad: { key: 'riego.umbral-humedad', rule: 'RiegoPorDeficitRule' },
+  umbralCritico: { key: 'riego.umbral-critico', rule: 'DeficitCriticoRule' },
+  saturacionBloqueo: { key: 'riego.saturacion-bloqueo', rule: 'SustratoSaturadoRule' },
+  saturacionAlerta: { key: 'riego.saturacion-alerta', rule: 'SustratoSaturadoRule' },
+  lluviaProbabilidad: { key: 'riego.lluvia-probabilidad', rule: 'PosponerPorLluviaRule' },
+  lluviaMm: { key: 'riego.lluvia-mm', rule: 'PosponerPorLluviaRule' },
+  uvUmbral: { key: 'mediasombra.uv-umbral', rule: 'ShadingRule' },
+  ceBaja: { key: 'nutricion.ce-baja', rule: 'LowEcRule' },
+  humedadPredisponente: { key: 'biotico.humedad-predisponente', rule: 'FungalConditionRule' },
+  phFerrica: { key: 'clorosis.ph-ferrica', rule: 'ChlorosisNonNutritionalRule' },
+  luzAlta: { key: 'estres.luz-alta', rule: 'SolarStressRule' },
+  humedadReposicion: { key: 'estres.humedad-reposicion', rule: 'SolarStressRule' },
+  luzBaja: { key: 'estres.luz-baja', rule: 'SolarStressUnexplainedRule' },
+  tempBaja: { key: 'estres.temp-baja', rule: 'SolarStressUnexplainedRule' },
+  humedadMaxima: { key: 'seguridad.rango-hum-max', rule: 'ReadingValidationGuard' },
+  relecturasInvalidas: { key: 'seguridad.relecturas-invalidas', rule: 'ReadingValidationGuard' },
+};
+
+const CONFIDENCE_KEY = 'diagnostico.confianza-minima';
+
+const numeric = (p: ParametroRegla | undefined): number => (p ? parseFloat(p.valor) : NaN);
+
+/**
+ * The copy of `key` that `rule` owns. Falls back to any copy of the key (an older backend without `regla`, or a rule
+ * renamed in code) and then to the factory value.
+ */
+function copyOf(parametros: ParametroRegla[], key: string, rule: string): number {
+  const own = numeric(parametros.find((x) => x.clave === key && x.regla === rule));
+  if (!Number.isNaN(own)) return own;
+  const any = numeric(parametros.find((x) => x.clave === key));
+  return Number.isNaN(any) ? DEFAULT_THRESHOLDS[key] : any;
+}
+
+/**
+ * Several pieces check the minimum diagnosis confidence (every diagnosis rule and the application preconditions, P-D1),
+ * each with its own copy: a diagnosis that clears the strictest one is valid for all of them.
+ */
+function strictestConfidence(parametros: ParametroRegla[]): number {
+  const values = parametros.filter((x) => x.clave === CONFIDENCE_KEY).map(numeric).filter((v) => !Number.isNaN(v));
+  return values.length > 0 ? Math.max(...values) : DEFAULT_THRESHOLDS[CONFIDENCE_KEY];
+}
+
 export function buildThresholds(parametros: ParametroRegla[]): ThresholdMap {
-  const get = (key: string): number => {
-    const p = parametros.find((x) => x.clave === key);
-    const v = p ? parseFloat(p.valor) : NaN;
-    return Number.isNaN(v) ? DEFAULT_THRESHOLDS[key] : v;
-  };
-  return {
-    umbralHumedad: get('riego.umbral-humedad'),
-    umbralCritico: get('riego.umbral-critico'),
-    saturacionBloqueo: get('riego.saturacion-bloqueo'),
-    saturacionAlerta: get('riego.saturacion-alerta'),
-    lluviaProbabilidad: get('riego.lluvia-probabilidad'),
-    lluviaMm: get('riego.lluvia-mm'),
-    uvUmbral: get('mediasombra.uv-umbral'),
-    ceBaja: get('nutricion.ce-baja'),
-    humedadPredisponente: get('biotico.humedad-predisponente'),
-    phFerrica: get('clorosis.ph-ferrica'),
-    luzAlta: get('estres.luz-alta'),
-    humedadReposicion: get('estres.humedad-reposicion'),
-    luzBaja: get('estres.luz-baja'),
-    tempBaja: get('estres.temp-baja'),
-    confianzaMinima: get('diagnostico.confianza-minima'),
-    humedadMaxima: get('seguridad.rango-hum-max'),
-    relecturasInvalidas: get('seguridad.relecturas-invalidas'),
-  };
+  const resolved = Object.fromEntries(
+    Object.entries(THRESHOLD_SOURCES).map(([field, { key, rule }]) => [field, copyOf(parametros, key, rule)]),
+  ) as Omit<ThresholdMap, 'confianzaMinima'>;
+  return { ...resolved, confianzaMinima: strictestConfidence(parametros) };
 }
 
 export interface RuleConditionResult {

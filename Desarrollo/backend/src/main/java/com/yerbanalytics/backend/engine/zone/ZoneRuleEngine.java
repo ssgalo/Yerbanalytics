@@ -8,7 +8,7 @@ import com.yerbanalytics.backend.engine.RuleAction;
 import com.yerbanalytics.backend.engine.RuleBranch;
 import com.yerbanalytics.backend.engine.overrides.RuleOverrides;
 import com.yerbanalytics.backend.engine.parametros.CatalogoParametrosService;
-import com.yerbanalytics.backend.engine.parametros.ParametrosVigentes;
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.engine.traza.AccionTrazada;
 import com.yerbanalytics.backend.engine.traza.EstadoRegla;
 import com.yerbanalytics.backend.engine.traza.Evaluacion;
@@ -97,7 +97,7 @@ public class ZoneRuleEngine {
     public List<TrazaRegla> evaluate(ZoneRuleContext original) {
         // Los overrides los pone el motor: quien arma el contexto no sabe que existen.
         ZoneRuleContext ctx = original.withOverrides(overrides);
-        ParametrosVigentes current = parameters.vigentes();
+        ParametrosPorPieza current = parameters.vigentes();
         List<TrazaRegla> trace = new ArrayList<>(rules.size());
         String abortMediasombra = null;
 
@@ -111,7 +111,7 @@ public class ZoneRuleEngine {
                         List.of(), List.of(), abortMediasombra));
                 continue;
             }
-            Evaluacion ev = new Evaluacion(rule, current);
+            Evaluacion ev = new Evaluacion(rule, current.de(rule));
             List<RuleAction> actions;
             try {
                 actions = rule.evaluate(ctx, ev);

@@ -53,10 +53,16 @@ public class OperationalRuleStates {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    /** {@code true} si la pieza corre según el vivero (la fila, o la siembra si no tiene). */
+    /**
+     * {@code true} si la pieza corre según el vivero: nunca si está eliminada; si no, el interruptor decidido por una
+     * persona o, sin decisión, la siembra.
+     */
     public boolean isActive(String name) {
         RuleState row = states().get(name);
-        return row != null ? row.active() : activeByDefault(name);
+        if (row != null && row.deleted()) {
+            return false;
+        }
+        return row != null && row.switchDecided() ? row.active() : activeByDefault(name);
     }
 
     /** El estado que tiene sin que nadie lo haya decidido: apagada si es una retirada. */
@@ -64,29 +70,64 @@ public class OperationalRuleStates {
         return !retired.contains(name);
     }
 
-    /** El último cambio de la pieza; vacío si nunca se cambió. */
+    /** El último cambio del interruptor de la pieza; vacío si nunca se decidió (aunque tenga nombre propio). */
     public Optional<RuleState> state(String name) {
+        return Optional.ofNullable(states().get(name)).filter(RuleState::switchDecided);
+    }
+
+    /** La fila de la pieza, con o sin decisión del interruptor (nombre propio, eliminada); vacío si no tiene. */
+    public Optional<RuleState> row(String name) {
         return Optional.ofNullable(states().get(name));
     }
 
-    /** Nombres de las piezas apagadas en el vivero: las filas apagadas y las retiradas sin fila. */
+    /** Nombres de las piezas apagadas en el vivero: las filas apagadas o eliminadas y las retiradas sin decisión. */
     public Set<String> inactiveNames() {
         Map<String, RuleState> rows = states();
         Set<String> out = new HashSet<>();
-        rows.values().stream().filter(r -> !r.active()).forEach(r -> out.add(r.name()));
+        rows.keySet().stream().filter(n -> !isActive(n)).forEach(out::add);
         retired.stream().filter(n -> !rows.containsKey(n)).forEach(out::add);
         return out;
     }
 
     /**
-     * Guarda la decisión y, cuando la transacción confirma, actualiza el cache. Sin transacción (tests) lo hace en el
-     * acto.
+     * Guarda la decisión del interruptor (conserva el nombre propio y la marca de eliminada) y, cuando la transacción
+     * confirma, actualiza el cache. Sin transacción (tests) lo hace en el acto.
      */
     @Transactional
     public RuleState set(String name, boolean active, String reason, String user) {
         // El cache se carga ANTES de escribir: una lectura después podría ver la fila sin commit.
-        states();
-        RuleStateEntity row = new RuleStateEntity(name, active, reason, user, System.currentTimeMillis());
+        RuleState previous = states().get(name);
+        return write(new RuleStateEntity(name, active, reason, user, System.currentTimeMillis(),
+                previous != null ? previous.label() : null, previous != null && previous.deleted() ? Boolean.TRUE : null));
+    }
+
+    /**
+     * Guarda el nombre propio ({@code null} = el de fábrica) sin tocar el interruptor: si la pieza no tenía fila, la que
+     * se crea no decide el encendido (rige la siembra).
+     */
+    @Transactional
+    public RuleState setLabel(String name, String label) {
+        RuleState previous = states().get(name);
+        RuleStateEntity row = previous != null
+                ? new RuleStateEntity(name, previous.active(), previous.reason(), previous.updatedBy(),
+                        previous.updatedTs(), label, previous.deleted() ? Boolean.TRUE : null)
+                : new RuleStateEntity(name, activeByDefault(name), null, null, null, label, null);
+        return write(row);
+    }
+
+    /**
+     * Elimina ({@code true}) o restaura ({@code false}) la pieza. En los dos casos queda apagada: eliminar la apaga, y
+     * restaurar no la prende (prenderla es otra decisión). Conserva el nombre propio.
+     */
+    @Transactional
+    public RuleState setDeleted(String name, boolean deleted, String user) {
+        RuleState previous = states().get(name);
+        return write(new RuleStateEntity(name, false, null, user, System.currentTimeMillis(),
+                previous != null ? previous.label() : null, deleted ? Boolean.TRUE : null));
+    }
+
+    private RuleState write(RuleStateEntity row) {
+        String name = row.getNombre();
         repository.save(row);
         RuleState state = RuleState.of(row);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

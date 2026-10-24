@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.service;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.NurseryProperties;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.constant.NurseryConstants;
@@ -69,7 +70,7 @@ class NurseryServiceHardwareTest {
         sectorRepository = mock(SectorRepository.class);
         hardwareService = mock(HardwareService.class);
         CatalogoParametrosService parametros = mock(CatalogoParametrosService.class);
-        when(parametros.vigentes()).thenReturn(ReglaTestSupport.fabrica());
+        when(parametros.vigentes()).thenReturn(ParametrosPorPieza.uniforme(ReglaTestSupport.fabrica()));
         Rule observadora = new Rule() {
             @Override public int priority() { return 10; }
             @Override public String name() { return "Observadora"; }

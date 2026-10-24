@@ -14,7 +14,7 @@ test('SupplyRule plans a prior diagnosis above the minimum confidence', () => {
 
 test('the planned confidence follows the backend threshold and is capped at 100', () => {
   const strict = buildThresholds([
-    { clave: 'diagnostico.confianza-minima', etiqueta: '', valor: '98', fabrica: '85', unidad: '%' },
+    { regla: 'ApplicationService', clave: 'diagnostico.confianza-minima', etiqueta: '', valor: '98', fabrica: '85', unidad: '%' },
   ]);
   assert.equal(calculateConditions(['SUPPLY'], strict).diagnostico?.conf, 100);
 });
@@ -31,4 +31,31 @@ test('SupplyRule forces a critical ambient humidity without touching substrate h
   const withIrrigation = calculateConditions(['R01', 'SUPPLY'], thresholds);
   assert.equal(withIrrigation.telemetria.humAmb, 98);
   assert.ok(withIrrigation.telemetria.humSus > thresholds.umbralCritico);
+});
+
+const copy = (regla: string, clave: string, valor: string) => ({ regla, clave, etiqueta: '', valor, fabrica: '', unidad: '' });
+
+test('each threshold comes from the copy of the rule its scenario exercises', () => {
+  const t = buildThresholds([
+    copy('PosponerPorLluviaRule', 'riego.umbral-humedad', '50'),
+    copy('RiegoPorDeficitRule', 'riego.umbral-humedad', '40'),
+    copy('PosponerPorLluviaRule', 'riego.umbral-critico', '30'),
+    copy('DeficitCriticoRule', 'riego.umbral-critico', '33'),
+  ]);
+  assert.equal(t.umbralHumedad, 40);
+  assert.equal(t.umbralCritico, 33);
+});
+
+test('without the copy of its rule a threshold falls back to any copy, then to the factory value', () => {
+  const t = buildThresholds([copy('FueraDeVentanaRiegoRule', 'riego.umbral-humedad', '48')]);
+  assert.equal(t.umbralHumedad, 48);
+  assert.equal(t.umbralCritico, 35);
+});
+
+test('the minimum confidence is the strictest of all the copies', () => {
+  const t = buildThresholds([
+    copy('FungalDamageRule', 'diagnostico.confianza-minima', '60'),
+    copy('ApplicationService', 'diagnostico.confianza-minima', '80'),
+  ]);
+  assert.equal(t.confianzaMinima, 80);
 });

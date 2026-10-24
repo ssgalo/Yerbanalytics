@@ -1,5 +1,6 @@
 package com.yerbanalytics.backend.supply;
 
+import com.yerbanalytics.backend.engine.parametros.ParametrosPorPieza;
 import com.yerbanalytics.backend.config.ZonaHorariaVivero;
 import com.yerbanalytics.backend.dto.NewTankLoad;
 import com.yerbanalytics.backend.dto.TankLevel;
@@ -65,7 +66,7 @@ class TankServiceTest {
 
         history = mock(HistorialService.class);
         CatalogoParametrosService catalog = mock(CatalogoParametrosService.class);
-        when(catalog.vigentes()).thenReturn(new CatalogoParametros(List.of()).fabricas());
+        when(catalog.vigentes()).thenReturn(ParametrosPorPieza.uniforme(new CatalogoParametros(List.of()).fabricas()));
         service = new TankService(tanks, zones, history, catalog, CLOCK);
     }
 

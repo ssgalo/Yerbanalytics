@@ -467,6 +467,56 @@ public class HistorialService {
     }
 
     /**
+     * Registra que alguien renombró una regla desde Motor de reglas (o le restableció el nombre de fábrica): quién, el
+     * nombre anterior y el nuevo. Como el cambio de estado, es operar el vivero y queda en el historial.
+     */
+    @Transactional
+    public void registrarNombreRegla(String usuario, String regla, String codigo, String anterior, String nuevo,
+                                     boolean deFabrica) {
+        String sufijo = codigo == null || codigo.isBlank() ? "" : " (" + codigo + ")";
+        HistorialEventoEntity e = eventoDeRegla(regla);
+        e.setLectura("Nombre de una regla del motor: «" + anterior + "»" + sufijo + ".");
+        e.setDecision("Regla «" + anterior + "»" + sufijo + " renombrada a «" + nuevo + "» por " + usuario + "."
+                + (deFabrica ? " Se restableció el nombre de fábrica." : ""));
+        e.setAccion("Sólo cambia el nombre que se muestra; la regla sigue evaluando igual.");
+        historialRepository.save(e);
+    }
+
+    /**
+     * Registra que alguien eliminó una regla de la vista de Motor de reglas (queda apagada) o la restauró (vuelve
+     * apagada). Eliminar no borra lógica: es una decisión operativa.
+     */
+    @Transactional
+    public void registrarEliminacionRegla(String usuario, String regla, String etiqueta, String codigo,
+                                          boolean eliminada) {
+        String nombre = "«" + etiqueta + "»" + (codigo == null || codigo.isBlank() ? "" : " (" + codigo + ")");
+        HistorialEventoEntity e = eventoDeRegla(regla);
+        e.setLectura("Reglas del motor: " + nombre + ".");
+        e.setDecision("Regla " + nombre + (eliminada ? " eliminada" : " restaurada") + " por " + usuario + ".");
+        e.setAccion(eliminada
+                ? "El motor deja de evaluarla desde el próximo pulso y sale de la vista hasta que alguien la restaure."
+                : "Vuelve a la vista apagada: el motor no la evalúa hasta que alguien la prenda.");
+        historialRepository.save(e);
+    }
+
+    /** Evento de configuración del motor de reglas, sin sector ni zona. */
+    private HistorialEventoEntity eventoDeRegla(String regla) {
+        HistorialEventoEntity e = new HistorialEventoEntity();
+        e.setId(UUID.randomUUID().toString());
+        e.setSectorId(EMDASH);
+        e.setZonaId(EMDASH);
+        e.setZonaName("Sistema");
+        e.setTipo("Configuración");
+        e.setTs(reloj.millis());
+        e.setRegla(regla);
+        e.setRes("Efectiva");
+        e.setSev(EMDASH);
+        e.setEvoShow(false);
+        e.setBloqueoRepeticion(false);
+        return e;
+    }
+
+    /**
      * Registra un movimiento (u orden no enviada) de la mediasombra de una macro-zona. La malla es de la zona: el evento
      * queda con {@code sectorId = "—"}. {@code regla} dice quién la movió (una regla del motor, el horario de la
      * mediasombra o una secuencia).

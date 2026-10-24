@@ -252,7 +252,7 @@ public class ApplicationService implements ConsumidorParametros {
 
         Instant now = clock.instant();
         ApplicationFacts facts = facts(sector, supply, now, requiresDiagnosis, originRule);
-        PreconditionResult result = preconditions.check(facts, catalog.vigentes(), overrides);
+        PreconditionResult result = preconditions.check(facts, catalog.vigentes().de(preconditions), overrides);
         if (!result.isMet()) {
             if (result.capReached()) {
                 fungicideCap.reportReached(sector, result.reason());
@@ -422,6 +422,6 @@ public class ApplicationService implements ConsumidorParametros {
         }
         ApplicationFacts fungicideFacts = facts(sector, Supply.FUNGICIDE, now, waiting.get().isRequiresDiagnosis(),
                 waiting.get().getRuleName());
-        return preconditions.check(fungicideFacts, catalog.vigentes(), overrides).isMet();
+        return preconditions.check(fungicideFacts, catalog.vigentes().de(preconditions), overrides).isMet();
     }
 }

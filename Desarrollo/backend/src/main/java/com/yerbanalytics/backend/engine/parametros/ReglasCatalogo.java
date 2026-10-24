@@ -30,26 +30,30 @@ public class ReglasCatalogo {
 
     /** Todas las piezas, por prioridad y luego por nombre. */
     public List<ReglaCatalogoDto> reglas() {
-        return registry.all().stream().map(p -> regla(p, states.state(p.name()).orElse(null))).toList();
+        return registry.all().stream().map(p -> regla(p, states.row(p.name()).orElse(null))).toList();
     }
 
     /** Una pieza con el estado vigente. */
     public Optional<ReglaCatalogoDto> regla(String name) {
-        return registry.find(name).map(p -> regla(p, states.state(p.name()).orElse(null)));
+        return registry.find(name).map(p -> regla(p, states.row(p.name()).orElse(null)));
     }
 
     /**
-     * Una pieza con un estado dado ({@code null} = nunca cambiada). Lo usa quien acaba de escribirlo, antes del commit,
-     * cuando el cache todavía no lo refleja.
+     * Una pieza con una fila dada ({@code null} = sin fila). Lo usa quien acaba de escribirla, antes del commit, cuando
+     * el cache todavía no la refleja.
      */
-    public ReglaCatalogoDto regla(DemoControllable pieza, RuleState estado) {
+    public ReglaCatalogoDto regla(DemoControllable pieza, RuleState fila) {
         String name = pieza.name();
         boolean activaPorDefecto = states.activeByDefault(name);
         List<String> parametros = pieza instanceof ConsumidorParametros c
                 ? c.parametros().stream().map(DefinicionParametro::clave).toList()
                 : List.of();
+        boolean decidida = fila != null && fila.switchDecided();
+        boolean eliminada = fila != null && fila.deleted();
+        boolean activa = !eliminada && (decidida ? fila.active() : activaPorDefecto);
         return new ReglaCatalogoDto(
                 name,
+                fila != null && fila.label() != null ? fila.label() : pieza.label(),
                 pieza.label(),
                 pieza.code(),
                 pieza.branch().name(),
@@ -57,9 +61,10 @@ public class ReglasCatalogo {
                 pieza.effect().name(),
                 pieza.priority(),
                 parametros,
-                estado != null ? estado.active() : activaPorDefecto,
+                activa,
                 activaPorDefecto,
                 pieza.protection().orElse(null),
-                estado != null ? new UltimoCambioReglaDto(estado.reason(), estado.updatedBy(), estado.updatedTs()) : null);
+                decidida ? new UltimoCambioReglaDto(fila.reason(), fila.updatedBy(), fila.updatedTs()) : null,
+                eliminada);
     }
 }

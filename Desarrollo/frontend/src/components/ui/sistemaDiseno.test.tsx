@@ -72,6 +72,15 @@ describe('selección accesible', () => {
     fireEvent.click(s);
     expect(onChange).toHaveBeenCalledWith(false);
   });
+
+  it('Switch a medio camino expone aria-checked="mixed" y al tocarlo pide prender', () => {
+    const onChange = vi.fn();
+    render(<Switch checked="mixed" onChange={onChange} label="Todas las reglas de Riego" />);
+    const s = screen.getByRole('switch', { name: 'Todas las reglas de Riego' });
+    expect(s.getAttribute('aria-checked')).toBe('mixed');
+    fireEvent.click(s);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
 });
 
 describe('campos', () => {

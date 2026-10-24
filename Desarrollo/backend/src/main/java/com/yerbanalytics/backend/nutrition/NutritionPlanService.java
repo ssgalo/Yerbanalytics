@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+import java.util.Map;
 
 /**
  * El estado del plan de nutrición de cada macro-zona y las transiciones que le piden las reglas N-01 y N-02
@@ -81,9 +81,13 @@ public class NutritionPlanService implements ConsumidorParametros {
         return NAME;
     }
 
+    /**
+     * El intervalo de fábrica del plan es el de N-01, que es quien decide cuándo toca (rediseno-motor-reglas D-2): se
+     * lee de su copia y se edita en su fila.
+     */
     @Override
-    public List<DefinicionParametro> parametros() {
-        return List.of(ParametrosNutricion.PLAN_INTERVAL);
+    public Map<DefinicionParametro, String> parametrosDe() {
+        return Map.of(ParametrosNutricion.PLAN_INTERVAL, NutritionPlanRule.NAME);
     }
 
     // -------------------------------------------------------------------------

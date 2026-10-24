@@ -151,7 +151,7 @@ public class ReadingValidationGuard implements ConsumidorParametros, DemoControl
         if (!overrides.isEnabled(NAME)) {
             return ReadingCheck.allAccepted(reading);
         }
-        ParametrosVigentes vigentes = parametros.vigentes();
+        ParametrosVigentes vigentes = parametros.vigentes().de(this);
         Set<String> invalid = ReadingValidator.invalidMetrics(reading, vigentes);
         String zoneId = zona.getId();
 

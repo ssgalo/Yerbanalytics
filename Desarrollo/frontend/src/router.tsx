@@ -13,6 +13,7 @@ import { DiagnosisCriteriaPage } from '@/features/configuracion/DiagnosisCriteri
 import { HardwarePage } from '@/features/hardware/HardwarePage';
 import { TopologiaPage } from '@/features/topologia/TopologiaPage';
 import { ReglasPage } from '@/features/reglas/ReglasPage';
+import { InspectorPage } from '@/features/reglas/inspector/InspectorPage';
 import { UsuariosPage } from '@/features/usuarios/UsuariosPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { CambiarClavePage } from '@/features/auth/CambiarClavePage';
@@ -78,6 +79,7 @@ export const routes: RouteObject[] = [
       { path: 'preferencias', element: con(VISTAS.preferencias, <PreferencesPage />) },
       { path: 'criterio-diagnostico', element: con(VISTAS.criterioDiagnostico, <DiagnosisCriteriaPage />) },
       { path: 'reglas', element: con(VISTAS.reglas, <ReglasPage />) },
+      { path: 'reglas/inspector', element: con(VISTAS.inspector, <InspectorPage />) },
       { path: 'hardware', element: con(VISTAS.hardware, <HardwarePage />) },
       { path: 'topologia', element: con(VISTAS.topologia, <TopologiaPage />) },
       { path: 'usuarios', element: con(VISTAS.usuarios, <UsuariosPage />) },

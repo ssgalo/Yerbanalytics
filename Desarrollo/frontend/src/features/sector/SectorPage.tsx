@@ -90,7 +90,7 @@ export function SectorPage() {
         </Badge>
         <span className={styles.reason}>{sector.reason}</span>
         {/* Cómo decidió el motor para este sector: recibido vs. umbral de cada regla */}
-        <Link className={styles.motorLink} to={`/reglas?tab=inspector&sector=${encodeURIComponent(sector.id)}`}>
+        <Link className={styles.motorLink} to={`/reglas/inspector?sector=${encodeURIComponent(sector.id)}`}>
           Ver última evaluación del motor
         </Link>
       </div>

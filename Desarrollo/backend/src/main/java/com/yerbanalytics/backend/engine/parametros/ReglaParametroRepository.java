@@ -4,5 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ParametroReglaRepository extends JpaRepository<ParametroReglaEntity, String> {
+public interface ReglaParametroRepository extends JpaRepository<ReglaParametroEntity, ReglaParametroId> {
 }

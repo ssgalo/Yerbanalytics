@@ -136,7 +136,7 @@ describe('NodoPanel', () => {
     expect(fila.textContent).toContain('riego.ventana-normal');
   });
 
-  it('"Editar parámetro" avisa qué regla abrir en Parámetros', () => {
+  it('"Editar parámetro" avisa qué regla desplegar en Motor de reglas', () => {
     const { onEditar } = montar(regla());
 
     fireEvent.click(screen.getByRole('button', { name: /Editar parámetro/ }));

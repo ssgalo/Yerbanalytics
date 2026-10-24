@@ -3,43 +3,52 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import fixture from './catalogoReglas.fixture.json';
 import { parametroError } from '@/lib/parametrosValidation';
-import type { CatalogoReglas } from '@/types/domain';
+import type { CatalogoReglas, ParametroRegla } from '@/types/domain';
 
 const catalogo = fixture as CatalogoReglas;
 
 describe('catalogoReglas.fixture.json · consistencia interna', () => {
-  it('cada clave aparece una sola vez', () => {
-    const claves = catalogo.parametros.map((p) => p.clave);
-    expect(new Set(claves).size).toBe(claves.length);
+  it('cada copia (regla, clave) aparece una sola vez', () => {
+    const copias = catalogo.parametros.map((p) => `${p.regla}|${p.clave}`);
+    expect(new Set(copias).size).toBe(copias.length);
   });
 
-  it('toda regla referencia claves que existen', () => {
-    const claves = new Set(catalogo.parametros.map((p) => p.clave));
-    for (const r of catalogo.reglas) for (const c of r.parametros) expect(claves.has(c)).toBe(true);
-  });
-
-  it('usadoPor es el índice inverso de reglas[].parametros, más los consumidores que no son reglas', () => {
-    const ids = new Set(catalogo.reglas.map((r) => r.id));
+  it('las copias de una clave comparten la definición (tipo, rango, unidad, fábrica)', () => {
+    const def = ({ regla: _r, valor: _v, modificado: _m, updatedBy: _b, updatedTs: _t, ...resto }: ParametroRegla) =>
+      resto;
+    const primera = new Map<string, ParametroRegla>();
     for (const p of catalogo.parametros) {
-      const esperado = catalogo.reglas.filter((r) => r.parametros.includes(p.clave)).map((r) => r.id);
-      expect(p.usadoPor.filter((u) => ids.has(u)).sort()).toEqual([...esperado].sort());
+      const otra = primera.get(p.clave);
+      if (otra) expect(def(p)).toEqual(def(otra));
+      else primera.set(p.clave, p);
     }
   });
 
-  it('riego.sectores-simultaneos lo usa el despacho (que no es una regla) y ninguna regla', () => {
-    const p = catalogo.parametros.find((x) => x.clave === 'riego.sectores-simultaneos');
-    expect(p?.usadoPor).toEqual(['DespachoRiego']);
+  it('las copias de cada pieza son exactamente las claves que declara, en su orden', () => {
+    for (const r of catalogo.reglas) {
+      expect(catalogo.parametros.filter((p) => p.regla === r.id).map((p) => p.clave)).toEqual(r.parametros);
+    }
   });
 
-  it('el umbral de riego es compartido por R-01, R-03, R-05 y R-06 (y por la alerta de falla hidráulica), y no hay claves de las reglas viejas', () => {
-    const umbral = catalogo.parametros.find((x) => x.clave === 'riego.umbral-humedad');
-    expect(umbral?.usadoPor).toEqual([
+  it('las demás copias son de servicios de ejecución (sin interruptor); el despacho sólo tiene la suya', () => {
+    const ids = new Set(catalogo.reglas.map((r) => r.id));
+    const ejecucion = [...new Set(catalogo.parametros.map((p) => p.regla).filter((id) => !ids.has(id)))];
+    expect(ejecucion.sort()).toEqual(['ApplicationService', 'DespachoRiego', 'PulsoSensado', 'ReadingPurge', 'TankService']);
+    expect(catalogo.parametros.filter((p) => p.regla === 'DespachoRiego').map((p) => p.clave)).toEqual([
+      'riego.sectores-simultaneos',
+    ]);
+  });
+
+  it('el umbral de riego tiene una copia en R-01, R-03, R-05, R-06 y la alerta de falla hidráulica, y no hay claves de las reglas viejas', () => {
+    const copias = catalogo.parametros.filter((x) => x.clave === 'riego.umbral-humedad');
+    expect(copias.map((p) => p.regla).sort()).toEqual([
       'FueraDeVentanaRiegoRule',
       'HardwareFaultService',
       'PausaTrasAplicacionRule',
       'PosponerPorLluviaRule',
       'RiegoPorDeficitRule',
     ]);
+    const umbral = copias[0];
     expect(umbral?.fabrica).toBe('45');
     expect(catalogo.parametros.find((x) => x.clave === 'riego.lluvia-probabilidad')?.fabrica).toBe('70');
     const claves = catalogo.parametros.map((x) => x.clave);
@@ -136,7 +145,8 @@ describe.skipIf(!existsSync(DIR_PARAMETROS))('catalogoReglas.fixture.json · con
   });
 
   it('el fixture tiene exactamente los parámetros del backend, con la misma definición y fábrica', () => {
-    const delFixture = catalogo.parametros.map((p) => ({
+    const unaPorClave = [...new Map(catalogo.parametros.map((p) => [p.clave, p])).values()];
+    const delFixture = unaPorClave.map((p) => ({
       clave: p.clave,
       tipo: p.tipo,
       unidad: p.unidad,
@@ -151,7 +161,7 @@ describe.skipIf(!existsSync(DIR_PARAMETROS))('catalogoReglas.fixture.json · con
 
 /**
  * Qué parámetros declara cada regla (`parametros()`), leído del código Java de `engine/rules/`.
- * De ahí salen `reglas[].parametros` y, por inversión, `usadoPor` del fixture.
+ * De ahí salen `reglas[].parametros` y las copias `(regla, clave)` del fixture.
  */
 export function parametrosPorRegla(
   fuentes: Record<string, string>,
@@ -179,7 +189,7 @@ function leerReglasDelBackend(): Record<string, string> {
 /**
  * Consumidores de parámetros que no son reglas (el despacho de riego, la purga del historial, el pulso de sensado, el
  * escalamiento del nodo, el guard de lectura inválida, el servicio de fallas del hardware, los de aplicación de insumos y el plan de nutrición): también
- * entran en `usadoPor`. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
+ * tienen sus copias. Cada uno declara sus parámetros en un `parametros()` igual al de una regla.
  */
 const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   DespachoRiego: resolve(DIR_ENGINE, 'riego', 'DespachoRiego.java'),
@@ -194,6 +204,23 @@ const CONSUMIDORES_QUE_NO_SON_REGLA: Record<string, string> = {
   NutritionPlanService: resolve(DIR_ENGINE, '..', 'nutrition', 'NutritionPlanService.java'),
   EffectivenessService: resolve(DIR_ENGINE, '..', 'effectiveness', 'EffectivenessService.java'),
   HorarioMediasombraService: resolve(DIR_ENGINE, '..', 'mediasombra', 'HorarioMediasombraService.java'),
+};
+
+/**
+ * Claves que un servicio lee de la copia de la regla que decidió (design D-2, `parametrosDe()`): no son copias suyas.
+ */
+const LEIDAS_DE_LA_DUENA: Record<string, string[]> = {
+  DespachoRiego: [
+    'riego.lluvia-probabilidad',
+    'riego.lluvia-mm',
+    'riego.lluvia-ventana',
+    'riego.saturacion-bloqueo',
+    'riego.ventana-normal',
+    'riego.pausa-tras-aplicacion',
+    'riego.exceptuado-bloqueo',
+    'seguridad.antiguedad-max-lectura',
+  ],
+  NutritionPlanService: ['nutricion.intervalo-plan'],
 };
 
 /**
@@ -238,7 +265,7 @@ describe('parametrosPorRegla (el lector del anti-drift)', () => {
 });
 
 describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS) || !DIRS_REGLAS_DE_FEATURE.every(existsSync))(
-  'catalogoReglas.fixture.json · reglas y usadoPor contra el código del backend',
+  'catalogoReglas.fixture.json · reglas y copias contra el código del backend',
   () => {
     const constantes = new Map(leerEnumsDelBackend().map((e) => [e.constante, e.clave]));
     const fuentes = leerReglasDelBackend();
@@ -273,17 +300,16 @@ describe.skipIf(!existsSync(DIR_PARAMETROS) || !existsSync(DIR_REGLAS) || !DIRS_
       }
     });
 
-    it('usadoPor de cada parámetro es el índice inverso de lo que declaran las reglas (y los demás consumidores) del backend', () => {
-      for (const p of catalogo.parametros) {
-        const esperado = catalogo.reglas.filter((r) => delBackend[r.id]?.includes(p.clave)).map((r) => r.id);
-        for (const [id, claves] of Object.entries(noRegla)) {
-          if (claves.includes(p.clave)) esperado.push(id);
-        }
-        expect({ clave: p.clave, usadoPor: [...p.usadoPor].sort() }).toEqual({
-          clave: p.clave,
-          usadoPor: esperado.sort(),
-        });
+    it('hay una copia por (pieza, clave) que declara el backend, menos las que un servicio lee de la regla dueña', () => {
+      const esperado: string[] = [];
+      for (const r of catalogo.reglas) {
+        for (const c of delBackend[r.id] ?? noRegla[r.id] ?? []) esperado.push(`${r.id}|${c}`);
       }
+      for (const [id, claves] of Object.entries(noRegla)) {
+        if (catalogo.reglas.some((r) => r.id === id)) continue;
+        for (const c of claves) if (!(LEIDAS_DE_LA_DUENA[id] ?? []).includes(c)) esperado.push(`${id}|${c}`);
+      }
+      expect(catalogo.parametros.map((p) => `${p.regla}|${p.clave}`).sort()).toEqual(esperado.sort());
     });
   },
 );
