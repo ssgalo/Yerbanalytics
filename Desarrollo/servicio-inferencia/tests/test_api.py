@@ -34,3 +34,14 @@ def test_alta_de_sano_sin_severidad():
 def test_alta_de_no_concluyente():
     payload = build_payload("CAP-3", Diagnosis("No concluyente", None, None, None, ()))
     assert payload == {"capturaId": "CAP-3", "estado": "No concluyente", "detections": []}
+
+
+def test_alta_con_recorte():
+    payload = build_payload(
+        "CAP-4", Diagnosis("Sano", None, "Alta", 0.81, (SANA,)), (0.2574, 0.2542, 1.0, 1.0)
+    )
+    assert payload["crop"] == [0.2574, 0.2542, 1.0, 1.0]
+
+
+def test_alta_sin_recorte_no_lleva_el_campo():
+    assert "crop" not in build_payload("CAP-5", Diagnosis("Sano", None, "Alta", 0.81, (SANA,)))

@@ -2,3 +2,6 @@ Pillow>=10.0.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 ultralytics>=8.0.0
+# Ultralytics lo pide cuando Pillow no reconoce una imagen (intenta leerla como HEIF) y, si falta,
+# lo instala solo en tiempo de ejecución. Declararlo evita ese pip install dentro del contenedor.
+pi-heif>=1.0.0

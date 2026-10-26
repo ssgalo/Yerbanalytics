@@ -79,6 +79,17 @@ services:
       BANDAS_CONFIANZA_ESTRES_SOLAR: ${BANDAS_CONFIANZA_ESTRES_SOLAR:-0.40,0.55,0.70}
       BANDAS_CONFIANZA_PLAGA_FOLIAR: ${BANDAS_CONFIANZA_PLAGA_FOLIAR:-0.35,0.50,0.65}
       BANDAS_CONFIANZA_DANO_FUNGICO: ${BANDAS_CONFIANZA_DANO_FUNGICO:-0.35,0.50,0.65}
+      # Recorte y tiling (ver "Preprocesado y tiling" en el README del servicio). Los márgenes son
+      # píxeles de la imagen ya orientada; se ajustan si cambia la resolución de la cámara.
+      RECORTE_IZQUIERDA: ${RECORTE_IZQUIERDA:-278}
+      RECORTE_ARRIBA: ${RECORTE_ARRIBA:-366}
+      RECORTE_DERECHA: ${RECORTE_DERECHA:-0}
+      RECORTE_ABAJO: ${RECORTE_ABAJO:-0}
+      TILES_FILAS: ${TILES_FILAS:-3}
+      TILES_COLUMNAS: ${TILES_COLUMNAS:-2}
+      TILES_SOLAPAMIENTO_PX: ${TILES_SOLAPAMIENTO_PX:-130}
+      TILES_TOLERANCIA_BORDE_PX: ${TILES_TOLERANCIA_BORDE_PX:-6}
+      TILES_FUSION_IOS: ${TILES_FUSION_IOS:-0.5}
     volumes:
       # Volumen compartido de imágenes con el backend.
       - ./Desarrollo/backend/capturas:/capturas

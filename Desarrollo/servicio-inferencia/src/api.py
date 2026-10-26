@@ -5,7 +5,8 @@ Responsabilidades:
   - GET  /api/capturas/pendientes-inactivas  → lista de capturas sin diagnóstico si el ciclo terminó.
   - GET  /api/configuracion/diagnostico      → criterio del agrónomo (bandas de severidad y orden
                                                de criticidad), leído una vez por ciclo.
-  - POST /api/diagnosticos                   → alta del diagnóstico con sus detecciones.
+  - POST /api/diagnosticos                   → alta del diagnóstico con sus detecciones y el
+                                               recorte analizado.
 
 Autenticación: el backend exige sesión de usuario en toda /api/**, y este servicio entra como
 cualquier otro cliente, con una cuenta de rol Servicio que da de alta el Administrador desde el
@@ -183,12 +184,16 @@ def fetch_criteria() -> Criteria:
     return Criteria(severity_bands=bands, criticality=criticality)
 
 
-def build_payload(captura_id: str, diagnosis: Diagnosis) -> dict:
+def build_payload(
+    captura_id: str, diagnosis: Diagnosis, crop: tuple[float, float, float, float] | None = None
+) -> dict:
     """
     Arma el cuerpo del alta (design D7/D12).
 
     `sev` sólo en estados anómalos; `confidence` y `conf` (score promedio × 100) salvo en
     No concluyente. `detections` lleva todas las válidas que sobrevivieron a los solapes.
+    `crop` (D5 de add-tiling-inferencia) es la región analizada, normalizada sobre la imagen
+    orientada; con él, las cajas son relativas a esa región.
     """
     payload: dict = {"capturaId": captura_id, "estado": diagnosis.state}
     if diagnosis.severity is not None:
@@ -200,10 +205,14 @@ def build_payload(captura_id: str, diagnosis: Diagnosis) -> dict:
     payload["detections"] = [
         {"label": d.label, "score": d.score, "box": list(d.box)} for d in diagnosis.detections
     ]
+    if crop is not None:
+        payload["crop"] = list(crop)
     return payload
 
 
-def registrar_diagnostico(captura_id: str, diagnosis: Diagnosis) -> None:
+def registrar_diagnostico(
+    captura_id: str, diagnosis: Diagnosis, crop: tuple[float, float, float, float] | None = None
+) -> None:
     """
     Registra el diagnóstico en el backend por el camino único de alta (`POST /api/diagnosticos`).
 
@@ -213,7 +222,7 @@ def registrar_diagnostico(captura_id: str, diagnosis: Diagnosis) -> None:
     Raises:
         requests.RequestException: ante cualquier fallo de red o HTTP ≥ 400.
     """
-    payload = build_payload(captura_id, diagnosis)
+    payload = build_payload(captura_id, diagnosis, crop)
     response = _request("POST", "/api/diagnosticos", json=payload)
     if response.status_code == 400:
         # El backend explica en {"error": …} qué campo rechazó: vale la pena dejarlo en el log.
