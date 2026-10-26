@@ -44,8 +44,9 @@ public class DiagnosticoController {
      * {@code add-diagnostico-por-detecciones}).
      *
      * <p>El cuerpo es {@link NuevoDiagnostico}: {@code capturaId}, {@code estado}, {@code sev}
-     * (sólo en estados anómalos), {@code confidence} y {@code conf} (salvo en No concluyente) y
-     * {@code detections} (opcional). {@code sectorId} y {@code zonaId} son opcionales: si no
+     * (sólo en estados anómalos), {@code confidence} y {@code conf} (salvo en No concluyente),
+     * {@code detections} (opcional) y {@code crop} (opcional: la región analizada; con él, las cajas
+     * son relativas a esa región, design D5 de {@code add-tiling-inferencia}). {@code sectorId} y {@code zonaId} son opcionales: si no
      * vienen, se toman de la captura. El emisor puede sobrescribirlos, pero no puede omitir la
      * captura.
      */
@@ -59,10 +60,13 @@ public class DiagnosticoController {
         return ResponseEntity.ok(service.listar());
     }
 
-    /** Las cajas de un diagnóstico persistido: no viajan en el listado ni en el snapshot (design D8). */
+    /**
+     * Las cajas de un diagnóstico persistido y su recorte: no viajan en el listado ni en el snapshot
+     * (design D8).
+     */
     @GetMapping("/{id}/detecciones")
     public ResponseEntity<DetectionsResponse> detecciones(@PathVariable String id) {
-        return ResponseEntity.ok(new DetectionsResponse(service.detecciones(id)));
+        return ResponseEntity.ok(service.detecciones(id));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

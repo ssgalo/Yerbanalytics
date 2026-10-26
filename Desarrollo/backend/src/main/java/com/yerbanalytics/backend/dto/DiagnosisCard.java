@@ -1,5 +1,7 @@
 package com.yerbanalytics.backend.dto;
 
+import java.util.List;
+
 /**
  * Tarjeta de la vista de Diagnósticos de IA.
  *
@@ -15,10 +17,13 @@ package com.yerbanalytics.backend.dto;
  * <p>{@code conf} es el score promedio × 100 ({@code null} en No concluyente) y
  * {@code confidence}, el nivel de confianza. {@code detectionCount} dice cuántas cajas tiene el
  * diagnóstico sin traerlas: se piden aparte a {@code GET /api/diagnosticos/{id}/detecciones}.
- * {@code concluyente} = el estado no es No concluyente.
+ * {@code concluyente} = el estado no es No concluyente. {@code crop} es la región analizada
+ * ({@code [x1, y1, x2, y2]} normalizado), para que la miniatura muestre lo mismo que el visor;
+ * {@code null} si el diagnóstico no tiene recorte.
  */
 public record DiagnosisCard(
         String id, String sectorId, String zonaName, String estado, Double conf,
         String sev, String sevSoft, String sevInk, String thumb, String time, boolean concluyente,
-        String imagenUrl, Long creadoEn, String confidence, int detectionCount
+        String imagenUrl, Long creadoEn, String confidence, int detectionCount,
+        List<Double> crop
 ) {}
