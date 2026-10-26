@@ -24,7 +24,7 @@ import type {
   CatalogoReglas,
   Configuracion,
   DagSchema,
-  Detection,
+  DiagnosisDetections,
   DiagnosisCriteria,
   ErrorParametro,
   DisposicionTopologia,
@@ -149,14 +149,15 @@ export class HttpRepository implements DataRepository {
     return (await res.json()) as DiagnosisCriteria;
   }
 
-  async getDiagnosisDetections(diagnosisId: string): Promise<Detection[]> {
+  async getDiagnosisDetections(diagnosisId: string): Promise<DiagnosisDetections> {
     const res = await apiFetch(`${this.baseUrl}/diagnosticos/${encodeURIComponent(diagnosisId)}/detecciones`);
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? `Error ${res.status} al obtener las detecciones de ${diagnosisId}`);
     }
-    const body = (await res.json()) as { detections?: Detection[] | null };
-    return body.detections ?? [];
+    const body = (await res.json()) as Partial<DiagnosisDetections>;
+    // Un backend anterior al recorte no manda `crop`: las cajas son de la imagen entera.
+    return { detections: body.detections ?? [], crop: body.crop ?? null };
   }
 
   async getPlanRustificacion(zonaId: string): Promise<PlanRustificacion | null> {

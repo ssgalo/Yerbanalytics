@@ -1,12 +1,14 @@
 """
 settings.py — Configuración del servicio leída del entorno.
 
-Dos grupos:
+Tres grupos:
   - Rutas y clases: carpeta del servicio, resolución de rutas relativas (MODEL_PATH, CAPTURAS_DIR)
     y el mapeo de clases del modelo (MODEL_CLASSES).
   - Parámetros del EQUIPO (design D4): umbral global de YOLO, IoU de solapamiento y bandas de
     confianza por clase. No se editan desde el dashboard: son calibración del modelo, no criterio
     agronómico.
+  - Recorte y tiling (add-tiling-inferencia, D7): márgenes de recorte, grilla de tiles y unión de
+    cajas entre tiles. También son del equipo: dependen del montaje de la cámara y del modelo.
 
 Una variable ausente toma su default con un WARNING que la nombra. Un valor mal formado levanta
 `SettingsError`; main lo convierte en un log CRITICAL y `sys.exit(1)`, porque una calibración
@@ -200,3 +202,78 @@ def load_team_settings(
         logger.warning("MODEL_CLASSES no incluye '%s': ningún diagnóstico podrá ser Sano.", HEALTHY)
 
     return TeamSettings(conf_global, overlap_iou, bands)
+
+
+# ---------------------------------------------------------------------------
+# Recorte y tiling (add-tiling-inferencia, design D7)
+# ---------------------------------------------------------------------------
+
+# Valores de fábrica para la cámara actual (capturas de 1080×1440): sacan el riel y el piso.
+DEFAULT_CROP = {"RECORTE_IZQUIERDA": 278, "RECORTE_ARRIBA": 366, "RECORTE_DERECHA": 0, "RECORTE_ABAJO": 0}
+DEFAULT_TILE_ROWS = 3
+DEFAULT_TILE_COLUMNS = 2
+DEFAULT_TILE_OVERLAP_PX = 130
+DEFAULT_TILE_EDGE_TOLERANCE_PX = 6
+DEFAULT_TILE_FUSION_IOS = 0.5
+
+
+@dataclass(frozen=True)
+class CropMargins:
+    """Píxeles que se quitan de cada borde de la imagen ya orientada."""
+
+    left: int
+    top: int
+    right: int
+    bottom: int
+
+
+@dataclass(frozen=True)
+class TilingSettings:
+    crop: CropMargins
+    rows: int
+    columns: int
+    overlap_px: int
+    edge_tolerance_px: int
+    fusion_ios: float
+
+
+def _read_int(env: Mapping[str, str], name: str, default: int, minimum: int) -> int:
+    raw = env.get(name, "").strip()
+    if not raw:
+        logger.warning("%s no está definida: se usa el valor por defecto %s.", name, default)
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise SettingsError(f"{name}='{raw}' no es un número entero.") from None
+    if value < minimum:
+        raise SettingsError(f"{name}={raw} debe ser un entero ≥ {minimum}.")
+    return value
+
+
+def load_tiling_settings(env: Mapping[str, str] | None = None) -> TilingSettings:
+    """
+    Lee y valida el recorte, la grilla de tiles y la unión de cajas entre tiles.
+
+    La validez del recorte y de la grilla contra el tamaño de cada imagen se verifica por captura
+    (tiling.py): acá sólo se exige que cada valor esté bien formado.
+
+    Raises:
+        SettingsError: valores mal formados o fuera de rango.
+    """
+    env = os.environ if env is None else env
+
+    crop = CropMargins(*(_read_int(env, name, default, 0) for name, default in DEFAULT_CROP.items()))
+    rows = _read_int(env, "TILES_FILAS", DEFAULT_TILE_ROWS, 1)
+    columns = _read_int(env, "TILES_COLUMNAS", DEFAULT_TILE_COLUMNS, 1)
+    overlap = _read_int(env, "TILES_SOLAPAMIENTO_PX", DEFAULT_TILE_OVERLAP_PX, 0)
+    tolerance = _read_int(env, "TILES_TOLERANCIA_BORDE_PX", DEFAULT_TILE_EDGE_TOLERANCE_PX, 0)
+    fusion_ios = _read_number(env, "TILES_FUSION_IOS", DEFAULT_TILE_FUSION_IOS)
+
+    if (rows > 1 or columns > 1) and tolerance >= overlap:
+        raise SettingsError(
+            f"TILES_TOLERANCIA_BORDE_PX={tolerance} debe ser menor que TILES_SOLAPAMIENTO_PX={overlap}: "
+            f"si no, toda caja de la franja compartida contaría como cortada por el borde."
+        )
+
+    return TilingSettings(crop, rows, columns, overlap, tolerance, fusion_ios)

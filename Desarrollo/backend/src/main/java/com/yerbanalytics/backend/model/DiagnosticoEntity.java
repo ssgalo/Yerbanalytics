@@ -78,6 +78,15 @@ public class DiagnosticoEntity {
     private String detections;
 
     /**
+     * Región de la captura que analizó el servicio de inferencia, como JSON ({@code [x1, y1, x2, y2]}
+     * normalizado sobre la imagen orientada). Con recorte, las cajas de {@link #detections} son
+     * relativas a esa región. {@code null} en la carga manual y en los diagnósticos anteriores a la
+     * columna, que se ven sobre la imagen entera (design D5 de {@code add-tiling-inferencia}).
+     */
+    @Column(name = "crop", columnDefinition = "text")
+    private String crop;
+
+    /**
      * Cantidad de detecciones, para que el snapshot no tenga que parsear el JSON. Nullable a
      * propósito: {@code ddl-auto} la agrega a una tabla con filas, y las anteriores quedan en
      * {@code null}, que se lee como 0 ({@link #getDetectionCount()}).

@@ -5,7 +5,8 @@ Consulta el backend periódicamente, corre el detector de hojas sobre cada image
 convierte todas sus detecciones en **un único diagnóstico** y lo registra por el camino único de
 alta (`POST /api/diagnosticos`), el mismo que usa la carga manual del simulador.
 
-Cambio de referencia: `openspec/changes/add-diagnostico-por-detecciones/` (design D1–D12).
+Cambios de referencia: `openspec/changes/add-diagnostico-por-detecciones/` (design D1–D12) y
+`openspec/changes/add-tiling-inferencia/` (preprocesado y tiling, D1–D7).
 
 ## Arquitectura
 
@@ -15,15 +16,20 @@ main.py
   → GET  /api/capturas/pendientes-inactivas      (backend Java)
   → si hay pendientes: GET /api/configuracion/diagnostico   (criterio del agrónomo, 1 vez por ciclo)
   → por captura:
-      model.py      detect(imagen)   → todas las cajas con score ≥ YOLO_CONF_GLOBAL
-      diagnosis.py  diagnose(...)    → estado, severidad, confianza, score promedio, detecciones
+      imaging.py    load_normalized + crop   → imagen orientada (EXIF), RGB, sin riel ni piso
+      tiling.py     tile_grid                → grilla de tiles con solapamiento
+      model.py      detect(tile) × N         → cajas con score ≥ YOLO_CONF_GLOBAL, por tile
+      tiling.py     merge_across_tiles       → una caja por hoja cortada entre tiles vecinos
+      diagnosis.py  diagnose(...)            → estado, severidad, confianza, score promedio, detecciones
   → POST /api/diagnosticos                       (backend Java)
 ```
 
 | Módulo | Qué hace |
 |---|---|
 | `src/settings.py` | Rutas, `MODEL_CLASSES` y parámetros del **equipo** (umbral global, IoU, bandas de confianza). Valida al arrancar. |
-| `src/model.py` | Carga el detector YOLOv8 una vez y traduce `result.boxes` a detecciones (estado, score, caja `xyxyn`). No elige nada. |
+| `src/imaging.py` | Normalización (EXIF, RGB) y recorte de la captura, en memoria. Lo único que toca Pillow. |
+| `src/tiling.py` | Lógica **pura**: grilla de tiles, traslado de cajas a la imagen recortada, unión entre tiles y normalización. |
+| `src/model.py` | Carga el detector YOLOv8 una vez y traduce `result.boxes` de un tile a detecciones (estado, score, caja en píxeles). No elige nada. |
 | `src/diagnosis.py` | Lógica **pura** (sin I/O ni `ultralytics`): de las detecciones al diagnóstico. Se prueba sin GPU ni checkpoint. |
 | `src/api.py` | Cliente HTTP con la sesión de la cuenta de servicio: pendientes, criterio y alta. |
 | `src/main.py` | Orquestador: arranque, polling y tolerancia a fallos. |
@@ -72,6 +78,65 @@ normalizada `[x1, y1, x2, y2]` a 4 decimales. Con ellas el dashboard dibuja las 
   ciclo con pendientes, sin caché**: un cambio se aplica a la próxima captura. Si el pedido falla, o
   a algún estado anómalo de `MODEL_CLASSES` le falta criterio, el ciclo se omite y las capturas
   siguen pendientes.
+
+## Preprocesado y tiling
+
+Una captura del riel (1080×1440) trae 60–80 hojas, y el modelo se entrenó con imágenes de 5 a 20.
+Antes de `diagnose()`, el servicio lleva al modelo imágenes parecidas a las del entrenamiento sin
+contar dos veces la misma hoja (la severidad sale de la **cantidad**):
+
+```
+ JPEG en disco (intacto)
+   │ exif_transpose → convert("RGB")                          imaging.load_normalized
+   ▼
+ imagen orientada 1080×1440 (la misma que muestra el navegador)
+   │ quitar RECORTE_IZQUIERDA / ARRIBA / DERECHA / ABAJO       imaging.crop
+   ▼
+ región 802×1074 (sin riel ni piso)
+   │ TILES_FILAS × TILES_COLUMNAS, TILES_SOLAPAMIENTO_PX       tiling.tile_grid
+   ▼
+ 6 tiles de 466×445 → detect() en cada uno → cajas a píxeles de la región
+   │ unión entre tiles vecinos                                 tiling.merge_across_tiles
+   │ normalizar sobre la región, 4 decimales                   tiling.normalize
+   ▼
+ diagnose() — sin cambios
+```
+
+**Grilla.** Por eje, con largo `L`, `n` tiles y solapamiento `O`: tamaño `t = ceil((L + (n−1)·O) / n)`
+y posiciones `p_i = round(i·(L − t) / (n − 1))`; el último tile se apoya en el borde. Con una sola
+fila o columna, ese eje no solapa.
+
+**Regla de unión.** Dos cajas de tiles **vecinos** (comparten borde o esquina) se fusionan cuando:
+
+1. al menos una **toca el borde interno** que da hacia el otro tile (a menos de
+   `TILES_TOLERANCIA_BORDE_PX`), y
+2. su **IoS** (intersección ÷ área de la más chica) es ≥ `TILES_FUSION_IOS`.
+
+La caja fusionada es la **unión** de las dos, con clase y score de la de **mayor área** (la que vio
+más de la hoja), y se repite hasta que no queda ningún par: una hoja en la esquina de cuatro tiles
+termina en una caja. No mira la clase (son dos vistas de una hoja, no dos hojas) y va **antes** del
+filtro por clase, porque los pedazos suelen tener score bajo.
+
+- *Por qué la condición del borde*: en el follaje las hojas se pisan; sin ella, una hoja chica
+  dentro de una grande se fusionaría y se perdería.
+- *Lo que no hace*: dos vistas **enteras** de una hoja que cae en la franja compartida no tocan el
+  borde; sus cajas son casi iguales y las resuelve el paso de solapes de `diagnose()`.
+- Dos cajas del mismo tile nunca se fusionan acá: son dos cosas que el detector vio en una vista.
+
+**Qué viaja al backend.** Las `detections` quedan normalizadas sobre la **región recortada** y el
+alta agrega `crop = [x1, y1, x2, y2]`, la región normalizada sobre la imagen orientada (con el
+recorte de fábrica, `[0.2574, 0.2542, 1.0, 1.0]`). El dashboard muestra sólo esa región del JPEG
+original, con las cajas encima. El JPEG no se modifica.
+
+**Ajustar el recorte.** Los márgenes son píxeles de la imagen **ya orientada**. Para encontrarlos,
+abrí una captura real en un editor de imágenes y medí cuánto ocupan el riel y el piso desde cada
+borde. Si cambia la resolución de la cámara (`capturas.ancho-max` / `alto-max` del backend), hay que
+volver a medirlos: un recorte que no entra en la imagen deja la captura **pendiente** con un error que
+nombra las variables y el tamaño (no se recorta "lo que se pueda", porque eso analizaría otra región
+sin avisar). Lo mismo pasa con una grilla que no deja avance entre tiles.
+
+Cada captura deja en el log la región, la cantidad de tiles, las cajas antes y después de la unión y
+el tiempo total.
 
 ## Modelo
 
@@ -152,17 +217,29 @@ Las rutas relativas (`MODEL_PATH`, `CAPTURAS_DIR`) se resuelven contra la carpet
 | `BANDAS_CONFIANZA_ESTRES_SOLAR` | `0.40,0.55,0.70` | idem |
 | `BANDAS_CONFIANZA_PLAGA_FOLIAR` | `0.35,0.50,0.65` | idem (umbral más bajo: clase peligrosa, se prioriza recall) |
 | `BANDAS_CONFIANZA_DANO_FUNGICO` | `0.35,0.50,0.65` | idem |
+| `RECORTE_IZQUIERDA` | `278` | Píxeles que se quitan del borde izquierdo de la imagen orientada (riel). Entero ≥ 0. |
+| `RECORTE_ARRIBA` | `366` | Ídem, borde superior (piso). |
+| `RECORTE_DERECHA` | `0` | Ídem, borde derecho. |
+| `RECORTE_ABAJO` | `0` | Ídem, borde inferior. |
+| `TILES_FILAS` | `3` | Filas de la grilla de tiles. Entero ≥ 1. |
+| `TILES_COLUMNAS` | `2` | Columnas de la grilla. Cada tile es una inferencia. Entero ≥ 1. |
+| `TILES_SOLAPAMIENTO_PX` | `130` | Píxeles que comparten dos tiles vecinos. No cambia la cantidad de inferencias. Entero ≥ 0. |
+| `TILES_TOLERANCIA_BORDE_PX` | `6` | Distancia máxima al borde interno para considerar una caja cortada. Entero ≥ 0, menor que el solapamiento. |
+| `TILES_FUSION_IOS` | `0.5` | IoS desde el que una caja cortada y otra de un tile vecino son la misma hoja. En `(0, 1]`. |
 
 > **Los parámetros del equipo son PROVISORIOS**: no salen todavía de las curvas PR. Se cambian por
-> entorno, sin tocar código.
+> entorno, sin tocar código. El solapamiento y la IoS de la unión los fija el spike de calibración de
+> `add-tiling-inferencia` (tarea 1).
 
 Reglas de los parámetros del equipo:
 
 - La clave de cada clase es el estado de la plataforma sin acentos ni espacios
   (`Daño fúngico` → `BANDAS_CONFIANZA_DANO_FUNGICO`), no el nombre interno del checkpoint.
 - **Ausente** → toma el default y deja un `WARNING` que nombra la variable.
-- **Mal formada** (no son tres números en `(0, 1]` estrictamente crecientes) o `YOLO_CONF_GLOBAL`
-  mayor que algún umbral de validez → el servicio **no arranca** (`CRITICAL` + `exit 1`). Una
+- **Mal formada** (no son tres números en `(0, 1]` estrictamente crecientes; un recorte o una grilla
+  que no es un entero en su rango; una IoS fuera de `(0, 1]`; una tolerancia de borde que no es
+  menor que el solapamiento) o `YOLO_CONF_GLOBAL` mayor que algún umbral de validez → el servicio
+  **no arranca** (`CRITICAL` + `exit 1`). Una
   calibración inválida produciría diagnósticos plausibles y errados sin ningún aviso.
 - Una clase de `MODEL_CLASSES` sin default (p. ej. `Ácaro`) exige su variable.
 
@@ -197,7 +274,7 @@ python src/main.py           # o: cd src && python main.py
 
 ## Tests
 
-La lógica del diagnóstico y la validación de parámetros se prueban sin YOLO ni backend:
+La lógica del diagnóstico, el tiling y la validación de parámetros se prueban sin YOLO ni backend:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -207,8 +284,10 @@ python -m pytest
 | Archivo | Cubre |
 |---|---|
 | `tests/test_diagnosis.py` | El ejemplo del documento, empates (relevancia y solapes), filtro antes que solapes, IoU, Sano, No concluyente, bajo el mínimo, estado sin criterio. |
-| `tests/test_settings.py` | Defaults, variable ausente, bandas mal formadas, umbral global por encima de un umbral de clase, rutas relativas. |
-| `tests/test_api.py` | Cuerpo del alta para un anómalo, Sano y No concluyente. |
+| `tests/test_settings.py` | Defaults, variable ausente, bandas mal formadas, umbral global por encima de un umbral de clase, rutas relativas; recorte y tiling ausentes, negativos, no numéricos y fuera de rango. |
+| `tests/test_tiling.py` | Grilla de fábrica (6 tiles de 466×445), un solo tile, grilla sin avance, traslado, cortada + entera, dos pedazos, hojas distintas que se pisan, esquina de cuatro tiles, hoja entera repetida en la franja (la deja una `diagnose()`). |
+| `tests/test_imaging.py` | EXIF rotado 90°, sin EXIF, escala de grises / RGBA / CMYK, recorte de fábrica y recorte que no entra. |
+| `tests/test_api.py` | Cuerpo del alta para un anómalo, Sano y No concluyente; con y sin `crop`. |
 
 ## Ejecución con Docker Compose
 
@@ -234,6 +313,7 @@ El volumen `capturas-data` es compartido entre el backend y este servicio.
 | Sesión vencida o revocada (`401`) | Reinicia sesión y reintenta una vez |
 | Credenciales faltantes o rechazadas | Log error, espera el próximo ciclo |
 | Archivo JPEG no existe en disco | Log warning, pasa a la siguiente captura |
+| Recorte que no entra en la imagen, o grilla sin avance entre tiles | Log error que nombra las variables y el tamaño; la captura sigue pendiente |
 | JPEG ilegible o error durante la inferencia | Log error, pasa a la siguiente captura |
 | Backend rechaza el POST (`400`) | Log error con el mensaje del backend; la captura reaparece en el próximo ciclo |
 | Reinicio del proceso | La captura vuelve a aparecer como pendiente y se reprocesa (idempotente) |

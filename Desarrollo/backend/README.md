@@ -743,7 +743,8 @@ modelo; el backend lo valida, lo guarda y lo sirve, pero no lo recalcula.
   "sev": "Baja",
   "confidence": "Media",
   "conf": 62.0,
-  "detections": [{"label": "Clorosis", "score": 0.62, "box": [0.12, 0.30, 0.18, 0.37]}]
+  "detections": [{"label": "Clorosis", "score": 0.62, "box": [0.12, 0.30, 0.18, 0.37]}],
+  "crop": [0.2574, 0.2542, 1.0, 1.0]
 }
 ```
 
@@ -759,6 +760,12 @@ modelo; el backend lo valida, lo guarda y lo sirve, pero no lo recalcula.
 - `detections` es opcional (la carga manual no trae): como máximo 2000; cada una con `label` de la
   taxonomía, `score` en `[0, 1]` y `box` = `[x1, y1, x2, y2]` normalizada en `[0, 1]` con `x1 < x2` e
   `y1 < y2`. Una sola detección inválida rechaza el alta completa.
+- `crop` es opcional: la región de la captura que analizó el servicio de inferencia, con el formato
+  de una caja (`[x1, y1, x2, y2]` normalizado sobre la imagen **ya orientada**, `x1 < x2`, `y1 < y2`).
+  Con `crop`, las cajas de `detections` son relativas a esa región; sin él, a la imagen entera (la
+  carga manual y los diagnósticos viejos). Se guarda con el diagnóstico (`diagnostico.crop`, JSON en
+  texto, nullable; la crea `ddl-auto`), no con la captura: si cambia el recorte, cada diagnóstico se
+  sigue viendo con el que usó. El JPEG no se toca. Ver `openspec/changes/add-tiling-inferencia/` (D5).
 - Todo error es `400 {"error": "<mensaje apto para mostrar>"}`, que nombra el campo.
 - El alta actualiza el diagnóstico vigente del sector, incluido el nivel (`sector.diagnosis_confidence`).
 
@@ -768,7 +775,7 @@ modelo; el backend lo valida, lo guarda y lo sirve, pero no lo recalcula.
 **Lectura.** `Diagnostico` (listado), `DiagnosisCard` (snapshot) y `Diagnosis` (sector) traen
 `conf` (nulo en No concluyente), `confidence` y —las dos primeras— `detectionCount`; **no** traen las
 cajas, que serían decenas de KB por tarjeta. Se piden aparte:
-`GET /api/diagnosticos/{id}/detecciones` → `{"detections": [...]}`, o `404 {"error": …}` si el id no
+`GET /api/diagnosticos/{id}/detecciones` → `{"detections": [...], "crop": [...] | null}`, o `404 {"error": …}` si el id no
 existe (incluye los `DG-` que el snapshot deriva del sector). Las detecciones se guardan como JSON en
 `diagnostico.detections` (texto): sólo se leen juntas para dibujarlas.
 

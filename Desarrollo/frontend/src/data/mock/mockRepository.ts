@@ -17,7 +17,7 @@ import type {
   CatalogoReglas,
   Configuracion,
   DagSchema,
-  Detection,
+  DiagnosisDetections,
   DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
@@ -201,13 +201,14 @@ export class MockRepository implements DataRepository {
     return structuredClone(this.diagnosisCriteria);
   }
 
-  async getDiagnosisDetections(diagnosisId: string): Promise<Detection[]> {
+  async getDiagnosisDetections(diagnosisId: string): Promise<DiagnosisDetections> {
     const card = (await this.getNursery()).diagById[diagnosisId];
     // Igual que el backend: un id que no existe es un 404. (La demo no tiene tarjetas `DG-`.)
     if (!card) {
       throw new Error(`El diagnóstico ${diagnosisId} no existe.`);
     }
-    return mockDetections(card.id, card.estado, card.sev, card.conf);
+    // Las fotos de la demo ya están encuadradas: sin recorte.
+    return { detections: mockDetections(card.id, card.estado, card.sev, card.conf), crop: null };
   }
 
   /**

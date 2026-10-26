@@ -257,6 +257,12 @@ Modelo de visión para diagnosticar el estado del sector.
   (severidad + confianza), desempata la criticidad. **El filtro va antes que los solapes, a
   propósito**: una caja inválida no debe poder borrar a una válida de otra clase. Spec y porqués:
   `openspec/changes/add-diagnostico-por-detecciones/`.
+- **Preprocesado y tiling antes del diagnóstico** (`imaging.py`, `tiling.py`): la captura se orienta (EXIF), se
+  recorta (sin riel ni piso, `RECORTE_*`) y se divide en tiles con solapamiento (3×2, 130 px de fábrica), porque el
+  modelo se entrenó con 5–20 hojas por imagen y una captura trae 60–80. Las cajas de los tiles se **unen** antes de
+  `diagnose()` (borde compartido + IoS, para no contar dos veces una hoja cortada: la severidad sale de la cantidad);
+  `diagnose()` no cambia. El alta lleva `crop` y las cajas relativas a esa región; el visor muestra sólo la región,
+  y el JPEG no se toca. Spec: `openspec/changes/add-tiling-inferencia/`.
 - **El diagnóstico describe; el motor decide.** El módulo no conoce reglas ni acciones.
 - **Datasets**: NO se versionan en Git (pesados; viven en Google Drive y se
   re-descargan de sus fuentes/DOIs). Donantes curados por homología fenotípica del

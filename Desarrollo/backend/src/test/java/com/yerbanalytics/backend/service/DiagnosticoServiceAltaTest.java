@@ -76,7 +76,12 @@ class DiagnosticoServiceAltaTest {
 
     private static NuevoDiagnostico alta(String estado, String sev, String confidence, Double conf,
                                          List<Detection> detections) {
-        return new NuevoDiagnostico("CAP-1", null, null, estado, sev, confidence, conf, detections);
+        return new NuevoDiagnostico("CAP-1", null, null, estado, sev, confidence, conf, detections, null);
+    }
+
+    private static NuevoDiagnostico altaConRecorte(List<Double> crop) {
+        return new NuevoDiagnostico("CAP-1", null, null, "Sano", null, "Alta", 91.0,
+                List.of(new Detection("Sano", 0.91, CAJA)), crop);
     }
 
     private void rechaza(NuevoDiagnostico d) {
@@ -205,7 +210,7 @@ class DiagnosticoServiceAltaTest {
 
         @Test
         void sinCaptura_400() {
-            assertThatThrownBy(() -> service.alta(new NuevoDiagnostico(null, null, null, "Sano", null, "Alta", 90.0, null)))
+            assertThatThrownBy(() -> service.alta(new NuevoDiagnostico(null, null, null, "Sano", null, "Alta", 90.0, null, null)))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }
@@ -328,8 +333,70 @@ class DiagnosticoServiceAltaTest {
         DiagnosticoEntity viejo = new DiagnosticoEntity();
         viejo.setId("DX-00001");
         when(repo.findById("DX-00001")).thenReturn(Optional.of(viejo));
-        assertThat(service.detecciones("DX-00001")).isEmpty();
+        assertThat(service.detecciones("DX-00001").detections()).isEmpty();
+        assertThat(service.detecciones("DX-00001").crop()).isNull();
         assertThat(viejo.getDetectionCount()).isZero();
+    }
+
+    @Nested
+    @DisplayName("Recorte (add-tiling-inferencia, D5)")
+    class Recorte {
+
+        private DiagnosticoEntity guardado() {
+            ArgumentCaptor<DiagnosticoEntity> captor = ArgumentCaptor.forClass(DiagnosticoEntity.class);
+            verify(repo).save(captor.capture());
+            return captor.getValue();
+        }
+
+        @Test
+        void conRecorte_seGuardaYSeDevuelveConLasDetecciones() {
+            List<Double> crop = List.of(0.2574, 0.2542, 1.0, 1.0);
+            service.alta(altaConRecorte(crop));
+
+            DiagnosticoEntity e = guardado();
+            assertThat(e.getCrop()).isEqualTo("[0.2574,0.2542,1.0,1.0]");
+            when(repo.findById(e.getId())).thenReturn(Optional.of(e));
+            assertThat(service.detecciones(e.getId()).crop()).containsExactlyElementsOf(crop);
+            assertThat(service.detecciones(e.getId()).detections()).hasSize(1);
+        }
+
+        @Test
+        void sinRecorte_quedaSinRecorte() {
+            service.alta(altaConRecorte(null));
+
+            DiagnosticoEntity e = guardado();
+            assertThat(e.getCrop()).isNull();
+            when(repo.findById(e.getId())).thenReturn(Optional.of(e));
+            assertThat(service.detecciones(e.getId()).crop()).isNull();
+        }
+
+        @Test
+        void recorteFueraDeRango_400QueNombraElCampo() {
+            assertThatThrownBy(() -> service.alta(altaConRecorte(List.of(0.1, 0.2, 1.2, 0.9))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("crop");
+            verify(repo, never()).save(any());
+        }
+
+        @Test
+        void recorteConX1MayorOIgualQueX2_400() {
+            rechaza(altaConRecorte(List.of(0.5, 0.2, 0.5, 0.9)));
+        }
+
+        @Test
+        void recorteConY1MayorQueY2_400() {
+            rechaza(altaConRecorte(List.of(0.1, 0.9, 0.5, 0.2)));
+        }
+
+        @Test
+        void recorteDeTresValores_400() {
+            rechaza(altaConRecorte(List.of(0.1, 0.2, 0.5)));
+        }
+
+        @Test
+        void recorteConUnNulo_400() {
+            rechaza(altaConRecorte(Arrays.asList(0.1, null, 0.5, 0.9)));
+        }
     }
 
     @Test

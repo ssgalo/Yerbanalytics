@@ -5,9 +5,9 @@ Responsabilidades:
   - Cargar el checkpoint (YOLOv8 de detección) una única vez y mantenerlo en memoria.
   - Verificar al arrancar que MODEL_CLASSES tenga tantas clases como el checkpoint, y dejar en el
     log el mapeo índice → nombre del checkpoint → estado de la plataforma.
-  - `detect(image_path)`: corre YOLO con el umbral global y devuelve TODAS las detecciones
-    (estado, score y caja normalizada). Elegir el diagnóstico NO es tarea de este módulo: eso lo
-    hace diagnosis.py.
+  - `detect(image)`: corre YOLO con el umbral global sobre una imagen en memoria (un tile) y
+    devuelve TODAS las detecciones (estado, score y caja en píxeles de esa imagen). Unir los tiles
+    es tarea de tiling.py, y elegir el diagnóstico, de diagnosis.py.
 """
 
 from __future__ import annotations
@@ -15,14 +15,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from PIL import Image
 from ultralytics import YOLO
 
-from diagnosis import Detection
+from tiling import PixelDetection
 
 logger = logging.getLogger(__name__)
-
-# Decimales con que viajan score y coordenadas (contrato D12).
-_DECIMALS = 4
 
 
 class InferenceModel:
@@ -52,42 +50,28 @@ class InferenceModel:
     def classes(self) -> list[str]:
         return list(self._classes)
 
-    def detect(self, image_path: str) -> list[Detection]:
+    def detect(self, image: Image.Image) -> list[PixelDetection]:
         """
-        Corre el detector sobre una imagen y devuelve sus detecciones con score ≥ YOLO_CONF_GLOBAL.
+        Corre el detector sobre una imagen en memoria (un tile, ya en RGB) y devuelve sus
+        detecciones con score ≥ YOLO_CONF_GLOBAL, con cajas xyxy en píxeles de esa imagen.
 
-        Raises:
-            FileNotFoundError: si el archivo no existe en disco.
-            ValueError: si el archivo existe pero no se puede leer como imagen.
+        Las cajas no se redondean acá: la unión entre tiles decide en los bordes, y normalizar es
+        el último paso (tiling.normalize).
         """
-        path = Path(image_path)
-        if not path.is_file():
-            raise FileNotFoundError(f"Imagen no encontrada en disco: {image_path}")
-
-        results = self._model(str(path), conf=self._conf_global, verbose=False)
+        results = self._model(image, conf=self._conf_global, verbose=False)
         if not results:
-            # Ultralytics devuelve una lista vacía (con un WARNING propio) si no puede leer el archivo.
-            raise ValueError(f"No se pudo leer la imagen (¿JPEG truncado o vacío?): {image_path}")
+            return []
         boxes = results[0].boxes
         if boxes is None or len(boxes) == 0:
             return []
 
-        detections: list[Detection] = []
-        classes = boxes.cls.tolist()
-        scores = boxes.conf.tolist()
-        coords = boxes.xyxyn.tolist()
-        for cls, score, xyxyn in zip(classes, scores, coords):
-            x1, y1, x2, y2 = (round(min(max(v, 0.0), 1.0), _DECIMALS) for v in xyxyn)
-            if not (x1 < x2 and y1 < y2):
-                # Una caja de menos de una diezmilésima de la imagen no es una hoja, y el backend
-                # rechazaría el alta entera por una caja degenerada.
-                logger.warning("Se descarta una caja degenerada tras el redondeo: %s", xyxyn)
-                continue
+        width, height = image.size
+        detections: list[PixelDetection] = []
+        for cls, score, xyxy in zip(boxes.cls.tolist(), boxes.conf.tolist(), boxes.xyxy.tolist()):
+            x1, y1, x2, y2 = (
+                min(max(v, 0.0), size) for v, size in zip(xyxy, (width, height, width, height))
+            )
             detections.append(
-                Detection(
-                    label=self._classes[int(cls)],
-                    score=round(float(score), _DECIMALS),
-                    box=(x1, y1, x2, y2),
-                )
+                PixelDetection(label=self._classes[int(cls)], score=float(score), box=(x1, y1, x2, y2))
             )
         return detections

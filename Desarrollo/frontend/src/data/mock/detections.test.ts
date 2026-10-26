@@ -60,7 +60,9 @@ describe('detecciones de la demo', () => {
   it('el repositorio mock las sirve por id, y un id inexistente es un error', async () => {
     const repo = new MockRepository(SEED);
     const d = diagnoses.find((x) => x.detectionCount > 0)!;
-    expect(await repo.getDiagnosisDetections(d.id)).toHaveLength(d.detectionCount);
+    const { detections, crop } = await repo.getDiagnosisDetections(d.id);
+    expect(detections).toHaveLength(d.detectionCount);
+    expect(crop).toBeNull();
     await expect(repo.getDiagnosisDetections('DX-99999')).rejects.toThrow(/no existe/);
   });
 

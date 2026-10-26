@@ -333,7 +333,8 @@ public class NurseryService {
                     null, // derivada del sector: no tiene captura asociada
                     lecturaPorZona.get(s.zona()),
                     d.confidence(),
-                    0 // derivada del sector: sin detecciones propias
+                    0, // derivada del sector: sin detecciones propias
+                    null
             ));
         }
 
@@ -359,7 +360,8 @@ public class NurseryService {
                     null, // derivada del sector: no tiene captura asociada
                     lecturaPorZona.get(s.zona()),
                     null, // ni nivel de confianza
-                    0
+                    0,
+                    null
             ));
         }
 
@@ -936,7 +938,8 @@ public class NurseryService {
                     imagenes.get(e.getCapturaId()),
                     e.getCreadoEn(),
                     e.getConfidence(),
-                    e.getDetectionCount()
+                    e.getDetectionCount(),
+                    diagnosticoService.recorte(e)
             ));
         }
         return out;

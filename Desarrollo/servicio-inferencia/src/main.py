@@ -12,8 +12,11 @@ Ciclo de vida:
        b. Si hay pendientes, lee UNA vez el criterio del agrónomo (/api/configuracion/diagnostico).
           Si falla, o falta criterio para algún estado anómalo del modelo, se omite el ciclo y las
           capturas siguen pendientes.
-       c. Por cada captura: detect → diagnose → registrar_diagnostico.
+       c. Por cada captura: normalizar → recortar → tiles → detect por tile → unir cajas →
+          diagnose → registrar_diagnostico (con el recorte aplicado).
             - Si el archivo no existe en disco: log warning, continúa.
+            - Si el recorte o la grilla no entran en la imagen: log error, la captura sigue
+              pendiente.
             - Si la inferencia o el backend fallan: log error, continúa (no detiene el ciclo).
 
 Comportamiento ante reinicios:
@@ -45,17 +48,28 @@ load_dotenv(SERVICE_DIR / ".env", override=False)
 from api import fetch_criteria, obtener_pendientes, registrar_diagnostico  # noqa: E402
 from diagnosis import (  # noqa: E402
     Criteria,
+    Detection,
     DiagnosisError,
     MissingCriteriaError,
     check_criteria,
     diagnose,
 )
+from imaging import NormalizedBox, crop, load_normalized  # noqa: E402
 from model import InferenceModel  # noqa: E402
 from settings import (  # noqa: E402
     SettingsError,
     TeamSettings,
+    TilingSettings,
     load_team_settings,
+    load_tiling_settings,
     model_classes_from_env,
+)
+from tiling import (  # noqa: E402
+    TilingError,
+    merge_across_tiles,
+    normalize,
+    tile_grid,
+    to_image_coords,
 )
 
 # ---------------------------------------------------------------------------
@@ -106,7 +120,42 @@ def _resumen_por_clase(labels: list[str]) -> str:
     return ", ".join(f"{label}={n}" for label, n in counts.most_common()) or "ninguna"
 
 
-def procesar_ciclo(model: InferenceModel, team: TeamSettings, capturas_dir: Path) -> None:
+def detect_tiled(
+    model: InferenceModel, path: Path, tiling: TilingSettings, captura_id: str
+) -> tuple[list[Detection], NormalizedBox]:
+    """
+    Normaliza y recorta la captura, corre el detector por tile y une las cajas (design D2 de
+    add-tiling-inferencia).
+
+    Devuelve las cajas normalizadas sobre la región recortada y el recorte normalizado sobre la
+    imagen orientada.
+
+    Raises:
+        FileNotFoundError / ValueError: si la imagen no existe o no se puede leer.
+        TilingError: si el recorte o la grilla no entran en la imagen.
+    """
+    start = time.monotonic()
+    region, crop_box = crop(load_normalized(path), tiling.crop)
+    width, height = region.size
+    tiles = tile_grid(width, height, tiling.rows, tiling.columns, tiling.overlap_px)
+
+    raw = []
+    for tile in tiles:
+        image = region.crop((tile.x, tile.y, tile.right, tile.bottom))
+        raw.extend(to_image_coords(tile, model.detect(image)))
+    merged = merge_across_tiles(raw, tiling.edge_tolerance_px, tiling.fusion_ios)
+    detections = normalize(merged, width, height)
+
+    logger.info(
+        "Captura %s: región %d×%d, %d tile(s), %d caja(s) → %d tras unir tiles, %.1f s",
+        captura_id, width, height, len(tiles), len(raw), len(detections), time.monotonic() - start,
+    )
+    return detections, crop_box
+
+
+def procesar_ciclo(
+    model: InferenceModel, team: TeamSettings, tiling: TilingSettings, capturas_dir: Path
+) -> None:
     """Ejecuta un ciclo completo de polling y procesamiento."""
     try:
         pendientes = obtener_pendientes()
@@ -145,13 +194,20 @@ def procesar_ciclo(model: InferenceModel, team: TeamSettings, capturas_dir: Path
 
         # --- Detectar y diagnosticar ---
         try:
-            detections = model.detect(str(ruta))
+            detections, crop_box = detect_tiled(model, ruta, tiling, captura.captura_id)
             diagnosis = diagnose(detections, team.confidence_bands, team.overlap_iou, criteria)
         except FileNotFoundError:
             logger.warning(
                 "Captura %s: el archivo '%s' no existe en disco. "
                 "Se omite esta captura y se continúa con la siguiente.",
                 captura.captura_id, ruta,
+            )
+            continue
+        except TilingError as exc:
+            logger.error(
+                "Captura %s: %s No se diagnostica; sigue pendiente hasta que se ajuste la "
+                "configuración.",
+                captura.captura_id, exc,
             )
             continue
         except MissingCriteriaError as exc:
@@ -172,7 +228,7 @@ def procesar_ciclo(model: InferenceModel, team: TeamSettings, capturas_dir: Path
             continue
 
         logger.info(
-            "Captura %s: %d detección(es) (umbral global), válidas tras filtro y solapes: %s → "
+            "Captura %s: %d detección(es) (umbral global, tiles unidos), válidas tras filtro y solapes: %s → "
             "diagnóstico %s (severidad=%s, confianza=%s, promedio=%s)",
             captura.captura_id,
             len(detections),
@@ -185,7 +241,7 @@ def procesar_ciclo(model: InferenceModel, team: TeamSettings, capturas_dir: Path
 
         # --- Registrar diagnóstico ---
         try:
-            registrar_diagnostico(captura.captura_id, diagnosis)
+            registrar_diagnostico(captura.captura_id, diagnosis, crop_box)
         except Exception as exc:
             logger.error(
                 "Captura %s: no se pudo registrar el diagnóstico en el backend: %s. "
@@ -208,6 +264,7 @@ def main() -> None:
         model_path = _model_path()
         classes = model_classes_from_env()
         team = load_team_settings(classes)
+        tiling = load_tiling_settings()
     except SettingsError as exc:
         logger.critical("Configuración inválida: %s", exc)
         sys.exit(1)
@@ -220,6 +277,19 @@ def main() -> None:
             "  Bandas de confianza   : %-13s válida %.2f · media %.2f · alta %.2f",
             state, bands.valid, bands.medium, bands.high,
         )
+
+    logger.info(
+        "  Recorte (px)          : izquierda %d · arriba %d · derecha %d · abajo %d",
+        tiling.crop.left, tiling.crop.top, tiling.crop.right, tiling.crop.bottom,
+    )
+    logger.info(
+        "  Tiles                 : %d filas × %d columnas · solapamiento %d px",
+        tiling.rows, tiling.columns, tiling.overlap_px,
+    )
+    logger.info(
+        "  Unión entre tiles     : tolerancia de borde %d px · IoS %.2f",
+        tiling.edge_tolerance_px, tiling.fusion_ios,
+    )
 
     # Cargar el modelo una única vez al arranque.
     try:
@@ -236,7 +306,7 @@ def main() -> None:
     logger.info("Modelo listo. Iniciando ciclo de polling cada %d s.", intervalo_polling)
 
     while True:
-        procesar_ciclo(model, team, capturas_dir)
+        procesar_ciclo(model, team, tiling, capturas_dir)
         time.sleep(intervalo_polling)
 
 

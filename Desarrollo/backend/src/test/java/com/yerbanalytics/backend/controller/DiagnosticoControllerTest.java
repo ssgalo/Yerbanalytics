@@ -367,7 +367,34 @@ class DiagnosticoControllerTest {
         mvc.perform(get("/api/diagnosticos/" + id + "/detecciones"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.detections").isArray())
-                .andExpect(jsonPath("$.detections.length()").value(0));
+                .andExpect(jsonPath("$.detections.length()").value(0))
+                .andExpect(jsonPath("$.crop").value((Object) null));
+    }
+
+    @Test
+    void elRecorteSeConsultaConLasDetecciones() throws Exception {
+        Map<String, Object> body = anomalo(capturaExistente(), "Clorosis", 62.0);
+        body.put("detections", List.of(deteccion("Clorosis", 0.62, 0.12, 0.30, 0.18, 0.37)));
+        body.put("crop", List.of(0.2574, 0.2542, 1.0, 1.0));
+        String id = json.readTree(alta(body)).get("id").asText();
+
+        mvc.perform(get("/api/diagnosticos/" + id + "/detecciones"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detections.length()").value(1))
+                .andExpect(jsonPath("$.crop.length()").value(4))
+                .andExpect(jsonPath("$.crop[0]").value(0.2574))
+                .andExpect(jsonPath("$.crop[3]").value(1.0));
+    }
+
+    @Test
+    void recorteInvalido_400QueNombraElCampo() throws Exception {
+        Map<String, Object> body = anomalo(capturaExistente(), "Clorosis", 62.0);
+        body.put("crop", List.of(0.6, 0.2, 0.4, 1.0));
+        mvc.perform(post("/api/diagnosticos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("crop")));
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yerbanalytics.backend.constant.NurseryConstants;
+import com.yerbanalytics.backend.dto.DetectionsResponse;
 import com.yerbanalytics.backend.dto.Detection;
 import com.yerbanalytics.backend.dto.Diagnostico;
 import com.yerbanalytics.backend.exception.DiagnosisNotFoundException;
@@ -64,6 +65,7 @@ public class DiagnosticoService {
     public static final int MAX_DETECCIONES = 2000;
 
     private static final TypeReference<List<Detection>> LISTA_DETECCIONES = new TypeReference<>() {};
+    private static final TypeReference<List<Double>> CAJA = new TypeReference<>() {};
 
     private final DiagnosticoRepository repo;
     private final CapturaRepository capturaRepo;
@@ -84,7 +86,7 @@ public class DiagnosticoService {
     public record NuevoDiagnostico(
             String capturaId, String sectorId, String zonaId,
             String estado, String sev, String confidence, Double conf,
-            List<Detection> detections) {}
+            List<Detection> detections, List<Double> crop) {}
 
     /**
      * Da de alta un diagnóstico. El sector y la macro-zona pueden venir explícitos; si no, se
@@ -110,6 +112,7 @@ public class DiagnosticoService {
         String confidence = d.confidence() == null || d.confidence().isBlank() ? null : d.confidence().trim();
         validarCoherencia(estado, sev, confidence, d.conf());
         List<Detection> detecciones = validarDetecciones(d.detections());
+        List<Double> crop = validarRecorte(d.crop());
 
         String sectorFinal = (d.sectorId() != null && !d.sectorId().isBlank())
                 ? d.sectorId().trim() : captura.getSectorId();
@@ -133,6 +136,7 @@ public class DiagnosticoService {
         e.setConfidence(confidence);
         e.setDetections(aJson(detecciones));
         e.setDetectionCount(detecciones.size());
+        e.setCrop(crop != null ? aJson(crop) : null);
         e.setCreadoEn(System.currentTimeMillis());
         repo.save(e);
 
@@ -181,14 +185,16 @@ public class DiagnosticoService {
     }
 
     /**
-     * Las detecciones de un diagnóstico persistido. Un diagnóstico sin detecciones (carga manual o
-     * anterior a la columna) devuelve la lista vacía; un id que no existe, {@link DiagnosisNotFoundException}.
+     * Las detecciones de un diagnóstico persistido y su recorte. Un diagnóstico sin detecciones (carga
+     * manual o anterior a la columna) devuelve la lista vacía, y uno sin recorte, {@code crop: null};
+     * un id que no existe, {@link DiagnosisNotFoundException}.
      */
     @Transactional(readOnly = true)
-    public List<Detection> detecciones(String id) {
+    public DetectionsResponse detecciones(String id) {
         DiagnosticoEntity e = repo.findById(id)
                 .orElseThrow(() -> new DiagnosisNotFoundException("El diagnóstico '" + id + "' no existe."));
-        return deJson(e.getDetections());
+        return new DetectionsResponse(deJson(e.getDetections(), LISTA_DETECCIONES, List.of()),
+                deJson(e.getCrop(), CAJA, null));
     }
 
     /**
@@ -269,7 +275,7 @@ public class DiagnosticoService {
                 throw new IllegalArgumentException(donde + " debe tener un score entre 0 y 1.");
             }
             List<Double> box = det.box();
-            if (box == null || box.size() != 4 || box.stream().anyMatch(v -> v == null || v.isNaN() || v < 0 || v > 1)) {
+            if (!esCajaNormalizada(box)) {
                 throw new IllegalArgumentException(donde
                         + " debe tener una caja (box) de cuatro coordenadas normalizadas entre 0 y 1.");
             }
@@ -282,22 +288,47 @@ public class DiagnosticoService {
         return out;
     }
 
+    /**
+     * El recorte es opcional (la carga manual no lo manda); si viene, tiene el formato de una caja:
+     * {@code [x1, y1, x2, y2]} normalizado, con {@code x1 < x2} e {@code y1 < y2}.
+     */
+    private static List<Double> validarRecorte(List<Double> crop) {
+        if (crop == null) {
+            return null;
+        }
+        if (!esCajaNormalizada(crop) || crop.get(0) >= crop.get(2) || crop.get(1) >= crop.get(3)) {
+            throw new IllegalArgumentException("El recorte (crop) debe ser [x1, y1, x2, y2] normalizado entre 0 y 1,"
+                    + " con x1 < x2 e y1 < y2.");
+        }
+        return List.copyOf(crop);
+    }
+
+    private static boolean esCajaNormalizada(List<Double> box) {
+        return box != null && box.size() == 4
+                && box.stream().noneMatch(v -> v == null || v.isNaN() || v < 0 || v > 1);
+    }
+
     // ------------------------------------------------------------------
 
-    private String aJson(List<Detection> detecciones) {
+    private String aJson(List<?> valor) {
         try {
-            return json.writeValueAsString(detecciones);
+            return json.writeValueAsString(valor);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("No se pudieron serializar las detecciones", ex);
         }
     }
 
-    private List<Detection> deJson(String valor) {
+    /** El recorte guardado con el diagnóstico, o {@code null} si no tiene. */
+    public List<Double> recorte(DiagnosticoEntity e) {
+        return deJson(e.getCrop(), CAJA, null);
+    }
+
+    private <T> T deJson(String valor, TypeReference<T> tipo, T vacio) {
         if (valor == null || valor.isBlank()) {
-            return List.of();
+            return vacio;
         }
         try {
-            return json.readValue(valor, LISTA_DETECCIONES);
+            return json.readValue(valor, tipo);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Las detecciones guardadas no son un JSON válido", ex);
         }
