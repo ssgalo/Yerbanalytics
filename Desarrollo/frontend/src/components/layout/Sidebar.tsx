@@ -48,7 +48,6 @@ const CONFIGURACION: NavItem[] = [
     label: 'Criterio de diagnóstico',
   },
   { to: '/reglas', vista: VISTAS.reglas, icon: 'rules', label: 'Motor de reglas', end: true },
-  { to: '/reglas/inspector', vista: VISTAS.inspector, icon: 'sensor', label: 'Inspector del motor' },
   { to: '/hardware', vista: VISTAS.hardware, icon: 'hardware', label: 'Hardware' },
   { to: '/topologia', vista: VISTAS.topologia, icon: 'cube', label: 'Topología' },
   { to: '/usuarios', vista: VISTAS.usuarios, icon: 'users', label: 'Usuarios' },
