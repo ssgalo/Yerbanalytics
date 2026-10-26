@@ -5,7 +5,7 @@
    `?zona=` no hay contexto que mostrar y se vuelve ahí. Por eso adentro
    no hay selector de zonas, sólo "Volver".
 
-   Tarjetas: sectores, valores sensados, rustificación, plan de nutrición, tanques de insumo y bloqueo manual. La forma
+   Tarjetas: sectores, valores sensados, rustificación, tanques de insumo y bloqueo manual. La forma
    de la grilla decide la disposición: una macro-zona más ancha que alta
    apila las tarjetas a todo el ancho; una más alta que ancha deja los
    sectores a la izquierda, el sensado a la derecha y la rustificación
@@ -21,7 +21,6 @@ import { SensingCard } from './components/SensingCard';
 import { HardeningCard } from './components/HardeningCard';
 import { ManualLockCard } from '@/features/manual-lock/ManualLockCard';
 import { TankCard } from '@/features/supply/TankCard';
-import { NutritionPlanCard } from '@/features/nutrition/NutritionPlanCard';
 import styles from './MapPage.module.css';
 
 export function MapPage() {
@@ -63,7 +62,6 @@ export function MapPage() {
         />
         <SensingCard className={styles.sensing} zona={zona} wide={wide} />
         <HardeningCard className={styles.hardening} zona={zona} />
-        <NutritionPlanCard className={styles.nutrition} zona={zona} />
         <TankCard className={styles.tanks} zoneId={zona.id} />
         <ManualLockCard className={styles.lock} zonaId={zona.id} label={`la macro-zona ${zona.id}`} />
       </div>

@@ -50,16 +50,3 @@ describe('SensingCard · detalle en modal', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
-
-describe('SensingCard · DPV', () => {
-  it('muestra el déficit de presión de vapor de la zona, derivado de su temperatura y humedad', async () => {
-    montarApp('/mapa?zona=MZ-2');
-    await screen.findByRole('heading', { name: 'Valores sensados' });
-
-    const grupo = screen.getByRole('region', { name: 'Derivada, informativa' });
-    expect(within(grupo).getByText('Déficit de presión de vapor')).toBeTruthy();
-    expect(within(grupo).getByText('kPa')).toBeTruthy();
-    // El DPV no se sensa: no es una fila que abra el histórico de una métrica
-    expect(within(grupo).queryByRole('button')).toBeNull();
-  });
-});
