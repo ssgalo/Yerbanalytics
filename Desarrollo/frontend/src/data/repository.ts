@@ -15,7 +15,7 @@ import type {
   CatalogoReglas,
   Configuracion,
   DagSchema,
-  Detection,
+  DiagnosisDetections,
   DiagnosisCriteria,
   DisposicionTopologia,
   HardwareData,
@@ -77,10 +77,10 @@ export interface DataRepository {
    */
   saveDiagnosisCriteria(criteria: DiagnosisCriteria): Promise<DiagnosisCriteria>;
   /**
-   * Cajas guardadas con un diagnóstico (`DX-`). Rechaza si el id no existe (incluye los `DG-`
-   * derivados del sector, que no tienen detecciones).
+   * Cajas guardadas con un diagnóstico (`DX-`) y su recorte. Rechaza si el id no existe (incluye
+   * los `DG-` derivados del sector, que no tienen detecciones).
    */
-  getDiagnosisDetections(diagnosisId: string): Promise<Detection[]>;
+  getDiagnosisDetections(diagnosisId: string): Promise<DiagnosisDetections>;
   /** Devuelve el estado técnico de la flota de hardware (HU-18 / HU-21). */
   getHardware(): Promise<HardwareData>;
   /** Da de alta un dispositivo (valida unicidad) y devuelve la flota actualizada (HU-18). */

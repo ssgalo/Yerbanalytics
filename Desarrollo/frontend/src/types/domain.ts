@@ -236,6 +236,11 @@ export interface DiagnosisCard {
    */
   imagenUrl?: string | null;
   /**
+   * Región analizada (`[x1, y1, x2, y2]` normalizado sobre la imagen orientada): la miniatura
+   * muestra sólo esa parte, como el visor. `null` o ausente = la imagen entera.
+   */
+  crop?: [number, number, number, number] | null;
+  /**
    * Momento del diagnóstico (ms epoch): el alta, si nació de una captura; la última lectura de la
    * zona, si se deriva del sector. `null` si la zona nunca reportó. `time` es el mismo dato ya
    * redactado ("hace 12 min").
@@ -405,7 +410,8 @@ export interface DiagnosisDetail {
 
 /**
  * Una caja que detectó el modelo y sobrevivió al filtro y a la resolución de solapes.
- * `box` = [x1, y1, x2, y2] normalizadas a la imagen (0–1, `xyxyn`), independientes de la resolución.
+ * `box` = [x1, y1, x2, y2] normalizadas (0–1, `xyxyn`), independientes de la resolución: sobre la
+ * región `crop` del diagnóstico si tiene, o sobre la imagen entera.
  */
 export interface Detection {
   /** Estado de la plataforma ("Clorosis", "Sano"…), no el nombre interno del modelo. */
@@ -413,6 +419,17 @@ export interface Detection {
   /** 0–1. */
   score: number;
   box: [number, number, number, number];
+}
+
+/** Las cajas de un diagnóstico y la región de la captura sobre la que se calcularon. */
+export interface DiagnosisDetections {
+  detections: Detection[];
+  /**
+   * Región analizada por el servicio de inferencia, [x1, y1, x2, y2] normalizada sobre la imagen
+   * (ya orientada, como la muestra el navegador). `null` en la carga manual y en los diagnósticos
+   * anteriores al recorte: las cajas son de la imagen entera.
+   */
+  crop: [number, number, number, number] | null;
 }
 
 /** Bandas de severidad de un estado anómalo, en cantidad de hojas detectadas por sector. */

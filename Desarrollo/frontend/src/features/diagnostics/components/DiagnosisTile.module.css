@@ -34,6 +34,8 @@
   overflow: hidden;
   cursor: zoom-in;
   font-family: var(--font-body);
+  /* La región recortada se dimensiona contra la miniatura (cqw/cqh) */
+  container-type: size;
 }
 
 .thumb:focus-visible {
@@ -48,11 +50,32 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.thumb:hover .region {
+  transform: scale(1.03);
+}
+
+/* Marco de la foto: sin recorte ocupa la miniatura; con recorte toma su forma y la cubre (inline) */
+.region {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
   transition: transform 0.25s;
 }
 
-.thumb:hover .photo {
-  transform: scale(1.03);
+.region[style] {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+}
+
+.regionPhoto {
+  position: absolute;
+  display: block;
+  max-width: none;
 }
 
 /* Rótulo sobre la imagen */
@@ -165,10 +188,10 @@ a.sector:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .photo {
+  .region {
     transition: none;
   }
-  .thumb:hover .photo {
+  .thumb:hover .region {
     transform: none;
   }
 }

@@ -306,12 +306,20 @@ describe('HttpRepository · criterio y detecciones de diagnóstico', () => {
     );
   });
 
-  it('getDiagnosisDetections pide las cajas de un diagnóstico y devuelve la lista', async () => {
+  it('getDiagnosisDetections pide las cajas de un diagnóstico y su recorte', async () => {
     const detections = [{ label: 'Clorosis', score: 0.62, box: [0.12, 0.3, 0.18, 0.37] }];
-    const llamadas = stubFetch({ status: 200, body: { detections } });
+    const crop = [0.2574, 0.2542, 1, 1];
+    const llamadas = stubFetch({ status: 200, body: { detections, crop } });
 
-    expect(await new HttpRepository(BASE).getDiagnosisDetections('DX-00001')).toEqual(detections);
+    expect(await new HttpRepository(BASE).getDiagnosisDetections('DX-00001')).toEqual({ detections, crop });
     expect(llamadas[0].url).toBe(`${BASE}/diagnosticos/DX-00001/detecciones`);
+  });
+
+  it('sin crop (diagnóstico viejo o backend anterior) el recorte es null', async () => {
+    const detections = [{ label: 'Sano', score: 0.8, box: [0.1, 0.1, 0.2, 0.2] }];
+    stubFetch({ status: 200, body: { detections } });
+
+    expect(await new HttpRepository(BASE).getDiagnosisDetections('DX-00001')).toEqual({ detections, crop: null });
   });
 
   it('un 404 (id inexistente o DG- derivado) rechaza', async () => {

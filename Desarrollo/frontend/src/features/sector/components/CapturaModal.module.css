@@ -90,6 +90,23 @@
   max-height: 100cqh;
 }
 
+/* Región recortada: el marco tiene la relación de aspecto de la región (inline, sale del recorte y del
+   tamaño de la foto) y la imagen, escalada y desplazada por porcentajes, asoma sólo por ahí. */
+.region {
+  display: block;
+}
+
+.region .foto {
+  position: absolute;
+  max-width: none;
+  max-height: none;
+}
+
+/* Hasta saber qué región mostrar, la foto no se ve (ocupa su lugar igual) */
+.pending {
+  visibility: hidden;
+}
+
 /* Selector de cajas y su leyenda */
 .tools {
   display: flex;

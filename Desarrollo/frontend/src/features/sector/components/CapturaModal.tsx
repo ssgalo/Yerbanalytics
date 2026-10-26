@@ -3,20 +3,28 @@
    diagnóstico de IA y se cierra con Escape, con la X o con un clic
    fuera de la imagen.
 
-   Si el diagnóstico nació de una captura real muestra la fotografía
-   entera (sin recortar); si no hay foto —o no se puede cargar—, cae al
-   gradiente que representa el estado detectado.
+   Si el diagnóstico nació de una captura real muestra la fotografía; si
+   no hay foto —o no se puede cargar—, cae al gradiente que representa el
+   estado detectado.
+
+   Región analizada: el servicio de inferencia recorta la captura (saca el
+   riel y el piso) y manda el recorte con las detecciones. Por eso las
+   detecciones se piden al abrir: con recorte, las tres vistas muestran
+   sólo esa región del JPEG original, recortada con CSS (design D6 de
+   add-tiling-inferencia); sin recorte, o si el pedido falla, la imagen
+   entera. Mientras llegan, la foto no se muestra, para que no aparezca
+   entera y se recorte de golpe.
 
    Si el diagnóstico tiene detecciones, ofrece Original · Diagnóstico ·
-   Todas. Arranca en Original (la foto tal cual) y las cajas se piden al
-   backend recién cuando se elige una vista que las muestra. Si el pedido
-   falla, la foto sigue a la vista con un aviso.
+   Todas. Arranca en Original (la foto sin cajas). Si el pedido falla, la
+   foto sigue a la vista y, al elegir una vista con cajas, un aviso
+   permite reintentar.
    ============================================================ */
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { getRepository } from '@/data';
 import { Icon } from '@/components/ui/Icon';
 import { Segmented } from '@/components/ui/Seleccion';
-import type { Detection } from '@/types/domain';
+import type { DiagnosisDetections } from '@/types/domain';
 import { DetectionLegend, DetectionOverlay } from './DetectionOverlay';
 import type { BoxView } from './detectionView';
 import styles from './CapturaModal.module.css';
@@ -38,8 +46,32 @@ interface CapturaModalProps {
 type BoxesState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ok'; detections: Detection[] }
+  | ({ status: 'ok' } & DiagnosisDetections)
   | { status: 'error' };
+
+interface NaturalSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Estilos del marco y de la imagen para mostrar sólo la región `crop`: el marco toma la relación de
+ * aspecto de la región y cabe en el escenario; la imagen se escala y se desplaza por porcentajes.
+ */
+function regionLayout(crop: NonNullable<DiagnosisDetections['crop']>, natural: NaturalSize) {
+  const [x1, y1, x2, y2] = crop;
+  const w = x2 - x1;
+  const h = y2 - y1;
+  const ratio = (w * natural.width) / (h * natural.height);
+  const frame: CSSProperties = { aspectRatio: ratio, width: `min(100cqw, calc(100cqh * ${ratio}))` };
+  const img: CSSProperties = {
+    width: `${100 / w}%`,
+    height: `${100 / h}%`,
+    left: `${(-x1 / w) * 100}%`,
+    top: `${(-y1 / h) * 100}%`,
+  };
+  return { frame, img };
+}
 
 const VIEWS: { value: BoxView; label: string }[] = [
   { value: 'original', label: 'Original' },
@@ -64,6 +96,7 @@ export function CapturaModal({
   const [imagenRota, setImagenRota] = useState(false);
   const [view, setView] = useState<BoxView>('original');
   const [boxes, setBoxes] = useState<BoxesState>({ status: 'idle' });
+  const [natural, setNatural] = useState<NaturalSize | null>(null);
   const mounted = useRef(true);
   const conFoto = !!imagenUrl && !imagenRota;
   // Las cajas sólo tienen sentido sobre la fotografía
@@ -74,6 +107,13 @@ export function CapturaModal({
     return () => {
       mounted.current = false;
     };
+  }, []);
+
+  // El recorte viaja con las detecciones: se piden al abrir, aunque se arranque en Original.
+  const fetchesOnOpen = !!imagenUrl && !!diagnosisId;
+  useEffect(() => {
+    if (fetchesOnOpen) loadBoxes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una sola vez, al abrir
   }, []);
 
   useEffect(() => {
@@ -97,7 +137,7 @@ export function CapturaModal({
     setBoxes({ status: 'loading' });
     getRepository()
       .getDiagnosisDetections(diagnosisId)
-      .then((detections) => mounted.current && setBoxes({ status: 'ok', detections }))
+      .then((result) => mounted.current && setBoxes({ status: 'ok', ...result }))
       .catch(() => mounted.current && setBoxes({ status: 'error' }));
   }
 
@@ -108,6 +148,10 @@ export function CapturaModal({
   }
 
   const showBoxes = offersBoxes && view !== 'original';
+  const crop = boxes.status === 'ok' ? boxes.crop : null;
+  const region = crop && natural ? regionLayout(crop, natural) : null;
+  // Sin ocultarla, la foto aparecería entera y se recortaría de golpe al llegar el recorte.
+  const pending = boxes.status === 'loading' || (!!crop && !natural);
 
   return (
     <div
@@ -152,12 +196,22 @@ export function CapturaModal({
 
       <div className={styles.stage}>
         {conFoto ? (
-          // El marco toma el tamaño exacto de la imagen renderizada: las cajas quedan alineadas.
-          <div className={styles.frame} onClick={keepOpen}>
+          // El marco toma el tamaño exacto de lo que se ve de la foto (la imagen entera o la
+          // región recortada): las cajas, en coordenadas de eso, quedan alineadas.
+          <div
+            className={`${styles.frame} ${region ? styles.region : ''} ${pending ? styles.pending : ''}`}
+            style={region?.frame}
+            onClick={keepOpen}
+            data-testid="captura-frame"
+          >
             <img
               className={styles.foto}
+              style={region?.img}
               src={imagenUrl}
               alt={`Captura cenital del sector ${sectorId}`}
+              onLoad={(e) =>
+                setNatural({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })
+              }
               onError={() => setImagenRota(true)}
             />
             {showBoxes && boxes.status === 'ok' && (
