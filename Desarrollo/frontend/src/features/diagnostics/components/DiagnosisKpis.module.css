@@ -27,10 +27,11 @@
 }
 
 
+/* Columnas de igual ancho: todas las cifras quedan a la misma distancia entre sí */
 .figures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 34px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px 24px;
 }
 
 /* Cada cifra es un filtro, pero se ve igual que una cifra del Panel general: sin relleno ni borde */
@@ -133,7 +134,8 @@
     padding: 14px 16px;
   }
   .figures {
-    gap: 8px 22px;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px 16px;
   }
   .number {
     font-size: 1.625rem;
