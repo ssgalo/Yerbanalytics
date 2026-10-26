@@ -62,7 +62,7 @@ export function ZoneTray({ zona, sectorsPerRow }: ZoneTrayProps) {
   const stale = zona.lectura.stale;
   const counts = FOOT.map((f) => ({ ...f, n: countByStatus(zona, f.status) })).filter((f) => f.n > 0);
   const label = [
-    `${zona.id}, ${zona.sub}`,
+    zona.id,
     counts.map((c) => `${c.n} ${c.n === 1 ? c.one : c.many}`).join(', '),
     stale ? 'lectura atrasada' : '',
   ]
@@ -75,7 +75,6 @@ export function ZoneTray({ zona, sectorsPerRow }: ZoneTrayProps) {
         <Link to={to} className={styles.code} aria-label={`${label}. Ver detalle de la macro-zona`}>
           {zona.id}
         </Link>
-        <span className={styles.sub}>{zona.sub}</span>
         <span className={styles.node} title="Nodo testigo: habla por todos los sectores de la macro-zona">
           <NodeStatus zona={zona} />
         </span>
