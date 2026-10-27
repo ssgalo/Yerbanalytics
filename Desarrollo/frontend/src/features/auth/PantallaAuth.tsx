@@ -16,7 +16,6 @@ export function PantallaAuth({ children }: { children: ReactNode }) {
           Sensado por macro-zona, diagnóstico de IA por sector y acciones correctivas autónomas para el
           vivero de yerba mate.
         </p>
-        <div className={styles.marcaPie}>Vivero San Ignacio · Misiones</div>
       </aside>
       <main className={styles.contenido}>
         <Card className={styles.tarjeta}>{children}</Card>

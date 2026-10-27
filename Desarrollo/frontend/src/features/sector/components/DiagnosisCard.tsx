@@ -8,6 +8,7 @@ import { buttonClass } from '@/components/ui/clases';
 import { useAuth } from '@/hooks/AuthContext';
 import { puedeVer, VISTAS } from '@/lib/vistas';
 import { hasConfidence, isAnomalous } from '@/lib/diagnosis';
+import { CroppedPhoto } from '@/features/diagnostics/components/CroppedPhoto';
 import { ConfidenceChip } from '@/features/diagnostics/components/ConfidenceChip';
 import type { DiagnosisDetail } from '@/types/domain';
 import { CapturaModal } from './CapturaModal';
@@ -44,11 +45,14 @@ export function DiagnosisCard({ diag, ago, sectorId, isOffline }: DiagnosisCardP
         <button
           type="button"
           className={styles.thumb}
-          style={{ background: diag.thumb }}
+          // Con foto, el fondo es sólo el de respaldo: la imagen (recortada) va encima.
+          style={{ background: diag.imagenUrl ? undefined : diag.thumb }}
           onClick={() => setCapturaAbierta(true)}
           aria-label={`Ver la captura cenital de ${sectorId} a tamaño completo`}
         >
-          {!diag.imagenUrl && (
+          {diag.imagenUrl ? (
+            <CroppedPhoto src={diag.imagenUrl} crop={diag.crop} />
+          ) : (
             <Icon
               name="leaf-simple"
               size={60}

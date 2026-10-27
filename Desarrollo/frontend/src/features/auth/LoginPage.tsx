@@ -7,7 +7,7 @@
    - Al entrar vuelve a la ruta que se había pedido, si el rol todavía puede verla.
    - Los usuarios demo se listan sólo en modo mock: el repositorio http no tiene ninguno.
    ============================================================ */
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type AnimationEvent, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { CredencialesIncorrectasError, getSeguridadRepository, SesionNoEstablecidaError } from '@/data';
 import { useAuth, type MotivoAviso } from '@/hooks/AuthContext';
@@ -30,6 +30,16 @@ export function LoginPage() {
   const [clave, setClave] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Chrome autocompleta sin entregarle los valores a la página hasta la primera interacción:
+  // los campos se ven llenos pero el estado está vacío. Se detecta con la animación de
+  // `:-webkit-autofill` (ver Auth.module.css) y al enviar se leen los valores del formulario.
+  const [autocompletado, setAutocompletado] = useState({ username: false, clave: false });
+  const onAnimationStart = (campo: 'username' | 'clave') => (e: AnimationEvent<HTMLInputElement>) => {
+    if (e.animationName.includes('autofillStart')) setAutocompletado((a) => ({ ...a, [campo]: true }));
+    if (e.animationName.includes('autofillEnd')) setAutocompletado((a) => ({ ...a, [campo]: false }));
+  };
+  const usuarioListo = !!username || autocompletado.username;
+  const claveLista = !!clave || autocompletado.clave;
 
   if (estado === 'cargando') return <PantallaEspera />;
 
@@ -41,10 +51,14 @@ export function LoginPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const form = new FormData(e.currentTarget as HTMLFormElement);
+    const u = String(form.get('username') ?? username);
+    const c = String(form.get('clave') ?? clave);
+    if (!u || !c) return;
     setError(null);
     setEnviando(true);
     try {
-      await login(username, clave);
+      await login(u, c);
     } catch (err) {
       setError(
         err instanceof CredencialesIncorrectasError
@@ -86,6 +100,7 @@ export function LoginPage() {
             spellCheck={false}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            onAnimationStart={onAnimationStart('username')}
             required
           />
         </label>
@@ -98,10 +113,11 @@ export function LoginPage() {
             autoComplete="current-password"
             value={clave}
             onChange={(e) => setClave(e.target.value)}
+            onAnimationStart={onAnimationStart('clave')}
             required
           />
         </label>
-        <button type="submit" className={styles.btnPrimario} disabled={enviando || !username || !clave}>
+        <button type="submit" className={styles.btnPrimario} disabled={enviando || !usuarioListo || !claveLista}>
           {enviando ? 'Ingresando…' : 'Ingresar'}
         </button>
       </form>

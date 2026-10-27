@@ -64,14 +64,6 @@
   text-decoration: none;
 }
 
-.sub {
-  font-size: var(--t-12);
-  font-stretch: var(--w-cond);
-  color: var(--on-tray-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .node {
   margin-left: auto;

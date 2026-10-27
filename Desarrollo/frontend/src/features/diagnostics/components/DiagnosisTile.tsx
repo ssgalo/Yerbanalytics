@@ -9,13 +9,14 @@
    Muestra el nivel de confianza (y el score promedio como dato secundario) y la severidad sólo si
    el estado es anómalo. No dice si el motor puede actuar: eso lo decide el motor. No concluyente
    no lleva confianza, severidad ni score. */
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DiagnosisCard, Severity } from '@/types/domain';
 import { Chip, type ChipTone } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
 import { hasConfidence, isAnomalous } from '@/lib/diagnosis';
 import { ConfidenceChip } from './ConfidenceChip';
+import { CroppedPhoto } from './CroppedPhoto';
 import styles from './DiagnosisTile.module.css';
 
 /** La severidad se pinta con la tinta del estado que implica. */
@@ -43,31 +44,6 @@ function elapsed(createdAt: number): string {
   return `hace ${days} ${days === 1 ? 'día' : 'días'}`;
 }
 
-/**
- * Estilos para que la región `crop` cubra la miniatura: el marco toma la relación de aspecto de la
- * región y crece hasta cubrir el contenedor; la imagen se escala y se desplaza por porcentajes.
- */
-function coverRegion(
-  crop: [number, number, number, number],
-  natural: { width: number; height: number },
-) {
-  const [x1, y1, x2, y2] = crop;
-  const w = x2 - x1;
-  const h = y2 - y1;
-  const ratio = (w * natural.width) / (h * natural.height);
-  const frame: CSSProperties = {
-    aspectRatio: ratio,
-    width: `max(100cqw, calc(100cqh * ${ratio}))`,
-  };
-  const img: CSSProperties = {
-    width: `${100 / w}%`,
-    height: `${100 / h}%`,
-    left: `${(-x1 / w) * 100}%`,
-    top: `${(-y1 / h) * 100}%`,
-  };
-  return { frame, img };
-}
-
 interface DiagnosisTileProps {
   d: DiagnosisCard;
   onExpand: (id: string) => void;
@@ -77,9 +53,7 @@ interface DiagnosisTileProps {
 
 export function DiagnosisTile({ d, onExpand, canOpenSector }: DiagnosisTileProps) {
   const [brokenImage, setBrokenImage] = useState(false);
-  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
   const hasPhoto = !!d.imagenUrl && !brokenImage;
-  const region = d.crop && natural ? coverRegion(d.crop, natural) : null;
   const anomalous = isAnomalous(d.estado);
   const withConfidence = hasConfidence(d.estado);
 
@@ -93,24 +67,13 @@ export function DiagnosisTile({ d, onExpand, canOpenSector }: DiagnosisTileProps
         aria-label={`Ver la captura de ${d.sectorId} a pantalla completa`}
       >
         {hasPhoto ? (
-          <span className={styles.region} style={region?.frame}>
-            <img
-              className={region ? styles.regionPhoto : styles.photo}
-              // Hasta conocer el tamaño, la foto entera no se muestra: se recortaría de golpe.
-              style={region ? region.img : d.crop ? { visibility: 'hidden' } : undefined}
-              src={d.imagenUrl ?? ''}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onLoad={(e) =>
-                setNatural({
-                  width: e.currentTarget.naturalWidth,
-                  height: e.currentTarget.naturalHeight,
-                })
-              }
-              onError={() => setBrokenImage(true)}
-            />
-          </span>
+          <CroppedPhoto
+            className={styles.region}
+            src={d.imagenUrl ?? ''}
+            crop={d.crop}
+            loading="lazy"
+            onError={() => setBrokenImage(true)}
+          />
         ) : (
           <Icon
             name="leaf-simple"

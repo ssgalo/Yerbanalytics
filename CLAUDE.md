@@ -210,7 +210,7 @@ npm run dev          # http://localhost:5173
 - **Features** (`src/features/`): una carpeta por vista — dashboard, map, sector,
   diagnostics, reglas, historial, demo-expo, placeholder. **Motor de reglas** (`/reglas`) muestra las reglas por objetivo,
   una fila por regla (interruptor, menú ⋮ para renombrar o eliminar, y sus parámetros al desplegarla) y un interruptor por grupo; el
-  **Inspector del motor** (`/reglas/inspector`, entrada propia en Configuración) es el grafo de reglas con la última evaluación de un sector. **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
+  **Inspector del motor** (`/reglas/inspector`, sin entrada en la sidebar; se llega por URL o desde el sector) es el grafo de reglas con la última evaluación de un sector. **Demo Expo** (`/demo-expo`) dispara y muestra en vivo la pasada del riel;
   se ve u oculta con un interruptor en Configuración → Preferencias.
 - **Routing**: react-router (`src/router.tsx`).
 

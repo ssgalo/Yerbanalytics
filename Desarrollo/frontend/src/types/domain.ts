@@ -399,6 +399,8 @@ export interface DiagnosisDetail {
   concluyente: boolean;
   hasFoto: boolean;
   imagenUrl?: string;
+  /** Región analizada de esa foto: la miniatura muestra sólo esa parte. `null` = la imagen entera. */
+  crop: [number, number, number, number] | null;
   /**
    * Id del diagnóstico `DX-` más reciente del sector (el que nació de una captura), para pedir sus
    * cajas; `null` si el sector no tiene ninguno. Lo resuelve el dashboard, no viene del backend.

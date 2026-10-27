@@ -3,7 +3,6 @@ import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import type { MetricThreshold } from '@/types/domain';
 import { umbralError } from '@/lib/configValidation';
 import { Input } from '@/components/ui/Field';
-import { Chip } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
 import { fmtNum } from '@/components/ui/rango';
 import styles from './UmbralesForm.module.css';
@@ -185,11 +184,6 @@ export function UmbralesForm({ value, saved, disabled, onChange }: UmbralesFormP
                 <span className={styles.metricName}>
                   {u.label} <span className={styles.metricUnit}>{u.unit}</span>
                 </span>
-                {u.provisional && (
-                  <span title="Rango sin validar con el vivero: se muestra y colorea, pero no cambia el estado de los sectores ni emite alertas.">
-                    <Chip tone="line">Informativa</Chip>
-                  </span>
-                )}
               </div>
               <div className={styles.editor}>
                 <BandBar u={u} disabled={disabled} onChange={(patch) => onChange(i, patch)} />

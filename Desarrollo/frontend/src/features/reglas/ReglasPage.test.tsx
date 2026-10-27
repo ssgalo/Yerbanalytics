@@ -25,12 +25,12 @@ const campo = () => document.getElementById(`param-${R01}-${UMBRAL}`) as HTMLInp
 const cargada = () => screen.findByRole('switch', { name: 'Apagar Riego por déficit hídrico' }, { timeout: 5000 });
 
 describe('Ruta /reglas', () => {
-  it('el Sidebar enlaza a "Motor de reglas" y a "Inspector del motor" dentro de Configuración', async () => {
+  it('el Sidebar enlaza a "Motor de reglas" dentro de Configuración', async () => {
     montarApp('/');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }));
     expect((await screen.findByRole('link', { name: 'Motor de reglas' })).getAttribute('href')).toBe('/reglas');
-    expect(screen.getByRole('link', { name: 'Inspector del motor' }).getAttribute('href')).toBe('/reglas/inspector');
+    expect(screen.queryByRole('link', { name: 'Inspector del motor' })).toBeNull();
   });
 
   it('muestra las reglas, sin selector de pestañas', async () => {

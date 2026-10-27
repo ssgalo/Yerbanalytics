@@ -37,10 +37,11 @@
   font-stretch: var(--w-cond);
 }
 
+/* Columnas de igual ancho: todas las cifras quedan a la misma distancia entre sí */
 .figures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 34px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px 24px;
 }
 
 .figure {
@@ -92,6 +93,12 @@
   text-decoration: none;
   font: inherit;
   color: inherit;
+}
+
+/* La columna principal separa título y cifras con 14px (su gap); acá el gap es 8px, así que
+   el título suma la diferencia para que las cifras de las tres columnas queden a la misma altura. */
+.side > .heading {
+  margin-bottom: 6px;
 }
 
 .sideAction {
@@ -156,7 +163,8 @@
     padding: 14px 16px;
   }
   .figures {
-    gap: 8px 22px;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px 16px;
   }
   .number {
     font-size: 1.625rem;

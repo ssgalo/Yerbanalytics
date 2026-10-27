@@ -46,20 +46,20 @@ const COMPARTIDO: [string, string, string][] = [
 ];
 
 const CLASES_DIAGNOSTICO: [string, string, string][] = [
-  ['--dx-sano', '#57965F', 'Sano'],
-  ['--dx-clorosis', '#C2B14E', 'Clorosis'],
-  ['--dx-estres', '#C4843E', 'Estrés solar'],
-  ['--dx-plaga', '#4F8F86', 'Plaga foliar'],
-  ['--dx-fungico', '#7A5A40', 'Daño fúngico'],
+  ['--dx-sano', '#6FAF7E', 'Sano'],
+  ['--dx-clorosis', '#D4B648', 'Clorosis'],
+  ['--dx-estres', '#D97FA6', 'Estrés solar'],
+  ['--dx-plaga', '#5E8FD4', 'Plaga foliar'],
+  ['--dx-fungico', '#C8625F', 'Daño fúngico'],
   ['--dx-nc', '#9BA39E', 'No concluyente · rayado con --dx-nc-2'],
 ];
 
 const CAJAS_DETECCION: [string, string, string][] = [
-  ['--det-sano', '#5CD6FF', 'Sano'],
-  ['--det-clorosis', '#FFE45C', 'Clorosis'],
-  ['--det-estres-solar', '#FF9A3C', 'Estrés solar'],
-  ['--det-plaga-foliar', '#FF5CCB', 'Plaga foliar'],
-  ['--det-dano-fungico', '#C9A2FF', 'Daño fúngico'],
+  ['--det-sano', '#3FBF5F', 'Sano'],
+  ['--det-clorosis', '#F2C81B', 'Clorosis'],
+  ['--det-estres-solar', '#FF5CB8', 'Estrés solar'],
+  ['--det-plaga-foliar', '#3D8BFF', 'Plaga foliar'],
+  ['--det-dano-fungico', '#E5484D', 'Daño fúngico'],
 ];
 
 /** Muestra de cajas sobre una captura de la demo: el único lugar donde van los --det-*. */

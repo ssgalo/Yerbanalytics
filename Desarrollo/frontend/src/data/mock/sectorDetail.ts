@@ -30,6 +30,8 @@ export function buildSectorDetail(
   latestCapture?: Pick<DiagnosisCard, 'id' | 'detectionCount'> | null,
   /** Mediasombra de su macro-zona (la malla es de la zona, no del sector). */
   mediasombra?: PosicionMediasombra | null,
+  /** Región analizada de la foto (`imagenUrl`). */
+  crop?: DiagnosisCard['crop'],
 ): SectorDetail {
   // presentación del diagnóstico
   const diag: DiagnosisDetail = {
@@ -44,6 +46,7 @@ export function buildSectorDetail(
     concluyente: s.diagnosis.estado !== 'No concluyente' && s.diagnosis.estado !== 'Sin diagnóstico',
     hasFoto: !!imagenUrl || s.status !== 'offline',
     imagenUrl,
+    crop: imagenUrl ? (crop ?? null) : null,
     diagnosisId: latestCapture?.id ?? null,
     detectionCount: latestCapture?.detectionCount ?? 0,
   };

@@ -46,19 +46,19 @@ export const theme = {
   onArt: '#FFFFFF',
   onArtMuted: '#A9B5AE',
   /* clases de diagnóstico (sólo composición) */
-  dxSano: '#57965F',
-  dxClorosis: '#C2B14E',
-  dxEstres: '#C4843E',
-  dxPlaga: '#4F8F86',
-  dxFungico: '#7A5A40',
+  dxSano: '#6FAF7E',
+  dxClorosis: '#D4B648',
+  dxEstres: '#D97FA6',
+  dxPlaga: '#5E8FD4',
+  dxFungico: '#C8625F',
   dxNc: '#9BA39E',
   dxNc2: '#C9CEC9',
   /* cajas de detección (sólo sobre fotografía) */
-  detSano: '#5CD6FF',
-  detClorosis: '#FFE45C',
-  detEstresSolar: '#FF9A3C',
-  detPlagaFoliar: '#FF5CCB',
-  detDanoFungico: '#C9A2FF',
+  detSano: '#3FBF5F',
+  detClorosis: '#F2C81B',
+  detEstresSolar: '#FF5CB8',
+  detPlagaFoliar: '#3D8BFF',
+  detDanoFungico: '#E5484D',
 } as const;
 
 export type Theme = typeof theme;
