@@ -41,6 +41,7 @@
   overflow: hidden;
   cursor: zoom-in;
   font-family: var(--font-body);
+  background: var(--art);
 }
 
 .thumbLabel {
