@@ -95,6 +95,12 @@
   color: inherit;
 }
 
+/* La columna principal separa título y cifras con 14px (su gap); acá el gap es 8px, así que
+   el título suma la diferencia para que las cifras de las tres columnas queden a la misma altura. */
+.side > .heading {
+  margin-bottom: 6px;
+}
+
 .sideAction {
   cursor: pointer;
   transition: background 0.12s;
