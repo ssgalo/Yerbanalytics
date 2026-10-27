@@ -126,6 +126,27 @@
   outline: none;
 }
 
+.input:-webkit-autofill {
+  animation: autofillStart 0.01s;
+}
+
+.input:not(:-webkit-autofill) {
+  animation: autofillEnd 0.01s;
+}
+
+/* Animaciones vacías: sólo sirven para que LoginPage se entere del autocompletado. */
+@keyframes autofillStart {
+  from {
+    opacity: 1;
+  }
+}
+
+@keyframes autofillEnd {
+  from {
+    opacity: 1;
+  }
+}
+
 .input:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgba(30, 106, 78, 0.14);
