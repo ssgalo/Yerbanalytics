@@ -12,7 +12,7 @@ import styles from './DashboardPage.module.css';
 
 /** Vista principal del panel de control del vivero. */
 export function DashboardPage() {
-  usePageTitle('Panel general', 'Vivero San Ignacio · Misiones, AR');
+  usePageTitle('Panel general', '');
 
   const { stats, zonas, layout } = useNurseryData();
   const { puede } = useAuth();
