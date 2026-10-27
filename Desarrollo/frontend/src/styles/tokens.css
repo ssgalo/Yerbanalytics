@@ -68,11 +68,11 @@
   /* clases de diagnóstico de IA: tonos terrosos y apagados, sólo para mostrar cómo se reparten
      los diagnósticos (barra y muestras de la vista Diagnósticos). No son estados de salud, así
      que nunca tiñen texto ni compiten con --ok/--warn/--crit. "No concluyente" es una trama. */
-  --dx-sano: #57965f;
-  --dx-clorosis: #c2b14e;
-  --dx-estres: #c4843e;
-  --dx-plaga: #4f8f86;
-  --dx-fungico: #7a5a40;
+  --dx-sano: #6faf7e;
+  --dx-clorosis: #d4b648;
+  --dx-estres: #d97fa6;
+  --dx-plaga: #5e8fd4;
+  --dx-fungico: #c8625f;
   --dx-nc: #9ba39e;
   --dx-nc-2: #c9cec9;
 
@@ -80,11 +80,11 @@
      la captura). Saturadas y claras a propósito, para leerse sobre follaje verde (siempre con un
      halo de --art debajo) y distinguirse entre sí; la forma del trazo distingue además el estado
      diagnosticado. Fuera de una foto no se usan: ni texto, ni estado, ni composición (eso es --dx-*). */
-  --det-sano: #5cd6ff;
-  --det-clorosis: #ffe45c;
-  --det-estres-solar: #ff9a3c;
-  --det-plaga-foliar: #ff5ccb;
-  --det-dano-fungico: #c9a2ff;
+  --det-sano: #3fbf5f;
+  --det-clorosis: #f2c81b;
+  --det-estres-solar: #ff5cb8;
+  --det-plaga-foliar: #3d8bff;
+  --det-dano-fungico: #e5484d;
 
   /* texto sobre un fondo de marca / acción primaria */
   --on-brand: #ffffff;
