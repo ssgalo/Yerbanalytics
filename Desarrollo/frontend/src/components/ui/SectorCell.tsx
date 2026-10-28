@@ -8,15 +8,13 @@ interface TrayCellProps {
   selected?: boolean;
 }
 
-/** Un sector en el plano: un punto con la forma de su estado. Va dentro de una `Bandeja`. */
+/** Un sector en el plano: su bandeja de plantines, con las hojas del color de su estado. Va dentro de una `Bandeja`. */
 export function TrayCell({ status, selected }: TrayCellProps) {
   return <i className={cx(styles.tray, styles[TONO[status]], selected && styles.sel)} aria-hidden="true" />;
 }
 
 interface GridCellProps {
   status: Status;
-  /** Número del sector dentro de la macro-zona. */
-  numero: number;
   /** Nombre accesible completo, p. ej. "Sector MZ-4-005". */
   label: string;
   /** Diagnóstico de IA sin revisar. */
@@ -25,17 +23,17 @@ interface GridCellProps {
   onClick?: () => void;
 }
 
-/** Un sector en la grilla de la macro-zona: celda numerada y tocable. */
-export function GridCell({ status, numero, label, diag, selected, onClick }: GridCellProps) {
+/** Un sector en la grilla de la macro-zona: su bandeja, tocable. El número queda en el nombre accesible. */
+export function GridCell({ status, label, diag, selected, onClick }: GridCellProps) {
   return (
     <button
       type="button"
-      className={cx(styles.grid, styles[TONO[status]], diag && styles.diag, selected && styles.sel)}
+      className={cx(styles.grid, diag && styles.diag, selected && styles.sel)}
       aria-label={`${label}: ${ETIQUETA_ESTADO[status]}${diag ? ', diagnóstico sin revisar' : ''}`}
       aria-pressed={selected}
       onClick={onClick}
     >
-      <span className={styles.num}>{numero}</span>
+      <i className={cx(styles.tray, styles[TONO[status]])} aria-hidden="true" />
     </button>
   );
 }

@@ -61,7 +61,6 @@ export function SectorsCard({ zona, columns, wide, onSectorClick, className }: S
               <GridCell
                 key={s.id}
                 status={s.status}
-                numero={s.n}
                 label={`Sector ${s.id}`}
                 onClick={() => onSectorClick(s.id)}
               />
