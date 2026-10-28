@@ -164,7 +164,7 @@ export function SistemaDisenoPage() {
               </div>
             </div>
             <div className={styles.boxDark}>
-              <span className={styles.meta}>Bandeja (un punto = un sector)</span>
+              <span className={styles.meta}>Bandeja (una bandeja de plantines = un sector)</span>
               <div className={styles.trayGrid}>
                 {(['ok', 'ok', 'warning', 'warning', 'critical', 'critical', 'offline', 'offline'] as Status[]).map(
                   (s, i) => (
@@ -177,9 +177,9 @@ export function SistemaDisenoPage() {
               <span className={styles.meta}>Grilla de macro-zona</span>
               <div className={styles.zGrid}>
                 {TODOS.map((s, i) => (
-                  <GridCell key={s} status={s} numero={i + 1} label={`Sector MZ-4-00${i + 1}`} />
+                  <GridCell key={s} status={s} label={`Sector MZ-4-00${i + 1}`} />
                 ))}
-                <GridCell status="ok" numero={5} label="Sector MZ-4-005" diag />
+                <GridCell status="ok" label="Sector MZ-4-005" diag />
               </div>
             </div>
           </div>

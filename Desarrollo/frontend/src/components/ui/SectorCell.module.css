@@ -1,33 +1,53 @@
-/* Celdas de sector sobre la bandeja (--tray). Un punto = un sector, con la forma de su
-   estado. `tray`: el punto chico del plano. `grid`: la celda numerada de la macro-zona. */
+/* Celdas de sector sobre la bandeja (--tray). Una bandeja de plantines = un sector, del color de su
+   estado. `tray`: la bandeja del plano. `grid`: la celda tocable de la macro-zona. */
 
+/* Cada sector se dibuja como su bandeja de plantines vista de costado: la bandeja negra de tubetes
+   y tres plantines de tallo alto con hojas alternas, como en el vivero. Las hojas toman el color del
+   estado (`--leaf`) sobre su tono suave (`--fill`); la bandeja es siempre oscura (`--art`). Un solo
+   elemento por sector: plantines y bandeja son máscaras SVG, no nodos. */
 .tray {
+  --fill: var(--tray-2);
+  --leaf: var(--off);
   aspect-ratio: 1;
-  border-radius: 50%;
   position: relative;
   display: block;
-  background: var(--tray-2);
+  box-sizing: border-box;
+  border-radius: 18%;
+  background: var(--fill);
 }
-.tray.ok {
-  background: var(--ok);
-}
-.tray.warn {
-  background: linear-gradient(to top, var(--warn) 52%, var(--tray-2) 52%);
-  box-shadow: inset 0 0 0 1.5px var(--warn);
-}
-.tray.crit {
-  background: transparent;
-}
-.tray.crit::before {
+.tray::before,
+.tray::after {
   content: '';
   position: absolute;
-  inset: 8%;
-  border-radius: 2px;
-  background: var(--crit);
-  transform: rotate(45deg) scale(0.86);
+  inset: 0;
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
 }
-.tray.off {
-  background: transparent;
+.tray::before {
+  background: var(--leaf);
+  mask-image: url('./assets/bandeja-plantines.svg');
+  -webkit-mask-image: url('./assets/bandeja-plantines.svg');
+}
+.tray::after {
+  background: var(--art);
+  mask-image: url('./assets/bandeja-tubetes.svg');
+  -webkit-mask-image: url('./assets/bandeja-tubetes.svg');
+}
+.ok {
+  --fill: var(--ok-soft);
+  --leaf: var(--ok);
+}
+.warn {
+  --fill: var(--warn-soft);
+  --leaf: var(--warn);
+}
+.crit {
+  --fill: var(--crit-soft);
+  --leaf: var(--crit);
+}
+.off {
+  --fill: var(--off-soft);
+  --leaf: var(--off);
   box-shadow: inset 0 0 0 1.5px var(--off);
 }
 .tray.sel {
@@ -35,58 +55,20 @@
   outline-offset: 2px;
 }
 
+/* En la grilla de la macro-zona la bandeja llena una celda tocable. */
 .grid {
   aspect-ratio: 1;
   border: 0;
-  padding: 0;
+  padding: 1px;
   position: relative;
-  display: grid;
-  place-items: center;
-  text-decoration: none;
+  display: block;
   background: none;
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 700;
-  font-stretch: var(--w-cond);
   border-radius: 8px;
   cursor: pointer;
 }
-.grid::before {
-  content: '';
-  position: absolute;
-  inset: 1px;
-  border-radius: 50%;
-}
-.num {
-  position: relative;
-}
-.grid.ok {
-  color: #0d2618;
-}
-.grid.ok::before {
-  background: var(--ok);
-}
-.grid.warn {
-  color: var(--ink);
-}
-.grid.warn::before {
-  background: linear-gradient(to top, var(--warn) 50%, var(--tray-2) 50%);
-  box-shadow: inset 0 0 0 2px var(--warn);
-}
-.grid.crit {
-  color: #fff;
-}
-.grid.crit::before {
-  inset: 15%;
-  border-radius: 3px;
-  transform: rotate(45deg);
-  background: var(--crit);
-}
-.grid.off {
-  color: var(--on-tray-muted);
-}
-.grid.off::before {
-  box-shadow: inset 0 0 0 1.5px var(--off);
+.grid .tray {
+  width: 100%;
+  height: 100%;
 }
 /* Diagnóstico nuevo sin revisar: punto oscuro arriba a la derecha. */
 .diag::after {
