@@ -236,6 +236,7 @@ export interface Pasada {
 
 export type TipoSecuencia =
   | 'RIEGO'
+  | 'DOSIS'
   | 'MEDIASOMBRA'
   | 'LECTURA'
   | 'MEDIASOMBRA_ABRIR'
@@ -254,6 +255,8 @@ export interface ParametrosSecuencia {
   duracionSeg?: number | null;
   esperaSeg?: number | null;
   ejecutarMotor?: boolean | null;
+  /** Sólo DOSIS: mililitros de la bomba de insumo (1 a 50). */
+  ml?: number | null;
 }
 
 export interface PasoSecuencia {

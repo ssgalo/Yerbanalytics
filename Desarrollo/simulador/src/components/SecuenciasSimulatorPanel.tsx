@@ -1,15 +1,13 @@
 /* ============================================================
    Secuencias directas de actuadores (Demo Expo - simulador).
-   Four cards: Riego, Mediasombra, Abrir/cerrar mediasombra, Lectura de sensores.
+   Five cards: Riego, Dosificación, Mediasombra, Abrir/cerrar mediasombra, Lectura de sensores.
    Adapted from the dashboard's SecuenciasPanel.tsx but without react-router-dom
    and using the simulator's useSecuenciaSimulator hook.
    ============================================================ */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSecuenciaSimulator } from '../hooks/useSecuenciaSimulator';
-import type { PasoSecuencia, Secuencia, TipoPasoSecuencia } from '../types';
-
-const RIEGO = { min: 1, max: 120, defecto: 10 };
-const ESPERA = { min: 0, max: 600, defecto: 10 };
+import { DOSIS, ESPERA, RIEGO, etiquetaPaso, textoPaso } from '../secuencias';
+import type { Secuencia } from '../types';
 
 function enRango(texto: string, { min, max }: { min: number; max: number }): number | null {
   if (texto.trim() === '') return null;
@@ -28,63 +26,6 @@ function Tarjeta({ titulo, descripcion, children }: { titulo: string; descripcio
 }
 
 /* ---- Secuencia progress display ---- */
-
-const EN_CURSO_TEXTO: Record<TipoPasoSecuencia, string> = {
-  ABRIR: 'Abriendo…',
-  ESPERAR: 'Esperando…',
-  CERRAR: 'Cerrando…',
-  DESPLEGAR: 'Desplegando…',
-  ENROLLAR: 'Enrollando…',
-  PEDIR: 'Pidiendo la lectura…',
-  ESPERAR_TELEMETRIA: 'Esperando al nodo…',
-  MOSTRAR: 'Preparando la lectura…',
-};
-
-const LISTO_TEXTO: Record<TipoPasoSecuencia, string> = {
-  ABRIR: 'Válvula abierta',
-  ESPERAR: 'Listo',
-  CERRAR: 'Válvula cerrada',
-  DESPLEGAR: 'Desplegada',
-  ENROLLAR: 'Enrollada',
-  PEDIR: 'Pedido enviado',
-  ESPERAR_TELEMETRIA: 'Lectura recibida',
-  MOSTRAR: 'Lista',
-};
-
-function tipoPasoLabel(paso: PasoSecuencia, sec: Secuencia): string {
-  switch (paso.tipo) {
-    case 'ABRIR': return `Abrir válvula (${sec.sectorId ?? '—'})`;
-    case 'CERRAR': return 'Cerrar válvula';
-    case 'DESPLEGAR': return sec.tipo === 'MEDIASOMBRA_CERRAR' ? 'Cerrar mediasombra (desplegar)' : 'Desplegar mediasombra';
-    case 'ENROLLAR': return sec.tipo === 'MEDIASOMBRA_ABRIR' ? 'Abrir mediasombra (enrollar)' : 'Enrollar mediasombra';
-    case 'ESPERAR':
-      return sec.tipo === 'RIEGO'
-        ? `Regar ${sec.parametros.duracionSeg ?? '—'} s`
-        : `Mantener desplegada ${sec.parametros.esperaSeg ?? '—'} s`;
-    case 'PEDIR':
-      return sec.parametros.ejecutarMotor
-        ? `Pedir lectura a ${sec.zonaId} + motor`
-        : `Pedir lectura a ${sec.zonaId}`;
-    case 'ESPERAR_TELEMETRIA': return 'Esperando telemetría…';
-    case 'MOSTRAR': return 'Mostrar lectura';
-  }
-}
-
-function textoPasoSecuencia(paso: PasoSecuencia): string {
-  switch (paso.estado) {
-    case 'PENDIENTE': return 'Pendiente';
-    case 'ERROR': return paso.detalle ?? 'Falló';
-    case 'OMITIDO': return paso.detalle ?? 'Omitido';
-    case 'EN_CURSO': {
-      if (paso.tipo === 'ESPERAR' && paso.esperaHasta) {
-        const faltan = Math.max(0, Math.ceil((paso.esperaHasta - Date.now()) / 1000));
-        return faltan === 0 ? 'Esperando confirmación del nodo…' : `Faltan ${faltan} s`;
-      }
-      return EN_CURSO_TEXTO[paso.tipo];
-    }
-    case 'OK': return LISTO_TEXTO[paso.tipo];
-  }
-}
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   EN_CURSO: 'En curso',
@@ -153,8 +94,8 @@ function SecuenciaProgreso({
                 {ok ? '✓' : err ? '✗' : paso.n}
               </span>
               <div style={{ flex: 1 }}>
-                <span>{tipoPasoLabel(paso, secuencia)}</span>
-                <span className="muted" style={{ marginLeft: 8 }}>{textoPasoSecuencia(paso)}</span>
+                <span>{etiquetaPaso(paso, secuencia)}</span>
+                <span className="muted" style={{ marginLeft: 8 }}>{textoPaso(paso, secuencia)}</span>
               </div>
             </li>
           );
@@ -192,6 +133,7 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
     useSecuenciaSimulator();
   const [riegoTxt, setRiegoTxt] = useState(String(RIEGO.defecto));
   const [esperaTxt, setEsperaTxt] = useState(String(ESPERA.defecto));
+  const [mlTxt, setMlTxt] = useState(String(DOSIS.defecto));
 
   useEffect(() => {
     descartarError();
@@ -200,6 +142,7 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
   const ocupado = secuencia?.estado === 'EN_CURSO' || pasadaEnCurso || iniciando;
   const duracion = enRango(riegoTxt, RIEGO);
   const espera = enRango(esperaTxt, ESPERA);
+  const ml = enRango(mlTxt, DOSIS);
 
   return (
     <section className="card">
@@ -228,6 +171,31 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
             onClick={() => duracion !== null && void iniciar('RIEGO', { duracionSeg: duracion })}
           >
             Regar
+          </button>
+        </Tarjeta>
+
+        <Tarjeta
+          titulo="Dosificación"
+          descripcion="Prende la bomba de insumo con los ml pedidos y la apaga. Directo al actuador: no pasa por las precondiciones ni descuenta el tanque."
+        >
+          <label className="field">
+            <span className="label">Mililitros</span>
+            <input
+              type="number"
+              className="num"
+              min={DOSIS.min}
+              max={DOSIS.max}
+              value={mlTxt}
+              onChange={(e) => setMlTxt(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="primary"
+            disabled={ocupado || ml === null}
+            onClick={() => ml !== null && void iniciar('DOSIS', { ml })}
+          >
+            Dosificar
           </button>
         </Tarjeta>
 
