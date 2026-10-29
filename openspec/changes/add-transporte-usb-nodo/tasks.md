@@ -20,12 +20,13 @@
 
 ## 4. Prueba con hardware
 
-> Bloqueada hasta dar permiso sobre el puerto serie (`sudo usermod -aG dialout $USER` y volver a entrar). El puente ya se probó de punta a punta con un puerto virtual (pty) contra el Mosquitto real, en tópicos de prueba.
+> Probado el 28/10/2026 con la placa real (grabada con `sg dialout -c "./puente-usb/compilar-nodo-usb.sh --subir"` tras sumar el
+> usuario al grupo `dialout`). Abrir el puerto no resetea la placa (no aparece el texto de arranque de la ROM).
 
-- [ ] 4.1 Grabar `nodo_combinado_usb`, arrancar el puente y ver la sesión en el broker
-- [ ] 4.2 Lectura sin motor (`POST /api/pulsos {"ejecutarMotor": false}`): llega la telemetría con hora actual y la MAC de siempre
-- [ ] 4.3 Pasada del riel: vuelven `ACEPTADO` y `LLEGO`
-- [ ] 4.4 Desenchufar y enchufar el USB: se recupera solo
+- [x] 4.1 Grabar `nodo_combinado_usb`, arrancar el puente y ver la sesión en el broker: la placa mandó sus 4 suscripciones en el primer latido
+- [x] 4.2 Lectura sin motor (`POST /api/pulsos {"ejecutarMotor": false}`): «respondieron todas las zonas», MAC `DC:DA:0C:45:76:D0`, timestamp actual (el del latido), señal 0. Ojo: con la fuente de telemetría de demo en `SIMULATOR` el backend descarta, a propósito, el tópico del nodo real
+- [x] 4.3 Pasada del riel: `COMPLETADA`, los 5 pasos en OK (eventos del riel y fotos)
+- [ ] 4.4 Desenchufar y enchufar el USB: se recupera solo (falta la prueba física; el reinicio rápido del puente, con cambio de sesión, sí se probó: la placa reenvió las suscripciones en el mismo segundo)
 
 ## 5. Documentación
 
