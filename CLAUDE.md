@@ -365,7 +365,7 @@ cd Desarrollo/backend
   `GET /api/auditoria` → gestión de seguridad (HU-01 / HU-20). Ver "Autenticación y permisos" en
   el README del backend.
 - `POST /api/secuencias`, `GET /api/secuencias/actual`, `POST /api/secuencias/actual/cancelar` →
-  secuencias guionadas de Demo Expo (riego, mediasombra, lectura): comandan el actuador directo, sin
+  secuencias guionadas de Demo Expo (riego, dosis, mediasombra, lectura): comandan el actuador directo, sin
   pasar por el motor, y no corren a la vez que una pasada. Ver README del backend y
   `openspec/changes/add-secuencias-demo-expo/`.
 - `POST /api/diagnosticos` → **alta de diagnóstico**. Camino único: lo usan la carga manual del
@@ -626,6 +626,6 @@ Detalle, arranque y diagnóstico de fallas: `Desarrollo/simulador/README.md`.
 | Servicio de inferencia y módulo de diagnóstico | `Desarrollo/servicio-inferencia/README.md`, `openspec/changes/add-diagnostico-por-detecciones/` |
 | Negocio / alcance | `Documentacion/` |
 | Reglas agronómicas y su estado en el motor | `docs-motor-reglas-e-integracion/` (`reglas_v2.md`, `diferencias-motor-reglas-vs-reglas-v2.md`) |
-| Secuencias de Demo Expo (riego, mediasombra, lectura) | `openspec/changes/add-secuencias-demo-expo/`, `Desarrollo/backend/README.md` ("Secuencias"), `docs-motor-reglas-e-integracion/analisis-demo-expo-vs-vivero.md` §9 |
+| Secuencias de Demo Expo (riego, dosis, mediasombra, lectura) | `openspec/changes/add-secuencias-demo-expo/`, `Desarrollo/backend/README.md` ("Secuencias"), `docs-motor-reglas-e-integracion/analisis-demo-expo-vs-vivero.md` §9 |
 | Pasada del riel (backend) y firmware del riel | `Desarrollo/backend/README.md` ("Planificador de pasadas"), `Desarrollo/embebido/README.md` (sección "Riel"), `openspec/changes/add-pasada-riel/` |
 | Del sensor al motor / conectar el ESP32 | `docs-motor-reglas-e-integracion/circuito-sensado-a-motor.md`, `conectar-esp32.md` |

@@ -1431,7 +1431,8 @@ ni bean. El código productivo sólo conoce la interfaz neutra `mqtt/TelemetryAd
 ## Secuencias de la Demo Expo
 
 Una **secuencia** es un guion corto contra el actuador de un sector, con cada paso visible: **riego**
-(abre la válvula, espera el ACK del final del riego, cierra), **mediasombra** (despliega, espera, enrolla) y **lectura** (pide una
+(abre la válvula, espera el ACK del final del riego, cierra), **dosis** (prende la bomba de insumo con N ml, espera el ACK del
+final, la apaga), **mediasombra** (despliega, espera, enrolla) y **lectura** (pide una
 lectura al nodo testigo y la muestra). No pasan por el motor de reglas: son una prueba directa del
 hardware. La excepción es la lectura con `"parametros":{"ejecutarMotor":true}` ("Leer sensores y ejecutar
 motor ahora"): su pedido sale como un pulso de sensado con motor sólo de su zona, así que la telemetría que
@@ -1440,7 +1441,7 @@ en curso). Una sola a la vez, y ninguna mientras corre una pasada del riel (ni a
 
 | Método y ruta | Respuesta |
 |---|---|
-| `POST /api/secuencias` | `202` + `Secuencia` · `400 {"error"}` (tipo desconocido, `duracionSeg` o `esperaSeg` fuera de rango) · `409 {"error"}` (hay una secuencia o una pasada en curso; sin topología) |
+| `POST /api/secuencias` | `202` + `Secuencia` · `400 {"error"}` (tipo desconocido, `duracionSeg`, `esperaSeg` o `ml` fuera de rango) · `409 {"error"}` (hay una secuencia o una pasada en curso; sin topología) |
 | `GET /api/secuencias/actual` | `200` + `Secuencia` (la en curso o la última) · `204` si no hubo ninguna desde el arranque |
 | `POST /api/secuencias/actual/cancelar` | `200` + `Secuencia` · `409` si no hay una en curso o ya se está cancelando |
 
@@ -1450,8 +1451,9 @@ ACK final (los `EN_CURSO` `en_cola`/`iniciado` sólo estiran el plazo; `sin_camb
 llevan parámetros y se rigen por la misma guardia (`409` con otra secuencia o una pasada). Se pasan por acá y no por
 un publish directo al broker para que el seguimiento de comandos y el estado del backend las vean.
 
-Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "MEDIASOMBRA_CERRAR", "parametros": {"duracionSeg": N, "esperaSeg": N}}`.
-`duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200: el tope del contrato);
+Pedido: `{"tipo": "RIEGO" | "DOSIS" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "MEDIASOMBRA_CERRAR", "parametros": {"duracionSeg": N, "esperaSeg": N, "ml": N}}`.
+`duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200: el tope del contrato); `ml` sólo a `DOSIS` (default 5, de 1
+a 50: `ContratoNodo.BOMBA_ML_MAX`);
 `esperaSeg` sólo a `MEDIASOMBRA` (default 10, de 0 a 600). La forma de `Secuencia` y sus pasos:
 `openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.
 
@@ -1476,6 +1478,11 @@ Pedido: `{"tipo": "RIEGO" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "M
   (`SUCCESS`, con cualquier `tipo`: `ok` o `limite_excedido`); un `ERROR` inmediato (`duracion_invalida`,
   `sector_invalido`…) falla el paso con el tipo como código. `CERRAR` corre siempre: `valve OFF` y su ACK
   inmediato. El `ERROR cancelado` que recibe el ON cuando el OFF lo corta se ignora (cita otro `commandId`).
+- **Dosis.** El mismo guion que el riego con la bomba de insumo: `ABRIR` publica `pump ON {ml}` (el firmware abre la
+  válvula del sector y prende la bomba lo que tardan los ml, 1 s por ml), `ESPERAR` espera su ACK final hasta ml +
+  `margen-ack-riego-seg`, y `CERRAR` publica `pump OFF`. Como el riego manual, va **directo al actuador**: no pasa por
+  `ApplicationService`, así que no evalúa P-D1…P-D5 ni descuenta el tanque. Si el nodo está regando, la dosis espera su turno
+  (`EN_CURSO en_cola` estira el plazo).
 - **Paso seguro.** El `ON` de la válvula lleva `durationSec = N`, así que el
   nodo la apaga solo aunque el backend desaparezca. Ante cualquier falla o cancelación se publica el `OFF`
   (riego) o el `SET 100` (mediasombra) igual, se marcan `OMITIDO` los pasos de espera y la secuencia
