@@ -515,6 +515,172 @@ class SecuenciaServiceTest {
         }
     }
 
+    // ================================================================ DOSIS
+
+    @Nested
+    @DisplayName("dosis")
+    class Dosis {
+
+        private Secuencia iniciarDosis(Integer ml) {
+            return service.iniciar(new IniciarSecuencia("DOSIS", new ParametrosSecuencia(null, null, null, ml)));
+        }
+
+        @Test
+        @DisplayName("iniciar prende la bomba de insumo del primer sector con los ml pedidos: ABRIR OK al publicar y ESPERAR espera el ACK")
+        void iniciaConElDestino() {
+            long t0 = reloj.millis();
+            Secuencia s = iniciarDosis(8);
+
+            assertThat(s.tipo()).isEqualTo("DOSIS");
+            assertThat(s.estado()).isEqualTo("EN_CURSO");
+            assertThat(s.zonaId()).isEqualTo(ZONA);
+            assertThat(s.sectorId()).isEqualTo(SECTOR);
+            assertThat(s.parametros()).isEqualTo(new ParametrosSecuencia(null, null, null, 8));
+            assertThat(s.pasos()).extracting(PasoSecuencia::tipo).containsExactly("ABRIR", "ESPERAR", "CERRAR");
+            assertThat(s.pasos()).extracting(PasoSecuencia::estado).containsExactly("OK", "EN_CURSO", "PENDIENTE");
+            // 1 s por ml (ContratoNodo.BOMBA_INSUMO_MS_POR_ML): la cuenta regresiva muestra el fin esperado de la dosis.
+            assertThat(s.pasos().get(1).commandId()).isEqualTo(s.pasos().get(0).commandId());
+            assertThat(s.pasos().get(1).esperaHasta()).isEqualTo(t0 + 8_000);
+            verificarPublicado("pump", "ON", Map.of("ml", 8));
+        }
+
+        @Test
+        @DisplayName("sin parámetros usa 5 ml por defecto")
+        void mlPorDefecto() {
+            Secuencia s = service.iniciar(new IniciarSecuencia("DOSIS", null));
+
+            assertThat(s.parametros().ml()).isEqualTo(5);
+            verificarPublicado("pump", "ON", Map.of("ml", 5));
+        }
+
+        @Test
+        @DisplayName("el ACK del ON llega al final de la dosis: recién ahí apaga la bomba y el ACK del OFF completa")
+        void caminoFeliz() {
+            iniciarDosis(8);
+
+            avanzar(8);
+            verify(actuadores, never()).publicar(anyString(), anyString(), eq("pump"), eq("OFF"), anyMap());
+
+            ackOk(2);
+            assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
+            verificarPublicado("pump", "OFF", Map.of());
+
+            ackOk(3);
+            assertThat(secuencia().estado()).isEqualTo("COMPLETADA");
+            assertThat(secuencia().pasos()).extracting(PasoSecuencia::estado).containsExactly("OK", "OK", "OK");
+            // Nunca toca la válvula por su cuenta: la abre y la cierra el firmware junto con la bomba.
+            verify(actuadores, never()).publicar(anyString(), anyString(), eq("valve"), anyString(), anyMap());
+        }
+
+        @Test
+        @DisplayName("sin ACK a ml + margen (8 + 15 s): ACTUADOR_SIN_RESPUESTA de la bomba y se apaga igual")
+        void esperarSinAck() {
+            iniciarDosis(8);
+
+            avanzar(22);
+            assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
+
+            avanzar(1);
+            assertThat(paso(2).estado()).isEqualTo("ERROR");
+            assertThat(paso(2).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
+            assertThat(paso(2).detalle()).isEqualTo(
+                    "La bomba de insumo no respondió en 23 s. ¿El ESP32 está encendido y conectado al broker?");
+            verificarPublicado("pump", "OFF", Map.of());
+
+            ackOk(3);
+            assertThat(secuencia().estado()).isEqualTo("FALLIDA");
+        }
+
+        @Test
+        @DisplayName("en_cola (el nodo está regando) alarga el plazo del ACK por la espera máxima")
+        void enColaAlargaElPlazo() {
+            iniciarDosis(8);
+
+            ack(paso(2).commandId(), "EN_CURSO", "{\"tipo\":\"en_cola\",\"posicion\":1,\"esperaMaxSec\":40}");
+            avanzar(60);   // 8 + 15 + 40 = 63 s
+            assertThat(paso(2).estado()).isEqualTo("EN_CURSO");
+
+            avanzar(3);
+            assertThat(paso(2).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
+        }
+
+        @Test
+        @DisplayName("un ERROR cancelado del ON sin cancelar desde acá: la dosificación fue cortada por otro")
+        void cortadoPorOtro() {
+            iniciarDosis(8);
+
+            ack(paso(2).commandId(), "ERROR", "{\"tipo\":\"cancelado\"}");
+
+            assertThat(paso(2).codigoError()).isEqualTo("CANCELADO");
+            assertThat(paso(2).detalle()).isEqualTo("La dosificación fue cortada por otro comando antes de terminar.");
+            assertThat(paso(3).estado()).isEqualTo("EN_CURSO");
+        }
+
+        @Test
+        @DisplayName("CERRAR sin ACK: FALLIDA, y el detalle avisa que el nodo apaga la bomba al terminar la dosis")
+        void cerrarSinAck() {
+            iniciarDosis(8);
+            ackOk(2);
+
+            avanzar(10);
+
+            assertThat(paso(3).codigoError()).isEqualTo("ACTUADOR_SIN_RESPUESTA");
+            assertThat(paso(3).detalle()).contains("La bomba de insumo no respondió en 10 s")
+                    .endsWith("El nodo apaga la bomba sola al terminar los 8 ml.");
+            verify(actuadores, times(1)).publicar(anyString(), anyString(), eq("pump"), eq("OFF"), anyMap());
+        }
+
+        @Test
+        @DisplayName("cancelar en la espera: apaga la bomba y queda CANCELADA")
+        void cancelarEnLaEspera() {
+            iniciarDosis(8);
+            String on = paso(2).commandId();
+
+            service.cancelar();
+            verificarPublicado("pump", "OFF", Map.of());
+            ack(on, "ERROR", "{\"tipo\":\"cancelado\"}");
+            ackOk(3);
+
+            assertThat(secuencia().estado()).isEqualTo("CANCELADA");
+            assertThat(secuencia().error()).isNull();
+        }
+
+        @Test
+        @DisplayName("400: ml < 1 o mayor que el tope del firmware (50); nada se publica")
+        void validacion() {
+            assertThatThrownBy(() -> iniciarDosis(0)).isInstanceOf(SecuenciaInvalidaException.class);
+            assertThatThrownBy(() -> iniciarDosis(-3)).isInstanceOf(SecuenciaInvalidaException.class);
+            assertThatThrownBy(() -> iniciarDosis(51))
+                    .isInstanceOf(SecuenciaInvalidaException.class)
+                    .hasMessageContaining("50");
+
+            verifyNoInteractions(actuadores);
+            assertThat(service.estado()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("los topes se aceptan: 1 y 50 ml")
+        void topesValidos() {
+            iniciarDosis(1);
+            verificarPublicado("pump", "ON", Map.of("ml", 1));
+            service.cancelar();
+            ackOk(3);
+
+            iniciarDosis(50);
+            verificarPublicado("pump", "ON", Map.of("ml", 50));
+        }
+
+        @Test
+        @DisplayName("un riego no lleva ml, y una dosis no lleva duración")
+        void parametrosDeCadaTipo() {
+            assertThat(iniciar("RIEGO", 15, null).parametros().ml()).isNull();
+            service.cancelar();
+            ackOk(3);
+
+            assertThat(iniciarDosis(8).parametros().duracionSeg()).isNull();
+        }
+    }
+
     // ================================================================ MEDIASOMBRA
 
     @Nested

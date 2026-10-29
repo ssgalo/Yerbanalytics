@@ -41,8 +41,8 @@ import java.util.regex.Pattern;
 
 /**
  * Orquestador de las secuencias guionadas de la Demo Expo: <b>riego</b> (abrir la válvula, esperar,
- * cerrar), <b>mediasombra</b> (desplegar, esperar, enrollar) y <b>lectura</b> (pedir la lectura, esperar
- * la telemetría, mostrarla). Calcado de {@link PasadaRielService}, a propósito una máquina aparte: la
+ * cerrar), <b>dosis</b> (prender la bomba de insumo con N ml, esperar, apagarla), <b>mediasombra</b> (desplegar,
+ * esperar, enrollar) y <b>lectura</b> (pedir la lectura, esperar la telemetría, mostrarla). Calcado de {@link PasadaRielService}, a propósito una máquina aparte: la
  * pasada está probada con hardware y sus pasos (captura, {@code ACEPTADO}, republicar) no se parecen a
  * los de un actuador.
  *
@@ -67,6 +67,11 @@ import java.util.regex.Pattern;
  * siempre. El {@code ERROR cancelado} del ON que provoca nuestro propio OFF se ignora: llega con el
  * commandId del ON, que ya no es el del paso en curso.
  *
+ * <p><b>Dosis.</b> Es el mismo guion que el riego con la bomba de insumo: {@code pump ON {ml}} (el firmware abre la
+ * válvula del sector, prende la bomba el tiempo que corresponde a los ml y contesta al terminar), la espera de ese ACK
+ * y {@code pump OFF} de seguro. Como el riego manual, va directo al actuador: no pasa por {@code ApplicationService},
+ * así que no evalúa las precondiciones P-D1…P-D5 ni descuenta el tanque.
+ *
  * <p><b>ACK intermedios.</b> Con la cola de cargas del nodo (add-cola-actuadores-nodo) un comando puede esperar turno:
  * el nodo avisa {@code EN_CURSO en_cola / iniciado}. Eso no cierra ningún paso; sólo recalcula el plazo del ACK final
  * (ver {@code aplicarIntermedio}). El ABRIR del riego encadena a ESPERAR en el mismo instante, así que el intermedio del
@@ -87,6 +92,7 @@ public class SecuenciaService implements UsoDelHardware {
     static final String RIEGO = "RIEGO";
     static final String MEDIASOMBRA = "MEDIASOMBRA";
     static final String LECTURA = "LECTURA";
+    static final String DOSIS = "DOSIS";
     /** Acciones sueltas de un solo paso: abrir = enrollar (100), cerrar = desplegar (0). */
     static final String MEDIASOMBRA_ABRIR = "MEDIASOMBRA_ABRIR";
     static final String MEDIASOMBRA_CERRAR = "MEDIASOMBRA_CERRAR";
@@ -113,6 +119,7 @@ public class SecuenciaService implements UsoDelHardware {
     private static final String CANCELADA_POR_OPERADOR = "Cancelada por el operador";
 
     private static final int DURACION_RIEGO_DEFECTO_SEG = 10;
+    private static final int ML_DOSIS_DEFECTO = 5;
     private static final int ESPERA_MEDIASOMBRA_DEFECTO_SEG = 10;
     private static final int ESPERA_MEDIASOMBRA_MAX_SEG = 600;
 
@@ -269,7 +276,7 @@ public class SecuenciaService implements UsoDelHardware {
         ParametrosSecuencia pedidos = pedido == null || pedido.parametros() == null
                 ? new ParametrosSecuencia(null, null) : pedido.parametros();
         if (tipo == null) {
-            throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
+            throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, DOSIS, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
         switch (tipo) {
             case RIEGO -> {
@@ -280,6 +287,14 @@ public class SecuenciaService implements UsoDelHardware {
                             "duracionSeg tiene que estar entre 1 y " + max + " (recibí " + duracion + ").");
                 }
                 return new ParametrosSecuencia(duracion, null);
+            }
+            case DOSIS -> {
+                int max = ContratoNodo.BOMBA_ML_MAX;
+                int ml = pedidos.ml() != null ? pedidos.ml() : ML_DOSIS_DEFECTO;
+                if (ml < 1 || ml > max) {
+                    throw new SecuenciaInvalidaException("ml tiene que estar entre 1 y " + max + " (recibí " + ml + ").");
+                }
+                return new ParametrosSecuencia(null, null, null, ml);
             }
             case MEDIASOMBRA -> {
                 int espera = pedidos.esperaSeg() != null ? pedidos.esperaSeg() : ESPERA_MEDIASOMBRA_DEFECTO_SEG;
@@ -296,7 +311,7 @@ public class SecuenciaService implements UsoDelHardware {
                 return new ParametrosSecuencia(null, null);
             }
             default -> throw new SecuenciaInvalidaException("Tipo de secuencia desconocido: " + tipo
-                    + " (RIEGO, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
+                    + " (RIEGO, DOSIS, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
     }
 
@@ -308,9 +323,9 @@ public class SecuenciaService implements UsoDelHardware {
             throw new SecuenciaRechazadaException("Ya hay una lectura de sensores en curso. Esperá a que termine.");
         }
         ZonaEntity zona = zonaDestino();
-        // Sólo el riego es de un sector; la mediasombra es de la zona y la lectura también.
+        // Sólo el riego y la dosis son de un sector; la mediasombra es de la zona y la lectura también.
         String sectorId = null;
-        if (RIEGO.equals(tipo)) {
+        if (esDeSector(tipo)) {
             sectorId = zona.getSectors().stream().map(SectorEntity::getId).min(Comparator.naturalOrder())
                     .orElseThrow(() -> new SecuenciaRechazadaException(
                             "La zona " + zona.getId() + " no tiene sectores."));
@@ -319,8 +334,8 @@ public class SecuenciaService implements UsoDelHardware {
         SecuenciaInterna p = new SecuenciaInterna(UUID.randomUUID().toString(), tipo, zona.getId(), sectorId,
                 parametros, reloj.millis());
         switch (tipo) {
-            case RIEGO -> {
-                p.duracionValvulaSeg = parametros.duracionSeg();
+            case RIEGO, DOSIS -> {
+                p.duracionValvulaSeg = RIEGO.equals(tipo) ? parametros.duracionSeg() : segundosDeDosis(parametros.ml());
                 p.pasos.add(new Paso(1, ABRIR));
                 p.pasos.add(new Paso(2, ESPERAR));
                 p.pasos.add(new Paso(3, CERRAR));
@@ -422,7 +437,11 @@ public class SecuenciaService implements UsoDelHardware {
         paso.iniciadoEn = reloj.millis();
         switch (paso.tipo) {
             case ABRIR -> {
-                publicarComando(p, paso, "valve", "ON", Map.of("durationSec", p.duracionValvulaSeg));
+                if (DOSIS.equals(p.tipo)) {
+                    publicarComando(p, paso, "pump", "ON", Map.of("ml", p.parametros.ml()));
+                } else {
+                    publicarComando(p, paso, "valve", "ON", Map.of("durationSec", p.duracionValvulaSeg));
+                }
                 // El firmware contesta el ON al FINAL del riego, no al abrir: publicar bien es todo lo que se
                 // verifica acá. El ACK se espera en ESPERAR, citando el commandId de este comando.
                 if (EN_CURSO.equals(paso.estado)) {
@@ -430,14 +449,14 @@ public class SecuenciaService implements UsoDelHardware {
                     cerrarYSeguir(p, paso, OK, null, null);
                 }
             }
-            case CERRAR -> publicarComando(p, paso, "valve", "OFF", Map.of());
+            case CERRAR -> publicarComando(p, paso, DOSIS.equals(p.tipo) ? "pump" : "valve", "OFF", Map.of());
             case DESPLEGAR -> publicarComando(p, paso, "shade", "SET", Map.of("targetPct", APERTURA_DESPLEGADA));
             case ENROLLAR -> publicarComando(p, paso, "shade", "SET", Map.of("targetPct", APERTURA_ENROLLADA));
             case ESPERAR -> {
                 long ahora = reloj.millis();
                 paso.esperaHasta = ahora + esperaSeg(p) * 1000L;
-                if (RIEGO.equals(p.tipo)) {
-                    // Espera el ACK del ON: llega cuando el riego termina (N s) o antes, si lo rechazan o lo cortan.
+                if (esDeSector(p.tipo)) {
+                    // Espera el ACK del ON: llega cuando el riego o la dosis termina, o antes si lo rechazan o lo cortan.
                     paso.commandId = p.comandoOnId;
                     paso.venceAckEn = paso.esperaHasta + props.getMargenAckRiegoSeg() * 1000L;
                 }
@@ -516,7 +535,7 @@ public class SecuenciaService implements UsoDelHardware {
         }
         long ahora = reloj.millis();
         paso.venceAckEn = ahora + esperaMs + timeoutAckSeg(p, paso) * 1000L;
-        if (ESPERAR.equals(paso.tipo) && RIEGO.equals(p.tipo)) {
+        if (ESPERAR.equals(paso.tipo) && esDeSector(p.tipo)) {
             paso.esperaHasta = ahora + esperaMs + p.duracionValvulaSeg * 1000L;   // fin esperado del riego, para la cuenta regresiva
         }
     }
@@ -546,7 +565,7 @@ public class SecuenciaService implements UsoDelHardware {
         long ahora = reloj.millis();
         switch (paso.tipo) {
             case ESPERAR -> {
-                if (RIEGO.equals(p.tipo)) {
+                if (esDeSector(p.tipo)) {
                     // El paso termina con el ACK del ON (aplicarAck); acá sólo vence si no llega.
                     if (ahora >= paso.venceAckEn) {
                         cerrarYSeguir(p, paso, ERROR, "ACTUADOR_SIN_RESPUESTA", detalleDeError(p, paso,
@@ -658,25 +677,35 @@ public class SecuenciaService implements UsoDelHardware {
     private static boolean esDeComando(SecuenciaInterna p, Paso paso) {
         return switch (paso.tipo) {
             case CERRAR, DESPLEGAR, ENROLLAR -> true;
-            case ESPERAR -> RIEGO.equals(p.tipo);
+            case ESPERAR -> esDeSector(p.tipo);
             default -> false;
         };
     }
 
     private static boolean esValvula(SecuenciaInterna p, Paso paso) {
-        return CERRAR.equals(paso.tipo) || ABRIR.equals(paso.tipo) || (ESPERAR.equals(paso.tipo) && RIEGO.equals(p.tipo));
+        return CERRAR.equals(paso.tipo) || ABRIR.equals(paso.tipo) || (ESPERAR.equals(paso.tipo) && esDeSector(p.tipo));
     }
 
     /** Plazo del ACK: el del OFF es corto; el del ON del riego es la duración N más el margen. */
     private int timeoutAckSeg(SecuenciaInterna p, Paso paso) {
-        if (ESPERAR.equals(paso.tipo) && RIEGO.equals(p.tipo)) {
+        if (ESPERAR.equals(paso.tipo) && esDeSector(p.tipo)) {
             return p.duracionValvulaSeg + props.getMargenAckRiegoSeg();
         }
         return esValvula(p, paso) ? props.getTimeoutAckValvulaSeg() : props.getTimeoutAckMediasombraSeg();
     }
 
     private static int esperaSeg(SecuenciaInterna p) {
-        return RIEGO.equals(p.tipo) ? p.parametros.duracionSeg() : p.parametros.esperaSeg();
+        return esDeSector(p.tipo) ? p.duracionValvulaSeg : p.parametros.esperaSeg();
+    }
+
+    /** Riego y dosis comandan un actuador del sector (válvula o bomba de insumo) con el mismo guion. */
+    private static boolean esDeSector(String tipo) {
+        return RIEGO.equals(tipo) || DOSIS.equals(tipo);
+    }
+
+    /** Lo que tarda la bomba en largar los ml (espejo de BOMBA_INSUMO_MS_POR_ML del firmware), redondeado hacia arriba. */
+    private static int segundosDeDosis(int ml) {
+        return (int) ((ml * ContratoNodo.BOMBA_INSUMO_MS_POR_ML + 999) / 1000);
     }
 
     private static String tipoDelDetalle(JsonNode detalle) {
@@ -694,12 +723,14 @@ public class SecuenciaService implements UsoDelHardware {
     /** Texto legible del error (design §2.5). Para CERRAR avisa que el nodo apaga la bomba solo. */
     private String detalleDeError(SecuenciaInterna p, Paso paso, String codigo, String tipoOriginal) {
         String detalle = switch (codigo) {
-            case "ACTUADOR_SIN_RESPUESTA" -> (esValvula(p, paso) ? "La válvula" : "La mediasombra")
+            case "ACTUADOR_SIN_RESPUESTA" -> (!esValvula(p, paso) ? "La mediasombra"
+                    : DOSIS.equals(p.tipo) ? "La bomba de insumo" : "La válvula")
                     + " no respondió en " + timeoutAckSeg(p, paso)
                     + " s. ¿El ESP32 está encendido y conectado al broker?";
             case "FALLA_MECANICA" -> "La mediasombra no llegó al final de carrera.";
             case "REEMPLAZADO" -> "El movimiento fue interrumpido por otro comando.";
-            case "CANCELADO" -> "El riego fue cortado por otro comando antes de terminar.";
+            case "CANCELADO" -> (DOSIS.equals(p.tipo) ? "La dosificación fue cortada" : "El riego fue cortado")
+                    + " por otro comando antes de terminar.";
             case "COMANDO_INVALIDO", "DURACION_INVALIDA", "ACTUADOR_DESCONOCIDO", "ACCION_INVALIDA",
                  "SECTOR_INVALIDO", "PARAMETROS_INVALIDOS" ->
                     "El ESP32 rechazó el comando (" + tipoOriginal + ").";
@@ -709,6 +740,9 @@ public class SecuenciaService implements UsoDelHardware {
     }
 
     private static String avisoDeApagadoSolo(SecuenciaInterna p) {
+        if (DOSIS.equals(p.tipo)) {
+            return " El nodo apaga la bomba sola al terminar los " + p.parametros.ml() + " ml.";
+        }
         return " El nodo apaga la bomba solo a los " + p.duracionValvulaSeg + " s.";
     }
 
@@ -772,9 +806,9 @@ public class SecuenciaService implements UsoDelHardware {
         boolean cancelacionSolicitada;
         String error;
         LecturaSecuencia lectura;
-        /** durationSec del {@code valve ON}: el nodo apaga solo a ese plazo (= duracionSeg). Sólo riego. */
+        /** Lo que dura la carga: durationSec del {@code valve ON}, o lo que tarda la bomba en largar los ml. Riego y dosis. */
         int duracionValvulaSeg;
-        /** commandId del {@code valve ON}: su ACK llega al final del riego y lo espera ESPERAR. Sólo riego. */
+        /** commandId del ON (válvula o bomba): su ACK llega al final y lo espera ESPERAR. Riego y dosis. */
         String comandoOnId;
         /** Hora del pedido de lectura; la respuesta es la primera telemetría recibida desde acá. */
         long pedidoEn;
