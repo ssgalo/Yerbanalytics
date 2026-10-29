@@ -26,7 +26,7 @@
 - [x] 4.1 Grabar `nodo_combinado_usb`, arrancar el puente y ver la sesión en el broker: la placa mandó sus 4 suscripciones en el primer latido
 - [x] 4.2 Lectura sin motor (`POST /api/pulsos {"ejecutarMotor": false}`): «respondieron todas las zonas», MAC `DC:DA:0C:45:76:D0`, timestamp actual (el del latido), señal 0. Ojo: con la fuente de telemetría de demo en `SIMULATOR` el backend descarta, a propósito, el tópico del nodo real
 - [x] 4.3 Pasada del riel: `COMPLETADA`, los 5 pasos en OK (eventos del riel y fotos)
-- [ ] 4.4 Desenchufar y enchufar el USB: se recupera solo (falta la prueba física; el reinicio rápido del puente, con cambio de sesión, sí se probó: la placa reenvió las suscripciones en el mismo segundo)
+- [x] 4.4 Desenchufar y enchufar el USB: se recupera solo (00:07:43 se pierde el puerto, 00:07:47 se reabre con sesión nueva y la placa reenvía sus 4 suscripciones; también se probó el reinicio rápido del puente)
 
 ## 5. Documentación
 
