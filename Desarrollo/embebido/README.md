@@ -118,6 +118,14 @@ arduino-cli upload -p <puerto> --fqbn "$FQBN" /tmp/nodo_combinado
 En el Arduino IDE: placa **ESP32S3 Dev Module**, Flash Size **16MB**, PSRAM **OPI PSRAM**,
 USB CDC On Boot según el puerto (ver arriba).
 
+### Transporte USB (sólo para la expo)
+
+Donde el Wi-Fi de 2,4 GHz no sirve (un salón lleno), el nodo combinado puede hablar MQTT **por el cable
+USB** con un puente en la PC: `transporte_usb/` reemplaza a `comun/net_wifi.cpp` y `comun/net_mqtt.cpp`
+con la misma interfaz, y el backend no se entera. Se graba con `puente-usb/compilar-nodo-usb.sh --subir`
+(o el entorno `nodo_combinado_usb` de PlatformIO) y se vuelve al Wi-Fi grabando `nodo_combinado`. Guía:
+[`puente-usb/README.md`](puente-usb/README.md).
+
 ---
 
 ## 3. Configuración (`comun/config.h`)

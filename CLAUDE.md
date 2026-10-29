@@ -28,7 +28,7 @@ Yerbanalytics/
 │   ├── servicio-inferencia/ Daemon Python: YOLOv8 (`modelo_final.pt`) + módulo de diagnóstico (ver §5)
 │   ├── contratos/     Contratos versionados entre la plataforma y sus dispositivos
 │   ├── certs/         CA local y certificados TLS de la LAN (no se versionan)
-│   ├── embebido/      Firmware ESP32 (nodo testigo y actuadores); fuente del contrato MQTT. `prototipo_hardware/` = sketches del hardware real, incl. el riel por MQTT (§6.1)
+│   ├── embebido/      Firmware ESP32 (nodo testigo y actuadores); fuente del contrato MQTT. `prototipo_hardware/` = sketches del hardware real, incl. el riel por MQTT (§6.1). `transporte_usb/` + `puente-usb/` = MQTT por cable USB, sólo para la expo (ver §6.2)
 │   └── Modelo_IA/     Modelo de visión: datasets, notebooks, resultados (ver §5)
 ├── Documentacion/     Documentos de negocio, alcance, arquitectura, entregas
 ├── docs-motor-reglas-e-integracion/  Reglas agronómicas v2, su comparación con el motor, circuito de sensado, guía del ESP32 (ver §6)
@@ -582,6 +582,11 @@ Invariantes a respetar al tocar esta área:
   `SIM_NODE_MAX_LOADS`). Orden de despliegue: backend antes que firmware.
   Incluye la duración máxima de la válvula (1200 s): el backend nunca pide más y un `config.h`
   anterior del firmware no compila a propósito.
+- **El transporte USB de la expo no es un cuarto espejo del contrato.** Donde el Wi-Fi no sirve, el nodo
+  combinado se graba con `transporte_usb/` (misma interfaz que `net_wifi`/`net_mqtt`) y un puente en la PC
+  (`Desarrollo/embebido/puente-usb/`) traslada **los mismos tópicos y payloads** al broker: para el backend
+  el puente es el nodo. Su protocolo de líneas (`@S`/`@P`/`@H`/`@M`) vive sólo entre la placa y el puente.
+  Es un workaround: el transporte de siempre es el Wi-Fi. Ver `openspec/changes/add-transporte-usb-nodo/`.
 
 No confundir el simulador con el **modo estático** del dashboard: ése es
 `VITE_DATA_SOURCE=mock` (§4), una demo ilustrativa sin backend. El simulador es lo contrario —
