@@ -10,7 +10,8 @@ Expo:      ESP32 ──USB────▶ puente (PC) ──▶ Mosquitto ◀─
 
 Para el backend, el puente **es** el nodo: publica en los mismos tópicos, con los mismos payloads. Backend,
 broker, dashboard, simulador y contrato MQTT no cambian. Diseño y porqués:
-`openspec/changes/add-transporte-usb-nodo/`.
+`openspec/changes/add-transporte-usb-nodo/`. Explicación de arquitectura, con diagramas:
+[`docs/arquitectura-transporte-usb.md`](docs/arquitectura-transporte-usb.md) y su versión en PDF.
 
 > **Es un workaround.** El transporte de siempre es el Wi-Fi (`nodo_combinado`). Después de la expo hay que
 > volver a grabar ese firmware.
