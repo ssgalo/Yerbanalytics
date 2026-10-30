@@ -174,6 +174,43 @@ class SecuenciaServiceTest {
         }
 
         @Test
+        @DisplayName("con sectorId de la zona de destino riega ese sector y no el primero")
+        void conSectorElegido() {
+            Secuencia s = service.iniciar(new IniciarSecuencia("RIEGO", new ParametrosSecuencia(15, null), "MZ-2-003"));
+
+            assertThat(s.sectorId()).isEqualTo("MZ-2-003");
+            verify(actuadores).publicar(ZONA, "MZ-2-003", "valve", "ON", Map.of("durationSec", 15));
+        }
+
+        @Test
+        @DisplayName("la dosis también acepta sectorId")
+        void dosisConSectorElegido() {
+            Secuencia s = service.iniciar(new IniciarSecuencia("DOSIS", new ParametrosSecuencia(null, null, null, 5), "MZ-2-003"));
+
+            assertThat(s.sectorId()).isEqualTo("MZ-2-003");
+        }
+
+        @Test
+        @DisplayName("un sectorId de otra zona o inexistente es un pedido inválido y no publica nada")
+        void sectorFueraDeLaZona() {
+            assertThatThrownBy(() -> service.iniciar(new IniciarSecuencia("RIEGO", null, "MZ-10-001")))
+                    .isInstanceOf(SecuenciaInvalidaException.class).hasMessageContaining("MZ-10-001");
+            assertThatThrownBy(() -> service.iniciar(new IniciarSecuencia("RIEGO", null, "MZ-2-999")))
+                    .isInstanceOf(SecuenciaInvalidaException.class);
+            verify(actuadores, never()).publicar(anyString(), anyString(), anyString(), anyString(), anyMap());
+            assertThat(service.estado()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("las secuencias de zona rechazan un sectorId")
+        void sectorEnSecuenciaDeZona() {
+            for (String tipo : List.of("MEDIASOMBRA", "MEDIASOMBRA_ABRIR", "MEDIASOMBRA_CERRAR", "LECTURA")) {
+                assertThatThrownBy(() -> service.iniciar(new IniciarSecuencia(tipo, null, SECTOR)))
+                        .isInstanceOf(SecuenciaInvalidaException.class).hasMessageContaining("sectorId");
+            }
+        }
+
+        @Test
         @DisplayName("sin parámetros usa 10 s por defecto")
         void duracionPorDefecto() {
             Secuencia s = service.iniciar(new IniciarSecuencia("RIEGO", null));

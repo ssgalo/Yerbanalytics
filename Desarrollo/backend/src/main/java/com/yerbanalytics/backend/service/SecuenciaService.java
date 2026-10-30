@@ -181,8 +181,9 @@ public class SecuenciaService implements UsoDelHardware {
     public Secuencia iniciar(IniciarSecuencia pedido) {
         ParametrosSecuencia parametros = validar(pedido);
         String tipo = pedido.tipo();
+        String sectorElegido = pedido.sectorId();
         return guardia.conHardwareLibre(this, SecuenciaRechazadaException::new,
-                () -> iniciarSecuencia(tipo, parametros));
+                () -> iniciarSecuencia(tipo, parametros, sectorElegido));
     }
 
     /** El hardware está ocupado sólo mientras la secuencia está {@code EN_CURSO}; lee la foto, sin lock. */
@@ -278,6 +279,10 @@ public class SecuenciaService implements UsoDelHardware {
         if (tipo == null) {
             throw new SecuenciaInvalidaException("Falta el tipo de secuencia (RIEGO, DOSIS, MEDIASOMBRA, LECTURA, MEDIASOMBRA_ABRIR o MEDIASOMBRA_CERRAR).");
         }
+        if (pedido.sectorId() != null && !esDeSector(tipo)) {
+            throw new SecuenciaInvalidaException("sectorId sólo aplica al riego y a la dosis (" + tipo
+                    + " es de la zona).");
+        }
         switch (tipo) {
             case RIEGO -> {
                 int max = ContratoNodo.DURACION_VALVULA_MAX_SEG;
@@ -315,7 +320,7 @@ public class SecuenciaService implements UsoDelHardware {
         }
     }
 
-    private synchronized Secuencia iniciarSecuencia(String tipo, ParametrosSecuencia parametros) {
+    private synchronized Secuencia iniciarSecuencia(String tipo, ParametrosSecuencia parametros, String sectorElegido) {
         if (actual != null && EN_CURSO.equals(actual.estado)) {
             throw new SecuenciaRechazadaException("Ya hay una secuencia en curso.");
         }
@@ -325,7 +330,14 @@ public class SecuenciaService implements UsoDelHardware {
         ZonaEntity zona = zonaDestino();
         // Sólo el riego y la dosis son de un sector; la mediasombra es de la zona y la lectura también.
         String sectorId = null;
-        if (esDeSector(tipo)) {
+        if (esDeSector(tipo) && sectorElegido != null) {
+            // El sector elegido tiene que ser de la zona de destino: la secuencia no sale de ella.
+            if (zona.getSectors().stream().noneMatch(x -> sectorElegido.equals(x.getId()))) {
+                throw new SecuenciaInvalidaException("El sector " + sectorElegido + " no pertenece a la zona "
+                        + zona.getId() + ".");
+            }
+            sectorId = sectorElegido;
+        } else if (esDeSector(tipo)) {
             sectorId = zona.getSectors().stream().map(SectorEntity::getId).min(Comparator.naturalOrder())
                     .orElseThrow(() -> new SecuenciaRechazadaException(
                             "La zona " + zona.getId() + " no tiene sectores."));

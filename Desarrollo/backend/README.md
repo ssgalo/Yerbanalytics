@@ -1451,13 +1451,14 @@ ACK final (los `EN_CURSO` `en_cola`/`iniciado` sólo estiran el plazo; `sin_camb
 llevan parámetros y se rigen por la misma guardia (`409` con otra secuencia o una pasada). Se pasan por acá y no por
 un publish directo al broker para que el seguimiento de comandos y el estado del backend las vean.
 
-Pedido: `{"tipo": "RIEGO" | "DOSIS" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "MEDIASOMBRA_CERRAR", "parametros": {"duracionSeg": N, "esperaSeg": N, "ml": N}}`.
+Pedido: `{"tipo": "RIEGO" | "DOSIS" | "MEDIASOMBRA" | "LECTURA" | "MEDIASOMBRA_ABRIR" | "MEDIASOMBRA_CERRAR", "parametros": {"duracionSeg": N, "esperaSeg": N, "ml": N}, "sectorId": "MZ-1-002"}`.
 `duracionSeg` sólo aplica a `RIEGO` (default 10, de 1 a 1200: el tope del contrato); `ml` sólo a `DOSIS` (default 5, de 1
 a 50: `ContratoNodo.BOMBA_ML_MAX`);
 `esperaSeg` sólo a `MEDIASOMBRA` (default 10, de 0 a 600). La forma de `Secuencia` y sus pasos:
 `openspec/changes/add-secuencias-demo-expo/design.md` §2.7 y `dto/Secuencia.java`.
 
-- **Destino.** La zona de menor número (orden numérico) y su primer sector. Sin topología, `409`.
+- **Destino.** La zona de menor número (orden numérico) y su primer sector. `sectorId` (opcional, sólo `RIEGO` y `DOSIS`) elige otro
+  sector de esa zona; si no es de ella, o el tipo es de zona, `400`. Sin topología, `409`.
 - **MQTT que ahora sí se usa.** Publica `ON`/`OFF` de la válvula en `nursery/zone/{zona}/sector/{sector}/command`, y el
   `SET` de la mediasombra (que es de la zona) y `LEER_AHORA` en `nursery/zone/{zona}/command` (QoS 1). **Escucha el ACK de
   los actuadores** (`nursery/zone/+/sector/+/ack` y, el de la malla, `nursery/zone/+/ack`) con un adaptador propio
