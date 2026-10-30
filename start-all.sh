@@ -189,7 +189,7 @@ start_service backend "$BACKEND_DIR" ./mvnw spring-boot:run
 
 # --- 3. Frontend ------------------------------------------------------------
 info "[3/5] Iniciando Frontend (React + Vite)..."
-start_service frontend "$FRONTEND_DIR" npm run dev
+start_service frontend "$FRONTEND_DIR" npm run dev -- --host
 
 # --- 4. Simulador -----------------------------------------------------------
 if [ "$HAY_SIM" -eq 1 ]; then
@@ -223,11 +223,11 @@ echo
 if [ "$OPEN_BROWSER" -eq 1 ] && command -v xdg-open >/dev/null 2>&1; then
   info "[5/5] Esperando a que los frontends respondan para abrir el navegador..."
   if wait_port 5173; then
-    xdg-open "http://localhost:5173" >/dev/null 2>&1 || true
+    xdg-open "http://192.168.1.10:5173" >/dev/null 2>&1 || true
     ok "      Dashboard abierto."
     sleep 2
   else
-    warn "[AVISO] El dashboard no respondio a tiempo. Abrilo a mano: http://localhost:5173"
+    warn "[AVISO] El dashboard no respondio a tiempo. Abrilo a mano: http://192.168.1.10:5173"
   fi
   if [ "$HAY_SIM" -eq 1 ]; then
     if wait_port 5180; then
@@ -245,7 +245,7 @@ echo
 ok "==========================================="
 ok "  Servicios iniciando en segundo plano."
 ok "  - Backend:    http://localhost:8000"
-ok "  - Frontend:   http://localhost:5173"
+ok "  - Frontend:   http://192.168.1.10:5173"
 [ "$HAY_SIM" -eq 1 ] && ok "  - Simulador:  http://localhost:5180"
 [ "$INF_MODE" = "docker" ] && ok "  - Inferencia: daemon Docker: docker logs -f servicio-inferencia"
 [ "$INF_MODE" = "local" ] && ok "  - Inferencia: venv local"
