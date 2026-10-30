@@ -6,7 +6,7 @@
    ============================================================ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '../api';
-import type { ParametrosSecuencia, Secuencia, TipoSecuencia } from '../types';
+import type { IniciarSecuenciaOpciones, ParametrosSecuencia, Secuencia, TipoSecuencia } from '../types';
 
 const INTERVALO_EN_CURSO_MS = 1000;
 
@@ -15,7 +15,11 @@ export interface UseSecuenciaSimulatorResult {
   cargando: boolean;
   error: string | null;
   iniciando: boolean;
-  iniciar: (tipo: TipoSecuencia, parametros?: ParametrosSecuencia) => Promise<void>;
+  iniciar: (
+    tipo: TipoSecuencia,
+    parametros?: ParametrosSecuencia,
+    opciones?: IniciarSecuenciaOpciones,
+  ) => Promise<void>;
   cancelar: () => Promise<void>;
   descartarError: () => void;
 }
@@ -61,11 +65,15 @@ export function useSecuenciaSimulator(): UseSecuenciaSimulatorResult {
   }, [enCurso, consultar]);
 
   const iniciar = useCallback(
-    async (tipo: TipoSecuencia, parametros?: ParametrosSecuencia) => {
+    async (
+      tipo: TipoSecuencia,
+      parametros?: ParametrosSecuencia,
+      opciones?: IniciarSecuenciaOpciones,
+    ) => {
       setErrorAccion(null);
       setIniciando(true);
       try {
-        const nueva = await api.iniciarSecuencia(tipo, parametros);
+        const nueva = await api.iniciarSecuencia(tipo, parametros, opciones);
         pedido.current++;
         setSecuencia(nueva);
         setErrorConsulta(null);

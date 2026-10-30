@@ -31,6 +31,7 @@ import type {
   Pasada,
   PasoPasada,
   ParametroRegla,
+  IniciarSecuenciaOpciones,
   ParametrosSecuencia,
   RegisteredDiagnosis,
   Secuencia,
@@ -466,11 +467,12 @@ export async function getSecuenciaActual(): Promise<Secuencia | null> {
 export async function iniciarSecuencia(
   tipo: TipoSecuencia,
   parametros?: ParametrosSecuencia,
+  opciones?: IniciarSecuenciaOpciones,
 ): Promise<Secuencia> {
   const res = await fetch(`${BACKEND}/api/secuencias`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tipo, parametros: parametros ?? {} }),
+    body: JSON.stringify({ tipo, parametros: parametros ?? {}, ...(opciones?.sectorId ? { sectorId: opciones.sectorId } : {}) }),
   });
   return json<Secuencia>(res, 'iniciar la secuencia');
 }

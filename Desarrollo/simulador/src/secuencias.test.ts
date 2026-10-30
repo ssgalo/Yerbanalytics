@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DOSIS, etiquetaPaso, textoPaso } from './secuencias';
-import type { PasoSecuencia, Secuencia, TipoPasoSecuencia, TipoSecuencia } from './types';
+import { DOSIS, etiquetaPaso, secondSectorOfDestination, textoPaso } from './secuencias';
+import type { PasoSecuencia, SectorRef, Secuencia, TipoPasoSecuencia, TipoSecuencia } from './types';
 
 function secuencia(tipo: TipoSecuencia, parametros: Secuencia['parametros']): Secuencia {
   return {
@@ -54,4 +54,21 @@ test('la cuenta regresiva de la espera vale igual para riego y dosis', () => {
 
 test('los límites de la dosis son los del firmware: de 1 a 50 ml, 5 por defecto', () => {
   assert.deepEqual(DOSIS, { min: 1, max: 50, defecto: 5 });
+});
+
+const sec = (id: string, zonaId: string): SectorRef => ({ id, zonaId, zonaName: zonaId });
+
+test('secondSectorOfDestination: segundo sector de la zona de menor número (orden natural)', () => {
+  const sectors = [
+    sec('MZ-10-001', 'MZ-10'),
+    sec('MZ-2-003', 'MZ-2'),
+    sec('MZ-2-002', 'MZ-2'),
+    sec('MZ-2-001', 'MZ-2'),
+  ];
+  assert.equal(secondSectorOfDestination(sectors), 'MZ-2-002');
+});
+
+test('secondSectorOfDestination: sin segundo sector o sin topología no hay destino', () => {
+  assert.equal(secondSectorOfDestination([]), null);
+  assert.equal(secondSectorOfDestination([sec('MZ-1-001', 'MZ-1')]), null);
 });

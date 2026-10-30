@@ -1,12 +1,13 @@
 /* ============================================================
    Secuencias directas de actuadores (Demo Expo - simulador).
-   Five cards: Riego, Dosificación, Mediasombra, Abrir/cerrar mediasombra, Lectura de sensores.
+   Six cards: Riego del sector 1, Riego del sector 2, Dosificación, Mediasombra, Abrir/cerrar mediasombra, Lectura de sensores.
    Adapted from the dashboard's SecuenciasPanel.tsx but without react-router-dom
    and using the simulator's useSecuenciaSimulator hook.
    ============================================================ */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSecuenciaSimulator } from '../hooks/useSecuenciaSimulator';
-import { DOSIS, ESPERA, RIEGO, etiquetaPaso, textoPaso } from '../secuencias';
+import * as api from '../api';
+import { DOSIS, ESPERA, RIEGO, etiquetaPaso, secondSectorOfDestination, textoPaso } from '../secuencias';
 import type { Secuencia } from '../types';
 
 function enRango(texto: string, { min, max }: { min: number; max: number }): number | null {
@@ -134,6 +135,20 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
   const [riegoTxt, setRiegoTxt] = useState(String(RIEGO.defecto));
   const [esperaTxt, setEsperaTxt] = useState(String(ESPERA.defecto));
   const [mlTxt, setMlTxt] = useState(String(DOSIS.defecto));
+  const [riego2Txt, setRiego2Txt] = useState(String(RIEGO.defecto));
+  const [sector2, setSector2] = useState<string | null>(null);
+
+  // El segundo sector sale de la topología real, no se escribe a mano.
+  useEffect(() => {
+    let vivo = true;
+    api
+      .getSectors()
+      .then((ss) => vivo && setSector2(secondSectorOfDestination(ss)))
+      .catch(() => vivo && setSector2(null));
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   useEffect(() => {
     descartarError();
@@ -143,6 +158,7 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
   const duracion = enRango(riegoTxt, RIEGO);
   const espera = enRango(esperaTxt, ESPERA);
   const ml = enRango(mlTxt, DOSIS);
+  const duracion2 = enRango(riego2Txt, RIEGO);
 
   return (
     <section className="card">
@@ -152,7 +168,7 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
       </p>
 
       <div className="sensors">
-        <Tarjeta titulo="Riego" descripcion="Abre la válvula, espera y la cierra.">
+        <Tarjeta titulo="Riego del sector 1" descripcion="Abre la válvula, espera y la cierra.">
           <label className="field">
             <span className="label">Segundos</span>
             <input
@@ -169,6 +185,39 @@ export function SecuenciasSimulatorPanel({ pasadaEnCurso }: Props) {
             className="primary"
             disabled={ocupado || duracion === null}
             onClick={() => duracion !== null && void iniciar('RIEGO', { duracionSeg: duracion })}
+          >
+            Regar
+          </button>
+        </Tarjeta>
+
+        <Tarjeta
+          titulo="Riego del sector 2"
+          descripcion={
+            sector2
+              ? `Igual que el riego del sector 1, sobre ${sector2}.`
+              : 'No hay un segundo sector en la zona de destino.'
+          }
+        >
+          <label className="field">
+            <span className="label">Segundos</span>
+            <input
+              type="number"
+              className="num"
+              min={RIEGO.min}
+              max={RIEGO.max}
+              value={riego2Txt}
+              onChange={(e) => setRiego2Txt(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="primary"
+            disabled={ocupado || duracion2 === null || sector2 === null}
+            onClick={() =>
+              duracion2 !== null &&
+              sector2 !== null &&
+              void iniciar('RIEGO', { duracionSeg: duracion2 }, { sectorId: sector2 })
+            }
           >
             Regar
           </button>

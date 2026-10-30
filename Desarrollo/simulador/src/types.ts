@@ -259,6 +259,11 @@ export interface ParametrosSecuencia {
   ml?: number | null;
 }
 
+/** Cuerpo de iniciar una secuencia. `sectorId` (opcional) sólo vale para RIEGO y DOSIS: un sector de la zona de destino. */
+export interface IniciarSecuenciaOpciones {
+  sectorId?: string;
+}
+
 export interface PasoSecuencia {
   n: number;
   tipo: TipoPasoSecuencia;

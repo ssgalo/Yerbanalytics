@@ -79,6 +79,9 @@ simulador (punto ámbar, con el motivo).
   diagnóstico vigente del sector (el de la última pasada del riel), lo muestra y avisa si el insumo no va a actuar porque
   no hay nada para tratar; sin diagnóstico avisa y sigue con riego y mediasombra. Un diagnóstico se usa una vez por pulso.
   Lógica en `src/happyPath.ts`; reutiliza los escenarios R01 + SUPPLY + SHADING + APPLICATION_PRECONDITIONS.
+- **Riego del sector 1 / del sector 2** (pestaña *Demo Expo*, tarjetas de *Secuencias*) — cada una con sus segundos (1 a 120). La del
+  sector 2 manda `sectorId` en el pedido de la secuencia `RIEGO`: es el segundo sector (orden natural) de la zona de menor número, leído de
+  la topología del backend (`secondSectorOfDestination`, `src/secuencias.ts`); sin segundo sector el botón queda deshabilitado.
 - **Abrir / cerrar mediasombra** (pestaña *Demo Expo*, tarjeta de *Secuencias*) — dos botones de un clic y una sola
   acción: *Abrir* enrolla (`targetPct` 100) y *Cerrar* despliega (`targetPct` 0). Pasan por la API de secuencias del
   backend (`MEDIASOMBRA_ABRIR` / `MEDIASOMBRA_CERRAR`), no por un publish directo, así el seguimiento de comandos y el

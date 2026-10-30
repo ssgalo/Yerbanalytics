@@ -2,12 +2,24 @@
    Textos de las secuencias directas de Demo Expo (lógica pura).
    Riego y dosis comparten el guion (ABRIR, ESPERAR, CERRAR): sólo cambia el actuador, válvula o bomba de insumo.
    ============================================================ */
-import type { PasoSecuencia, Secuencia, TipoPasoSecuencia } from './types';
+import type { PasoSecuencia, SectorRef, Secuencia, TipoPasoSecuencia } from './types';
 
 export const RIEGO = { min: 1, max: 120, defecto: 10 };
 export const ESPERA = { min: 0, max: 600, defecto: 10 };
 /** Tope del firmware por comando (ContratoNodo.BOMBA_ML_MAX). Por defecto poco: es líquido de verdad sobre plantas. */
 export const DOSIS = { min: 1, max: 50, defecto: 5 };
+
+/**
+ * El segundo sector de la zona de destino de las secuencias (la de menor número, orden natural: MZ-2 antes que MZ-10, el mismo
+ * criterio del backend). El primero es el que riega solo la secuencia sin `sectorId`. `null` si no hay un segundo.
+ */
+export function secondSectorOfDestination(sectors: SectorRef[]): string | null {
+  const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+  const zonaId = [...new Set(sectors.map((s) => s.zonaId))].sort(natural)[0];
+  if (zonaId === undefined) return null;
+  const ids = sectors.filter((s) => s.zonaId === zonaId).map((s) => s.id).sort(natural);
+  return ids[1] ?? null;
+}
 
 const EN_CURSO_TEXTO: Record<TipoPasoSecuencia, string> = {
   ABRIR: 'Abriendo…',
